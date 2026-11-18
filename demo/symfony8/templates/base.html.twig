@@ -1,0 +1,24 @@
+{#- REQ-DEMO-014: the demo shell is UiKit's admin layout with UiKit's default theme (nowo-ui.css from the bundle's own
+    asset package, no CSS framework, no CDN). -#}
+{% extends '@NowoUiKit/layout/admin.html.twig' %}
+
+{% block nowo_ui_document_title %}{% block title %}CRM Kit Bundle demo{% endblock %} — Symfony 8{% endblock %}
+
+{% block nowo_ui_navigation %}
+    <header class="nowo-ui-header" data-testid="demo-masthead">
+        <a class="nowo-ui-brand" href="{{ path('demo_home') }}">CRM Kit Bundle · Symfony 8</a>
+        <nav class="nowo-ui-menu" aria-label="Demo">
+            <a class="nowo-ui-link" href="{{ path('demo_home') }}" data-testid="demo-nav-demo_home">Overview</a>
+            {% if is_granted('ROLE_USER') %}
+                <a class="nowo-ui-link" href="/crm/companies" data-testid="demo-nav-companies">Companies</a>
+                <a class="nowo-ui-link" href="/crm/contacts" data-testid="demo-nav-contacts">Contacts</a>
+                <span class="nowo-ui-muted" data-testid="demo-user">{{ app.user.userIdentifier }}</span>
+                <a class="nowo-ui-link" href="{{ path('demo_logout') }}" data-testid="demo-logout">Sign out</a>
+            {% else %}
+                <a class="nowo-ui-link" href="{{ path('demo_login') }}" data-testid="demo-nav-login">Sign in</a>
+            {% endif %}
+        </nav>
+    </header>
+{% endblock %}
+
+{% block nowo_ui_content %}{% block body %}{% endblock %}{% endblock %}

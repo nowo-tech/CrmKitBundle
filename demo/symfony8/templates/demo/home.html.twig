@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Overview{% endblock %}
+
+{% block nowo_ui_page_header %}
+    {{ include(nowo_ui_partial('page_header'), {
+        title: 'CRM Kit Bundle',
+        intro: 'Companies and contacts with custom fields, tags, owners, notes, a timeline, CSV / vCard import and duplicate merging. Sign in as one of the demo people (password "demo").',
+    }) }}
+{% endblock %}
+
+{% block body %}
+    <section class="nowo-ui-card" data-testid="demo-people">
+        <div class="nowo-ui-card__body">
+            <table class="nowo-ui-data-table">
+                <thead><tr><th scope="col">User</th><th scope="col">Person</th><th scope="col">What they can do</th></tr></thead>
+                <tbody>
+                    {% for person in people %}
+                        <tr><th scope="row"><code class="nowo-ui-code">{{ person.user }}</code></th><td>{{ person.name }}</td><td>{{ person.roles }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p>
+                <a class="nowo-ui-link" href="{{ path('demo_login') }}" data-testid="demo-login">Sign in</a>
+                · <a class="nowo-ui-link" href="/crm/companies" data-testid="demo-open-companies">Companies</a>
+                · <a class="nowo-ui-link" href="/crm/contacts">Contacts</a>
+                · <a class="nowo-ui-link" href="/crm/import">Import</a>
+                · <a class="nowo-ui-link" href="/crm/admin/fields">Custom fields</a>
+            </p>
+            <p class="nowo-ui-muted">Link a company to the demo's projects P-1, P-2 or P-3 to see the host panel on its 360° page. FrankenPHP: {{ worker ? 'worker mode (kernel kept alive, not reset)' : 'classic mode' }}.</p>
+        </div>
+    </section>
+{% endblock %}

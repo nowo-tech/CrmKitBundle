@@ -1,0 +1,7 @@
+controllers:
+    resource: ../src/Controller/
+    type: attribute
+
+nowo_crm_kit:
+    resource: '.'
+    type: nowo_crm_kit_ui

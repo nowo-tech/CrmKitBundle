@@ -1,0 +1,6 @@
+# The CRM's lists open their row actions on right-click / long press, and its pages offer the focus mode.
+nowo_ui_kit:
+    theme:
+        context_menus: true
+        focus_mode:
+            enabled: true

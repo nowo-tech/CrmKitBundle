@@ -183,7 +183,7 @@ final class ValueTest extends TestCase
                 return [];
             }
         };
-        self::assertNotSame(CrmPanelProviderInterface::PANEL_TAG, $both::HOST_OBJECT_TAG);
+        self::assertSame([null, 'project'], [$both->panel(new PanelContext(new TenantRef('acme'), SubjectRef::of(SubjectType::Company, '01900000-0000-7000-8000-000000000001'), null, [])), $both->type()]);
     }
 
     public function testEnumsAndExceptions(): void

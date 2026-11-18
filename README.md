@@ -1,0 +1,146 @@
+# CRM Kit Bundle
+
+[![CI](https://github.com/nowo-tech/CrmKitBundle/actions/workflows/ci.yml/badge.svg)](https://github.com/nowo-tech/CrmKitBundle/actions/workflows/ci.yml) [![Packagist Version](https://img.shields.io/packagist/v/nowo-tech/crm-kit-bundle.svg?style=flat)](https://packagist.org/packages/nowo-tech/crm-kit-bundle) [![Packagist Downloads](https://img.shields.io/packagist/dt/nowo-tech/crm-kit-bundle.svg)](https://packagist.org/packages/nowo-tech/crm-kit-bundle) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php)](https://php.net) [![Symfony](https://img.shields.io/badge/Symfony-7.4%20%7C%208.0%20%7C%208.1%2B-000000?logo=symfony)](https://symfony.com) [![GitHub stars](https://img.shields.io/github/stars/nowo-tech/CrmKitBundle.svg?style=social&label=Star)](https://github.com/nowo-tech/CrmKitBundle) [![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen)](#tests-and-coverage)
+
+> ⭐ **Found this useful?** Install it from [Packagist](https://packagist.org/packages/nowo-tech/crm-kit-bundle) and give it a star on [GitHub](https://github.com/nowo-tech/CrmKitBundle): it helps us maintain and improve the project.
+
+**A CRM for Symfony applications: companies and contacts with owners, tags, custom fields, notes, an activity
+timeline, CSV / vCard import and export, duplicate merging, GDPR consent / export / erasure and a 360° record page that
+shows your own modules through host panels. Tenant-aware, deny by default, on a private entity manager, with a UiKit +
+FormKit UI.**
+
+**Standard Symfony by default, DDD / hexagonal opt-in:** zero configuration in a standard project; public ports are
+interfaces and value objects with no Symfony, Doctrine or HTTP types, the bundle-owned tables are mapped in XML and
+referenced by id, and the bundle never flushes your EntityManager.
+
+> **Status: 0.1.0 (phase A, not tagged yet): companies and contacts.** Pipeline, quotes, invoices, campaigns, a
+> customer portal and reports follow phase by phase from [docs/CONTRACT.md](docs/CONTRACT.md)
+> ([docs/ROADMAP.md](docs/ROADMAP.md)). Usage: [docs/USAGE.md](docs/USAGE.md).
+
+> **Compatible with Symfony 7.4, 8.0 and 8.1** · PHP 8.2+ (Symfony 8.x requires PHP 8.4+)
+
+![FrankenPHP Friendly Worker Mode](docs/images/frankenphp-friendly.png)
+
+This bundle is **FrankenPHP worker mode friendly** (kernel kept alive and not reset).
+
+## Features
+
+Phase A (0.1.0), always on when the bundle is enabled:
+
+- **Companies and contacts**: core fields, owners (people of your application), tags, custom fields per tenant
+  (text, textarea, number, date, boolean, choice, url, email), trash with restore and purge.
+- **Affiliations**: a contact belongs to any number of companies, each with a role, one of them primary.
+- **Notes and timeline**: plain-text notes (pinned first) and an append-only activity timeline per record; a company's
+  timeline includes its contacts' entries; your application adds its own entries.
+- **360° page**: details, contacts / companies, host links (your projects, tickets and so on, referenced by id and
+  resolved by your code on every view), host panels (your read models), notes, timeline, possible duplicates, consents.
+- **Import and export**: CSV (`,` or `;`) and vCard 3.0 / 4.0 import with a preview, an editable column mapping and a
+  duplicate policy; CSV export of a filtered list (formula cells neutralised) and a vCard 4.0 per contact.
+- **Duplicates and merging**: hints by name, website domain and tax id (companies) or sort name (contacts); a
+  field-by-field merge that moves every child row and keeps a snapshot.
+- **GDPR**: consent per contact and purpose (append-only), a JSON export, an erasure that keeps consent proof without
+  its evidence, and a retention purge.
+- **Plan limits**: atomic counters per tenant, so two creates at the limit can never both pass.
+- **Header search**: two SearchKit providers when `nowo-tech/search-kit-bundle` is installed.
+- **Private entity manager** `nowo_crm_kit`, declared by the Flex recipe, so the bundle never flushes the host's
+  unit of work; every write is a transaction-doctrine write unit (409 with `CONFLICT_001` / `CONFLICT_002`).
+
+Built phase by phase: **A companies and contacts (0.1)** → B pipeline → C quotes → D invoices → E campaigns →
+F customer portal → G reports (1.0).
+
+## Installation
+
+```bash
+composer require nowo-tech/crm-kit-bundle
+```
+
+See [docs/INSTALLATION.md](docs/INSTALLATION.md).
+
+## Configuration
+
+```yaml
+# config/packages/nowo_crm_kit.yaml
+nowo_crm_kit:
+    doctrine:
+        entity_manager: nowo_crm_kit
+    access:
+        roles:
+            view: [ROLE_USER]
+            edit: [ROLE_USER]
+            manage: [ROLE_ADMIN]
+    ui:
+        enabled: true
+```
+
+```yaml
+# config/routes/nowo_crm_kit.yaml
+nowo_crm_kit:
+    resource: .
+    type: nowo_crm_kit_ui
+    prefix: /admin
+```
+
+Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Requirements
+
+- PHP >= 8.2, < 8.6 (Symfony 8.x needs PHP 8.4+)
+- Symfony 7.4, 8.0 or 8.1
+- Doctrine DBAL 3.8+ / 4 and ORM 3.7+ with DoctrineBundle
+- `nowo-tech/ui-kit-bundle` ^2.55, `nowo-tech/form-kit-bundle` ^2.23, `nowo-tech/transaction-doctrine` ^1.6,
+  `nowo-tech/transaction-contract` ^1.0
+- Optional: `nowo-tech/search-kit-bundle` ^1.7 (header search; SearchKit needs PHP >= 8.3), `symfony/security-bundle`
+  (default access checker and actor directory)
+
+## Demo
+
+`demo/symfony7` (Symfony 7.4, http://localhost:8263) and `demo/symfony8` (Symfony 8.1, http://localhost:8262):
+FrankenPHP worker mode, MySQL, UiKit + FormKit, in-memory users `ana`, `mia` and `admin` (password `demo`);
+`make -C demo up-symfony8`, then `make test-e2e` for the Playwright run. See
+[docs/DEMO-FRANKENPHP.md](docs/DEMO-FRANKENPHP.md).
+
+## Documentation
+
+- [Installation](docs/INSTALLATION.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [Usage](docs/USAGE.md)
+- [Contributing](docs/CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Changelog](docs/CHANGELOG.md)
+- [Upgrading](docs/UPGRADING.md)
+- [Release](docs/RELEASE.md)
+- [Security](docs/SECURITY.md)
+- [Engram](docs/ENGRAM.md)
+- [Spec-driven development](docs/SPEC-DRIVEN-DEVELOPMENT.md)
+- [GitHub Spec Kit](docs/SPEC-KIT.md)
+- [Roadmap](docs/ROADMAP.md)
+
+### Additional documentation
+
+- [Contract](docs/CONTRACT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Concurrency](docs/CONCURRENCY.md)
+- [FrankenPHP worker audit](docs/FRANKENPHP-WORKER-AUDIT.md)
+- [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md)
+- [PSR compliance](docs/PSR.md)
+- [GitHub CI](docs/GITHUB_CI.md)
+
+## Tests and coverage
+
+```bash
+make test               # PHPUnit in Docker
+make test-coverage-100  # fails below 100 % of src/
+make test-with-db       # Database suite on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16
+make release-check      # every gate, demo included
+```
+
+- PHP: 100 % of `src/` (gate in CI). Database suite on SQLite, MySQL 8.4, MariaDB 11.4 and PostgreSQL 16 in CI,
+  two-connection race tests included ([docs/CONCURRENCY.md](docs/CONCURRENCY.md)).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+## Author
+
+Created by [Héctor Franco Aceituno](https://github.com/HecFranco) at [Nowo.tech](https://nowo.tech).

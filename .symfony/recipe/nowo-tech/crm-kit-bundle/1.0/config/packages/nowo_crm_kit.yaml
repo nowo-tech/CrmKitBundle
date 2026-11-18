@@ -1,0 +1,11 @@
+# CRM Kit Bundle: see https://github.com/nowo-tech/CrmKitBundle/blob/main/docs/CONFIGURATION.md
+nowo_crm_kit:
+    doctrine:
+        entity_manager: nowo_crm_kit   # declared in nowo_crm_kit_doctrine.yaml; null = the default entity manager
+    access:
+        roles:                         # the default access checker: every list empty = denied
+            view: []
+            edit: []
+            manage: []
+    ui:
+        enabled: false                 # then import the routes: {resource: ., type: nowo_crm_kit_ui, prefix: /admin}

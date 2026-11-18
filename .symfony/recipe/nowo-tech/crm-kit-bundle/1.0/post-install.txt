@@ -1,0 +1,10 @@
+Nowo CRM Kit Bundle installed.
+
+The recipe declares the private entity manager "nowo_crm_kit" (config/packages/nowo_crm_kit_doctrine.yaml).
+DoctrineBundle needs the multi-entity-manager form (doctrine.orm.entity_managers.default ...); a host that must keep a
+single entity manager sets nowo_crm_kit.doctrine.entity_manager: null.
+
+Nothing is granted until you map roles (nowo_crm_kit.access.roles) or plug in your own access checker.
+Create the tables with doctrine:migrations:diff --em=nowo_crm_kit (see docs/INSTALLATION.md).
+
+Docs: https://github.com/nowo-tech/CrmKitBundle/tree/main/docs

@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Single-run claim of the retention purge, counter row locked before `counters:rebuild` recounts, one custom-field
+  define at a time per tenant and type, audit entries for notes, tag assignments, links, affiliations and host
+  timeline entries, the route × profile permission-matrix test, and a dependency-floor CI job
+  (`nowo-tech/transaction-*` at their lowest allowed versions, demo locks checked by `.scripts/check-demo-lock.py`).
 - **Phase A: companies and contacts** (0.1.0, contract sections 5 to 18), always on when the bundle is enabled.
 - Companies and contacts on one service, `RecordServiceInterface` (`create`, `update`, `trash`, `restore`, `purge`,
   `affiliate`, `unaffiliate`) with `RecordInput` (type, core values, owner, custom values, tag ids, `setOwner`):

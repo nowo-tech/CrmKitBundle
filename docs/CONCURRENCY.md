@@ -63,7 +63,7 @@ for JSON).
 | Tag create / rename | Name key unique `(tenant_id, name_key)`, checked first, then the key; `version` on rename | Taken name: form error `error.tag_taken`; stale rename: `crm_record_stale` | form error / 409 |
 | Tag delete | Taggings deleted with the tag in one unit | — | — |
 | Tag assign | Record `FOR UPDATE`; set difference; taggings unique | A racing duplicate tagging: one more run against its rows | — |
-| Field define | Key unique `(tenant_id, subject_type, field_key)`, checked first; count ≤ `fields.max_per_subject` read in the unit | Taken key: form error `error.field_key_taken` | form error |
+| Field define | Key unique `(tenant_id, subject_type, field_key)`, checked first; count ≤ `fields.max_per_subject` read after locking the `fields.<type>` row of `crm_counter` `FOR UPDATE` (one define at a time per tenant and type) | Taken key: form error `error.field_key_taken` | form error |
 | Field change / archive | `version` | Stale: `crm_record_stale` | 409 domain |
 | Note add / edit / delete | `version` on edit; delete by id | Stale edit: `crm_record_stale`; note gone: 404 | 409 / 404 |
 | Host link add / remove | Pre-check of the pair; unique `(tenant_id, subject_type, subject_id, host_type, host_id)` | A racing add: one more run returns the existing link (idempotent) | — |
@@ -76,7 +76,7 @@ for JSON).
 | **Merge** | Both records `FOR UPDATE` in id order, versions re-checked ([Merge](#merge)) | `crm_merge_stale` | 409 domain |
 | GDPR erasure | Contact `FOR UPDATE`, status re-checked; children deleted by primary key after an exact re-select | Already erased: nothing to do (idempotent) | — |
 | GDPR export | A unit (it writes the `exported` timeline entry) | — | — |
-| Retention purge (command) | One unit per batch of 200; trashed records re-selected `FOR UPDATE` and re-checked (status, date) | A record restored meanwhile is skipped | — |
+| Retention purge (command) | Single run: a claim row (`__crm__` / `__purge__` in `crm_counter`, conditional UPDATE; a claim older than an hour is taken over; released in `finally`), then one unit per batch of 200; trashed records re-selected `FOR UPDATE` and re-checked (status, date) | A record restored meanwhile is skipped | — |
 | Counter rebuild (command) | One unit per tenant and resource: count of active rows, then the counter row `FOR UPDATE`, then set | — | — |
 
 ## Plan-limit counters
@@ -92,7 +92,7 @@ One row changed: taken. None: if the counter row exists, the limit is reached (`
 `INSERT IGNORE` (MySQL / MariaDB), `INSERT … ON CONFLICT DO NOTHING` (PostgreSQL) or `INSERT OR IGNORE` (SQLite), so a
 racing creation never fails the statement (a PostgreSQL transaction stays usable), and the `UPDATE` runs again. The
 counter moves in the record's transaction, so a rollback restores it: −1 on trash, merge and erasure of an active
-contact, +1 on create and restore. `nowo:crm-kit:counters:rebuild` recounts after manual SQL. Never `COUNT()` then
+contact, +1 on create and restore. `nowo:crm-kit:counters:rebuild` locks the counter row first, then recounts (after manual SQL). Never `COUNT()` then
 insert (REQ-RUNTIME-003 rule 4).
 
 ## Version checks

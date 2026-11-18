@@ -48,6 +48,7 @@ final readonly class NoteService implements NoteServiceInterface
             $this->support->store->add(new Note($id, $context->tenant->value, $type, $subjectId, $body, $pinned, $context->actor->value, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, $type, $subjectId, ActivityKind::NoteAdded, ['note' => $id]);
             $effects->event(new NoteAdded($context->tenant, $context->actor, $context->now, $type, $subjectId, $id));
+            $this->support->audit($effects, $context, 'crm.note.added', $type, $subjectId, ['note' => $id]);
 
             return $id;
         });
@@ -66,6 +67,7 @@ final readonly class NoteService implements NoteServiceInterface
                 throw new ConflictException(ConflictException::STALE, $id);
             }
             $note->edit($body, $pinned, $context->now);
+            $this->support->audit($effects, $context, 'crm.note.edited', $note->getSubjectType(), $note->getSubjectId(), ['note' => $id]);
             $this->support->activity($context, $note->getSubjectType(), $note->getSubjectId(), ActivityKind::NoteEdited, ['note' => $id]);
         });
     }

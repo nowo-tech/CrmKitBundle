@@ -64,6 +64,7 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
             $id = $this->support->id();
             $this->support->store->add(new HostLink($id, $context->tenant->value, $type, $subjectId, $host->type, $host->id, $label, $context->actor->value, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, $type, $subjectId, ActivityKind::Linked, ['host_type' => $host->type]);
+            $this->support->audit($effects, $context, 'crm.link.added', $type, $subjectId, ['host_type' => $host->type]);
             $effects->event(new HostLinkAdded($context->tenant, $context->actor, $context->now, $type, $subjectId, $host->type, $host->id));
 
             return $id;
@@ -90,6 +91,7 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
             $this->support->load($context, $link->getSubjectType(), $link->getSubjectId(), CrmPermission::Edit);
             $this->support->store->remove($link); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, $link->getSubjectType(), $link->getSubjectId(), ActivityKind::Unlinked, ['host_type' => $link->getHostType()]);
+            $this->support->audit($effects, $context, 'crm.link.removed', $link->getSubjectType(), $link->getSubjectId(), ['host_type' => $link->getHostType()]);
             $effects->event(new HostLinkRemoved($context->tenant, $context->actor, $context->now, $link->getSubjectType(), $link->getSubjectId(), $link->getHostType(), $link->getHostId()));
         });
     }
@@ -151,6 +153,7 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
                 $translation['%' . $key . '%'] = $value;
             }
             $this->support->activity($context, $type, $subjectId, ActivityKind::Host, ['_label' => $labelKey, '_url' => $url] + $translation);
+            $this->support->audit($effects, $context, 'crm.timeline.host_entry', $type, $subjectId, ['label' => $labelKey]);
         });
     }
 }

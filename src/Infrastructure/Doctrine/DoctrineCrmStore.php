@@ -69,6 +69,12 @@ use const SORT_STRING;
  */
 final readonly class DoctrineCrmStore implements CrmStoreInterface
 {
+    /** Pseudo-tenant of the bundle's own claim rows in `crm_counter` (never a host tenant: the `__` prefix). */
+    public const SYSTEM_TENANT = '__crm__';
+
+    /** Resource of the retention purge's single-run claim (value = unix time of the claim, 0 = free). */
+    public const PURGE_CLAIM = '__purge__';
+
     /**
      * Wires the collaborators.
      */
@@ -565,10 +571,40 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * {@inheritDoc}
      */
+    public function lockCounter(TenantRef $tenant, string $resource): void
+    {
+        $this->insertCounter($tenant, $resource, 0);
+        $this->connection()->fetchOne('SELECT value FROM ' . $this->table(Counter::class) . ' WHERE tenant_id = ? AND resource = ?' . $this->forUpdate(), [$tenant->value, $resource]);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function claimPurge(int $now, int $staleBefore): bool
+    {
+        $tenant = new TenantRef(self::SYSTEM_TENANT);
+        $this->insertCounter($tenant, self::PURGE_CLAIM, 0);
+
+        return $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Counter::class) . ' SET value = ? WHERE tenant_id = ? AND resource = ? AND value < ?',
+            [$now, self::SYSTEM_TENANT, self::PURGE_CLAIM, $staleBefore],
+            [0 => ParameterType::INTEGER, 3 => ParameterType::INTEGER],
+        ) === 1;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function releasePurge(): void
+    {
+        $this->connection()->executeStatement('UPDATE ' . $this->table(Counter::class) . ' SET value = 0 WHERE tenant_id = ? AND resource = ?', [self::SYSTEM_TENANT, self::PURGE_CLAIM]);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function setCounter(TenantRef $tenant, string $resource, int $value): void
     {
-        $this->insertCounter($tenant, $resource, $value);
-        $this->connection()->fetchOne('SELECT value FROM ' . $this->table(Counter::class) . ' WHERE tenant_id = ? AND resource = ?' . $this->forUpdate(), [$tenant->value, $resource]);
         $this->connection()->executeStatement('UPDATE ' . $this->table(Counter::class) . ' SET value = ? WHERE tenant_id = ? AND resource = ?', [$value, $tenant->value, $resource], [0 => ParameterType::INTEGER]);
     }
 

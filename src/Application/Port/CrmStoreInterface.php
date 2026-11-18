@@ -251,8 +251,20 @@ interface CrmStoreInterface
     /** Gives one unit back (never below 0). */
     public function releaseCounter(TenantRef $tenant, string $resource): void;
 
-    /** Sets a counter (rebuild), locking its row first. */
+    /** Locks a counter row `FOR UPDATE` (created at 0 when missing); held until the unit ends. */
+    public function lockCounter(TenantRef $tenant, string $resource): void;
+
+    /** Sets a counter (rebuild); the caller locked its row first. */
     public function setCounter(TenantRef $tenant, string $resource, int $value): void;
+
+    /**
+     * Claims the single run of the retention purge (conditional UPDATE): true when free or the claim is older than
+     * `$staleBefore` (unix times).
+     */
+    public function claimPurge(int $now, int $staleBefore): bool;
+
+    /** Frees the purge claim. */
+    public function releasePurge(): void;
 
     /** Active records of the tenant. */
     public function countActive(TenantRef $tenant, SubjectType $type): int;

@@ -789,7 +789,7 @@ logo data URI, tokens), per call.
 | Q-O14 | Invoices (D) keep their own numbering per series in the CRM (VerifactuBundle has none) and the CRM models payment status (SepaPaymentBundle has none)? | **Yes** | Numbering in SerialNumberBundle |
 | Q-O15 | Campaigns (E) are built in the CRM (segments, suppression, unsubscribe, consent) on top of MailKit's sending and tracking, not in MailKit? | **Yes** (MailKit stays a transport / log / tracking layer) | Add campaigns to MailKit |
 
-## 23. Questions for Beacon (Q-B)
+## 23. Questions for Beacon (Q-B) — confirmed by Beacon 2026-11-19 (B1–B15)
 
 | # | Question | Recommendation (assumed for the build) |
 |---|---|---|
@@ -821,7 +821,21 @@ differs is applied in the next commit and noted here with the date._
   0.1.0 differs from this text are marked **(0.1.0)**.
 - The tag constants of the two host extension points are `CrmPanelProviderInterface::PANEL_TAG` and
   `CrmHostObjectResolverInterface::HOST_OBJECT_TAG`, so one host class can implement both.
-- Open items for later releases: the route × profile permission-matrix test, the `__purge__` single-run claim of the
-  retention purge, locking the counter row before the recount, the settings-row lock for `fields.max_per_subject`,
-  audit entries for notes, tags, links and affiliations, the Messenger import handler, the link picker
+- Done after the first review (2026-11-19): the route × profile permission-matrix test, the `__purge__` single-run
+  claim, the counter row locked before the recount, a `crm_counter` row lock for `fields.max_per_subject`, audit
+  entries for notes, tag assignments, links, affiliations and host timeline entries, a dependency-floor CI job.
+- Open items for later releases: the Messenger import handler, the link picker
   (`CrmHostObjectResolverInterface::search()`), the public JSON API (0.2.0, Q-O6).
+
+## Q-B answers from Beacon (2026-11-19): B1–B15 confirmed as implemented
+- B9: Beacon resolves the organisation from the header context (D-20261118-01). It answers 404 in Personal or when the feature is off.
+- B5: Beacon checks each 360° panel with its own permission. Deny by default, with a neutral placeholder when the panel is not visible.
+- B7: a one-time import of the spec 229 address book is welcome.
+- B11: audit through UserActionRecorder, recording ids (`recordIdsAndFlush`).
+- The integration findings are accepted: invoice numbering, payment state, unsubscribe and reminders live inside the CRM.
+- Fit of the ports (bundle side, 2026-11-19): `CrmAuditSinkInterface::record(AuditEntry)` receives ids, codes and
+  counts only and is called after the bundle's commit, outside its unit of work, so a recorder that writes and flushes
+  its own entity manager (`recordIdsAndFlush`) fits without touching the bundle's transaction. A panel provider that
+  denies its panel returns `null` (nothing shown) or a `Panel` with no items and an `emptyText` (the neutral
+  placeholder); both render.
+

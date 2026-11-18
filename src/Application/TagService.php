@@ -110,7 +110,7 @@ final readonly class TagService implements TagServiceInterface
         }
         $work = function (Effects $effects) use ($context, $type, $id, $tagIds): void {
             $record            = $this->support->load($context, $type, $id, CrmPermission::Edit, lock: true);
-            [$added, $removed] = $this->taggings->set($context, $type, $id, $tagIds); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+            [$added, $removed] = $this->taggings->set($context, $type, $id, $tagIds, $effects); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             if ($added !== [] || $removed !== []) {
                 $record->touch($context->now, $context->actor->value);
                 $effects->event(new TagsChanged($context->tenant, $context->actor, $context->now, $type, $id, $added, $removed));

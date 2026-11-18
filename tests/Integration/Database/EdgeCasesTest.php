@@ -26,10 +26,13 @@ use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
 use Nowo\CrmKitBundle\Domain\Value\HostObjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
 use ReflectionMethod;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
 
 /**
  * The rarer paths: unique keys refused by a racing writer on every unique table (one more run, or the matching
@@ -159,6 +162,43 @@ final class EdgeCasesTest extends CrmTestCase
         self::assertSame([$mine], $exact->invoke($store, [$mine, $theirs, 'junk'], Company::class, $tenant));
         self::assertSame([], $exact->invoke($store, [$mine], Company::class, $tenant, 'Ana'));
         self::assertSame([], $exact->invoke($store, 'not rows', Company::class, $tenant));
+    }
+
+    public function testOnlyOnePurgeRunsAtATime(): void
+    {
+        $this->boot();
+        $this->admin();
+        $console = new Application($this->kernel);
+        $purge   = new CommandTester($console->find('nowo:crm-kit:purge'));
+        $now     = $this->clock()->now()->getTimestamp();
+        $this->connection()->executeStatement("INSERT INTO nowo_crm_counter (tenant_id, resource, value) VALUES ('__crm__', '__purge__', ?)", [$now]);
+        self::assertSame(0, $purge->execute([]));
+        self::assertStringContainsString('Another purge is running', $purge->getDisplay());
+        $this->clock()->modify('+2 hours');
+        self::assertSame(0, $purge->execute([]));
+        self::assertStringContainsString('records: 0', $purge->getDisplay(), 'a claim older than an hour is taken over');
+        self::assertSame(0, $this->int("SELECT value FROM nowo_crm_counter WHERE tenant_id = '__crm__'"), 'released after the run');
+    }
+
+    public function testEveryWriteIsAudited(): void
+    {
+        $this->boot();
+        $this->admin();
+        $acme = $this->company('Acme');
+        $ada  = $this->contact('Ada', 'L');
+        $tags = $this->service(TagServiceInterface::class);
+        $vip  = $tags->create('VIP', 'red');
+        $tags->assign(SubjectType::Company, $acme, [$vip]);
+        $notes = $this->service(NoteServiceInterface::class);
+        $note  = $notes->add(SubjectType::Company, $acme, 'n');
+        $notes->edit($note, 'm', false, 1);
+        $links = $this->service(HostLinkServiceInterface::class);
+        $links->unlink($links->link(SubjectType::Company, $acme, new HostObjectRef('project', 'p1')));
+        $this->records()->unaffiliate($this->records()->affiliate($ada, $acme, null, true));
+        $this->service(TimelineInterface::class)->record(SubjectType::Company, $acme, 'host.event');
+        foreach (['crm.tags.changed', 'crm.note.added', 'crm.note.edited', 'crm.link.added', 'crm.link.removed', 'crm.affiliation.saved', 'crm.affiliation.removed', 'crm.timeline.host_entry'] as $action) {
+            self::assertContains($action, $this->recorder()->actions());
+        }
     }
 
     public function testSmallGatesAndLookups(): void

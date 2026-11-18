@@ -56,10 +56,12 @@ final readonly class PlanCounter
     }
 
     /**
-     * Recounts the active records of a tenant.
+     * Recounts the active records of a tenant (inside the caller's unit).
      */
     public function rebuild(TenantRef $tenant, SubjectType $type): int
     {
+        // Lock the counter row first, then count: a create racing the rebuild waits for it (REQ-RUNTIME-003).
+        $this->store->lockCounter($tenant, $type->resource()->value); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         $count = $this->store->countActive($tenant, $type);
         $this->store->setCounter($tenant, $type->resource()->value, $count); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
 

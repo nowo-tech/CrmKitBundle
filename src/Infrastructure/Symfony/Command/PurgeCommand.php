@@ -47,6 +47,11 @@ final class PurgeCommand extends Command
             return Command::INVALID;
         }
         $counts = $this->purger->purge($only, $input->getOption('dry-run') === true);
+        if ($counts === null) {
+            $output->writeln('Another purge is running; nothing done.');
+
+            return Command::SUCCESS;
+        }
         $output->writeln(sprintf('records: %d, timeline entries: %d, import rows: %d, merge traces: %d', $counts['records'], $counts['activities'], $counts['import_rows'], $counts['merges']));
 
         return Command::SUCCESS;

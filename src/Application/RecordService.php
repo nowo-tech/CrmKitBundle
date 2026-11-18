@@ -82,7 +82,7 @@ final readonly class RecordService implements RecordServiceInterface
                 $store->flush();
                 $this->support->activity($context, $input->type, $id, ActivityKind::Created);
                 if ($input->tagIds !== null && $input->tagIds !== []) {
-                    $this->taggings->set($context, $input->type, $id, $input->tagIds); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                    $this->taggings->set($context, $input->type, $id, $input->tagIds, $effects); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
                 }
                 $effects->event(new RecordCreated($context->tenant, $context->actor, $context->now, $input->type, $id));
                 $this->support->audit($effects, $context, 'crm.' . $input->type->value . '.created', $input->type, $id);
@@ -116,7 +116,7 @@ final readonly class RecordService implements RecordServiceInterface
                     $changed = array_merge($changed, $record->changeCustom(RecordValidator::custom($input->custom, $store->fields($context->tenant, $input->type, true), $record->getCustom())));
                 }
                 $ownerChanged      = $record->changeOwner($owner);
-                [$added, $removed] = $input->tagIds === null ? [[], []] : $this->taggings->set($context, $input->type, $id, $input->tagIds); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                [$added, $removed] = $input->tagIds === null ? [[], []] : $this->taggings->set($context, $input->type, $id, $input->tagIds, $effects); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
                 if ($changed === [] && !$ownerChanged && $added === [] && $removed === []) {
                     return $record->getVersion();
                 }
@@ -206,10 +206,10 @@ final readonly class RecordService implements RecordServiceInterface
         }
 
         try {
-            return $this->support->write(fn (Effects $effects): string => $this->writeAffiliation($context, $contactId, $companyId, $role, $primary));
+            return $this->support->write(fn (Effects $effects): string => $this->writeAffiliation($effects, $context, $contactId, $companyId, $role, $primary));
         } catch (DuplicateRowException) {
             // Another writer stored the same pair at the same moment: run once more, now as an update of that row.
-            return self::onceMore(fn (): string => $this->support->write(fn (Effects $effects): string => $this->writeAffiliation($context, $contactId, $companyId, $role, $primary)));
+            return self::onceMore(fn (): string => $this->support->write(fn (Effects $effects): string => $this->writeAffiliation($effects, $context, $contactId, $companyId, $role, $primary)));
         }
     }
 
@@ -229,10 +229,11 @@ final readonly class RecordService implements RecordServiceInterface
             $store->remove($affiliation); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, SubjectType::Contact, $affiliation->getContactId(), ActivityKind::Unaffiliated, ['company' => $affiliation->getCompanyId()]);
             $this->support->activity($context, SubjectType::Company, $affiliation->getCompanyId(), ActivityKind::Unaffiliated, ['contact' => $affiliation->getContactId()]);
+            $this->support->audit($effects, $context, 'crm.affiliation.removed', SubjectType::Contact, $affiliation->getContactId(), ['company' => $affiliation->getCompanyId()]);
         });
     }
 
-    private function writeAffiliation(CrmContext $context, string $contactId, string $companyId, ?string $role, bool $primary): string
+    private function writeAffiliation(Effects $effects, CrmContext $context, string $contactId, string $companyId, ?string $role, bool $primary): string
     {
         $store   = $this->support->store;
         $contact = $this->support->load($context, SubjectType::Contact, $contactId, CrmPermission::Edit, lock: true);
@@ -252,6 +253,7 @@ final readonly class RecordService implements RecordServiceInterface
         $id = $existing?->getId() ?? $this->support->id();
         $store->add(new Affiliation($id, $context->tenant->value, $contactId, $companyId, $role, $primary, $existing?->getCreatedAt() ?? $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         $contact->touch($context->now, $context->actor->value);
+        $this->support->audit($effects, $context, 'crm.affiliation.saved', SubjectType::Contact, $contactId, ['company' => $companyId, 'primary' => $primary]);
         if (!$existing instanceof Affiliation) {
             $this->support->activity($context, SubjectType::Contact, $contactId, ActivityKind::Affiliated, ['company' => $companyId]);
             $this->support->activity($context, SubjectType::Company, $companyId, ActivityKind::Affiliated, ['contact' => $contactId]);

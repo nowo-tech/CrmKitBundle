@@ -57,6 +57,8 @@ final readonly class FieldService implements FieldServiceInterface
 
         try {
             return $this->support->write(function (Effects $effects) use ($context, $type, $fieldKey, $label, $fieldType, $choices, $required, $position): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                // One define at a time per tenant and type, so the count bound holds under contention.
+                $this->support->store->lockCounter($context->tenant, 'fields.' . $type->value); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
                 $existing = $this->support->store->fields($context->tenant, $type, true);
                 foreach ($existing as $field) {
                     if ($field->getFieldKey() === $fieldKey->value) {

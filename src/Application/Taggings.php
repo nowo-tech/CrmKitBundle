@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
@@ -29,7 +30,8 @@ final readonly class Taggings
     }
 
     /**
-     * Replaces the record's tags; the added and removed tag ids.
+     * Replaces the record's tags; the added and removed tag ids. With `$effects`, the change is audited after the
+     * commit (imports audit one summary instead).
      *
      * @param list<string> $tagIds
      *
@@ -37,7 +39,7 @@ final readonly class Taggings
      *
      * @return array{list<string>, list<string>}
      */
-    public function set(CrmContext $context, SubjectType $type, string $id, array $tagIds): array
+    public function set(CrmContext $context, SubjectType $type, string $id, array $tagIds, ?Effects $effects = null): array
     {
         $store = $this->support->store;
         $known = [];
@@ -65,6 +67,11 @@ final readonly class Taggings
             if (!isset($current[$tagId])) {
                 $store->add(new Tagging($this->support->id(), $context->tenant->value, $tagId, $type, $id, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
                 $added[] = $tagId;
+            }
+        }
+        if ($added !== [] || $removed !== []) {
+            if ($effects instanceof Effects) {
+                $this->support->audit($effects, $context, 'crm.tags.changed', $type, $id, ['added' => count($added), 'removed' => count($removed)]);
             }
         }
         if ($added !== []) {

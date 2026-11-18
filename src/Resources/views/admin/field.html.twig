@@ -1,0 +1,9 @@
+{#
+  One custom field (manage): change, archive or bring back. Variables: page (FormPage), archive (FormView), archived.
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {{ parent() }}
+    {{ include('@NowoCrmKit/_form.html.twig', {form: archive, title: null, submit: archived ? 'field.restore' : 'field.archive', action: null, testid: 'crm-field-archive', variant: 'btn_secondary'}) }}
+{% endblock %}

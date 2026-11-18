@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nowo\CrmKitBundle\Domain\Service;
+
+use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
+use Nowo\CrmKitBundle\Domain\Enum\ImportFormat;
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Read\ImportView;
+
+/**
+ * CSV and vCard imports (contract sections 9 and 15.4), `edit`.
+ */
+interface ImportServiceInterface
+{
+    /**
+     * Parses a file into an import in preview; its id.
+     */
+    public function upload(SubjectType $type, ImportFormat $format, string $fileName, string $bytes): string;
+
+    /**
+     * The import with its first rows validated against the mapping.
+     */
+    public function preview(string $id, int $rows = 20): ImportView;
+
+    /**
+     * Claims the import for running with the chosen mapping (one confirm wins; a second answers 409).
+     *
+     * @param array<string, string> $mapping column => field (`first_name`, `custom.<key>`, `tags`, or '' to skip)
+     */
+    public function confirm(string $id, array $mapping, DuplicatePolicy $policy, int $expectedVersion): void;
+
+    /**
+     * Runs up to `$maxChunks` chunks of a running import (null: until done); whether it is done.
+     */
+    public function run(string $id, ?int $maxChunks = null): bool;
+
+    /**
+     * Cancels an import in preview (or a running one whose claim is stale).
+     */
+    public function cancel(string $id): void;
+}

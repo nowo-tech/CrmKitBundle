@@ -1,0 +1,60 @@
+{#
+  Import, step 2 and after: the preview with the mapping and the confirm form (status preview), the progress and the
+  "continue" / "cancel" buttons (running), the result (done). Variables: page (FormPage; form null after the confirm),
+  import (ImportView), action (FormView of the CSRF-only ActionType, rendered once).
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {%- set _b = page.bundle -%}
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-import-summary" data-status="{{ import.status.value }}">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <p>{{ 'import.summary'|trans({'%done%': import.rowsDone, '%total%': import.rowsTotal}, _d) }}</p>
+            <ul>
+                {% for outcome, count in import.counts %}<li data-testid="crm-import-count" data-outcome="{{ outcome }}">{{ ('import.outcome.' ~ outcome)|trans({}, _d) }}: {{ count }}</li>{% endfor %}
+            </ul>
+        </div>
+    </section>
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-import-rows">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'import.preview'|trans({}, _d) }}</h2>
+            <div class="nowo-ui-table-scroll" tabindex="0">
+            <table class="{{ nowo_ui_class('table', _b) }}">
+                <thead><tr><th scope="col">#</th>{% for column in import.columns %}<th scope="col">{{ column }}</th>{% endfor %}<th scope="col">{{ 'import.col.check'|trans({}, _d) }}</th></tr></thead>
+                <tbody>
+                {% for row in import.rows %}
+                    <tr data-testid="crm-import-row" data-outcome="{{ row.outcome.value }}">
+                        <th scope="row">{{ row.rowNo }}</th>
+                        {% for column in import.columns %}<td>{{ row.data[column] ?? '' }}</td>{% endfor %}
+                        <td>
+                            {% if row.outcome.value != 'pending' %}{{ ('import.outcome.' ~ row.outcome.value)|trans({}, _d) }}{% if row.message %} · {{ row.message|trans({}, _d) }}{% endif %}
+                            {% elseif row.errors is not empty %}{% for field, error in row.errors %}{{ field }}: {{ error|trans({}, _d) }}{% if not loop.last %}; {% endif %}{% endfor %}
+                            {% elseif row.duplicates is not empty %}{{ 'import.duplicate_of'|trans({'%name%': row.duplicates|join(', ')}, _d) }}
+                            {% else %}{{ 'import.ok'|trans({}, _d) }}{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </section>
+    {% if import.status.value == 'running' %}
+        {{ form_start(action, {action: path('nowo_crm_kit_import_show', {id: import.id})}) }}
+        {{ form_widget(action) }}
+        <div class="{{ nowo_ui_class('form_actions', _b) }}">
+            <button type="submit" name="do" value="run" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-continue">{{ 'import.continue'|trans({}, _d) }}</button>
+            <button type="submit" name="do" value="cancel" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-testid="crm-import-cancel">{{ 'import.cancel'|trans({}, _d) }}</button>
+        </div>
+        {{ form_end(action) }}
+    {% elseif import.status.value == 'preview' %}
+        {{ parent() }}
+        {{ form_start(action, {action: path('nowo_crm_kit_import_show', {id: import.id})}) }}
+        {{ form_widget(action) }}
+        <div class="{{ nowo_ui_class('form_actions', _b) }}"><button type="submit" name="do" value="cancel" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-testid="crm-import-cancel">{{ 'import.cancel'|trans({}, _d) }}</button></div>
+        {{ form_end(action) }}
+    {% else %}
+        <p><a href="{{ path('nowo_crm_kit_list', {type: import.subjectType.segment}) }}" data-testid="crm-import-back">{{ 'import.back'|trans({}, _d) }}</a></p>
+    {% endif %}
+{% endblock %}

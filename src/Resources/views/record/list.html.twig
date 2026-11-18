@@ -1,0 +1,10 @@
+{#
+  A list of companies or contacts (contract section 11.1): UiKit list scaffold (filters, server sort, pages, row
+  actions, phone cards) and the focus-mode toggle. Variables: page (ListPage).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
+
+{% block nowo_ui_content %}
+    <div class="crm-kit-toolbar" data-testid="crm-focus">{{ include(nowo_ui_partial('focus_mode_toggle', page.bundle), {area: 'crm', bundle: page.bundle}) }}</div>
+    {{ parent() }}
+{% endblock %}

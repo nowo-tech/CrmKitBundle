@@ -813,3 +813,15 @@ logo data URI, tokens), per call.
 
 _Empty until the owner and Beacon answer. The build of phase A follows the recommendations above; an answer that
 differs is applied in the next commit and noted here with the date._
+
+### Status 2026-11-18
+
+- The owner approved the bundle; the repository `nowo-tech/CrmKitBundle` exists (public).
+- Phase A is built on `feat/phase-a-companies-contacts` with every recommended answer above assumed. Places where
+  0.1.0 differs from this text are marked **(0.1.0)**.
+- The tag constants of the two host extension points are `CrmPanelProviderInterface::PANEL_TAG` and
+  `CrmHostObjectResolverInterface::HOST_OBJECT_TAG`, so one host class can implement both.
+- Open items for later releases: the route × profile permission-matrix test, the `__purge__` single-run claim of the
+  retention purge, locking the counter row before the recount, the settings-row lock for `fields.max_per_subject`,
+  audit entries for notes, tags, links and affiliations, the Messenger import handler, the link picker
+  (`CrmHostObjectResolverInterface::search()`), the public JSON API (0.2.0, Q-O6).

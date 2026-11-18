@@ -1,0 +1,18 @@
+{#
+  Merge, step 1: pick the other record (contract section 15.3). Variables: page (FormPage), duplicates (list of
+  {label, href}).
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {% if duplicates is not empty %}
+        <section class="{{ nowo_ui_class('card', page.bundle) }}" data-testid="crm-merge-duplicates">
+            <div class="{{ nowo_ui_class('card_body', page.bundle) }}">
+                <h2 class="{{ nowo_ui_class('card_title', page.bundle) }}">{{ 'merge.duplicates'|trans({}, _d) }}</h2>
+                <ul>{% for duplicate in duplicates %}<li><a href="{{ duplicate.href }}" data-testid="crm-merge-duplicate">{{ duplicate.label }}</a></li>{% endfor %}</ul>
+            </div>
+        </section>
+    {% endif %}
+    {{ parent() }}
+{% endblock %}

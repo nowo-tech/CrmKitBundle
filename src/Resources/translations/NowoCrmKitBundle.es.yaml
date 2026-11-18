@@ -1,0 +1,376 @@
+# CRM kit, fase A (empresas y contactos). Dominio NowoCrmKitBundle. Los parámetros van entre %.
+nav:
+    label: CRM
+    companies: Empresas
+    contacts: Contactos
+    import: Importar
+    tags: Etiquetas
+    fields: Campos personalizados
+    settings: Ajustes
+type:
+    company: Empresa
+    contact: Contacto
+status:
+    trashed: En la papelera
+    erased: Datos personales borrados
+value:
+    'yes': 'Sí'
+    'no': 'No'
+form:
+    save: Guardar
+    cancel: Cancelar
+list:
+    title:
+        company: Empresas
+        contact: Contactos
+    empty:
+        company: Aún no hay empresas.
+        contact: Aún no hay contactos.
+    empty_hint: Crea una o importa un archivo CSV o vCard.
+    export: Exportar CSV
+    col:
+        updated: Actualizado
+    filter:
+        q: Buscar
+        tag: Etiqueta
+        owner: Responsable
+        status: Mostrar
+        any: Cualquiera
+    status:
+        active: Activos
+        trashed: Papelera
+field:
+    name: Nombre
+    contact_name: Nombre
+    legal_name: Razón social
+    tax_id: NIF/CIF
+    website: Sitio web
+    email: Correo electrónico
+    phone: Teléfono
+    mobile: Móvil
+    industry: Sector
+    street: Calle
+    postal_code: Código postal
+    city: Ciudad
+    region: Provincia o región
+    country: País (código ISO)
+    description: Descripción
+    first_name: Nombre de pila
+    last_name: Apellidos
+    job_title: Cargo
+    owner: Responsable
+    owner_none: Sin responsable
+    tags: Etiquetas
+    active: Activo
+    archived: Archivado
+    archive: Archivar
+    restore: Recuperar
+    archived_flash: El campo está archivado. Sus valores se conservan y quedan ocultos.
+    restored: El campo se ha recuperado.
+    defined: Se ha añadido el campo.
+    saved: Se ha guardado el campo.
+    save: Guardar campo
+    edit: Editar campo
+    edit_title: 'Campo: %name%'
+    add:
+        company: Nuevo campo para empresas
+        contact: Nuevo campo para contactos
+    error:
+        required: Este campo es obligatorio.
+        type: Este valor no es válido para el campo.
+    form:
+        key: Clave
+        key_help: 'Letras minúsculas, dígitos y "_"; no se puede cambiar después.'
+        label: Etiqueta
+        type: Tipo
+        choices: Opciones
+        choices_help: Una opción por línea (solo para campos de elección).
+        required: Obligatorio
+        position: Posición
+field_type:
+    text: Texto
+    textarea: Texto largo
+    number: Número
+    date: Fecha
+    boolean: Sí / no
+    choice: Elección
+    url: Enlace
+    email: Correo electrónico
+fields:
+    title: Campos personalizados
+    intro: Campos propios para empresas y contactos. Los campos archivados conservan sus valores.
+    empty: Aún no hay campos personalizados.
+    define_for: 'Definir un campo para:'
+    col:
+        subject: Para
+        state: Estado
+record:
+    new:
+        company: Nueva empresa
+        contact: Nuevo contacto
+    edit_title: 'Editar %name%'
+    open: Abrir
+    edit: Editar
+    merge: Fusionar
+    merge_with: Fusionar en este registro
+    trash: Mover a la papelera
+    trash_confirm: ¿Mover este registro a la papelera? Se podrá restaurar durante un tiempo.
+    restore: Restaurar
+    purge: Eliminar definitivamente
+    purge_confirm: ¿Eliminar definitivamente este registro y todo lo asociado a él?
+    erase: Borrar datos personales
+    erase_confirm: "¿Borrar los datos personales de este contacto? Se eliminan las notas, los vínculos y la cronología; no se puede deshacer."
+    vcard: vCard
+    gdpr_export: Exportación de datos personales
+    details: Detalles
+    custom: Más campos
+    contacts: Contactos
+    companies: Empresas
+    affiliations_empty: Aún no hay ninguna.
+    duplicates: Posibles duplicados
+    created: Se ha creado el registro.
+    saved: Se ha guardado el registro.
+    trashed: El registro está en la papelera.
+    restored: Se ha restaurado el registro.
+    purged: Se ha eliminado el registro.
+    erased: "Se han borrado los datos personales del contacto."
+affiliation:
+    add: Añadir una empresa
+    save: Añadir
+    added: Se ha añadido la empresa.
+    removed: Se ha quitado la empresa.
+    remove: Quitar
+    primary: Principal
+    form:
+        company: Empresa
+        role: Función
+        primary: Empresa principal
+link:
+    title: Vinculado
+    add: Vincular con
+    save: Vincular
+    added: Se ha añadido el vínculo.
+    removed: Se ha quitado el vínculo.
+    remove: Quitar
+    form:
+        type: Tipo
+        id: Id
+        label: Etiqueta
+panel:
+    empty: Aún no hay nada.
+    more: Ver todo
+note:
+    title: Notas
+    add: Añadir una nota
+    save: Guardar nota
+    added: Se ha añadido la nota.
+    saved: Se ha guardado la nota.
+    deleted: Se ha eliminado la nota.
+    delete: Eliminar nota
+    delete_confirm: ¿Eliminar esta nota?
+    edit: Editar
+    empty: Aún no hay notas.
+    pinned: Fijada
+    form:
+        body: Nota
+        pinned: Fijar al principio
+tags:
+    title: Etiquetas
+    title_record: Etiquetas
+    intro: Las etiquetas agrupan empresas y contactos; los listados se pueden filtrar por ellas.
+    empty: Aún no hay etiquetas.
+    save: Guardar etiquetas
+    saved: Se han guardado las etiquetas.
+    form:
+        tags: Etiquetas
+tag:
+    add: Nueva etiqueta
+    save: Guardar etiqueta
+    created: Se ha creado la etiqueta.
+    saved: Se ha guardado la etiqueta.
+    deleted: Se ha eliminado la etiqueta.
+    delete: Eliminar etiqueta
+    edit: Editar
+    edit_title: 'Etiqueta: %name%'
+    form:
+        name: Nombre
+        colour: Color
+colour:
+    neutral: Gris
+    blue: Azul
+    green: Verde
+    yellow: Amarillo
+    orange: Naranja
+    red: Rojo
+    purple: Morado
+    teal: Verde azulado
+consent:
+    title: Consentimiento
+    add: Registrar una decisión de consentimiento
+    save: Registrar
+    recorded: Se ha registrado la decisión.
+    empty: No hay consentimientos registrados.
+    granted: Otorgado
+    withdrawn: Retirado
+    form:
+        purpose: Finalidad
+        decision: Decisión
+        evidence: Justificante
+        evidence_help: 'Su procedencia, p. ej. "formulario firmado 2026-11-18" (sin otros datos personales).'
+    purpose:
+        marketing_email: Correos de marketing
+        newsletter: Boletín
+        tracking: Seguimiento de aperturas y clics en correos
+    source:
+        form: Formulario
+        import: Importación
+        manual: Registrado a mano
+        portal: Portal de clientes
+        api: API
+timeline:
+    title: Cronología
+    empty: Aún no ha ocurrido nada.
+    open: Abrir
+activity:
+    created: 'Creado por %actor%'
+    updated: 'Actualizado por %actor%'
+    owner_changed: 'Responsable cambiado por %actor%'
+    trashed: 'Movido a la papelera por %actor%'
+    restored: 'Restaurado por %actor%'
+    merged: '%actor% ha fusionado otro registro en este'
+    note_added: 'Nota añadida por %actor%'
+    note_edited: 'Nota editada por %actor%'
+    note_deleted: 'Nota eliminada por %actor%'
+    tagged: 'Etiquetado por %actor%'
+    untagged: 'Etiqueta quitada por %actor%'
+    linked: 'Vinculado por %actor%'
+    unlinked: 'Vínculo quitado por %actor%'
+    affiliated: 'Vínculo con empresa añadido por %actor%'
+    unaffiliated: 'Vínculo con empresa quitado por %actor%'
+    consent_given: 'Consentimiento otorgado (registrado por %actor%)'
+    consent_withdrawn: 'Consentimiento retirado (registrado por %actor%)'
+    imported: 'Importado por %actor%'
+    exported: 'Datos personales exportados por %actor%'
+    host: 'Actualización'
+merge:
+    title: 'Fusionar en %name%'
+    intro: 'Marca los valores que se tomarán del otro registro; todo lo asociado a él pasa a este y el otro queda como una referencia a este registro.'
+    pick_intro: Elige el registro que se fusionará en este.
+    duplicates: Posibles duplicados
+    preview: Comparar
+    confirm: Fusionar
+    done: Se han fusionado los registros.
+    compare: '%other% en %survivor%'
+    moves: 'Se mueven %notes% notas, %tags% etiquetas, %links% vínculos, %affiliations% vínculos con empresas y %activities% entradas de la cronología.'
+    col:
+        field: Campo
+    form:
+        other: Id del otro registro
+        other_help: El id que aparece en la dirección de su página.
+import:
+    title: Importar
+    intro: 'Un archivo CSV (fila de encabezado, "," o ";", UTF-8) o un archivo vCard de contactos.'
+    upload: Subir y previsualizar
+    show_title: 'Importación: %file%'
+    preview: Primeras filas
+    confirm: Importar
+    continue: Continuar
+    cancel: Cancelar importación
+    cancelled: Se ha cancelado la importación.
+    back: Volver al listado
+    done: La importación ha terminado.
+    running: 'La importación está en curso: continúa para procesar las filas siguientes.'
+    ok: Listo
+    duplicate_of: 'Mismo correo que %name%'
+    summary: '%done% de %total% filas procesadas.'
+    status:
+        preview: Revisa la asignación y después importa.
+        running: En curso
+        done: Terminada
+        failed: Fallida
+        cancelled: Cancelada
+    outcome:
+        pending: En espera
+        created: Creado
+        updated: Actualizado
+        duplicate: Ya existe
+        invalid: No válido
+        limit: Supera el límite del plan
+    col:
+        check: Comprobación
+    subject:
+        contacts: Contactos
+        companies: Empresas
+    format:
+        csv: CSV
+        vcard: vCard
+    policy:
+        skip: Omitir las filas cuyo correo ya existe
+        update: Actualizar el contacto existente
+    target:
+        skip: '(omitir esta columna)'
+        company: Empresa (existente, por nombre)
+        tags: Etiquetas (existentes, separadas por comas)
+    form:
+        subject: Importar
+        format: Formato
+        file: Archivo
+        file_help: Hasta 5 000 filas.
+        policy: Correos existentes
+    error:
+        read: No se ha podido leer el archivo.
+        too_large: El archivo es demasiado grande.
+        too_many_rows: El archivo tiene demasiadas filas.
+        encoding: El archivo no es texto UTF-8.
+        header: 'Falta la fila de encabezado, tiene una columna vacía o una columna repetida.'
+        empty: El archivo no tiene filas.
+        vcard_contacts: Los archivos vCard solo importan contactos.
+        mapping: 'Asigna al menos una columna, cada campo una sola vez.'
+settings:
+    title: Ajustes
+    intro: Durante cuánto tiempo conserva el CRM lo que ya no necesita.
+    saved: Se han guardado los ajustes.
+    form:
+        trash_days: Días que un registro en la papelera se puede restaurar (7-365)
+        timeline_years: Años que se conserva la cronología (1-10)
+        import_keep_days: Días que se conservan las filas de una importación terminada (1-90)
+        merge_keep_days: Días que una fusión conserva los valores del registro fusionado (1-365)
+search:
+    group:
+        companies: Empresas
+        contacts: Contactos
+    see_all: 'Ver los %count%'
+flash:
+    conflict:
+        crm_record_stale: 'Alguien ha modificado este registro al mismo tiempo. El formulario muestra los valores actuales: revísalos y vuelve a guardar.'
+        crm_record_merged: Este registro se ha fusionado en otro.
+        crm_record_trashed: Este registro está en la papelera.
+        crm_merge_stale: Uno de los registros ha cambiado o se ha fusionado mientras tanto. Vuelve a comparar.
+        crm_import_running: Esta importación ya está en curso o terminada.
+        crm_limit_reached: 'Se ha alcanzado el límite del plan: no se pueden añadir más registros de este tipo.'
+        crm_settings_stale: Alguien ha modificado los ajustes al mismo tiempo. Revísalos y vuelve a guardar.
+error:
+    required: Este campo es obligatorio.
+    invalid: Este valor no es válido.
+    too_long: Este valor es demasiado largo.
+    unknown_field: Campo desconocido.
+    email: No es una dirección de correo electrónico.
+    url: 'No es una dirección web (http:// o https://).'
+    phone: No es un número de teléfono.
+    country: Usa el código de país de dos letras (ES, FR…).
+    contact_name: Un contacto necesita un nombre o unos apellidos.
+    email_taken: Otro contacto ya tiene este correo electrónico.
+    owner_unknown: Esta persona no puede ser responsable de registros.
+    tag_unknown: Etiqueta desconocida.
+    tag_name: El nombre de una etiqueta tiene de 1 a 60 caracteres.
+    tag_taken: Ya existe una etiqueta con este nombre.
+    field_key: 'Una clave tiene de 1 a 40 letras minúsculas, dígitos o "_", y empieza por una letra.'
+    field_key_reserved: Esta clave corresponde a un campo integrado.
+    field_key_taken: Ya existe un campo con esta clave.
+    field_limit: No se pueden añadir más campos personalizados.
+    field_choices: Un campo de elección necesita de 1 a 50 opciones.
+    note_invalid: Una nota admite hasta 10 000 caracteres de texto.
+    consent_purpose: Finalidad desconocida.
+    merge_same: Un registro no se puede fusionar consigo mismo.
+    out_of_range: Este valor está fuera de rango.
+    csrf: El formulario ha caducado. Recarga la página e inténtalo de nuevo.

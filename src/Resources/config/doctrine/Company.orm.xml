@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Company" table="crm_company">
+        <indexes>
+            <index name="crm_company_name" columns="tenant_id,status,name_key"/>
+            <index name="crm_company_domain" columns="tenant_id,domain_key"/>
+            <index name="crm_company_tax" columns="tenant_id,tax_id_key"/>
+            <index name="crm_company_owner" columns="tenant_id,owner_id"/>
+        </indexes>
+        <field name="name" column="name" type="string" length="200"/>
+        <field name="nameKey" column="name_key" type="string" length="200"/>
+        <field name="legalName" column="legal_name" type="string" length="200" nullable="true"/>
+        <field name="taxId" column="tax_id" type="string" length="64" nullable="true"/>
+        <field name="taxIdKey" column="tax_id_key" type="string" length="64" nullable="true"/>
+        <field name="website" column="website" type="string" length="255" nullable="true"/>
+        <field name="domainKey" column="domain_key" type="string" length="190" nullable="true"/>
+        <field name="industry" column="industry" type="string" length="80" nullable="true"/>
+        <field name="description" column="description" type="text" nullable="true"/>
+    </entity>
+</doctrine-mapping>

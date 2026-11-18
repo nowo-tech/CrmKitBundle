@@ -1,0 +1,25 @@
+{#
+  Merge, step 2: both records side by side; each checkbox takes that value from the other record (contract section
+  15.3). Variables: page (FormPage), preview (MergePreview), labels (field labels, same order as preview.fields).
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {%- set _b = page.bundle -%}
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-merge-preview">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'merge.compare'|trans({'%survivor%': preview.survivor.label, '%other%': preview.other.label}, _d) }}</h2>
+            <table class="{{ nowo_ui_class('table', _b) }}">
+                <thead><tr><th scope="col">{{ 'merge.col.field'|trans({}, _d) }}</th><th scope="col">{{ preview.survivor.label }}</th><th scope="col">{{ preview.other.label }}</th></tr></thead>
+                <tbody>
+                {% for field in preview.fields %}
+                    <tr><th scope="row">{{ labels[loop.index0] }}</th><td>{{ field.survivor ?? '—' }}</td><td>{{ field.other ?? '—' }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <p data-testid="crm-merge-moves">{{ 'merge.moves'|trans({'%notes%': preview.moves.notes, '%tags%': preview.moves.tags, '%links%': preview.moves.links, '%affiliations%': preview.moves.affiliations, '%activities%': preview.moves.activities}, _d) }}</p>
+        </div>
+    </section>
+    {{ parent() }}
+{% endblock %}

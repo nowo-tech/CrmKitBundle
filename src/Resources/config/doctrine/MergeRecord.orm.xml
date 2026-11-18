@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\MergeRecord" table="crm_merge">
+        <indexes>
+            <index name="crm_merge_survivor" columns="tenant_id,survivor_id"/>
+            <index name="crm_merge_merged" columns="tenant_id,merged_id"/>
+        </indexes>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="subjectType" column="subject_type" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\SubjectType"/>
+        <field name="survivorId" column="survivor_id" type="string" length="36"/>
+        <field name="mergedId" column="merged_id" type="string" length="36"/>
+        <field name="snapshot" column="snapshot" type="json"/>
+        <field name="taken" column="taken" type="json"/>
+        <field name="actorId" column="actor_id" type="string" length="128" nullable="true"/>
+        <field name="mergedAt" column="merged_at" type="nowo_crm_utc_datetime"/>
+    </entity>
+</doctrine-mapping>

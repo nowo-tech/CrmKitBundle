@@ -1,0 +1,282 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nowo\CrmKitBundle\Application\Port;
+
+use DateTimeImmutable;
+use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
+use Nowo\CrmKitBundle\Domain\Enum\RowOutcome;
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Model\Activity;
+use Nowo\CrmKitBundle\Domain\Model\Affiliation;
+use Nowo\CrmKitBundle\Domain\Model\Consent;
+use Nowo\CrmKitBundle\Domain\Model\Contact;
+use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
+use Nowo\CrmKitBundle\Domain\Model\CrmSettings;
+use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
+use Nowo\CrmKitBundle\Domain\Model\HostLink;
+use Nowo\CrmKitBundle\Domain\Model\Import;
+use Nowo\CrmKitBundle\Domain\Model\ImportRow;
+use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
+use Nowo\CrmKitBundle\Domain\Model\Note;
+use Nowo\CrmKitBundle\Domain\Model\Tag;
+use Nowo\CrmKitBundle\Domain\Model\Tagging;
+use Nowo\CrmKitBundle\Domain\Service\ListQuery;
+use Nowo\CrmKitBundle\Domain\Value\HostObjectRef;
+use Nowo\CrmKitBundle\Domain\Value\TenantRef;
+
+/**
+ * The CRM's persistence (implemented on the bundle's entity manager). Every lookup by tenant, owner or key re-checks
+ * the value with `===` in PHP after the query (REQ-SEC-006 rule 2); callers run inside the transaction runner.
+ *
+ * @internal
+ */
+interface CrmStoreInterface
+{
+    /** Schedules a new row. */
+    public function add(object $entity): void;
+
+    /** Schedules a row's removal. */
+    public function remove(object $entity): void;
+
+    /** Writes pending changes inside the running unit. */
+    public function flush(): void;
+
+    /** A record of the tenant, any status. */
+    public function record(SubjectType $type, TenantRef $tenant, string $id): ?CrmRecord;
+
+    /**
+     * Records of the tenant locked `FOR UPDATE` in id order (missing ids are absent).
+     *
+     * @param list<string> $ids
+     *
+     * @return array<string, CrmRecord>
+     */
+    public function lockRecords(SubjectType $type, TenantRef $tenant, array $ids): array;
+
+    /**
+     * Records of the tenant by id.
+     *
+     * @param list<string> $ids
+     *
+     * @return array<string, CrmRecord>
+     */
+    public function records(SubjectType $type, TenantRef $tenant, array $ids): array;
+
+    /** The contact holding an e-mail key, any status. */
+    public function contactByEmailKey(TenantRef $tenant, string $emailKey): ?Contact;
+
+    /**
+     * A page of records and the total.
+     *
+     * @return array{list<CrmRecord>, int}
+     */
+    public function list(TenantRef $tenant, ListQuery $query): array;
+
+    /**
+     * Records after `$afterId` (keyset by id) matching the query's filters.
+     *
+     * @return list<CrmRecord>
+     */
+    public function batch(TenantRef $tenant, ListQuery $query, ?string $afterId, int $limit): array;
+
+    /**
+     * Active records sharing a key with `$record` (name, domain, tax id / sort key, e-mail).
+     *
+     * @return list<CrmRecord>
+     */
+    public function duplicates(CrmRecord $record, int $limit = 10): array;
+
+    /**
+     * Active records whose searchable fields contain the text, and the total.
+     *
+     * @return array{list<CrmRecord>, int}
+     */
+    public function search(SubjectType $type, TenantRef $tenant, string $text, int $limit, ?string $companyId = null): array;
+
+    /**
+     * Affiliations of a contact or of a company.
+     *
+     * @return list<Affiliation>
+     */
+    public function affiliations(TenantRef $tenant, SubjectType $side, string $id): array;
+
+    /** One affiliation. */
+    public function affiliation(TenantRef $tenant, string $id): ?Affiliation;
+
+    /**
+     * Tags of the tenant, by name.
+     *
+     * @return list<Tag>
+     */
+    public function tags(TenantRef $tenant): array;
+
+    /** One tag. */
+    public function tag(TenantRef $tenant, string $id): ?Tag;
+
+    /**
+     * Taggings of records.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<Tagging>
+     */
+    public function taggings(TenantRef $tenant, SubjectType $type, array $ids): array;
+
+    /**
+     * Taggings of a tag.
+     *
+     * @return list<Tagging>
+     */
+    public function taggingsOfTag(TenantRef $tenant, string $tagId): array;
+
+    /**
+     * Field definitions, by position.
+     *
+     * @return list<FieldDefinition>
+     */
+    public function fields(TenantRef $tenant, SubjectType $type, bool $withArchived): array;
+
+    /** One field definition. */
+    public function field(TenantRef $tenant, string $id): ?FieldDefinition;
+
+    /**
+     * Notes of a record, pinned first, newest first.
+     *
+     * @return list<Note>
+     */
+    public function notes(TenantRef $tenant, SubjectType $type, string $id): array;
+
+    /** One note. */
+    public function note(TenantRef $tenant, string $id): ?Note;
+
+    /**
+     * Timeline entries of records, newest first, before an entry id (keyset).
+     *
+     * @param list<array{SubjectType, string}> $subjects
+     *
+     * @return list<Activity>
+     */
+    public function activities(TenantRef $tenant, array $subjects, int $limit, ?string $beforeId): array;
+
+    /**
+     * Every timeline entry of a record.
+     *
+     * @return list<Activity>
+     */
+    public function allActivities(TenantRef $tenant, SubjectType $type, string $id): array;
+
+    /**
+     * Consent rows of a contact, newest first.
+     *
+     * @return list<Consent>
+     */
+    public function consents(TenantRef $tenant, string $contactId): array;
+
+    /**
+     * Host links of a record.
+     *
+     * @return list<HostLink>
+     */
+    public function links(TenantRef $tenant, SubjectType $type, string $id): array;
+
+    /** One host link. */
+    public function link(TenantRef $tenant, string $id): ?HostLink;
+
+    /**
+     * Host links to a host object.
+     *
+     * @return list<HostLink>
+     */
+    public function linksTo(TenantRef $tenant, HostObjectRef $host): array;
+
+    /**
+     * Merge traces where the record was the merged one or the survivor.
+     *
+     * @return list<MergeRecord>
+     */
+    public function mergesOf(TenantRef $tenant, string $mergedId): array;
+
+    /** The tenant's settings, if saved. */
+    public function settings(TenantRef $tenant): ?CrmSettings;
+
+    /** One import. */
+    public function import(TenantRef $tenant, string $id): ?Import;
+
+    /**
+     * Rows of an import, by row number.
+     *
+     * @return list<ImportRow>
+     */
+    public function importRows(string $importId, int $limit, bool $pendingOnly): array;
+
+    /** Claims an import in preview (conditional UPDATE); whether this call won. */
+    public function claimImport(TenantRef $tenant, string $id, int $version, string $token, string $mappingJson, string $policy, DateTimeImmutable $now): bool;
+
+    /** Takes over a running import whose claim is older than `$staleBefore`; whether this call won. */
+    public function takeOverImport(TenantRef $tenant, string $id, string $token, DateTimeImmutable $now, DateTimeImmutable $staleBefore): bool;
+
+    /** Locks the import row and tells whether `$token` still holds it. */
+    public function holdsImport(string $id, string $token): bool;
+
+    /** Settles a pending row (conditional UPDATE); whether this call did. */
+    public function settleRow(string $rowId, RowOutcome $outcome, ?string $recordId, ?string $message): bool;
+
+    /**
+     * Adds to the progress and counters of an import (atomic UPDATE).
+     *
+     * @param array<string, int> $counts outcome => rows
+     */
+    public function advanceImport(string $id, int $rows, array $counts, DateTimeImmutable $now): void;
+
+    /** Moves an import to a final status. */
+    public function finishImport(string $id, ImportStatus $status, DateTimeImmutable $now, ?ImportStatus $from = null): bool;
+
+    /**
+     * Running imports whose claim is older than the time.
+     *
+     * @return list<array{tenant: string, id: string}>
+     */
+    public function staleImports(DateTimeImmutable $before, int $limit): array;
+
+    /**
+     * Takes one unit of a counter (atomic UPDATE; the row is created from `$current()` on first use); false at the
+     * limit.
+     *
+     * @param callable(): int $current the count of active rows, asked only when the row does not exist yet
+     */
+    public function takeCounter(TenantRef $tenant, string $resource, ?int $limit, callable $current): bool;
+
+    /** Gives one unit back (never below 0). */
+    public function releaseCounter(TenantRef $tenant, string $resource): void;
+
+    /** Sets a counter (rebuild), locking its row first. */
+    public function setCounter(TenantRef $tenant, string $resource, int $value): void;
+
+    /** Active records of the tenant. */
+    public function countActive(TenantRef $tenant, SubjectType $type): int;
+
+    /**
+     * Tenants that have CRM rows.
+     *
+     * @return list<string>
+     */
+    public function tenants(): array;
+
+    /**
+     * Ids of trashed records older than the time.
+     *
+     * @return list<string>
+     */
+    public function trashedBefore(TenantRef $tenant, SubjectType $type, DateTimeImmutable $before, int $limit): array;
+
+    /** Deletes timeline entries older than the time (one batch); how many. */
+    public function deleteActivitiesBefore(TenantRef $tenant, DateTimeImmutable $before, int $limit): int;
+
+    /** Deletes the rows of imports finished before the time (one batch); how many. */
+    public function deleteImportRowsBefore(TenantRef $tenant, DateTimeImmutable $before, int $limit): int;
+
+    /** Deletes merge traces older than the time (one batch); how many. */
+    public function deleteMergesBefore(TenantRef $tenant, DateTimeImmutable $before, int $limit): int;
+}

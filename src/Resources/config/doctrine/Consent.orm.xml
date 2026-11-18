@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Consent" table="crm_consent">
+        <indexes>
+            <index name="crm_consent_contact" columns="tenant_id,contact_id,purpose,recorded_at"/>
+        </indexes>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="contactId" column="contact_id" type="string" length="36"/>
+        <field name="purpose" column="purpose" type="string" length="64"/>
+        <field name="granted" column="granted" type="boolean"/>
+        <field name="source" column="source" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\ConsentSource"/>
+        <field name="evidence" column="evidence" type="string" length="255" nullable="true"/>
+        <field name="recordedById" column="recorded_by_id" type="string" length="128" nullable="true"/>
+        <field name="recordedAt" column="recorded_at" type="nowo_crm_utc_datetime"/>
+    </entity>
+</doctrine-mapping>

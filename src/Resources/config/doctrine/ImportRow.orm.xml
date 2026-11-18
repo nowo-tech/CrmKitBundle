@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\ImportRow" table="crm_import_row">
+        <unique-constraints>
+            <unique-constraint name="crm_import_row_no" columns="import_id,row_no"/>
+        </unique-constraints>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="importId" column="import_id" type="string" length="36"/>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="rowNo" column="row_no" type="integer"/>
+        <field name="data" column="data" type="json"/>
+        <field name="outcome" column="outcome" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\RowOutcome"/>
+        <field name="recordId" column="record_id" type="string" length="36" nullable="true"/>
+        <field name="message" column="message" type="string" length="80" nullable="true"/>
+    </entity>
+</doctrine-mapping>

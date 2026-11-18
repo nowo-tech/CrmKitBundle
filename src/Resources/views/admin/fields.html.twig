@@ -1,0 +1,13 @@
+{#
+  Custom fields (manage): every definition and the define form for companies or contacts (?for=company|contact).
+  Variables: page (ListPage), form (FormView), subject (company | contact).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
+
+{% block nowo_ui_list_after %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    <p data-testid="crm-fields-for">{{ 'fields.define_for'|trans({}, _d) }}
+        <a href="{{ path('nowo_crm_kit_fields', {for: 'company'}) }}"{% if subject == 'company' %} aria-current="page"{% endif %}>{{ 'type.company'|trans({}, _d) }}</a> ·
+        <a href="{{ path('nowo_crm_kit_fields', {for: 'contact'}) }}"{% if subject == 'contact' %} aria-current="page"{% endif %}>{{ 'type.contact'|trans({}, _d) }}</a></p>
+    {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'field.add.' ~ subject, submit: 'field.save', action: path('nowo_crm_kit_fields', {for: subject}), testid: 'crm-field-form'}) }}
+{% endblock %}

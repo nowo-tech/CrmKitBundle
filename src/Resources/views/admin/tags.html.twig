@@ -1,0 +1,8 @@
+{#
+  Tags of the tenant (manage): the list and the create form. Variables: page (ListPage), form (FormView).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
+
+{% block nowo_ui_list_after %}
+    {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'tag.add', submit: 'tag.save', action: null, testid: 'crm-tag-form'}) }}
+{% endblock %}

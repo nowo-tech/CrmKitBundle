@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Import" table="crm_import">
+        <indexes>
+            <index name="crm_import_tenant" columns="tenant_id,created_at"/>
+            <index name="crm_import_claim" columns="status,claimed_at"/>
+        </indexes>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="subjectType" column="subject_type" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\SubjectType"/>
+        <field name="format" column="format" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\ImportFormat"/>
+        <field name="status" column="status" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\ImportStatus"/>
+        <field name="fileName" column="file_name" type="string" length="255"/>
+        <field name="duplicatePolicy" column="duplicate_policy" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy"/>
+        <field name="columns" column="columns" type="json"/>
+        <field name="mapping" column="mapping" type="json"/>
+        <field name="rowsTotal" column="rows_total" type="integer"/>
+        <field name="rowsDone" column="rows_done" type="integer"/>
+        <field name="createdCount" column="created_count" type="integer"/>
+        <field name="updatedCount" column="updated_count" type="integer"/>
+        <field name="duplicateCount" column="duplicate_count" type="integer"/>
+        <field name="invalidCount" column="invalid_count" type="integer"/>
+        <field name="limitCount" column="limit_count" type="integer"/>
+        <field name="claimToken" column="claim_token" type="string" length="36" nullable="true"/>
+        <field name="claimedAt" column="claimed_at" type="nowo_crm_utc_datetime" nullable="true"/>
+        <field name="createdById" column="created_by_id" type="string" length="128" nullable="true"/>
+        <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime"/>
+        <field name="finishedAt" column="finished_at" type="nowo_crm_utc_datetime" nullable="true"/>
+        <field name="version" column="version" type="integer"/>
+    </entity>
+</doctrine-mapping>

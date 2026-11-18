@@ -1,0 +1,376 @@
+# CRM-kit, fase A (bedrijven en contacten). Domein NowoCrmKitBundle. Parameters staan tussen %.
+nav:
+    label: CRM
+    companies: Bedrijven
+    contacts: Contacten
+    import: Importeren
+    tags: Tags
+    fields: Aangepaste velden
+    settings: Instellingen
+type:
+    company: Bedrijf
+    contact: Contact
+status:
+    trashed: In de prullenbak
+    erased: Persoonsgegevens gewist
+value:
+    'yes': 'Ja'
+    'no': 'Nee'
+form:
+    save: Opslaan
+    cancel: Annuleren
+list:
+    title:
+        company: Bedrijven
+        contact: Contacten
+    empty:
+        company: Nog geen bedrijven.
+        contact: Nog geen contacten.
+    empty_hint: Maak er een aan of importeer een CSV- of vCard-bestand.
+    export: CSV exporteren
+    col:
+        updated: Bijgewerkt
+    filter:
+        q: Zoeken
+        tag: Tag
+        owner: Verantwoordelijke
+        status: Tonen
+        any: Alle
+    status:
+        active: Actief
+        trashed: Prullenbak
+field:
+    name: Naam
+    contact_name: Naam
+    legal_name: Juridische naam
+    tax_id: Btw-nummer
+    website: Website
+    email: E-mail
+    phone: Telefoon
+    mobile: Mobiel
+    industry: Branche
+    street: Straat
+    postal_code: Postcode
+    city: Plaats
+    region: Regio
+    country: Land (ISO-code)
+    description: Beschrijving
+    first_name: Voornaam
+    last_name: Achternaam
+    job_title: Functie
+    owner: Verantwoordelijke
+    owner_none: Geen verantwoordelijke
+    tags: Tags
+    active: Actief
+    archived: Gearchiveerd
+    archive: Archiveren
+    restore: Terugzetten
+    archived_flash: Het veld is gearchiveerd. De waarden blijven bewaard en zijn verborgen.
+    restored: Het veld is teruggezet.
+    defined: Het veld is toegevoegd.
+    saved: Het veld is opgeslagen.
+    save: Veld opslaan
+    edit: Veld bewerken
+    edit_title: 'Veld: %name%'
+    add:
+        company: Nieuw veld voor bedrijven
+        contact: Nieuw veld voor contacten
+    error:
+        required: Dit veld is verplicht.
+        type: Deze waarde past niet bij het veld.
+    form:
+        key: Sleutel
+        key_help: 'Kleine letters, cijfers en "_"; kan later niet meer worden gewijzigd.'
+        label: Label
+        type: Type
+        choices: Keuzes
+        choices_help: Eén keuze per regel (alleen keuzevelden).
+        required: Verplicht
+        position: Positie
+field_type:
+    text: Tekst
+    textarea: Lange tekst
+    number: Getal
+    date: Datum
+    boolean: Ja / nee
+    choice: Keuze
+    url: Link
+    email: E-mail
+fields:
+    title: Aangepaste velden
+    intro: Eigen velden voor bedrijven en contacten. Gearchiveerde velden behouden hun waarden.
+    empty: Nog geen aangepaste velden.
+    define_for: 'Een veld definiëren voor:'
+    col:
+        subject: Voor
+        state: Status
+record:
+    new:
+        company: Nieuw bedrijf
+        contact: Nieuw contact
+    edit_title: '%name% bewerken'
+    open: Openen
+    edit: Bewerken
+    merge: Samenvoegen
+    merge_with: Samenvoegen met dit record
+    trash: Naar de prullenbak verplaatsen
+    trash_confirm: Dit record naar de prullenbak verplaatsen? Het kan nog enige tijd worden teruggezet.
+    restore: Terugzetten
+    purge: Definitief verwijderen
+    purge_confirm: Dit record en alles wat eraan hangt definitief verwijderen?
+    erase: Persoonsgegevens wissen
+    erase_confirm: "De persoonsgegevens van dit contact wissen? Notities, koppelingen en tijdlijn worden verwijderd; dit kan niet ongedaan worden gemaakt."
+    vcard: vCard
+    gdpr_export: Export van persoonsgegevens
+    details: Details
+    custom: Meer velden
+    contacts: Contacten
+    companies: Bedrijven
+    affiliations_empty: Nog geen.
+    duplicates: Mogelijke dubbelen
+    created: Het record is aangemaakt.
+    saved: Het record is opgeslagen.
+    trashed: Het record staat in de prullenbak.
+    restored: Het record is teruggezet.
+    purged: Het record is verwijderd.
+    erased: "De persoonsgegevens van het contact zijn gewist."
+affiliation:
+    add: Een bedrijf toevoegen
+    save: Toevoegen
+    added: Het bedrijf is toegevoegd.
+    removed: Het bedrijf is verwijderd.
+    remove: Verwijderen
+    primary: Primair
+    form:
+        company: Bedrijf
+        role: Rol
+        primary: Primair bedrijf
+link:
+    title: Gekoppeld
+    add: Koppelen aan
+    save: Koppelen
+    added: De koppeling is toegevoegd.
+    removed: De koppeling is verwijderd.
+    remove: Verwijderen
+    form:
+        type: Type
+        id: Id
+        label: Label
+panel:
+    empty: Hier is nog niets.
+    more: Alles tonen
+note:
+    title: Notities
+    add: Een notitie toevoegen
+    save: Notitie opslaan
+    added: De notitie is toegevoegd.
+    saved: De notitie is opgeslagen.
+    deleted: De notitie is verwijderd.
+    delete: Notitie verwijderen
+    delete_confirm: Deze notitie verwijderen?
+    edit: Bewerken
+    empty: Nog geen notities.
+    pinned: Vastgezet
+    form:
+        body: Notitie
+        pinned: Bovenaan vastzetten
+tags:
+    title: Tags
+    title_record: Tags
+    intro: Tags groeperen bedrijven en contacten; lijsten kunnen erop worden gefilterd.
+    empty: Nog geen tags.
+    save: Tags opslaan
+    saved: De tags zijn opgeslagen.
+    form:
+        tags: Tags
+tag:
+    add: Nieuwe tag
+    save: Tag opslaan
+    created: De tag is aangemaakt.
+    saved: De tag is opgeslagen.
+    deleted: De tag is verwijderd.
+    delete: Tag verwijderen
+    edit: Bewerken
+    edit_title: 'Tag: %name%'
+    form:
+        name: Naam
+        colour: Kleur
+colour:
+    neutral: Grijs
+    blue: Blauw
+    green: Groen
+    yellow: Geel
+    orange: Oranje
+    red: Rood
+    purple: Paars
+    teal: Blauwgroen
+consent:
+    title: Toestemming
+    add: Een toestemmingsbeslissing vastleggen
+    save: Vastleggen
+    recorded: De beslissing is vastgelegd.
+    empty: Geen toestemming vastgelegd.
+    granted: Gegeven
+    withdrawn: Ingetrokken
+    form:
+        purpose: Doel
+        decision: Beslissing
+        evidence: Bewijs
+        evidence_help: 'Waar het vandaan komt, bijv. "getekend formulier 2026-11-18" (geen andere persoonsgegevens).'
+    purpose:
+        marketing_email: Marketing-e-mails
+        newsletter: Nieuwsbrief
+        tracking: Tracking van geopende e-mails en klikken
+    source:
+        form: Formulier
+        import: Import
+        manual: Handmatig vastgelegd
+        portal: Klantenportaal
+        api: API
+timeline:
+    title: Tijdlijn
+    empty: Er is nog niets gebeurd.
+    open: Openen
+activity:
+    created: 'Aangemaakt door %actor%'
+    updated: 'Bijgewerkt door %actor%'
+    owner_changed: 'Verantwoordelijke gewijzigd door %actor%'
+    trashed: 'Naar de prullenbak verplaatst door %actor%'
+    restored: 'Teruggezet door %actor%'
+    merged: 'Een ander record is door %actor% met dit record samengevoegd'
+    note_added: 'Notitie toegevoegd door %actor%'
+    note_edited: 'Notitie bewerkt door %actor%'
+    note_deleted: 'Notitie verwijderd door %actor%'
+    tagged: 'Tag toegevoegd door %actor%'
+    untagged: 'Tag verwijderd door %actor%'
+    linked: 'Gekoppeld door %actor%'
+    unlinked: 'Koppeling verwijderd door %actor%'
+    affiliated: 'Bedrijfskoppeling toegevoegd door %actor%'
+    unaffiliated: 'Bedrijfskoppeling verwijderd door %actor%'
+    consent_given: 'Toestemming gegeven (vastgelegd door %actor%)'
+    consent_withdrawn: 'Toestemming ingetrokken (vastgelegd door %actor%)'
+    imported: 'Geïmporteerd door %actor%'
+    exported: 'Persoonsgegevens geëxporteerd door %actor%'
+    host: 'Update'
+merge:
+    title: 'Samenvoegen met %name%'
+    intro: 'Vink de waarden aan die van het andere record moeten worden overgenomen; alles wat eraan hangt verhuist hierheen en het wordt een verwijzing naar dit record.'
+    pick_intro: Kies het record dat met dit record moet worden samengevoegd.
+    duplicates: Mogelijke dubbelen
+    preview: Vergelijken
+    confirm: Samenvoegen
+    done: De records zijn samengevoegd.
+    compare: '%other% in %survivor%'
+    moves: '%notes% notities, %tags% tags, %links% koppelingen, %affiliations% bedrijfskoppelingen en %activities% tijdlijnitems worden verplaatst.'
+    col:
+        field: Veld
+    form:
+        other: Id van het andere record
+        other_help: Het id in het adres van de pagina.
+import:
+    title: Importeren
+    intro: 'Een CSV-bestand (koprij, "," of ";", UTF-8) of een vCard-bestand met contacten.'
+    upload: Uploaden en voorvertoning
+    show_title: 'Import: %file%'
+    preview: Eerste rijen
+    confirm: Importeren
+    continue: Doorgaan
+    cancel: Import annuleren
+    cancelled: De import is geannuleerd.
+    back: Terug naar de lijst
+    done: De import is voltooid.
+    running: 'De import loopt: ga door om de volgende rijen te verwerken.'
+    ok: Klaar
+    duplicate_of: 'Zelfde e-mail als %name%'
+    summary: '%done% van %total% rijen verwerkt.'
+    status:
+        preview: Controleer de koppeling van de kolommen en importeer dan.
+        running: Bezig
+        done: Voltooid
+        failed: Mislukt
+        cancelled: Geannuleerd
+    outcome:
+        pending: Wachtend
+        created: Aangemaakt
+        updated: Bijgewerkt
+        duplicate: Bestaat al
+        invalid: Ongeldig
+        limit: Boven de limiet van het abonnement
+    col:
+        check: Controle
+    subject:
+        contacts: Contacten
+        companies: Bedrijven
+    format:
+        csv: CSV
+        vcard: vCard
+    policy:
+        skip: Rijen overslaan waarvan het e-mailadres al bestaat
+        update: Het bestaande contact bijwerken
+    target:
+        skip: '(deze kolom overslaan)'
+        company: Bedrijf (bestaand, op naam)
+        tags: Tags (bestaand, gescheiden door komma's)
+    form:
+        subject: Importeren
+        format: Formaat
+        file: Bestand
+        file_help: Tot 5 000 rijen.
+        policy: Bestaande e-mailadressen
+    error:
+        read: Het bestand kon niet worden gelezen.
+        too_large: Het bestand is te groot.
+        too_many_rows: Het bestand heeft te veel rijen.
+        encoding: Het bestand is geen UTF-8-tekst.
+        header: 'De koprij ontbreekt, bevat een lege kolom of een dubbele kolom.'
+        empty: Het bestand bevat geen rijen.
+        vcard_contacts: vCard-bestanden importeren alleen contacten.
+        mapping: 'Koppel minstens één kolom, elk veld één keer.'
+settings:
+    title: Instellingen
+    intro: Hoe lang het CRM bewaart wat het niet meer nodig heeft.
+    saved: De instellingen zijn opgeslagen.
+    form:
+        trash_days: Dagen dat een record uit de prullenbak kan worden teruggezet (7-365)
+        timeline_years: Jaren dat de tijdlijn wordt bewaard (1-10)
+        import_keep_days: Dagen dat de rijen van een voltooide import worden bewaard (1-90)
+        merge_keep_days: Dagen dat een samenvoeging de waarden van het samengevoegde record bewaart (1-365)
+search:
+    group:
+        companies: Bedrijven
+        contacts: Contacten
+    see_all: 'Alle %count% tonen'
+flash:
+    conflict:
+        crm_record_stale: 'Iemand heeft dit record op hetzelfde moment gewijzigd. Het formulier toont de huidige waarden: controleer ze en sla opnieuw op.'
+        crm_record_merged: Dit record is met een ander record samengevoegd.
+        crm_record_trashed: Dit record staat in de prullenbak.
+        crm_merge_stale: Een van de records is intussen gewijzigd of samengevoegd. Vergelijk opnieuw.
+        crm_import_running: Deze import loopt al of is al voltooid.
+        crm_limit_reached: 'De limiet van uw abonnement is bereikt: er kunnen geen records van dit soort meer worden toegevoegd.'
+        crm_settings_stale: Iemand heeft de instellingen op hetzelfde moment gewijzigd. Controleer ze en sla opnieuw op.
+error:
+    required: Dit veld is verplicht.
+    invalid: Deze waarde is ongeldig.
+    too_long: Deze waarde is te lang.
+    unknown_field: Onbekend veld.
+    email: Geen e-mailadres.
+    url: 'Geen webadres (http:// of https://).'
+    phone: Geen telefoonnummer.
+    country: Gebruik de landcode van twee letters (ES, FR…).
+    contact_name: Een contact heeft een voornaam of een achternaam nodig.
+    email_taken: Een ander contact heeft dit e-mailadres al.
+    owner_unknown: Deze persoon kan geen verantwoordelijke voor records zijn.
+    tag_unknown: Onbekende tag.
+    tag_name: Een tagnaam bestaat uit 1 tot 60 tekens.
+    tag_taken: Er bestaat al een tag met deze naam.
+    field_key: 'Een sleutel bestaat uit 1 tot 40 kleine letters, cijfers of "_" en begint met een letter.'
+    field_key_reserved: Deze sleutel hoort bij een ingebouwd veld.
+    field_key_taken: Er bestaat al een veld met deze sleutel.
+    field_limit: Er kunnen geen aangepaste velden meer worden toegevoegd.
+    field_choices: Een keuzeveld heeft 1 tot 50 keuzes nodig.
+    note_invalid: Een notitie bevat maximaal 10 000 tekens tekst.
+    consent_purpose: Onbekend doel.
+    merge_same: Een record kan niet met zichzelf worden samengevoegd.
+    out_of_range: Deze waarde valt buiten het bereik.
+    csrf: Het formulier is verlopen. Laad de pagina opnieuw en probeer het nog eens.

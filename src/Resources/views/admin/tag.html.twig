@@ -1,0 +1,9 @@
+{#
+  One tag (manage): rename / recolour, delete. Variables: page (FormPage), delete (FormView of ActionType).
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {{ parent() }}
+    {{ include('@NowoCrmKit/_form.html.twig', {form: delete, title: null, submit: 'tag.delete', action: null, testid: 'crm-tag-delete', variant: 'btn_danger'}) }}
+{% endblock %}

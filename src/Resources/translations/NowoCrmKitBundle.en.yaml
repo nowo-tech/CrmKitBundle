@@ -1,0 +1,376 @@
+# CRM kit, phase A (companies and contacts). Domain NowoCrmKitBundle. Parameters are %wrapped%.
+nav:
+    label: CRM
+    companies: Companies
+    contacts: Contacts
+    import: Import
+    tags: Tags
+    fields: Custom fields
+    settings: Settings
+type:
+    company: Company
+    contact: Contact
+status:
+    trashed: In the trash
+    erased: Personal data erased
+value:
+    'yes': 'Yes'
+    'no': 'No'
+form:
+    save: Save
+    cancel: Cancel
+list:
+    title:
+        company: Companies
+        contact: Contacts
+    empty:
+        company: No companies yet.
+        contact: No contacts yet.
+    empty_hint: Create one, or import a CSV or vCard file.
+    export: Export CSV
+    col:
+        updated: Updated
+    filter:
+        q: Search
+        tag: Tag
+        owner: Owner
+        status: Show
+        any: Any
+    status:
+        active: Active
+        trashed: Trash
+field:
+    name: Name
+    contact_name: Name
+    legal_name: Legal name
+    tax_id: Tax id
+    website: Website
+    email: E-mail
+    phone: Phone
+    mobile: Mobile
+    industry: Industry
+    street: Street
+    postal_code: Postal code
+    city: City
+    region: Region
+    country: Country (ISO code)
+    description: Description
+    first_name: First name
+    last_name: Last name
+    job_title: Job title
+    owner: Owner
+    owner_none: No owner
+    tags: Tags
+    active: Active
+    archived: Archived
+    archive: Archive
+    restore: Bring back
+    archived_flash: The field is archived. Its values are kept and hidden.
+    restored: The field is back.
+    defined: The field was added.
+    saved: The field was saved.
+    save: Save field
+    edit: Edit field
+    edit_title: 'Field: %name%'
+    add:
+        company: New field for companies
+        contact: New field for contacts
+    error:
+        required: This field is required.
+        type: This value does not fit the field.
+    form:
+        key: Key
+        key_help: 'Lowercase letters, digits and "_"; it cannot change later.'
+        label: Label
+        type: Type
+        choices: Choices
+        choices_help: One choice per line (choice fields only).
+        required: Required
+        position: Position
+field_type:
+    text: Text
+    textarea: Long text
+    number: Number
+    date: Date
+    boolean: Yes / no
+    choice: Choice
+    url: Link
+    email: E-mail
+fields:
+    title: Custom fields
+    intro: Fields of your own for companies and contacts. Archived fields keep their values.
+    empty: No custom fields yet.
+    define_for: 'Define a field for:'
+    col:
+        subject: For
+        state: State
+record:
+    new:
+        company: New company
+        contact: New contact
+    edit_title: 'Edit %name%'
+    open: Open
+    edit: Edit
+    merge: Merge
+    merge_with: Merge into this record
+    trash: Move to trash
+    trash_confirm: Move this record to the trash? It can be restored for a while.
+    restore: Restore
+    purge: Delete for good
+    purge_confirm: Delete this record and everything attached to it for good?
+    erase: Erase personal data
+    erase_confirm: "Erase this contact's personal data? Notes, links and the timeline are deleted; this cannot be undone."
+    vcard: vCard
+    gdpr_export: Personal data export
+    details: Details
+    custom: More fields
+    contacts: Contacts
+    companies: Companies
+    affiliations_empty: None yet.
+    duplicates: Possible duplicates
+    created: The record was created.
+    saved: The record was saved.
+    trashed: The record is in the trash.
+    restored: The record was restored.
+    purged: The record was deleted.
+    erased: "The contact's personal data was erased."
+affiliation:
+    add: Add a company
+    save: Add
+    added: The company was added.
+    removed: The company was removed.
+    remove: Remove
+    primary: Primary
+    form:
+        company: Company
+        role: Role
+        primary: Primary company
+link:
+    title: Linked
+    add: Link to
+    save: Link
+    added: The link was added.
+    removed: The link was removed.
+    remove: Remove
+    form:
+        type: Type
+        id: Id
+        label: Label
+panel:
+    empty: Nothing here yet.
+    more: See all
+note:
+    title: Notes
+    add: Add a note
+    save: Save note
+    added: The note was added.
+    saved: The note was saved.
+    deleted: The note was deleted.
+    delete: Delete note
+    delete_confirm: Delete this note?
+    edit: Edit
+    empty: No notes yet.
+    pinned: Pinned
+    form:
+        body: Note
+        pinned: Pin it to the top
+tags:
+    title: Tags
+    title_record: Tags
+    intro: Tags group companies and contacts; lists filter by them.
+    empty: No tags yet.
+    save: Save tags
+    saved: The tags were saved.
+    form:
+        tags: Tags
+tag:
+    add: New tag
+    save: Save tag
+    created: The tag was created.
+    saved: The tag was saved.
+    deleted: The tag was deleted.
+    delete: Delete tag
+    edit: Edit
+    edit_title: 'Tag: %name%'
+    form:
+        name: Name
+        colour: Colour
+colour:
+    neutral: Grey
+    blue: Blue
+    green: Green
+    yellow: Yellow
+    orange: Orange
+    red: Red
+    purple: Purple
+    teal: Teal
+consent:
+    title: Consent
+    add: Record a consent decision
+    save: Record
+    recorded: The decision was recorded.
+    empty: No consent recorded.
+    granted: Given
+    withdrawn: Withdrawn
+    form:
+        purpose: Purpose
+        decision: Decision
+        evidence: Evidence
+        evidence_help: 'Where it comes from, e.g. "signed form 2026-11-18" (no other personal data).'
+    purpose:
+        marketing_email: Marketing e-mails
+        newsletter: Newsletter
+        tracking: E-mail open and click tracking
+    source:
+        form: Form
+        import: Import
+        manual: Recorded by hand
+        portal: Customer portal
+        api: API
+timeline:
+    title: Timeline
+    empty: Nothing has happened yet.
+    open: Open
+activity:
+    created: 'Created by %actor%'
+    updated: 'Updated by %actor%'
+    owner_changed: 'Owner changed by %actor%'
+    trashed: 'Moved to the trash by %actor%'
+    restored: 'Restored by %actor%'
+    merged: 'Another record was merged into this one by %actor%'
+    note_added: 'Note added by %actor%'
+    note_edited: 'Note edited by %actor%'
+    note_deleted: 'Note deleted by %actor%'
+    tagged: 'Tagged by %actor%'
+    untagged: 'Tag removed by %actor%'
+    linked: 'Linked by %actor%'
+    unlinked: 'Link removed by %actor%'
+    affiliated: 'Company link added by %actor%'
+    unaffiliated: 'Company link removed by %actor%'
+    consent_given: 'Consent given (recorded by %actor%)'
+    consent_withdrawn: 'Consent withdrawn (recorded by %actor%)'
+    imported: 'Imported by %actor%'
+    exported: 'Personal data exported by %actor%'
+    host: 'Update'
+merge:
+    title: 'Merge into %name%'
+    intro: 'Tick the values to take from the other record; everything attached to it moves here and it becomes a pointer to this record.'
+    pick_intro: Pick the record to merge into this one.
+    duplicates: Possible duplicates
+    preview: Compare
+    confirm: Merge
+    done: The records were merged.
+    compare: '%other% into %survivor%'
+    moves: '%notes% notes, %tags% tags, %links% links, %affiliations% company links and %activities% timeline entries move.'
+    col:
+        field: Field
+    form:
+        other: Other record id
+        other_help: The id in the address of its page.
+import:
+    title: Import
+    intro: 'A CSV file (header row, "," or ";", UTF-8) or a vCard file of contacts.'
+    upload: Upload and preview
+    show_title: 'Import: %file%'
+    preview: First rows
+    confirm: Import
+    continue: Continue
+    cancel: Cancel import
+    cancelled: The import was cancelled.
+    back: Back to the list
+    done: The import finished.
+    running: 'The import is running: continue to process the next rows.'
+    ok: Ready
+    duplicate_of: 'Same e-mail as %name%'
+    summary: '%done% of %total% rows processed.'
+    status:
+        preview: Check the mapping, then import.
+        running: Running
+        done: Finished
+        failed: Failed
+        cancelled: Cancelled
+    outcome:
+        pending: Waiting
+        created: Created
+        updated: Updated
+        duplicate: Already there
+        invalid: Invalid
+        limit: Over the plan limit
+    col:
+        check: Check
+    subject:
+        contacts: Contacts
+        companies: Companies
+    format:
+        csv: CSV
+        vcard: vCard
+    policy:
+        skip: Skip rows whose e-mail exists
+        update: Update the existing contact
+    target:
+        skip: '(skip this column)'
+        company: Company (existing, by name)
+        tags: Tags (existing, comma separated)
+    form:
+        subject: Import
+        format: Format
+        file: File
+        file_help: Up to 5 000 rows.
+        policy: Existing e-mails
+    error:
+        read: The file could not be read.
+        too_large: The file is too large.
+        too_many_rows: The file has too many rows.
+        encoding: The file is not UTF-8 text.
+        header: 'The header row is missing, has an empty column or a column twice.'
+        empty: The file has no rows.
+        vcard_contacts: vCard files import contacts only.
+        mapping: 'Map at least one column, each field once.'
+settings:
+    title: Settings
+    intro: How long the CRM keeps what it no longer needs.
+    saved: The settings were saved.
+    form:
+        trash_days: Days a trashed record can be restored (7-365)
+        timeline_years: Years the timeline is kept (1-10)
+        import_keep_days: Days the rows of a finished import are kept (1-90)
+        merge_keep_days: Days a merge keeps the merged record's values (1-365)
+search:
+    group:
+        companies: Companies
+        contacts: Contacts
+    see_all: 'See all %count%'
+flash:
+    conflict:
+        crm_record_stale: 'Someone changed this record at the same moment. The form shows the current values: check them and save again.'
+        crm_record_merged: This record was merged into another one.
+        crm_record_trashed: This record is in the trash.
+        crm_merge_stale: One of the records changed or was merged meanwhile. Compare again.
+        crm_import_running: This import is already running or finished.
+        crm_limit_reached: 'Your plan limit is reached: no more records of this kind can be added.'
+        crm_settings_stale: Someone changed the settings at the same moment. Check them and save again.
+error:
+    required: This field is required.
+    invalid: This value is not valid.
+    too_long: This value is too long.
+    unknown_field: Unknown field.
+    email: Not an e-mail address.
+    url: 'Not a web address (http:// or https://).'
+    phone: Not a phone number.
+    country: Use the two-letter country code (ES, FR…).
+    contact_name: A contact needs a first or a last name.
+    email_taken: Another contact already has this e-mail.
+    owner_unknown: This person cannot own records.
+    tag_unknown: Unknown tag.
+    tag_name: A tag name has 1 to 60 characters.
+    tag_taken: A tag with this name exists.
+    field_key: 'A key has 1 to 40 lowercase letters, digits or "_", starting with a letter.'
+    field_key_reserved: This key is a built-in field.
+    field_key_taken: A field with this key exists.
+    field_limit: No more custom fields can be added.
+    field_choices: A choice field needs 1 to 50 choices.
+    note_invalid: A note has up to 10 000 characters of text.
+    consent_purpose: Unknown purpose.
+    merge_same: A record cannot be merged into itself.
+    out_of_range: This value is out of range.
+    csrf: The form expired. Reload the page and try again.

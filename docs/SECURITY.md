@@ -158,8 +158,10 @@ The tenant is the controller; the bundle is the tool.
   it. Call it only from trusted server-side code; never expose it to end users or agent tools (MCP).
 - **The placeholder `anonymised` is reserved** (`ActorRef::ANONYMISED`): `CrmAccess` treats it as no actor whatever
   the checker returns, the default checker and directory never derive it (nor `anonymous`) for a signed-in person,
-  `RecordService` refuses it as an owner and the visibility adapter drops it from listener owners, so nobody can
-  inherit the records of anonymised people (audit VD-1).
+  `RecordService` refuses it as an owner, `CrmAccess::visibleOwners()` drops it whatever the visibility service (the
+  bundle's or a host's) returns, it is never sent to the host resolver or directory for a name, and an import whose
+  uploader was anonymised resumes as the system actor, so nobody can inherit the records of anonymised people (audits
+  VD-1, VD2).
 - **Actor ids.** The actor id stored everywhere comes from `CrmActorResolverInterface::idOf()` (default the
   identifier). A host whose identifiers can change or be reused (e-mails) should return a stable id, or a former
   address's new holder inherits the old owner's records under `resource_scoping`.

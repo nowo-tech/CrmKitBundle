@@ -11,6 +11,7 @@ use Nowo\CrmKitBundle\Domain\Value\ExactId;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmActorResolverInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\IdentifierActorResolver;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
@@ -51,7 +52,7 @@ final readonly class SecurityActorDirectory implements CrmActorDirectoryInterfac
     {
         $user = $this->tokens?->getToken()?->getUser();
         $id   = $user instanceof UserInterface ? $this->actors->idOf($user) : '';
-        if (!$user instanceof UserInterface || !ExactId::isValid($id) || ActorRef::isReserved($id)) {
+        if (!$user instanceof UserInterface || !ExactId::isValid($id) || ActorRef::isReserved($id) || $id === SecurityCrmAccessChecker::ANONYMOUS) {
             return null;
         }
         $profile = $this->actors->resolve([$id])[$id] ?? null;

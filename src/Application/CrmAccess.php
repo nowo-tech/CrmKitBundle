@@ -17,6 +17,8 @@ use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Psr\Clock\ClockInterface;
 
+use function array_filter;
+use function array_values;
 use function in_array;
 
 /**
@@ -44,7 +46,11 @@ final readonly class CrmAccess
      */
     public function visibleOwners(CrmContext $context): ?array
     {
-        return $this->visibility?->visibleOwners($context->tenant, $context->actor);
+        $owners = $this->visibility?->visibleOwners($context->tenant, $context->actor);
+
+        // Whatever the visibility service (the bundle's or a host's) returns, the anonymised placeholder is never a
+        // visible owner (audits VD-1, VD2-7).
+        return $owners === null ? null : array_values(array_filter($owners, static fn (string $o): bool => !ActorRef::isReserved($o)));
     }
 
     /**

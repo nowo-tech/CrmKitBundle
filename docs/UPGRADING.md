@@ -48,18 +48,36 @@ CREATE TABLE crm_actor_map (old_id VARCHAR(128) NOT NULL PRIMARY KEY, new_id VAR
 
 INSERT INTO crm_actor_map (old_id, new_id) SELECT email, uuid FROM app_user;   -- your users
 
--- Pre-check: must return no row. A new id may not be the reserved placeholder, nor an identifier already stored that
--- the map does not replace (it would merge two people).
-WITH stored (id) AS (
+-- Pre-check: must return no row. A new id may not be reserved ('anonymised', 'anonymous'), nor an id already stored
+-- (in a column or inside a timeline / merge JSON document) that the map does not replace, nor shared by two old ids:
+-- each would merge two people. MySQL 8.4 / MariaDB 11.4:
+WITH stored_ids (id) AS (
     SELECT owner_id FROM nowo_crm_company UNION SELECT created_by_id FROM nowo_crm_company UNION SELECT updated_by_id FROM nowo_crm_company
     UNION SELECT owner_id FROM nowo_crm_contact UNION SELECT created_by_id FROM nowo_crm_contact UNION SELECT updated_by_id FROM nowo_crm_contact
     UNION SELECT author_id FROM nowo_crm_note UNION SELECT actor_id FROM nowo_crm_activity UNION SELECT recorded_by_id FROM nowo_crm_consent
     UNION SELECT created_by_id FROM nowo_crm_host_link UNION SELECT created_by_id FROM nowo_crm_role_assignment
     UNION SELECT created_by_id FROM nowo_crm_import UNION SELECT actor_id FROM nowo_crm_merge UNION SELECT updated_by_id FROM nowo_crm_settings
+    UNION SELECT JSON_UNQUOTE(JSON_EXTRACT(params, '$.owner')) FROM nowo_crm_activity WHERE kind = 'owner_changed'
+    UNION SELECT JSON_UNQUOTE(JSON_EXTRACT(snapshot, '$.owner')) FROM nowo_crm_merge
 )
 SELECT m.new_id FROM crm_actor_map m
- WHERE m.new_id = 'anonymised'
-    OR (m.new_id IN (SELECT id FROM stored) AND m.new_id NOT IN (SELECT old_id FROM crm_actor_map));
+ WHERE m.new_id IN ('anonymised', 'anonymous')
+    OR (m.new_id IN (SELECT id FROM stored_ids) AND m.new_id NOT IN (SELECT old_id FROM crm_actor_map))
+    OR m.new_id IN (SELECT new_id FROM crm_actor_map GROUP BY new_id HAVING COUNT(*) > 1);
+-- PostgreSQL 16: the same query with the JSON owners read by ->>
+WITH stored_ids (id) AS (
+    SELECT owner_id FROM nowo_crm_company UNION SELECT created_by_id FROM nowo_crm_company UNION SELECT updated_by_id FROM nowo_crm_company
+    UNION SELECT owner_id FROM nowo_crm_contact UNION SELECT created_by_id FROM nowo_crm_contact UNION SELECT updated_by_id FROM nowo_crm_contact
+    UNION SELECT author_id FROM nowo_crm_note UNION SELECT actor_id FROM nowo_crm_activity UNION SELECT recorded_by_id FROM nowo_crm_consent
+    UNION SELECT created_by_id FROM nowo_crm_host_link UNION SELECT created_by_id FROM nowo_crm_role_assignment
+    UNION SELECT created_by_id FROM nowo_crm_import UNION SELECT actor_id FROM nowo_crm_merge UNION SELECT updated_by_id FROM nowo_crm_settings
+    UNION SELECT params->>'owner' FROM nowo_crm_activity WHERE kind = 'owner_changed'
+    UNION SELECT snapshot->>'owner' FROM nowo_crm_merge
+)
+SELECT m.new_id FROM crm_actor_map m
+ WHERE m.new_id IN ('anonymised', 'anonymous')
+    OR (m.new_id IN (SELECT id FROM stored_ids) AND m.new_id NOT IN (SELECT old_id FROM crm_actor_map))
+    OR m.new_id IN (SELECT new_id FROM crm_actor_map GROUP BY new_id HAVING COUNT(*) > 1);
 
 -- Every id column (portable SQL). Repeat for each pair below; add ", version = version + 1" on the versioned tables
 -- (company, contact, note, import, settings) so open forms fail as stale.

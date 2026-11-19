@@ -185,6 +185,24 @@ final class AuditVdRegressionTest extends CrmTestCase
         self::assertSame('claim-elsewhere', $this->text('SELECT claim_token FROM nowo_crm_import WHERE id = ?', [$b]));
     }
 
+    public function testAnImportOfAnAnonymisedUploaderResumesAsTheSystem(): void
+    {
+        $this->boot();
+        $this->actAs('ana', 'view', 'create', 'edit', 'import', 'manage');
+        $imports = $this->service(ImportServiceInterface::class);
+        $id      = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'a.csv', "email,last_name\nnew@x.test,New\n");
+        $imports->confirm($id, ['email' => 'email', 'last_name' => 'last_name'], DuplicatePolicy::Skip, 1);
+        $this->service(CrmActorPersonalDataInterface::class)->anonymiseActor('ana');
+        self::assertSame(ActorRef::ANONYMISED, $this->text('SELECT created_by_id FROM nowo_crm_import WHERE id = ?', [$id]));
+
+        // A killed worker: the resume command finishes it with nobody signed in.
+        $this->clock()->sleep(3600);
+        $this->ctx()->actor = null;
+        self::assertSame(1, $this->service(ImportService::class)->resumeStale());
+        self::assertSame(ImportService::SYSTEM_ACTOR, $this->text("SELECT created_by_id FROM nowo_crm_contact WHERE email = 'new@x.test'"), 'never the placeholder');
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_activity WHERE actor_id = ? AND subject_type = ?', [ActorRef::ANONYMISED, 'contact']));
+    }
+
     /**
      * @param list<string> $roles
      */

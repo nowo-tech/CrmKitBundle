@@ -33,8 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `crm.actor.anonymised` per tenant after the commits, also for the batches committed before a failure. Each page is
   read without a lock and only its matched rows are locked by primary key, so a batch never blocks other tenants'
   writes. The placeholder `anonymised` (`ActorRef::ANONYMISED`) is reserved: never an actor (whatever the checker or
-  resolver returns), an owner input or a visible owner added by a listener; a signed-in person is never the demo's
-  shared actor `anonymous` either.
+  resolver returns), an owner input, a visible owner (whatever the visibility service returns), a name to resolve or
+  the actor of a resumed import; a signed-in person is never the demo's shared actor `anonymous` either. A failing
+  audit or listener for one tenant never stops the others from being released.
 - `CrmKitEvents` constants for the domain events dispatched after the commit (`CONTACT_ERASED`, `RECORDS_MERGED`,
   `HOST_LINK_REMOVED`, `RECORD_PURGED`, … : their class names), and the host's view of link, merge, erasure and purge
   changes in USAGE "Events".

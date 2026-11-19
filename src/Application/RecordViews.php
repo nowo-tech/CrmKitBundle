@@ -155,7 +155,8 @@ final readonly class RecordViews
      */
     public function actorName(TenantRef $tenant, ?string $actor): ?string
     {
-        $profile = $actor !== null && ExactId::isValid($actor) ? $this->directory->actor($tenant, new ActorRef($actor)) : null;
+        // The anonymised placeholder is nobody: never sent to the host for a name (audit VD2-7).
+        $profile = $actor !== null && ExactId::isValid($actor) && !ActorRef::isReserved($actor) ? $this->directory->actor($tenant, new ActorRef($actor)) : null;
 
         return $profile instanceof ActorProfile && $profile->ref->value === $actor ? $profile->name : null;
     }
@@ -172,7 +173,7 @@ final readonly class RecordViews
     {
         $ids = [];
         foreach ($actors as $actor) {
-            if ($actor !== null && ExactId::isValid($actor)) {
+            if ($actor !== null && ExactId::isValid($actor) && !ActorRef::isReserved($actor)) {
                 $ids[$actor] = true;
             }
         }

@@ -293,7 +293,8 @@ final readonly class ImportService implements ImportServiceInterface
         }
         $import = $this->import($tenant, $id);
         $now    = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
-        $actor ??= $import->getCreatedById() !== null && ExactId::isValid($import->getCreatedById()) ? $import->getCreatedById() : self::SYSTEM_ACTOR;
+        // An anonymised uploader is no actor: the run is then the system's (audit VD2-3).
+        $actor ??= $import->getCreatedById() !== null && ExactId::isValid($import->getCreatedById()) && !ActorRef::isReserved($import->getCreatedById()) ? $import->getCreatedById() : self::SYSTEM_ACTOR;
         $context = new CrmContext($tenant, new ActorRef($actor), $now);
         $type    = $import->getSubjectType();
         $fields  = $store->fields($tenant, $type, true);

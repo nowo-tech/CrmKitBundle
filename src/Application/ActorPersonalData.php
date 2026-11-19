@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Application;
 
 use DateTimeZone;
+use Error;
+use Exception;
 use Nowo\CrmKitBundle\Application\Port\CrmActorDataStoreInterface;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\CrmKitBundle\Domain\Event\ActorAnonymised;
@@ -17,6 +19,8 @@ use Nowo\CrmKitBundle\Domain\Value\ExactId;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Psr\Clock\ClockInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
+use ReflectionProperty;
+use Throwable;
 
 use function ksort;
 
@@ -78,7 +82,8 @@ final readonly class ActorPersonalData implements CrmActorPersonalDataInterface
     public function anonymiseActor(string $actorId): int
     {
         $this->check($actorId);
-        $counts = [];
+        $counts  = [];
+        $failure = null;
         try {
             foreach (CrmActorDataStoreInterface::KINDS as $kind) {
                 $after = null;
@@ -91,32 +96,62 @@ final readonly class ActorPersonalData implements CrmActorPersonalDataInterface
                     $after = $page['next'];
                 } while ($after !== null);
             }
-        } finally {
-            // Even when a later batch fails, the batches already committed are announced and audited (audit VD-3).
-            $total = $this->release($counts);
+        } catch (Throwable $e) {
+            $failure = $e;
+        }
+        // Even when a later batch failed, the batches already committed are audited and announced (audit VD-3), each
+        // tenant on its own: one failing audit or listener never loses the others (audit VD2-5).
+        [$total, $released] = $this->release($counts);
+        if ($failure instanceof Throwable) {
+            // The original failure is what the caller sees; a release failure is attached to the end of its chain.
+            throw $released instanceof Throwable ? $this->chain($failure, $released) : $failure;
+        }
+        if ($released instanceof Throwable) {
+            throw $released;
         }
 
         return $total;
     }
 
     /**
-     * Audits and announces the committed references per tenant; their total.
+     * Audits and announces the committed references per tenant; their total and the first release failure.
      *
      * @param array<array-key, int> $counts tenant => references replaced and committed
+     *
+     * @return array{int, Throwable|null}
      */
-    private function release(array $counts): int
+    private function release(array $counts): array
     {
         ksort($counts, SORT_STRING);
-        $now   = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
-        $total = 0;
+        $now     = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
+        $total   = 0;
+        $failure = null;
         foreach ($counts as $tenant => $count) {
-            $ref = new TenantRef((string) $tenant);
-            $this->audit->record(new AuditEntry($ref, null, 'crm.actor.anonymised', null, null, ['references' => $count], $now));
-            $this->events?->dispatch(new ActorAnonymised($ref, $now, $count));
             $total += $count;
+            try {
+                $ref = new TenantRef((string) $tenant);
+                $this->audit->record(new AuditEntry($ref, null, 'crm.actor.anonymised', null, null, ['references' => $count], $now));
+                $this->events?->dispatch(new ActorAnonymised($ref, $now, $count));
+            } catch (Throwable $e) {
+                $failure ??= $e;
+            }
         }
 
-        return $total;
+        return [$total, $failure];
+    }
+
+    /**
+     * `$failure` with `$cause` attached as the previous exception of the last one in its chain.
+     */
+    private function chain(Throwable $failure, Throwable $cause): Throwable
+    {
+        $last = $failure;
+        while ($last->getPrevious() instanceof Throwable) {
+            $last = $last->getPrevious();
+        }
+        (new ReflectionProperty($last instanceof Exception ? Exception::class : Error::class, 'previous'))->setValue($last, $cause);
+
+        return $failure;
     }
 
     /**

@@ -71,6 +71,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The CSV export has a `roles` column after `owner`.
 - The minimum database versions are MySQL 8.0, MariaDB 10.6 and PostgreSQL 9.5 (`SKIP LOCKED`; PostgreSQL 10 with
   DBAL 4).
+- `updated_at` of companies, contacts, notes and settings is kept to the microsecond (`DATETIME(6)` /
+  `TIMESTAMP(6)`, type `nowo_crm_utc_datetime_micro`): every write of a company or contact moves its optimistic
+  version, also two role-, tag- or affiliation-only changes in one second, so a stale form is refused (the
+  whole-second column hid them from Doctrine's change detection).
 - An empty `access_roles`, `manage_roles`, `amounts_roles` or `campaigns_roles` list means **any authenticated
   user** for that area (0.1.0's empty lists denied); `settings_roles`, `export_roles` and `erase_roles` must name at
   least one role.

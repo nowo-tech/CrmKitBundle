@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
+use DateTimeImmutable;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
 use Nowo\CrmKitBundle\Domain\Enum\ImportFormat;
@@ -66,9 +67,6 @@ final class RolesAndPurposesTest extends CrmTestCase
         $this->records()->setRoles(SubjectType::Company, $beta, ['partner', 'distributor']);
         self::assertSame(['partner', 'distributor'], $this->reader()->record(SubjectType::Company, $beta)->roles);
         self::assertSame(2, $this->reader()->record(SubjectType::Company, $beta)->version, 'an unchanged set writes nothing');
-        // The version follows the stored edit time (whole seconds, kept exact: owner decision 2026-11-19, audit UP): a
-        // second write of the same person in the same second keeps the version, so the clock moves on here.
-        $this->clock()->sleep(1);
         $version = $this->records()->update($beta, new RecordInput(SubjectType::Company, [], roles: ['customer']), 2);
         self::assertSame(3, $version);
         self::assertSame(['customer'], $this->reader()->record(SubjectType::Company, $beta)->roles);
@@ -383,6 +381,43 @@ final class RolesAndPurposesTest extends CrmTestCase
         $this->client->submit($form);
         self::assertSame(303, $this->client->getResponse()->getStatusCode());
         self::assertSame([$ada->id], $this->column('SELECT contact_id FROM nowo_crm_affiliation WHERE company_id = ? AND is_primary_contact = ?', [$acme, true]));
+    }
+
+    public function testRelationOnlyWritesInOneSecondMoveTheVersion(): void
+    {
+        $this->boot();
+        $this->admin();
+        $acme = $this->company('Acme');
+        $ada  = $this->contact('Ada', 'A');
+        $beta = $this->company('Beta');
+        $read = fn (SubjectType $type, string $id): int => $this->reader()->record($type, $id)->version;
+
+        // Two role-only writes within one second (the edit time is kept to the microsecond): two versions.
+        $v = $read(SubjectType::Company, $acme);
+        $this->clock()->sleep(0.001);
+        $this->records()->setRoles(SubjectType::Company, $acme, ['customer']);
+        $this->clock()->sleep(0.001);
+        $this->records()->setRoles(SubjectType::Company, $acme, ['supplier']);
+        self::assertSame($v + 2, $read(SubjectType::Company, $acme));
+        self::assertSame('10:00:00.002000', (new DateTimeImmutable($this->text('SELECT updated_at FROM nowo_crm_company WHERE id = ?', [$acme])))->format('H:i:s.u'), 'the stored time keeps its microseconds');
+        try {
+            $this->records()->update($acme, new RecordInput(SubjectType::Company, ['city' => 'Madrid']), $v + 1);
+            self::fail('a form of the previous version was stored');
+        } catch (ConflictException $e) {
+            self::assertSame(ConflictException::STALE, $e->errorCode);
+        }
+
+        // Two affiliation-only writes of a contact at one frozen instant: still two versions.
+        $c = $read(SubjectType::Contact, $ada);
+        $this->records()->affiliate($ada, $acme, 'CFO', true);
+        $this->records()->affiliate($ada, $beta, null, false);
+        self::assertSame($c + 2, $read(SubjectType::Contact, $ada));
+        try {
+            $this->records()->update($ada, new RecordInput(SubjectType::Contact, ['job_title' => 'X']), $c + 1);
+            self::fail('a stale contact form was stored');
+        } catch (ConflictException $e) {
+            self::assertSame(ConflictException::STALE, $e->errorCode);
+        }
     }
 
     public function testHiddenPurposesStayAndVersionsMoveWithRoles(): void

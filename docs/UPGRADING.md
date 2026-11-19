@@ -53,6 +53,27 @@ CREATE UNIQUE INDEX nowo_crm_role_assignment_key ON nowo_crm_role_assignment (te
 CREATE INDEX nowo_crm_role_assignment_role ON nowo_crm_role_assignment (tenant_id, role_key, subject_type);
 ```
 
+**Edit times to the microsecond.** `updated_at` of companies, contacts, notes and settings becomes `DATETIME(6)` /
+`TIMESTAMP(6)` (type `nowo_crm_utc_datetime_micro`), so every write moves the record's optimistic version, also two
+role-, tag- or affiliation-only changes in one second. Existing values keep their seconds (fraction zero):
+
+```sql
+-- MySQL 8.0+ / MariaDB 10.6+
+ALTER TABLE nowo_crm_company MODIFY updated_at DATETIME(6) NOT NULL;
+ALTER TABLE nowo_crm_contact MODIFY updated_at DATETIME(6) NOT NULL;
+ALTER TABLE nowo_crm_note MODIFY updated_at DATETIME(6) NOT NULL;
+ALTER TABLE nowo_crm_settings MODIFY updated_at DATETIME(6) NOT NULL;
+
+-- PostgreSQL
+ALTER TABLE nowo_crm_company ALTER COLUMN updated_at TYPE TIMESTAMP(6) WITHOUT TIME ZONE;
+ALTER TABLE nowo_crm_contact ALTER COLUMN updated_at TYPE TIMESTAMP(6) WITHOUT TIME ZONE;
+ALTER TABLE nowo_crm_note ALTER COLUMN updated_at TYPE TIMESTAMP(6) WITHOUT TIME ZONE;
+ALTER TABLE nowo_crm_settings ALTER COLUMN updated_at TYPE TIMESTAMP(6) WITHOUT TIME ZONE;
+```
+
+`doctrine:migrations:diff` produces them too (the metadata listener declares the column). On MySQL / MariaDB the
+`MODIFY` copies the table and PostgreSQL may rewrite it: run it in a maintenance window on large tables.
+
 Contract section 17 allows only nullable columns or indexes on an earlier table; the two new columns are `NOT NULL`
 **with a default**, which needs no backfill. On MySQL 8.0+, MariaDB 10.6+ and PostgreSQL 11+ adding them is a metadata
 change; **on PostgreSQL 9.5 – 10, `ADD COLUMN … NOT NULL DEFAULT` rewrites the whole table** under an exclusive lock:

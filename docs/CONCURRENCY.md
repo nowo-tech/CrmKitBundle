@@ -184,7 +184,10 @@ amount again, the rows attributed to the person who clicked (the resume command 
 killed worker) and finishes it. A double confirm, a double "Continue" or two runners never store a row twice: the
 chunk holds the import row lock, a runner whose token was replaced stops, and each row settles once. Two imports of
 the same person store one contact (the e-mail key); the second row becomes `duplicate` (or `updated`). No Messenger
-handler ships in 0.1.0.
+handler ships in 0.1.0. **(0.2.0)** The resume command runs
+with nobody signed in: it settles only rows that need no decision on one record and stops before the first one that
+updates an existing contact or names a company, leaving it (and the rows after it) pending under the claim for the
+next person's "Continue" (audit UP2-1).
 
 ## Isolation and locks
 

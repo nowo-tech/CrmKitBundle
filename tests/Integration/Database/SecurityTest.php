@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
+use LogicException;
 use Nowo\CrmKitBundle\Application\CrmReader;
+use Nowo\CrmKitBundle\Application\ImportService;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
 use Nowo\CrmKitBundle\Domain\Enum\ImportFormat;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
+use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Read\AffiliationView;
-use Nowo\CrmKitBundle\Domain\Read\ImportRowView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
@@ -36,6 +38,7 @@ use Symfony\Component\Security\Core\User\InMemoryUser;
 use function array_map;
 use function implode;
 use function iterator_to_array;
+use function range;
 
 /**
  * REQ-UI-002 on the pages with the bundle's own checkers (no host access checker): anonymous ⇒ the firewall's entry
@@ -91,6 +94,7 @@ final class SecurityTest extends CrmTestCase
         $leoDup = $records->create(new RecordInput(SubjectType::Contact, ['first_name' => 'Dup', 'last_name' => 'One'], 'leo'));
         $records->create(new RecordInput(SubjectType::Company, ['name' => 'Anas Co'], 'ana'));
         $shared = $this->company('Shared');
+        $gamma  = $this->company('Gamma');
         $records->affiliate($anaC, $shared, null, true);
         $leoAff = $records->affiliate($leoC, $shared, null, true, true);
         $links  = $this->service(HostLinkServiceInterface::class);
@@ -108,7 +112,7 @@ final class SecurityTest extends CrmTestCase
         self::assertNotNull($found);
         self::assertSame([[$leoC], 1], [$ids($found[0]), $found[1]], 'search and its total');
         self::assertSame([], $reader->duplicates(SubjectType::Contact, $leoDup), 'duplicates');
-        self::assertSame([$shared], $ids($reader->list(new ListQuery(SubjectType::Company))->rows), 'the company picker');
+        self::assertSame([$gamma, $shared], $ids($reader->list(new ListQuery(SubjectType::Company))->rows), 'the company picker');
         self::assertSame([$leoC], array_map(static fn (AffiliationView $a): string => $a->contactId, $reader->record(SubjectType::Company, $shared)->affiliations), 'a page\'s related records');
         self::assertSame([$leoC], array_map(static fn (SubjectRef $r): string => $r->id->value, $links->subjectsLinkedTo(new HostObjectRef('project', 'p1'))));
         foreach ($reader->timeline(SubjectType::Company, $shared) as $entry) {
@@ -126,12 +130,31 @@ final class SecurityTest extends CrmTestCase
         // A visibility of no owner at all (a host port may answer it) leaves the ownerless records only.
         self::assertSame(0, $this->service(CrmStoreInterface::class)->list(new TenantRef('acme'), new ListQuery(SubjectType::Contact), [])[1]);
 
-        // An import that would update ana's contact, or link ana's company, is refused per row (nothing echoed).
+        // More visible owners than one query may bind: a clear refusal (allowAll() and record checks instead).
+        try {
+            $this->service(CrmStoreInterface::class)->list(new TenantRef('acme'), new ListQuery(SubjectType::Contact), array_map(static fn (int $i): string => 'o' . $i, range(1, 1001)));
+            self::fail('1001 owners bound');
+        } catch (LogicException $e) {
+            self::assertStringContainsString('allowAll()', $e->getMessage());
+        }
+
+        // A taken e-mail names the other contact only to someone who may see it.
+        try {
+            $records->create(new RecordInput(SubjectType::Contact, ['last_name' => 'X', 'email' => 'ana-c@x.test']));
+            self::fail('a second contact with one e-mail');
+        } catch (InvalidInputException $e) {
+            self::assertSame([['email' => 'error.email_taken'], []], [$e->errors, $e->params]);
+        }
+
+        // An import that would update ana's contact is refused per row (nothing echoed); ana's company is unknown to
+        // leo, so the row is stored without that link.
         $imports = $this->service(ImportServiceInterface::class);
         $id      = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'u.csv', "email,last_name,company\nana-c@x.test,Changed,\nnew@x.test,New,Anas Co\n");
         $imports->confirm($id, ['email' => 'email', 'last_name' => 'last_name', 'company' => 'company'], DuplicatePolicy::Update, 1);
         self::assertTrue($imports->run($id));
-        self::assertSame([['error.forbidden', null], ['error.forbidden', null]], array_map(static fn (ImportRowView $r): array => [$r->message, $r->recordId], $imports->preview($id)->rows));
+        $rows = $imports->preview($id)->rows;
+        self::assertSame([['invalid', 'error.forbidden', null], ['created', null]], [[$rows[0]->outcome->value, $rows[0]->message, $rows[0]->recordId], [$rows[1]->outcome->value, $rows[1]->message]]);
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE contact_id = ?', [(string) $rows[1]->recordId]), 'no link to an invisible company');
         self::assertSame('Owned', $this->text('SELECT last_name FROM nowo_crm_contact WHERE id = ?', [$anaC]));
         $skip = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 's.csv', "email,last_name\nana-c@x.test,X\n");
         $imports->confirm($skip, ['email' => 'email', 'last_name' => 'last_name'], DuplicatePolicy::Skip, 1);
@@ -144,12 +167,12 @@ final class SecurityTest extends CrmTestCase
         $dispatcher->addListener(CrmKitEvents::RECORD_VISIBILITY, static function (RecordVisibilityEvent $event): void {
             $event->addOwner('ana');
         });
-        self::assertSame(4, $reader->list(new ListQuery(SubjectType::Contact))->total);
+        self::assertSame(5, $reader->list(new ListQuery(SubjectType::Contact))->total);
         self::assertSame($anaC, $reader->record(SubjectType::Contact, $anaC)->id);
 
         // Merging needs delete on the merged record; removing a company's primary contact needs edit on the company.
-        $dispatcher->addListener(CrmKitEvents::RECORD_ACCESS_CHECK, static function (RecordAccessCheckEvent $event) use ($anaC, $shared): void {
-            if (($event->getAction() === 'delete' && $event->getSubjectId() === $anaC) || ($event->getAction() === 'edit' && $event->getSubjectId() === $shared)) {
+        $dispatcher->addListener(CrmKitEvents::RECORD_ACCESS_CHECK, static function (RecordAccessCheckEvent $event) use ($anaC, $shared, $gamma): void {
+            if (($event->getAction() === 'delete' && $event->getSubjectId() === $anaC) || ($event->getAction() === 'edit' && $event->getSubjectId() === $shared) || ($event->getAction() === 'view' && $event->getSubjectId() === $gamma)) {
                 $event->deny();
             }
         });
@@ -165,6 +188,67 @@ final class SecurityTest extends CrmTestCase
         } catch (AccessDeniedException) {
         }
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE id = ? AND is_primary_contact = ?', [$leoAff, true]));
+
+        // A visible company a listener hides from leo: the row naming it is refused.
+        $denied = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'g.csv', "email,last_name,company\ng@x.test,G,Gamma\n");
+        $imports->confirm($denied, ['email' => 'email', 'last_name' => 'last_name', 'company' => 'company'], DuplicatePolicy::Update, 1);
+        self::assertTrue($imports->run($denied));
+        self::assertSame('error.forbidden', $imports->preview($denied)->rows[0]->message);
+
+        // The same taken e-mail named to someone who may see the contact.
+        $this->signIn('root');
+        try {
+            $records->create(new RecordInput(SubjectType::Contact, ['last_name' => 'X', 'email' => 'ana-c@x.test']));
+            self::fail('a second contact with one e-mail');
+        } catch (InvalidInputException $e) {
+            self::assertSame(['%id%' => $anaC], $e->params);
+        }
+    }
+
+    public function testTheResumeCommandLeavesRowsThatNeedARecordDecisionToAPerson(): void
+    {
+        $this->boot(['access_checker' => null, 'import' => ['chunk_rows' => 10]]);
+        $this->signIn('root');
+        $records = $this->records();
+        $ada     = $records->create(new RecordInput(SubjectType::Contact, ['last_name' => 'Ada', 'email' => 'ada@x.test']));
+        $this->company('Acme');
+        $imports = $this->service(ImportServiceInterface::class);
+        $id      = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'r.csv', "email,last_name,company\nnew@x.test,New,\nada@x.test,Changed,\nbob@x.test,Bob,Acme\n");
+        $imports->confirm($id, ['email' => 'email', 'last_name' => 'last_name', 'company' => 'company'], DuplicatePolicy::Update, 1);
+
+        // A killed worker: the claim goes stale and the resume command runs with nobody signed in.
+        $this->clock()->sleep(3600);
+        $this->signOut();
+        self::assertSame(0, $this->service(ImportService::class)->resumeStale());
+        $this->signIn('root');
+        $rows = $imports->preview($id)->rows;
+        self::assertSame(['created', 'pending', 'pending'], [$rows[0]->outcome->value, $rows[1]->outcome->value, $rows[2]->outcome->value], 'the update and the company row wait for a person');
+        self::assertSame('Ada', $this->text('SELECT last_name FROM nowo_crm_contact WHERE id = ?', [$ada]));
+
+        // The next person's "Continue" settles them under their own access.
+        self::assertTrue($imports->run($id));
+        $rows = $imports->preview($id)->rows;
+        self::assertSame(['created', 'updated', 'created'], [$rows[0]->outcome->value, $rows[1]->outcome->value, $rows[2]->outcome->value]);
+        self::assertSame('Changed', $this->text('SELECT last_name FROM nowo_crm_contact WHERE id = ?', [$ada]));
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation'));
+
+        // A new contact that names a company waits for a person too.
+        $named = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'n.csv', "email,last_name,company\ncyd@x.test,Cyd,Acme\n");
+        $imports->confirm($named, ['email' => 'email', 'last_name' => 'last_name', 'company' => 'company'], DuplicatePolicy::Skip, 1);
+        $this->clock()->sleep(3600);
+        $this->signOut();
+        self::assertSame(0, $this->service(ImportService::class)->resumeStale());
+        $this->signIn('root');
+        self::assertSame('pending', $imports->preview($named)->rows[0]->outcome->value);
+    }
+
+    private function signOut(): void
+    {
+        $container = $this->kernel->getContainer()->get('test.service_container');
+        self::assertInstanceOf(ContainerInterface::class, $container);
+        $tokens = $container->get('security.token_storage');
+        self::assertInstanceOf(TokenStorageInterface::class, $tokens);
+        $tokens->setToken(null);
     }
 
     private function signIn(string $user): void

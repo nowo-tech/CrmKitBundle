@@ -104,6 +104,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `primary_contact` timeline entry.
 - The scoping bypass asks the area checker (`canManageSettings`), so a host checker decides it too.
 
+### Fixed (audit UP-2, before the release)
+
+- `nowo:crm-kit:import:resume` (nobody signed in) settled every row needing a decision on one record as
+  `error.forbidden`: it now stops before such a row (an update of an existing contact, a named company) and leaves it
+  pending for a person's "Continue".
+- A taken e-mail (form error, import preview) names the other contact only to someone who may see it.
+- An import resolves a named company among the companies the importer may see (an invisible one is unknown), once,
+  and links exactly the company it checked.
+- More than 1 000 visible owners is refused with a clear `LogicException` (one SQL parameter each).
+- Docs: `RECORD_VISIBILITY` runs per access check; lists follow it, single records `RECORD_ACCESS_CHECK`; the
+  microsecond `ALTER`s are run by hand on DBAL 4; the GDPR export lists every affiliated company.
+
 ### Security
 
 - An import with the `update` duplicate policy rewrote existing contacts (values, custom values, tags, roles,

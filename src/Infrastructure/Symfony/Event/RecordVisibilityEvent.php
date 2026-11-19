@@ -10,8 +10,10 @@ use function array_values;
 use function in_array;
 
 /**
- * Dispatched as {@see CrmKitEvents::RECORD_VISIBILITY} once per call that lists records while
- * `security.resource_scoping` is on and the person does not see everything (`canManageSettings`). The visible owners
+ * Dispatched as {@see CrmKitEvents::RECORD_VISIBILITY} while `security.resource_scoping` is on and the person does not
+ * see everything (`canManageSettings`): once per read that returns several records **and once per decision on one
+ * record**, so a page with N access checks dispatches it N times. A listener that queries the database costs one query
+ * per dispatch; the bundle keeps no memo across them (FrankenPHP worker mode), so keep listeners cheap. The visible owners
  * start with the person; a listener adds the owners of their team (addOwner()) or opens every record (allowAll()). The
  * same set decides the default of {@see RecordAccessCheckEvent}, so lists, totals, search, exports and record pages
  * agree. Records without an owner are always visible. Request-scoped; ids only.

@@ -15,6 +15,7 @@ use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
+use LogicException;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
@@ -74,6 +75,9 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
 {
     /** Pseudo-tenant of the bundle's own claim rows in `crm_counter` (never a host tenant: the `__` prefix). */
     public const SYSTEM_TENANT = '__crm__';
+
+    /** Most owners a visibility filter binds (one SQL parameter each; PostgreSQL refuses more than 65 535). */
+    public const MAX_VISIBLE_OWNERS = 1000;
 
     /** Resource of the retention purge's single-run claim (value = unix time of the claim, 0 = free). */
     public const PURGE_CLAIM = '__purge__';
@@ -889,6 +893,9 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             $qb->andWhere('r.ownerId IS NULL');
 
             return;
+        }
+        if (count($visibleOwners) > self::MAX_VISIBLE_OWNERS) {
+            throw new LogicException('nowo_crm_kit: a nowo_crm_kit.record_visibility listener made more than ' . self::MAX_VISIBLE_OWNERS . ' owners visible. Call RecordVisibilityEvent::allowAll() for such a person and decide single records with nowo_crm_kit.record_access_check listeners instead.');
         }
         $qb->andWhere('r.ownerId IS NULL OR r.ownerId IN (:visibleOwners)')->setParameter('visibleOwners', $visibleOwners, ArrayParameterType::STRING);
     }

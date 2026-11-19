@@ -70,7 +70,10 @@ purposes (contract section 6.8) with the same model: no new permission, deny by 
 Every area also needs `canAccess`. A check on one record then goes through `CrmResourceAccessChecker` and the
 `nowo_crm_kit.record_access_check` event (a listener's deny wins). With `security.resource_scoping`, every read that
 returns several records (lists and totals, search, duplicates, CSV exports, related records, `subjectsLinkedTo()`)
-is filtered in SQL to the same visible owners as the record decision (`nowo_crm_kit.record_visibility`). Imports
+is filtered in SQL to the same visible owners as the record decision (`nowo_crm_kit.record_visibility`). Lists follow
+only `RECORD_VISIBILITY` (owner-based); `RECORD_ACCESS_CHECK` decides single-record pages and writes, so a record is
+hidden from lists through its owner. The GDPR export lists every company the contact is affiliated to. A taken e-mail
+names the other contact only to someone who may see it. Imports
 need `edit` on each existing contact they update and `view` on each company they name; a merge needs `delete` on the
 merged record. An empty role list means any authenticated user for that area. Notes: the author edits and deletes their own notes with `edit` on the
 record; another person's note needs `edit` on the record and `manage`.

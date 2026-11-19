@@ -26,9 +26,9 @@ src/Domain/Exception/      NotAvailable (404), AccessDenied (403), Conflict (409
 src/Domain/Import/         CsvParser, VcardParser (pure functions on bytes)
 src/Application/           services implementing the interfaces; CrmAccess (the gate), WriteSupport, PlanCounter,
                            RecordValidator, ImportMapping, RecordPurger, Taggings, Roles, PartyCatalogue, RecordViews
-src/Application/Port/      CrmStoreInterface (persistence port owned by the application)
+src/Application/Port/      CrmStoreInterface, CrmBatchLookupStoreInterface (persistence ports owned by the application)
 src/Application/Shared/    Effects (per-call after-commit buffer), TransactionRunnerInterface, unit exceptions
-src/Infrastructure/Doctrine/   DoctrineCrmStore, DoctrineTransactionRunner, CrmMetadataListener, BinaryCollation,
+src/Infrastructure/Doctrine/   DoctrineCrmStore, DoctrineCrmBatchLookupStore, DoctrineTransactionRunner, CrmMetadataListener, BinaryCollation,
                                UTC datetime type
 src/Infrastructure/Symfony/    DI (config tree, service definitions, compiler passes), controllers, forms, commands,
                                HTTP listeners (exceptions, conflicts, EM hygiene), port defaults, route loader

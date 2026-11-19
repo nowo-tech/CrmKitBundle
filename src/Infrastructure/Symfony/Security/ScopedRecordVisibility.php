@@ -50,6 +50,7 @@ final readonly class ScopedRecordVisibility implements CrmRecordVisibilityInterf
         $event = new RecordVisibilityEvent($user, $actor->value, $tenant->value);
         $this->events?->dispatch($event, CrmKitEvents::RECORD_VISIBILITY);
 
+        // The anonymised placeholder is dropped by CrmAccess::visibleOwners(), for this adapter and a host's alike.
         return $event->getOwners();
     }
 }

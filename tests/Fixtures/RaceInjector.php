@@ -16,6 +16,7 @@ use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tag;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use ReflectionClass;
+use RuntimeException;
 
 use function str_pad;
 
@@ -82,6 +83,18 @@ final class RaceInjector
         $this->context->bumpVersions = false;
         $em                          = $args->getObjectManager();
         $em->getConnection()->executeStatement('UPDATE ' . $em->getClassMetadata($object::class)->getTableName() . ' SET version = version + 1 WHERE id = ?', [$object->getId()]);
+    }
+
+    /**
+     * @param LifecycleEventArgs<EntityManagerInterface> $args
+     */
+    public function preRemove(LifecycleEventArgs $args): void
+    {
+        if ($args->getObject() instanceof CrmRecord && $this->context->failOnRemove) {
+            $this->context->failOnRemove = false;
+
+            throw new RuntimeException('Injected failure inside the unit.');
+        }
     }
 
     /**

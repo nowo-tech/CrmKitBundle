@@ -530,9 +530,45 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     public function takeOverImport(TenantRef $tenant, string $id, string $token, DateTimeImmutable $now, DateTimeImmutable $staleBefore): bool
     {
         return $this->connection()->executeStatement(
-            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = ?, claimed_at = ?, version = version + 1 WHERE id = ? AND tenant_id = ? AND status = ? AND claimed_at < ?',
+            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = ?, claimed_at = ?, version = version + 1 WHERE id = ? AND tenant_id = ? AND status = ? AND claimed_at < ? AND claim_token IS NOT NULL',
             [$token, $now, $id, $tenant->value, ImportStatus::Running->value, $staleBefore],
             [1 => UtcDateTimeImmutableType::NAME, 5 => UtcDateTimeImmutableType::NAME],
+        ) === 1;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function cancelImport(TenantRef $tenant, string $id, DateTimeImmutable $now, DateTimeImmutable $staleBefore): bool
+    {
+        return $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Import::class) . ' SET status = ?, finished_at = ?, claim_token = NULL, version = version + 1 WHERE id = ? AND tenant_id = ? AND (status = ? OR (status = ? AND (claim_token IS NULL OR claimed_at < ?)))',
+            [ImportStatus::Cancelled->value, $now, $id, $tenant->value, ImportStatus::Preview->value, ImportStatus::Running->value, $staleBefore],
+            [1 => UtcDateTimeImmutableType::NAME, 6 => UtcDateTimeImmutableType::NAME],
+        ) === 1;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function pauseImport(string $id, string $token, DateTimeImmutable $now): bool
+    {
+        return $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = NULL, claimed_at = ?, version = version + 1 WHERE id = ? AND status = ? AND claim_token = ?',
+            [$now, $id, ImportStatus::Running->value, $token],
+            [0 => UtcDateTimeImmutableType::NAME],
+        ) === 1;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function resumeImport(TenantRef $tenant, string $id, string $token, DateTimeImmutable $now): bool
+    {
+        return $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = ?, claimed_at = ?, version = version + 1 WHERE id = ? AND tenant_id = ? AND status = ? AND claim_token IS NULL',
+            [$token, $now, $id, $tenant->value, ImportStatus::Running->value],
+            [1 => UtcDateTimeImmutableType::NAME],
         ) === 1;
     }
 
@@ -590,7 +626,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     public function staleImports(DateTimeImmutable $before, int $limit): array
     {
         $rows = $this->connection()->fetchAllAssociative(
-            'SELECT tenant_id, id FROM ' . $this->table(Import::class) . ' WHERE status = ? AND claimed_at < ? ORDER BY id',
+            'SELECT tenant_id, id FROM ' . $this->table(Import::class) . ' WHERE status = ? AND claimed_at < ? AND claim_token IS NOT NULL ORDER BY id',
             [ImportStatus::Running->value, $before],
             [1 => UtcDateTimeImmutableType::NAME],
         );

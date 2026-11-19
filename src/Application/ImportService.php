@@ -161,6 +161,7 @@ final readonly class ImportService implements ImportServiceInterface
                 $import->getCreatedById(),
                 $import->getCreatedAt(),
                 $import->getClaimedAt(),
+                $import->isAwaitingPerson(),
             );
         });
     }
@@ -196,8 +197,15 @@ final readonly class ImportService implements ImportServiceInterface
             return $import->getStatus() === ImportStatus::Done;
         }
 
+        $token = $import->getClaimToken();
+        if ($token === null) {
+            // Paused by an unattended run: claim it now (a racing "Continue" that won runs it; this one joins its claim).
+            $mine  = $this->support->id();
+            $token = $this->support->write(fn (): bool => $this->support->store->resumeImport($context->tenant, $id, $mine, $context->now)) ? $mine : $this->support->read(fn (): ?string => $this->import($context->tenant, $id)->getClaimToken());
+        }
+
         // The rows of this run are attributed to the person who clicked (Continue), not to the uploader.
-        return $this->runClaimed($context->tenant, $id, (string) $import->getClaimToken(), $maxChunks, $context->actor->value);
+        return $this->runClaimed($context->tenant, $id, (string) $token, $maxChunks, $context->actor->value);
     }
 
     /**
@@ -208,9 +216,9 @@ final readonly class ImportService implements ImportServiceInterface
         $context = $this->support->access->context(CrmPermission::Import);
         $this->support->write(function (Effects $effects) use ($context, $id): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $import = $this->import($context->tenant, $id);
-            $stale  = $this->staleBefore($context->now);
-            $from   = $import->getStatus() === ImportStatus::Running && $import->getClaimedAt() < $stale ? ImportStatus::Running : ImportStatus::Preview;
-            if (!$this->support->store->finishImport($id, ImportStatus::Cancelled, $context->now, $from)) {
+            // One conditional UPDATE decides (audit VD-4): a preview, a paused import or a stale claim is cancelled; a
+            // claim taken meanwhile (a "Continue" or the resume command) answers crm_import_running.
+            if (!$this->support->store->cancelImport($context->tenant, $id, $context->now, $this->staleBefore($context->now))) {
                 throw new ConflictException(ConflictException::IMPORT_RUNNING, $id);
             }
             $this->support->audit($effects, $context, 'crm.import.cancelled', $import->getSubjectType(), $id);
@@ -220,8 +228,9 @@ final readonly class ImportService implements ImportServiceInterface
     /**
      * Takes over the imports whose claim is stale and runs them (resume command, no signed-in person); how many
      * finished. Nobody is signed in, so a row that needs a decision on one record (an update of an existing contact,
-     * a named company) is never settled here: the run stops before it and leaves it pending under the claim, for the
-     * next person's "Continue" to process with their own access (audit UP2-1).
+     * a named company) is never settled here: the run stops before it, leaves it pending and releases the claim, so the
+     * next person's "Continue" takes the import at once and processes it with their own access (audit UP2-1); later
+     * resume runs leave such an import alone.
      */
     public function resumeStale(int $limit = 20): int
     {
@@ -284,7 +293,8 @@ final readonly class ImportService implements ImportServiceInterface
         }
         $import = $this->import($tenant, $id);
         $now    = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
-        $actor ??= $import->getCreatedById() !== null && ExactId::isValid($import->getCreatedById()) ? $import->getCreatedById() : self::SYSTEM_ACTOR;
+        // An anonymised uploader is no actor: the run is then the system's (audit VD2-3).
+        $actor ??= $import->getCreatedById() !== null && ExactId::isValid($import->getCreatedById()) && !ActorRef::isReserved($import->getCreatedById()) ? $import->getCreatedById() : self::SYSTEM_ACTOR;
         $context = new CrmContext($tenant, new ActorRef($actor), $now);
         $type    = $import->getSubjectType();
         $fields  = $store->fields($tenant, $type, true);
@@ -310,6 +320,9 @@ final readonly class ImportService implements ImportServiceInterface
         }
         $store->advanceImport($id, array_sum($counts), $counts, $now);
         if ($paused) {
+            // Waiting for a person: the claim goes, in this transaction, so "Continue" needs no stale claim.
+            $store->pauseImport($id, $token, $now);
+
             return 'paused';
         }
         if (count($rows) === $this->chunkRows && $store->importRows($id, 1, true) !== []) {

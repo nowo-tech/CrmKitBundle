@@ -29,4 +29,13 @@ final readonly class HostObjectRef
             throw new InvalidArgumentException('A host object id must be 1-128 bytes of UTF-8 without control, format or edge whitespace characters.');
         }
     }
+
+    /**
+     * The key of the object in batch results: `<type>:<id>`, e.g. `issue:42`. The type never holds a `:`, so the
+     * first `:` splits the key even when the id contains one.
+     */
+    public function key(): string
+    {
+        return $this->type . ':' . $this->id;
+    }
 }

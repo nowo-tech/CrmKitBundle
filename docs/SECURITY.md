@@ -135,7 +135,10 @@ The tenant is the controller; the bundle is the tool.
   counter is released when the contact was active. An erased contact cannot be edited, restored or merged.
 - **Retention** (`nowo:crm-kit:purge`): trashed records after `trash_days` with every child row, timeline entries
   after `timeline_years`, import rows after `import_keep_days`, merge snapshots after `merge_keep_days`; one audit
-  entry per tenant with counts only.
+  entry per tenant with counts only. **(0.2.1)** Every committed batch of deleted records (trashed records and merge
+  tombstones) is announced after its commit with `RecordsPurged` (tenant and the records' type + id only), so a host
+  that derived rows from CRM ids can delete them; a manual `purge()` announces `RecordPurged` per record, an erasure
+  `ContactErased`. `CrmBatchLookupInterface::existing()` lets a host reconcile ids it missed.
 - **Audit and logs** carry ids, counts and codes only, never names, e-mails or note text: role edits are audited as
   `crm.roles.changed` with the added and removed keys, the company's primary contact as
   `crm.affiliation.primary_contact` with the contact id, affiliation saves with the flags and purpose keys, after the
@@ -149,6 +152,25 @@ The tenant is the controller; the bundle is the tool.
 - A host link URL returned by a resolver is rendered as given (escaped): return local paths or http(s) URLs only.
 - A provider exception is contained (the panel is skipped); a transient storage failure is rethrown so the write unit
   can replay.
+- **`CrmActorPersonalDataInterface` (`exportActor()` / `anonymiseActor()`) is a system API (0.2.1)** without any
+  tenant scope: it reads or rewrites a host person's references in every tenant and checks no permission. It is a
+  separate service so that a host GDPR controller bound to the tenant-scoped `CrmPersonalDataInterface` cannot reach
+  it. Call it only from trusted server-side code; never expose it to end users or agent tools (MCP).
+- **The placeholder `anonymised` is reserved** (`ActorRef::ANONYMISED`): `CrmAccess` treats it as no actor whatever
+  the checker returns, the default checker and directory never derive it (nor `anonymous`) for a signed-in person,
+  `RecordService` refuses it as an owner, `CrmAccess::visibleOwners()` drops it whatever the visibility service (the
+  bundle's or a host's) returns, it is never sent to the host resolver or directory for a name, and an import whose
+  uploader was anonymised resumes as the system actor, so nobody can inherit the records of anonymised people (audits
+  VD-1, VD2).
+- **Actor ids.** The actor id stored everywhere comes from `CrmActorResolverInterface::idOf()` (default the
+  identifier). A host whose identifiers can change or be reused (e-mails) should return a stable id, or a former
+  address's new holder inherits the old owner's records under `resource_scoping`.
+- **`CrmBatchLookupInterface` is a system API (0.2.1).** It is scoped to the `TenantRef` it is given (every query names
+  the tenant, every row is re-checked with `===`), but it resolves no tenant, actor or feature gate and checks no
+  permission and no record visibility (`security.resource_scoping` does not apply). Only trusted server-side code
+  (queue consumers, scheduled jobs) may call it, with a tenant taken from its own trusted data. A host must not expose
+  it, or show its results, to end users without its own permission checks; per-user reads go through
+  `CrmReaderInterface` and `HostLinkServiceInterface`, which check everything.
 
 ## Shared entity manager
 

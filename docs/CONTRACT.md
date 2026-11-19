@@ -324,6 +324,7 @@ invalid one is 404), not as `RecordId` objects; one `RecordServiceInterface` ser
 | `CrmExporterInterface` | `csv(ListQuery): iterable<string>` (one method for both types: the query's type; streamed lines, CSV-injection safe), `vcard(string $contactId): string` (vCard 4.0) |
 | `CrmPersonalDataInterface` | `export(string $contactId): array` (JSON-ready), `erase(string $contactId): void` (no reason code) |
 | `CrmSettingsInterface` | `get(): array{trash_days, timeline_years, import_keep_days, merge_keep_days, version}`, `update(int $trashDays, int $timelineYears, int $importKeepDays, int $mergeKeepDays, int $expectedVersion)` |
+| `CrmBatchLookupInterface` **(0.2.1)** | **System API** (the exception to "every call checks the permission": no tenant resolution, no actor, no permission or visibility check; trusted backend jobs only, §13). Tenant-scoped, one read query per call (per chunk of 500): `contactsByEmails(TenantRef, list<string>): array<emailKey, list<contactId>>`, `companiesByDomains(TenantRef, list<string>): array<domainKey, list<companyId>>`, `subjectsLinkedToMany(TenantRef, list<HostObjectRef>): array<"type:id", list<SubjectRef>>`, `affiliationsOf(TenantRef, list<contactId>): array<contactId, list<companyId>>` (primary first, then affiliation date, then id), `rolesAndTagsOf(TenantRef, list<SubjectRef>): array<"type:id", RolesAndTags>`, `existing(TenantRef, list<SubjectRef>): list<SubjectRef>` (rows still present in the tenant whatever their status; purged ones missing). Active records only except `rolesAndTagsOf` / `existing` (trashed, merged and erased excluded); every usable input answered |
 
 ## 8. Ports and SPIs (host-implemented; each has a safe default)
 
@@ -370,6 +371,15 @@ interface CrmActorDirectoryInterface                 // [SecurityActorDirectory:
     public function owners(TenantRef $tenant): array;
 }
 ```
+
+**(0.2.1) The actor id.** `Infrastructure\Symfony\Security\CrmActorResolverInterface` (`security.actor_resolver`;
+default `IdentifierActorResolver` = `getUserIdentifier()`, so no stored id changes) gives the actor id of a signed-in
+person: `idOf(UserInterface): string` is what the access checker's `currentActor()` and the default directory use,
+so it is what every owner, note author, created_by / updated_by, timeline actor, consent recorder, import uploader,
+merge actor and audit actor stores. `resolve(list<string> $ids): array<id, ActorProfile>` (the Domain port
+`CrmActorProfilesInterface`) names the people of one page in one call; ids it does not name fall back to
+`CrmActorDirectoryInterface::actor()`. A host whose identifier can change (an e-mail) returns a stable id (a user
+UUID); UPGRADING has the migration of existing ids.
 
 ### 8.2 Extension points
 
@@ -554,7 +564,9 @@ scope (or a scope on the company provider) answers `null`.
 
 ## 13. Permission matrix (deny by default)
 
-Every call: tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404; **0.2.0** on the pages behind a
+Every call (except the **0.2.1** system APIs `CrmBatchLookupInterface`, §7: tenant-scoped, no actor, no permission or
+visibility check, and `CrmActorPersonalDataInterface`, §16.5: no tenant scope at all; trusted backend jobs only, never
+end users, HTTP APIs or agent tools): tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404; **0.2.0** on the pages behind a
 firewall: the firewall's entry point, login redirect or 401) → `isGranted()` (false ⇒ 403); a record of another tenant
 is 404.
 
@@ -597,7 +609,13 @@ writes; to hide a record from lists, use its owner. Beacon maps its `crm.*` perm
 rollback or a write-unit replay drops what the failed attempt collected. Audit entries (`crm.company.created`,
 `crm.contact.erased`, `crm.records.merged`, `crm.import.completed`, `crm.settings.changed`, …) are written through the
 audit sink after commit with counts and ids only. **(0.2.0)** `RolesChanged` (type, id, added and removed keys) and the audit keys `crm.roles.changed`,
-`crm.affiliation.primary_contact`. **(0.1.0)** Audited: record create / update / trash / restore / purge,
+`crm.affiliation.primary_contact`. **(0.2.1)** `Infrastructure\Symfony\Event\CrmKitEvents` names every domain event
+(constants equal to the class names). There is no `CompanyErased` (companies are not erased; they leave through the
+trash and `RecordPurged`, or `RecordsPurged` from the retention purge). Erasure, purge and merge delete or move a
+record's links without a `HostLinkRemoved` per link: `ContactErased`, `RecordPurged` / `RecordsPurged` and
+`RecordsMerged` (type, survivor, merged) cover them. `RecordsPurged` (tenant, `list<SubjectRef>` with type + id only,
+no actor) is dispatched once per committed retention-purge batch (≤ 200 records of one type), after that batch's
+commit; a rolled-back batch dispatches nothing. **(0.1.0)** Audited: record create / update / trash / restore / purge,
 merge, contact export and erasure, consent, note delete, tag and field administration, import upload / completion /
 cancel, settings, retention purge. Not audited (timeline and events only): note add / edit, tag assignment, host link
 add / remove, affiliations, host timeline entries.
@@ -710,11 +728,19 @@ run(id, maxChunks): loop (0.1.0: the token is read from the claimed import):
                  last chunk: status='done', finished_at; after commit: ImportCompleted, audit
 resume command:  UPDATE crm_import SET claim_token=?, claimed_at=now, version=version+1
                  WHERE id=? AND tenant_id=? AND status='running' AND claimed_at < now - stale
+                       AND claim_token IS NOT NULL
+                 (0.2.1) stops before a row that needs a person: in the same unit
+                 UPDATE crm_import SET claim_token=NULL, claimed_at=now, version=version+1
+                 WHERE id=? AND status='running' AND claim_token=?   (waits for a person)
+continue:        (0.2.1) on a paused import: UPDATE crm_import SET claim_token=?, claimed_at=now, version=version+1
+                 WHERE id=? AND tenant_id=? AND status='running' AND claim_token IS NULL (one winner)
 ```
 
 A double confirm stores nothing twice (one claim wins; rows settle once). A killed worker leaves `running` with
 progress; the resume command takes over a stale claim **(0.1.0)**; the page's "Continue" button (anyone with `edit`)
-runs further chunks under the current claim, and "Cancel" ends a preview or a stale running import. Each chunk is
+runs further chunks under the current claim, and "Cancel" ends a preview or a stale running import. **(0.2.1)** An
+import the resume command paused (no claim: it waits for a person) is skipped by later resume runs, claimed at once by
+"Continue" and cancellable at once; no schema change (the empty `claim_token` of a running import is the flag). Each chunk is
 small so locks are short; no file I/O inside a unit (the file is parsed at upload, before the unit that stores the rows).
 
 ## 16. GDPR
@@ -750,9 +776,31 @@ cleared too; counter −1 when the contact was active; audit
 Per tenant: trashed records older than `trash_days` purged with their children; timeline entries older than
 `timeline_years` deleted; import rows of imports finished more than `import_keep_days` ago deleted (they hold personal
 data); merge snapshots older than `merge_keep_days` deleted. Batches of 200, one transaction each; audit summary per
-tenant (counts only, `crm.retention.purged`); `--dry-run` **(0.1.0)** counts trashed records only (up to one batch
+tenant (counts only, `crm.retention.purged`); **(0.2.1)** each committed batch of deleted records (trashed records,
+merge tombstones) dispatches `RecordsPurged` (tenant, type + id of each record) after its commit, nothing on a
+rollback; `--dry-run` **(0.1.0)** counts trashed records only (up to one batch
 per type). Import rows are deleted only for finished imports; the `crm_import` rows themselves stay. Inactive-contact review (contacts without activity for N years) is a report in
 phase G (Q-O8).
+
+### 16.5 A host person's references (0.2.1, system API)
+
+`CrmActorPersonalDataInterface::exportActor(string $actorId): array` and `anonymiseActor(string $actorId): int` (their
+own interface, so the tenant-scoped `CrmPersonalDataInterface` stays safe for host GDPR controllers) cover every
+CRM reference to a host person's actor id **in every tenant**: owner, note author, created_by / updated_by, timeline
+actor, consent recorder, host-link and role creator, import uploader, merge actor, and the owner inside owner-changed
+timeline entries and merge snapshots (kinds in `Application\Port\CrmActorDataStoreInterface::KINDS`). The export
+lists tenant ⇒ kind ⇒ row keys. Anonymisation replaces the id with the placeholder `anonymised`, keeps the records
+and everyone else's data, moves the version of versioned rows (a form opened before fails as stale instead of writing
+the old id back), and runs in batches of 200 rows, one write unit each (rows locked first; a lock conflict replays the
+batch or answers 409 + `CONFLICT_001` / `CONFLICT_002`, REQ-RUNTIME-003 rule 6); after the last commit it dispatches
+`ActorAnonymised` (tenant, count; never the id) and audits `crm.actor.anonymised` (count) per tenant. Running it again
+changes nothing and returns 0; if a batch fails, the batches committed before are still announced and audited, then
+the failure is rethrown. Each page is read without a lock and only its matched rows are locked by primary key (the
+actor columns have no index: a locking scan would block other tenants' writes). The placeholder is reserved
+(`ActorRef::ANONYMISED`): never an actor, an owner input or a visible owner. Like `CrmBatchLookupInterface` it is a
+**system API**: no tenant, actor or permission
+check; never exposed to end users or agent tools (MCP). There is no assignee in 0.2.x (tasks come in 0.4.0, which will
+add theirs to the kinds). Audit entries already written live in the host's audit sink: the host anonymises them.
 
 ## 17. Migrations
 
@@ -981,6 +1029,9 @@ differs is applied in the next commit and noted here with the date._
   its own entity manager (`recordIdsAndFlush`) fits without touching the bundle's transaction. A panel provider that
   denies its panel returns `null` (nothing shown) or a `Panel` with no items and an `emptyText` (the neutral
   placeholder); both render.
+- 0.2.1 for Beacon: an actor resolver for stable user ids (§8.1; Beacon registers its own, its access checker returns
+  `idOf()` itself); `CrmActorPersonalDataInterface` for account deletion (§16.5), called only from a backend job, never
+  from a page or an MCP tool; `CrmBatchLookupInterface` and `RecordsPurged` for derived rows (§7, §14).
 
 ## 25. Phase plan (owner, 2026-11-19)
 
@@ -991,6 +1042,7 @@ REQ-RUNTIME-002 / 003 with two-connection race tests, REQ-SEC-006, deny by defau
 | Release | Phase | Content |
 |---|---|---|
 | **0.2.0** (this release) | A2 | Party roles; the company's primary contact and affiliation purposes; role and purpose filters, import and export columns; the UD-2 follow-ups (§6.8, §15) |
+| **0.2.1** | A2 patch | Stable actor ids (`CrmActorResolverInterface`, §8.1), a host person's export and anonymisation across tenants (§16.5), the unattended import resume that waits for a person (§15.4). Additive, for host backend jobs: `CrmBatchLookupInterface` batch lookups including `existing()` for reconciliation (§7; system API without access checks, one query per call), the `RecordsPurged` event per committed retention-purge batch (§14, §16.4) and the `CrmKitEvents` constants of the domain events. No schema change |
 | **0.3.0** | B, funnels | Funnels with per-stage statistics and next actions (below) |
 | **0.4.0** | B2, tasks and agenda | Tasks, automations, meetings and calls, "my agenda" (below) |
 | **0.5.0** | C, quotes | Below |

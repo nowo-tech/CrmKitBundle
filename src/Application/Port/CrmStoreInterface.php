@@ -250,8 +250,26 @@ interface CrmStoreInterface
     /** Claims an import in preview (conditional UPDATE); whether this call won. */
     public function claimImport(TenantRef $tenant, string $id, int $version, string $token, string $mappingJson, string $policy, DateTimeImmutable $now): bool;
 
-    /** Takes over a running import whose claim is older than `$staleBefore`; whether this call won. */
+    /**
+     * Takes over a running import whose claim is older than `$staleBefore` (never one waiting for a person); whether
+     * this call won.
+     */
     public function takeOverImport(TenantRef $tenant, string $id, string $token, DateTimeImmutable $now, DateTimeImmutable $staleBefore): bool;
+
+    /**
+     * Cancels an import in preview, or a running one without a fresh claim (waiting for a person, or a claim older than
+     * `$staleBefore`), in one conditional UPDATE; whether this call cancelled it.
+     */
+    public function cancelImport(TenantRef $tenant, string $id, DateTimeImmutable $now, DateTimeImmutable $staleBefore): bool;
+
+    /**
+     * Releases the claim of `$token` on a running import that waits for a person (claim token emptied, claimed time
+     * set to now); whether this call held it. Such an import is left out of {@see self::staleImports()}.
+     */
+    public function pauseImport(string $id, string $token, DateTimeImmutable $now): bool;
+
+    /** Claims a running import that waits for a person (claim token empty) for `$token`; whether this call won. */
+    public function resumeImport(TenantRef $tenant, string $id, string $token, DateTimeImmutable $now): bool;
 
     /** Locks the import row and tells whether `$token` still holds it. */
     public function holdsImport(string $id, string $token): bool;
@@ -270,7 +288,7 @@ interface CrmStoreInterface
     public function finishImport(string $id, ImportStatus $status, DateTimeImmutable $now, ?ImportStatus $from = null): bool;
 
     /**
-     * Running imports whose claim is older than the time.
+     * Running imports whose claim is older than the time (never one waiting for a person).
      *
      * @return list<array{tenant: string, id: string}>
      */

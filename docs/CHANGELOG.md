@@ -7,6 +7,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Batch lookups for host jobs**: `CrmBatchLookupInterface` (public alias), a system API for the host's
+  backend jobs, tenant-scoped and without access checks: `contactsByEmails()`, `companiesByDomains()`,
+  `subjectsLinkedToMany()` (`<type>:<id>` keys), `affiliationsOf()` (primary first), `rolesAndTagsOf()` (read model
+  `RolesAndTags`) and `existing()` (the given records whose row still exists, any status: reconciliation sweeps). One
+  read query per call (per chunk of 500 inputs), every usable input answered, active records only.
+  Key helpers `EmailAddress::lookupKey()`, `CompanyDomain::key()` / `fromWebsite()` (the stored domain key now comes
+  from it), `HostObjectRef::key()`, `SubjectRef::key()`; persistence port `CrmBatchLookupStoreInterface` with
+  `DoctrineCrmBatchLookupStore` (plain SQL, no entity hydrated).
+- **`RecordsPurged`**: the scheduled retention purge announces every committed batch of deleted records
+  (trashed records and merge tombstones, at most 200 of one type) after its commit, with the tenant and the records'
+  type + id only (`CrmKitEvents::RECORDS_PURGED`); a rolled-back batch announces nothing. A manual `purge()` keeps
+  dispatching `RecordPurged` per record.
+- **Stable actor ids**: `CrmActorResolverInterface` (`security.actor_resolver`; default `IdentifierActorResolver`,
+  `getUserIdentifier()` as before) gives the actor id the access checker and the default directory use, so a host can
+  store user UUIDs instead of e-mails; `resolve()` (Domain port `CrmActorProfilesInterface`) names the actors of a page
+  (owners in lists, note authors, timeline and consent actors) in one call, the directory naming the rest.
+- **A person's references across tenants** (system API without tenant scope or permission check, its own interface
+  `CrmActorPersonalDataInterface` so the tenant-scoped `CrmPersonalDataInterface` stays safe for GDPR pages):
+  `exportActor()` and `anonymiseActor()` over owner, note author, created_by / updated_by, timeline, consent, link, role, import and
+  merge actors and the owner inside timeline entries and merge snapshots; batches of 200 rows, one write unit each,
+  versions moved, idempotent; event `ActorAnonymised` (`CrmKitEvents::ACTOR_ANONYMISED`, tenant and count) and audit
+  `crm.actor.anonymised` per tenant after the commits, also for the batches committed before a failure. Each page is
+  read without a lock and only its matched rows are locked by primary key, so a batch never blocks other tenants'
+  writes. The placeholder `anonymised` (`ActorRef::ANONYMISED`) is reserved: never an actor (whatever the checker or
+  resolver returns), an owner input, a visible owner (whatever the visibility service returns), a name to resolve or
+  the actor of a resumed import; a signed-in person is never the demo's shared actor `anonymous` either. A failing
+  audit or listener for one tenant never stops the others from being released.
+- `CrmKitEvents` constants for the domain events dispatched after the commit (`CONTACT_ERASED`, `RECORDS_MERGED`,
+  `HOST_LINK_REMOVED`, `RECORD_PURGED`, … : their class names), and the host's view of link, merge, erasure and purge
+  changes in USAGE "Events".
+
+### Fixed
+
+- **Paused unattended import resume** (follow-up of audit UP2-1): when the resume command stops before a row that
+  needs a person's decision, it now releases its claim in the same transaction. The import waits for a person
+  (`ImportView::$awaitingPerson`); later resume runs skip it instead of taking it again after `stale_claim_seconds`
+  and pausing again (with a fresh claim in between); a person's "Continue" claims it with its own token (one winner),
+  and "Cancel" ends it at once instead of waiting for the claim to go stale. Cancel decides in one conditional UPDATE,
+  so it never ends an import a "Continue" or the resume command has just claimed (`crm_import_running`). No schema
+  change.
+
 ## [0.2.0] - 2026-11-19
 
 ### Added

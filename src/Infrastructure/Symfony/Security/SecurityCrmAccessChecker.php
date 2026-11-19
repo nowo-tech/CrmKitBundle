@@ -33,6 +33,7 @@ final readonly class SecurityCrmAccessChecker implements CrmAccessCheckerInterfa
         private CrmResourceAccessChecker $resources,
         private ?TokenStorageInterface $tokens = null,
         private bool $allowUnauthenticated = false,
+        private CrmActorResolverInterface $actors = new IdentifierActorResolver(),
     ) {
     }
 
@@ -60,7 +61,10 @@ final readonly class SecurityCrmAccessChecker implements CrmAccessCheckerInterfa
     {
         $user = $this->user();
         if ($user instanceof UserInterface) {
-            return ExactId::isValid($user->getUserIdentifier()) ? new ActorRef($user->getUserIdentifier()) : null;
+            $id = $this->actors->idOf($user);
+
+            // A signed-in person never takes a reserved id: the anonymised placeholder or the demo's shared actor.
+            return ExactId::isValid($id) && !ActorRef::isReserved($id) && $id !== self::ANONYMOUS ? new ActorRef($id) : null;
         }
 
         return $this->allowUnauthenticated ? new ActorRef(self::ANONYMOUS) : null;

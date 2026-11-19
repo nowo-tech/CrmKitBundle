@@ -20,6 +20,7 @@ final readonly class ImportView
      * @param array<string, string> $mapping column => field
      * @param array{created: int, updated: int, duplicate: int, invalid: int, limit: int} $counts
      * @param list<ImportRowView> $rows the first rows
+     * @param bool $awaitingPerson an unattended run paused before a row that needs a person: "Continue" takes it at once
      */
     public function __construct(
         public string $id,
@@ -38,6 +39,7 @@ final readonly class ImportView
         public ?string $createdById,
         public DateTimeImmutable $createdAt,
         public ?DateTimeImmutable $claimedAt,
+        public bool $awaitingPerson = false,
     ) {
     }
 }

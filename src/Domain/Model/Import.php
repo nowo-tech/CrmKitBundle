@@ -169,6 +169,15 @@ class Import
         return ['created' => $this->createdCount, 'updated' => $this->updatedCount, 'duplicate' => $this->duplicateCount, 'invalid' => $this->invalidCount, 'limit' => $this->limitCount];
     }
 
+    /**
+     * Whether the import is running without a claim: an unattended run stopped before a row that needs a person's
+     * decision and released the import for the next person's "Continue".
+     */
+    public function isAwaitingPerson(): bool
+    {
+        return $this->status === ImportStatus::Running && $this->claimToken === null;
+    }
+
     /** The claim of the running worker. */
     public function getClaimToken(): ?string
     {

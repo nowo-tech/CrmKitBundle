@@ -11,13 +11,16 @@ use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Event\RecordsPurged;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\CrmSettings;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Value\AuditEntry;
+use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Psr\Clock\ClockInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 
 use function count;
 
@@ -25,7 +28,8 @@ use function count;
  * Deletes records with their children, and the retention purge (contract section 16.4): trashed records after
  * `trash_days`, timeline entries after `timeline_years`, import rows after `import_keep_days`, merge traces after
  * `merge_keep_days` (with the merge tombstones last changed before then). Batches of 200, one transaction each,
- * re-checked inside. Stateless.
+ * re-checked inside. Every committed batch of deleted records is announced with {@see RecordsPurged} after its commit
+ * (a rolled-back or replayed batch announces nothing). Stateless.
  *
  * @internal
  */
@@ -45,6 +49,7 @@ final readonly class RecordPurger
         private TransactionRunnerInterface $runner,
         private CrmAuditSinkInterface $audit,
         private ClockInterface $clock,
+        private ?EventDispatcherInterface $events = null,
     ) {
     }
 
@@ -155,18 +160,24 @@ final readonly class RecordPurger
 
                     continue 2;
                 }
-                $done = $this->claimed($claim, function () use ($tenant, $type, $ids, $before, $status): int { // @igor-ignore - the runner calls this closure at once and keeps nothing
-                    $deleted = 0;
+                // The deleted ids are the unit's result: a replayed attempt starts from an empty list.
+                $deleted = $this->claimed($claim, function () use ($tenant, $type, $ids, $before, $status): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                    $deleted = [];
                     foreach ($this->store->lockRecords($type, $tenant, $ids) as $record) {
                         $at = $status === RecordStatus::Trashed ? $record->getTrashedAt() : $record->getUpdatedAt();
                         if ($record->getStatus() === $status && $at instanceof DateTimeImmutable && $at < $before) {
                             $this->deleteRecord($tenant, $record);
-                            ++$deleted;
+                            $deleted[] = SubjectRef::of($type, $record->getId());
                         }
                     }
 
                     return $deleted;
                 });
+                // Committed: announce the batch (ids only).
+                if ($deleted !== []) {
+                    $this->events?->dispatch(new RecordsPurged($tenant, $this->clock->now(), $deleted));
+                }
+                $done = count($deleted);
                 $count += $done;
             } while (count($ids) === self::BATCH && $done > 0);
         }
@@ -195,11 +206,15 @@ final readonly class RecordPurger
 
     /**
      * One batch in one write unit, with the claim refreshed in the same transaction; the new claim time is kept only
-     * after the commit (a replayed attempt refreshes from the committed one).
+     * after the commit (a replayed attempt refreshes from the committed one). Returns the batch's result once committed.
      *
-     * @param callable(): int $batch
+     * @template T
+     *
+     * @param callable(): T $batch
+     *
+     * @return T
      */
-    private function claimed(PurgeClaim $claim, callable $batch): int
+    private function claimed(PurgeClaim $claim, callable $batch): mixed
     {
         // Another run took the claim over: PurgeClaimLostException, caught by purge().
         [$deleted, $next] = $this->runner->write(function () use ($claim, $batch): array { // @igor-ignore - the runner calls this closure at once and keeps nothing

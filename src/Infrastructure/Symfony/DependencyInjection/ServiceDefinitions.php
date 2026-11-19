@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection;
 
+use Nowo\CrmKitBundle\Application\ActorPersonalData;
 use Nowo\CrmKitBundle\Application\ConsentService;
 use Nowo\CrmKitBundle\Application\CrmAccess;
+use Nowo\CrmKitBundle\Application\CrmBatchLookup;
 use Nowo\CrmKitBundle\Application\CrmExporter;
 use Nowo\CrmKitBundle\Application\CrmPersonalData;
 use Nowo\CrmKitBundle\Application\CrmReader;
@@ -16,6 +18,8 @@ use Nowo\CrmKitBundle\Application\MergeService;
 use Nowo\CrmKitBundle\Application\NoteService;
 use Nowo\CrmKitBundle\Application\PartyCatalogue;
 use Nowo\CrmKitBundle\Application\PlanCounter;
+use Nowo\CrmKitBundle\Application\Port\CrmActorDataStoreInterface;
+use Nowo\CrmKitBundle\Application\Port\CrmBatchLookupStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Application\RecordPurger;
 use Nowo\CrmKitBundle\Application\RecordService;
@@ -37,6 +41,8 @@ use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmActorPersonalDataInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmBatchLookupInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmCatalogueInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
@@ -51,6 +57,8 @@ use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\CrmMetadataListener;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmActorDataStore;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmBatchLookupStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\CountersRebuildCommand;
@@ -90,10 +98,12 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SymfonyUuidGenerator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Routing\UiRouteLoader;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\AllowAllCrmKitAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ConfigurableCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmActorResolverInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmResourceAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\IdentifierActorResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
@@ -103,6 +113,7 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigura
 use function intdiv;
 use function interface_exists;
 use function is_array;
+use function is_string;
 use function max;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -145,14 +156,18 @@ final class ServiceDefinitions
         $s->set(ScopedRecordVisibility::class)->args([service(CrmKitAccessCheckerInterface::class), service('security.token_storage')->nullOnInvalid(), $events, param($p . 'security.resource_scoping')]);
         $s->alias(CrmRecordVisibilityInterface::class, ScopedRecordVisibility::class);
         $s->set(CrmResourceAccessChecker::class)->args([$events, service(CrmRecordVisibilityInterface::class)]);
+        // 0.2.1: the actor id of a signed-in person (security.actor_resolver, default getUserIdentifier()).
+        $s->set(IdentifierActorResolver::class);
+        $resolver = is_array($config['security'] ?? null) && is_string($config['security']['actor_resolver'] ?? null) ? $config['security']['actor_resolver'] : IdentifierActorResolver::class;
+        $s->alias(CrmActorResolverInterface::class, $resolver)->public();
         $s->set($p . 'default.access_checker', SecurityCrmAccessChecker::class)
-            ->args([service(CrmKitAccessCheckerInterface::class), service(CrmResourceAccessChecker::class), service('security.token_storage')->nullOnInvalid(), param($p . 'security.allow_unauthenticated')]);
+            ->args([service(CrmKitAccessCheckerInterface::class), service(CrmResourceAccessChecker::class), service('security.token_storage')->nullOnInvalid(), param($p . 'security.allow_unauthenticated'), service(CrmActorResolverInterface::class)]);
         $s->set(CrmKitGuard::class)->args([service(CrmAccess::class)])->public();
         $s->set(CrmKitAccessListener::class)->args([service(CrmKitGuard::class), service(CrmAccessCheckerInterface::class), service('security.firewall.map')->nullOnInvalid()])
             ->tag('kernel.event_listener', ['event' => 'kernel.controller', 'method' => 'onKernelController', 'priority' => 16]);
         $s->set($p . 'default.feature_gate', ConfiguredFeatureGate::class)->args([param($p . 'feature.default_enabled')]);
         $s->set($p . 'default.plan_limits', ConfiguredPlanLimits::class)->args([['companies' => param($p . 'limits.companies'), 'contacts' => param($p . 'limits.contacts')]]);
-        $s->set($p . 'default.actor_directory', SecurityActorDirectory::class)->args([service('security.token_storage')->nullOnInvalid()]);
+        $s->set($p . 'default.actor_directory', SecurityActorDirectory::class)->args([service('security.token_storage')->nullOnInvalid(), service(CrmActorResolverInterface::class)]);
         $s->set($p . 'default.audit_sink', PsrLogAuditSink::class)->args([$logger]);
         $s->set(IdGeneratorInterface::class, SymfonyUuidGenerator::class);
         foreach ([
@@ -171,6 +186,8 @@ final class ServiceDefinitions
         $s->alias(TransactionRunnerInterface::class, DoctrineTransactionRunner::class);
         $s->set(DoctrineCrmStore::class)->args([service(DoctrineTransactionRunner::class)]);
         $s->alias(CrmStoreInterface::class, DoctrineCrmStore::class);
+        $s->set(DoctrineCrmBatchLookupStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->alias(CrmBatchLookupStoreInterface::class, DoctrineCrmBatchLookupStore::class);
         $s->set(CrmMetadataListener::class)->args([param($p . 'doctrine.table_prefix')])->tag('doctrine.event_listener', ['event' => 'loadClassMetadata']);
         $s->set(EntityManagerHygieneListener::class)->args([service(DoctrineTransactionRunner::class)])
             ->tag('kernel.event_listener', ['event' => 'kernel.finish_request', 'method' => 'clear', 'priority' => -2048])
@@ -185,8 +202,8 @@ final class ServiceDefinitions
         $s->set(PartyCatalogue::class)->args([param($p . 'roles.catalogue'), param($p . 'affiliations.purposes')]);
         $s->alias(CrmCatalogueInterface::class, PartyCatalogue::class)->public();
         $s->set(Roles::class)->args([service(WriteSupport::class), service(PartyCatalogue::class)]);
-        $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class), service(PartyCatalogue::class)]);
-        $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock])->public();
+        $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class), service(PartyCatalogue::class), service(CrmActorResolverInterface::class)]);
+        $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events])->public();
         $s->set(RecordService::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(Taggings::class), service(CrmActorDirectoryInterface::class), service(RecordPurger::class), service(Roles::class), service(PartyCatalogue::class)]);
         $s->alias(RecordServiceInterface::class, RecordService::class)->public();
         $s->set(CrmReader::class)->args([service(WriteSupport::class), service(RecordViews::class), service(CrmActorDirectoryInterface::class), tagged_iterator(CrmPanelProviderInterface::PANEL_TAG), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), $logger])->public();
@@ -217,10 +234,18 @@ final class ServiceDefinitions
         $s->alias(MergeServiceInterface::class, MergeService::class)->public();
         $s->set(CrmExporter::class)->args([service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class)]);
         $s->alias(CrmExporterInterface::class, CrmExporter::class)->public();
+        // System API (0.2.1): a host person's references across tenants.
+        $s->set(DoctrineCrmActorDataStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->alias(CrmActorDataStoreInterface::class, DoctrineCrmActorDataStore::class);
+        $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events]);
+        $s->alias(CrmActorPersonalDataInterface::class, ActorPersonalData::class)->public();
         $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class)]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
+        // System API for the host's backend jobs: tenant-scoped, no access checks (USAGE "Batch lookups for host jobs").
+        $s->set(CrmBatchLookup::class)->args([service(CrmBatchLookupStoreInterface::class), service(PartyCatalogue::class)]);
+        $s->alias(CrmBatchLookupInterface::class, CrmBatchLookup::class)->public();
 
         // Console.
         $s->set(PurgeCommand::class)->args([service(RecordPurger::class)])->tag('console.command');

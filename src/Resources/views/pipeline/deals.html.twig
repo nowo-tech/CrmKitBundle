@@ -1,0 +1,15 @@
+{#
+  The deals (0.3.0): UiKit list scaffold with its filters (funnel, status, text, stale, order), the boards of the deal
+  funnels and the keyset "next page" link. Variables: page (ListPage), funnels (list of FunnelView), next (URL or null).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
+
+{% block nowo_ui_content %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {%- set _b = page.bundle -%}
+    {% if funnels is not empty %}
+        <p data-testid="crm-boards">{% for f in funnels %}<a href="{{ path('nowo_crm_kit_deal_board', {id: f.id}) }}">{{ f.name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+    {% endif %}
+    {{ parent() }}
+    {% if next %}<p><a href="{{ next }}" data-testid="crm-deals-next">{{ 'list.next'|trans({}, _d) }}</a></p>{% endif %}
+{% endblock %}

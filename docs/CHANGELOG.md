@@ -7,6 +7,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (0.3.0: funnels)
+
+- **Funnels** (`pipeline.enabled`, off by default; tables and pages only while on): deal funnels and party lifecycle
+  funnels of companies or contacts with ordered stages (open, won, lost; default probability; age limit that flags
+  stale items), defined by people with `manage` (`FunnelService`, `/admin/funnels`).
+- **Deals** (`DealService`, `DealReader`): a title, a company and / or a contact the actor may view, an owner, an
+  amount (`Money`, decimal + ISO 4217) and a probability override behind `amounts_view`, an expected close; stage
+  moves with a required lost reason (`pipeline.lost_reasons`) for a lost stage, won / lost close the deal, an open
+  stage reopens it; insert-only stage history with the seconds spent in the stage left; trash, restore, purge after
+  `trash_days`; plan limit `limits.deals`. Owner-based visibility and `nowo_crm_kit.record_access_check` with subject
+  type `deal`; keyset lists ordered by last change, expected close or amount.
+- **Statistics per funnel** (`FunnelStatistics`): count and stale count per stage now, counts at a past instant,
+  value and weighted value per currency with `amounts_view`, conversion to the next stage, win rate, average time in
+  stage, deals closed in a period with their lost reasons; owner, role and tag filters; same visibility as the lists;
+  CSV with formula cells neutralised.
+- **Next actions** (`NextActionService`) on companies, contacts and deals through the new port `CrmTaskPort`
+  (`pipeline.task_port`): the built-in list by default, or TaskBoard tasks through `TaskBoardCrmTaskPort`
+  (`pipeline.taskboard.board_id`, `pipeline.taskboard.column`, a host `CrmTaskBoardUserResolverInterface`). The port
+  runs before the CRM's write unit with the caller's dedupe key; a deal's `next_action_at` follows the earliest due
+  open action and an overdue one marks the deal stale.
+- **Lifecycle stages** of companies and contacts (`PartyStageService`) and the pages: deal list and board, deal page
+  (stage move, history, next actions, trash / restore / purge), deal forms, statistics, funnels administration, and
+  deals, lifecycle and next actions on the 360° page. 7 locales.
+- GDPR: the export of a contact lists its deals, lifecycle stages, stage history and next actions; erasing it unlinks
+  its deals and deletes the rest. Merges point deals and funnel rows at the survivor; a purged record's deals are
+  unlinked. `nowo:crm-kit:counters:rebuild` and `nowo:crm-kit:purge` know deals.
+
 ## [0.2.1] - 2026-11-19
 
 ### Added

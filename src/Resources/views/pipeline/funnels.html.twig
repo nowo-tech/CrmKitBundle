@@ -1,0 +1,8 @@
+{#
+  The funnels of the tenant (manage, 0.3.0): the list and the create form. Variables: page (ListPage), form (FormView).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
+
+{% block nowo_ui_list_after %}
+    {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'funnel.add', submit: 'funnel.save', action: null, testid: 'crm-funnel-form'}) }}
+{% endblock %}

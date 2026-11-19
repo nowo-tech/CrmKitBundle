@@ -1,5 +1,7 @@
 # CRM kit, fase A (aziende e contatti). Dominio NowoCrmKitBundle. I parametri sono racchiusi tra %.
 nav:
+    funnels: 'Imbuti'
+    deals: 'Trattative'
     label: CRM
     companies: Aziende
     contacts: Contatti
@@ -8,6 +10,7 @@ nav:
     fields: Campi personalizzati
     settings: Impostazioni
 type:
+    deal: 'Trattativa'
     company: Azienda
     contact: Contatto
 status:
@@ -20,6 +23,7 @@ form:
     save: Salva
     cancel: Annulla
 list:
+    next: 'Pagina successiva'
     title:
         company: Aziende
         contact: Contatti
@@ -31,6 +35,7 @@ list:
     col:
         updated: Aggiornato
     filter:
+        apply: 'Applica'
         role: 'Ruolo'
         purpose: 'Contatto per'
         primary_contact: 'Contatto principale'
@@ -246,6 +251,10 @@ timeline:
     empty: Non è ancora successo nulla.
     open: Apri
 activity:
+    lifecycle_stage: 'Fase del ciclo di vita cambiata da %actor%'
+    next_action_closed: 'Prossima azione chiusa da %actor%'
+    next_action_added: 'Prossima azione aggiunta da %actor%'
+    stage_moved: 'Fase cambiata da %actor%'
     roles_changed: 'Ruoli cambiati da %actor%'
     primary_contact: 'Contatto principale cambiato da %actor%'
     created: 'Creato da %actor%'
@@ -361,6 +370,7 @@ search:
     see_all: 'Mostra tutti i %count%'
 flash:
     conflict:
+        crm_stage_invalid: 'Questa fase non può essere usata: appartiene a un altro imbuto, oppure la fase o l’imbuto è archiviato o chiuso.'
         crm_record_stale: 'Qualcuno ha modificato questo record nello stesso momento. Il modulo mostra i valori attuali: controllali e salva di nuovo.'
         crm_record_merged: Questo record è stato unito a un altro.
         crm_record_trashed: Questo record è nel cestino.
@@ -370,6 +380,16 @@ flash:
         crm_settings_stale: Qualcuno ha modificato le impostazioni nello stesso momento. Controllale e salva di nuovo.
         crm_write_conflict: 'Un''altra modifica degli stessi dati è arrivata nello stesso momento. Riprova.'
 error:
+    stage_invalid: 'Impossibile salvare la fase: controlla il modulo.'
+    next_action_invalid: 'Impossibile salvare la prossima azione: controlla il modulo.'
+    amount_invalid: 'Inserisci un importo (al massimo 4 decimali) e una valuta di 3 lettere.'
+    lost_reason_unknown: 'Motivo di perdita sconosciuto.'
+    lost_reason_required: 'Indica perché la trattativa è stata persa.'
+    stage_limit: 'L’imbuto ha il numero massimo di fasi.'
+    funnel_limit: 'Il tenant ha il numero massimo di imbuti.'
+    funnel_kind: 'Questo imbuto non può essere usato qui.'
+    deal_party_required: 'Una trattativa richiede un’azienda o un contatto.'
+    deal_related_unknown: 'Scegli un’azienda o un contatto che puoi vedere.'
     forbidden: 'Non puoi modificarlo.'
     role_unknown: 'Ruolo sconosciuto.'
     purpose_unknown: 'Finalità sconosciuta.'
@@ -409,3 +429,165 @@ purpose:
     orders: 'Ordini'
     technical: 'Tecnico'
     general: 'Generale'
+deals:
+    title: 'Trattative'
+    empty: 'Ancora nessuna trattativa.'
+deal:
+    new: 'Nuova trattativa'
+    edit: 'Modifica'
+    edit_title: 'Modifica %name%'
+    created: 'Trattativa creata.'
+    saved: 'Trattativa salvata.'
+    moved: 'Fase cambiata.'
+    not_moved: 'La trattativa è già in quella fase.'
+    trashed: 'Trattativa spostata nel cestino.'
+    restored: 'Trattativa ripristinata.'
+    purged: 'Trattativa eliminata definitivamente.'
+    trash: 'Sposta nel cestino'
+    trash_confirm: 'Spostare questa trattativa nel cestino?'
+    restore: 'Ripristina'
+    purge: 'Elimina definitivamente'
+    purge_confirm: 'Eliminare definitivamente questa trattativa e la sua cronologia?'
+    funnel: 'Imbuto'
+    status_label: 'Stato'
+    status:
+        any: 'Aperta, vinta o persa'
+        open: 'Aperta'
+        won: 'Vinta'
+        lost: 'Persa'
+        trashed: 'Nel cestino'
+    stale: 'Ferma'
+    stale_only: 'Solo ferme'
+    sort_label: 'Ordine'
+    sort:
+        updated: 'Ultima modifica'
+        expected_close: 'Chiusura prevista'
+        amount: 'Importo'
+    hidden: 'Non visibile per te'
+    probability: 'Probabilità'
+    weighted: 'Valore ponderato'
+    history_title: 'Cronologia delle fasi'
+    history:
+        created: 'Creata'
+        days: '%days% giorni nella fase precedente'
+        via: 'tramite %via%'
+    form:
+        title: 'Titolo'
+        stage: 'Fase'
+        company: 'Azienda'
+        contact: 'Contatto'
+        owner: 'Responsabile'
+        amount: 'Importo'
+        currency: 'Valuta (ISO 4217)'
+        probability: 'Probabilità propria (%)'
+        expected_close: 'Chiusura prevista'
+        none: '— Nessuno —'
+    move:
+        title: 'Sposta in una fase'
+        save: 'Sposta'
+        stage: 'Fase'
+        lost_reason: 'Motivo di perdita'
+        lost_note: 'Nota di perdita'
+board:
+    title: 'Bacheca'
+    intro: 'Le trattative di questo imbuto per fase.'
+    empty: 'Nessuna trattativa.'
+    more: 'La bacheca mostra le prime 100 trattative.'
+    list: 'Vedi tutte nell’elenco'
+next_action:
+    title: 'Prossime azioni'
+    empty: 'Nessuna prossima azione.'
+    add: 'Aggiungi una prossima azione'
+    save: 'Aggiungi'
+    done: 'Fatta'
+    cancel: 'Annulla'
+    added: 'Prossima azione aggiunta.'
+    closed: 'Prossima azione chiusa.'
+    refused: 'Il servizio attività ha rifiutato la prossima azione. Non è stato salvato nulla.'
+    task: 'Apri l’attività'
+    task_hidden: 'Attività non visibile per te'
+    status:
+        open: 'Aperta'
+        done: 'Fatta'
+        cancelled: 'Annullata'
+    form:
+        title: 'Titolo'
+        due_at: 'Scadenza'
+        assignee: 'Assegnata a'
+        me: '— Io —'
+lifecycle:
+    title: 'Ciclo di vita'
+    none: 'Non in questo imbuto'
+    save: 'Imposta fase'
+    saved: 'Fase del ciclo di vita salvata.'
+    form:
+        stage: 'Fase del ciclo di vita'
+funnels:
+    title: 'Imbuti'
+    intro: 'Imbuti di trattative e del ciclo di vita di aziende e contatti.'
+    empty: 'Ancora nessun imbuto.'
+funnel:
+    add: 'Nuovo imbuto'
+    save: 'Crea'
+    edit: 'Modifica'
+    created: 'Imbuto creato.'
+    saved: 'Imbuto salvato.'
+    stages: 'Fasi'
+    form:
+        name: 'Nome'
+        kind: 'Tipo'
+        archived: 'Archiviato'
+    kind:
+        deal: 'Trattative'
+        party_company: 'Ciclo di vita delle aziende'
+        party_contact: 'Ciclo di vita dei contatti'
+stage:
+    add: 'Nuova fase'
+    save: 'Salva'
+    edit: 'Modifica'
+    created: 'Fase aggiunta.'
+    saved: 'Fase salvata.'
+    move_up: 'Sposta su'
+    move_down: 'Sposta giù'
+    form:
+        name: 'Nome'
+        kind: 'Tipo'
+        probability: 'Probabilità predefinita (%)'
+        rot_days: 'Ferma dopo (giorni)'
+        archived: 'Archiviata'
+    kind:
+        open: 'Aperta'
+        won: 'Vinta'
+        lost: 'Persa'
+    default:
+        open: 'Qualificata'
+        won: 'Vinta'
+        lost: 'Persa'
+        first: 'Nuovo'
+stats:
+    title: 'Statistiche'
+    title_of: 'Statistiche di %name%'
+    filter:
+        at: 'In un momento passato'
+        from: 'Chiuse dal'
+        to: 'Chiuse fino al'
+    at: 'Il %at%'
+    now: 'Ora (%at%)'
+    conversion: 'Alla fase successiva'
+    average_days: 'Giorni medi nella fase'
+    win_rate: 'Vinte dalla prima fase: %rate% %'
+    closed: 'Chiuse nel periodo: %won% vinte, %lost% perse'
+    csv:
+        stage: 'Fase'
+        kind: 'Tipo'
+        count: 'Trattative'
+        stale: 'Ferme'
+        currency: 'Valuta'
+        value: 'Valore'
+        weighted: 'Valore ponderato'
+lost_reason:
+    price: 'Prezzo'
+    timing: 'Tempistica'
+    competitor: 'Concorrente'
+    no_decision: 'Nessuna decisione'
+    other: 'Altro'

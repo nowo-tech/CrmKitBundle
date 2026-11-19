@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
-use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use InvalidArgumentException;
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;

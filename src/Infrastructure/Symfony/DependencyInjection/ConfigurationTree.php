@@ -6,8 +6,10 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection;
 
 use Nowo\CrmKitBundle\Domain\Value\AffiliationPurpose;
 use Nowo\CrmKitBundle\Domain\Value\ConsentPurpose;
+use Nowo\CrmKitBundle\Domain\Value\LostReasonKey;
 use Nowo\CrmKitBundle\Domain\Value\RoleKey;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
+use Symfony\Component\Config\Definition\Builder\NodeBuilder;
 
 use function array_unique;
 use function count;
@@ -22,13 +24,16 @@ use function str_starts_with;
 final class ConfigurationTree
 {
     /** Phases after A: switch => release that brings it. */
-    public const LATER_PHASES = ['pipeline' => '0.3.0', 'quotes' => '0.5.0', 'invoices' => '0.6.0', 'portal' => '0.7.0', 'campaigns' => '0.10.0', 'reports' => 'phase G (after 0.10.0)'];
+    public const LATER_PHASES = ['quotes' => '0.5.0', 'invoices' => '0.6.0', 'portal' => '0.7.0', 'campaigns' => '0.10.0', 'reports' => 'phase G (after 0.10.0)'];
 
     /** Built-in party roles (`distributor` is translated too, but opt-in). */
     public const DEFAULT_ROLES = ['customer', 'supplier', 'partner'];
 
     /** Built-in affiliation purposes. */
     public const DEFAULT_PURPOSES = ['billing', 'orders', 'technical', 'general'];
+
+    /** Built-in lost reasons of the funnels (0.3.0; labels `lost_reason.<key>`). */
+    public const DEFAULT_LOST_REASONS = ['price', 'timing', 'competitor', 'no_decision', 'other'];
 
     /** Most keys per catalogue. */
     public const MAX_KEYS = 32;
@@ -61,6 +66,7 @@ final class ConfigurationTree
         $children->arrayNode('limits')->addDefaultsIfNotSet()->info('ConfiguredPlanLimits: maximum active records per tenant; null = unlimited.')->children()
             ->integerNode('companies')->defaultNull()->min(0)->end()
             ->integerNode('contacts')->defaultNull()->min(0)->end()
+            ->integerNode('deals')->defaultNull()->min(0)->info('0.3.0: deals not in the trash.')->end()
         ->end()->end();
         $children->arrayNode('doctrine')->addDefaultsIfNotSet()->children()
             ->scalarNode('entity_manager')->defaultValue('nowo_crm_kit')->info('The private entity manager (the Flex recipe declares it); null = the default entity manager with explicit transactions.')->end()
@@ -106,13 +112,33 @@ final class ConfigurationTree
             ->integerNode('page_size')->defaultValue(25)->min(10)->max(100)->end()
             ->scalarNode('layout')->defaultNull()->info('Twig layout of the pages; null = UiKit admin layout.')->end()
         ->end()->end();
+        self::pipeline($children);
         foreach (self::LATER_PHASES as $phase => $release) {
             $children->arrayNode($phase)->addDefaultsIfNotSet()->children()
                 ->booleanNode('enabled')->defaultFalse()
-                    ->validate()->ifTrue(static fn (bool $v): bool => $v)->thenInvalid('nowo_crm_kit.' . $phase . ' arrives with ' . $release . '; this release ships phase A (companies, contacts, roles and purposes) only.')->end()
+                    ->validate()->ifTrue(static fn (bool $v): bool => $v)->thenInvalid('nowo_crm_kit.' . $phase . ' arrives with ' . $release . '; this release ships companies, contacts, roles, purposes and funnels only.')->end()
                 ->end()
             ->end()->end();
         }
+    }
+
+    /**
+     * The funnels (0.3.0): off by default; the deal funnels, lifecycle funnels, statistics and next actions.
+     */
+    private static function pipeline(NodeBuilder $children): void
+    {
+        $pipeline = $children->arrayNode('pipeline')->addDefaultsIfNotSet()->info('0.3.0: funnels with per-stage statistics, deals and next actions (tables and routes only while enabled).')->children();
+        $pipeline->booleanNode('enabled')->defaultFalse()->end();
+        $pipeline->arrayNode('lost_reasons')->info('Lost reason keys (labels lost_reason.<key> in the NowoCrmKitBundle domain); moving a deal to a lost stage needs one.')
+            ->scalarPrototype()->end()->defaultValue(self::DEFAULT_LOST_REASONS)->requiresAtLeastOneElement()
+            ->validate()->ifTrue(static fn (array $v): bool => !self::keys($v, LostReasonKey::PATTERN))->thenInvalid('pipeline.lost_reasons holds at most 32 distinct keys of 1-32 characters of a-z, 0-9 or "_", starting with a letter.')->end()
+        ->end();
+        $pipeline->scalarNode('task_port')->defaultNull()->info('Service id of a host CrmTaskPort for next actions; null = the TaskBoard bridge when taskboard.board_id is set, else the built-in list.')->end();
+        $pipeline->arrayNode('taskboard')->addDefaultsIfNotSet()->info('TaskBoard bridge (nowo-tech/task-board-bundle installed): next actions become tasks on this board.')->children()
+            ->scalarNode('board_id')->defaultNull()->info('The board new tasks go to; null = no bridge.')->end()
+            ->scalarNode('column')->defaultNull()->info('The column (TaskBoard status name) new tasks go to; null = the board\'s first.')->end()
+        ->end()->end();
+        $pipeline->end()->end();
     }
 
     /**

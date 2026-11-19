@@ -46,7 +46,7 @@ final readonly class RecordPage
     /**
      * Wires the collaborators.
      */
-    public function __construct(private UiSupport $ui, private CrmReaderInterface $reader, private CrmAccess $access, private RecordForms $forms)
+    public function __construct(private UiSupport $ui, private CrmReaderInterface $reader, private CrmAccess $access, private RecordForms $forms, private ?PipelineRecordBlock $pipeline = null)
     {
     }
 
@@ -198,6 +198,8 @@ final readonly class RecordPage
             'panels'     => $active ? $this->reader->panels($type, $view->id) : [],
             'duplicates' => $active ? $this->reader->duplicates($type, $view->id) : [],
             'consents'   => $type === SubjectType::Contact ? $this->reader->consents($view->id) : [],
+            // 0.3.0: deals, lifecycle stages and next actions (only while the funnels are on).
+            'pipeline' => $this->pipeline instanceof PipelineRecordBlock && $view->status !== RecordStatus::Erased ? $this->pipeline->variables($view, $edit) : null,
         ]);
     }
 

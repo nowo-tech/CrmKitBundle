@@ -252,7 +252,7 @@ final class BatchLookupTest extends CrmTestCase
         self::assertNotContains('RecordsPurged', $this->recorder()->eventNames());
         self::assertSame(203, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE tenant_id = 'acme'") + $this->int("SELECT COUNT(*) FROM nowo_crm_company WHERE tenant_id = 'acme'"));
 
-        self::assertSame(['records' => 202, 'tombstones' => 0, 'activities' => 0, 'import_rows' => 0, 'merges' => 0], $purger->purge($acme));
+        self::assertSame(['records' => 202, 'tombstones' => 0, 'activities' => 0, 'import_rows' => 0, 'merges' => 0, 'deals' => 0], $purger->purge($acme));
         self::assertCount(3, $seen->events, 'one event per committed batch: companies, then contacts in batches of 200');
         self::assertSame([false, false, false], $seen->inTransaction, 'dispatched after the commit');
         $keys = array_map(static fn (RecordsPurged $e): array => array_map(static fn (SubjectRef $s): string => $s->key(), $e->subjects), $seen->events);

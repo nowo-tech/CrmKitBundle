@@ -58,6 +58,7 @@ final readonly class UiSupport
         private CsrfTokenManagerInterface $csrf,
         private ?string $layout = null,
         public int $pageSize = 25,
+        private bool $pipeline = false,
     ) {
     }
 
@@ -239,6 +240,14 @@ final readonly class UiSupport
     }
 
     /**
+     * Requires a permission on one subject, a deal included (0.3.0; 403 without it).
+     */
+    public function requireSubject(CrmPermission $permission, SubjectRef $subject): void
+    {
+        $this->guard->requireGranted($permission, $subject);
+    }
+
+    /**
      * Whether the actor holds a permission (menus, buttons).
      */
     public function can(CrmPermission $permission): bool
@@ -255,6 +264,9 @@ final readonly class UiSupport
             new AreaNavItem(self::label('nav.companies'), $this->url('nowo_crm_kit_list', ['type' => 'companies']), $current === 'companies'),
             new AreaNavItem(self::label('nav.contacts'), $this->url('nowo_crm_kit_list', ['type' => 'contacts']), $current === 'contacts'),
         ];
+        if ($this->pipeline) {
+            $items[] = new AreaNavItem(self::label('nav.deals'), $this->url('nowo_crm_kit_deals'), $current === 'deals');
+        }
         if ($this->can(CrmPermission::Import)) {
             $items[] = new AreaNavItem(self::label('nav.import'), $this->url('nowo_crm_kit_import'), $current === 'import');
         }
@@ -262,6 +274,9 @@ final readonly class UiSupport
             $items[] = new AreaNavItem(self::label('nav.tags'), $this->url('nowo_crm_kit_tags'), $current === 'tags');
             $items[] = new AreaNavItem(self::label('nav.fields'), $this->url('nowo_crm_kit_fields'), $current === 'fields');
             $items[] = new AreaNavItem(self::label('nav.settings'), $this->url('nowo_crm_kit_settings'), $current === 'settings');
+            if ($this->pipeline) {
+                $items[] = new AreaNavItem(self::label('nav.funnels'), $this->url('nowo_crm_kit_funnels'), $current === 'funnels');
+            }
         }
 
         return new AreaNav($items, self::label('nav.label'));

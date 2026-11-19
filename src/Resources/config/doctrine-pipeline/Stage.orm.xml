@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Pipeline\Stage" table="crm_stage">
+        <indexes>
+            <index name="crm_stage_funnel" columns="tenant_id,funnel_id,position"/>
+        </indexes>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="funnelId" column="funnel_id" type="string" length="36"/>
+        <field name="name" column="name" type="string" length="80"/>
+        <field name="position" column="position" type="integer"/>
+        <field name="kind" column="kind" type="string" length="8" enum-type="Nowo\CrmKitBundle\Domain\Enum\StageKind"/>
+        <field name="probability" column="probability" type="smallint"/>
+        <field name="rotDays" column="rot_days" type="integer" nullable="true"/>
+        <field name="archived" column="archived" type="boolean"/>
+        <field name="version" column="version" type="integer" version="true"/>
+    </entity>
+</doctrine-mapping>

@@ -57,6 +57,7 @@ final class TestServices
             $recorder->tag('kernel.event_listener', ['event' => $event, 'method' => 'onEvent']);
         }
         $s->set('test.actor_resolver', TestActorResolver::class)->public();
+        $s->set('test.task_port', TestTaskPort::class)->public();
         $s->set('test.queries', QueryLog::class)->public();
         $s->set('test.query_counter', QueryCounter::class)->args([service('test.queries')])->tag('doctrine.middleware');
         $s->set('test.clock', MockClock::class)->args(['2026-11-18 10:00:00', 'UTC'])->public();

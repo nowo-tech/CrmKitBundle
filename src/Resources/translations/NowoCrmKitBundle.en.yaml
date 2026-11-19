@@ -1,5 +1,7 @@
 # CRM kit, phase A (companies and contacts). Domain NowoCrmKitBundle. Parameters are %wrapped%.
 nav:
+    funnels: 'Funnels'
+    deals: 'Deals'
     label: CRM
     companies: Companies
     contacts: Contacts
@@ -8,6 +10,7 @@ nav:
     fields: Custom fields
     settings: Settings
 type:
+    deal: 'Deal'
     company: Company
     contact: Contact
 status:
@@ -20,6 +23,7 @@ form:
     save: Save
     cancel: Cancel
 list:
+    next: 'Next page'
     title:
         company: Companies
         contact: Contacts
@@ -31,6 +35,7 @@ list:
     col:
         updated: Updated
     filter:
+        apply: 'Apply'
         role: 'Role'
         purpose: 'Contact for'
         primary_contact: 'Primary contact'
@@ -246,6 +251,10 @@ timeline:
     empty: Nothing has happened yet.
     open: Open
 activity:
+    lifecycle_stage: 'Lifecycle stage changed by %actor%'
+    next_action_closed: 'Next action closed by %actor%'
+    next_action_added: 'Next action added by %actor%'
+    stage_moved: 'Stage changed by %actor%'
     roles_changed: 'Roles changed by %actor%'
     primary_contact: 'Primary contact changed by %actor%'
     created: 'Created by %actor%'
@@ -361,6 +370,7 @@ search:
     see_all: 'See all %count%'
 flash:
     conflict:
+        crm_stage_invalid: 'This stage cannot be used: it belongs to another funnel, or the stage or the funnel is archived or closed.'
         crm_record_stale: 'Someone changed this record at the same moment. The form shows the current values: check them and save again.'
         crm_record_merged: This record was merged into another one.
         crm_record_trashed: This record is in the trash.
@@ -370,6 +380,16 @@ flash:
         crm_settings_stale: Someone changed the settings at the same moment. Check them and save again.
         crm_write_conflict: 'Another change of the same data arrived at the same moment. Try again.'
 error:
+    stage_invalid: 'The stage could not be saved: check the form.'
+    next_action_invalid: 'The next action could not be saved: check the form.'
+    amount_invalid: 'Enter an amount (up to 4 decimals) and a 3-letter currency.'
+    lost_reason_unknown: 'Unknown lost reason.'
+    lost_reason_required: 'Choose why the deal was lost.'
+    stage_limit: 'The funnel has the most stages allowed.'
+    funnel_limit: 'The tenant has the most funnels allowed.'
+    funnel_kind: 'This funnel cannot be used here.'
+    deal_party_required: 'A deal needs a company or a contact.'
+    deal_related_unknown: 'Pick a company or contact you can see.'
     forbidden: 'You may not change this.'
     role_unknown: 'Unknown role.'
     purpose_unknown: 'Unknown purpose.'
@@ -409,3 +429,165 @@ purpose:
     orders: 'Orders'
     technical: 'Technical'
     general: 'General'
+deals:
+    title: 'Deals'
+    empty: 'No deals yet.'
+deal:
+    new: 'New deal'
+    edit: 'Edit'
+    edit_title: 'Edit %name%'
+    created: 'Deal created.'
+    saved: 'Deal saved.'
+    moved: 'Stage changed.'
+    not_moved: 'The deal is already in that stage.'
+    trashed: 'Deal moved to the trash.'
+    restored: 'Deal restored.'
+    purged: 'Deal deleted for good.'
+    trash: 'Move to trash'
+    trash_confirm: 'Move this deal to the trash?'
+    restore: 'Restore'
+    purge: 'Delete for good'
+    purge_confirm: 'Delete this deal and its history for good?'
+    funnel: 'Funnel'
+    status_label: 'Status'
+    status:
+        any: 'Open, won or lost'
+        open: 'Open'
+        won: 'Won'
+        lost: 'Lost'
+        trashed: 'In the trash'
+    stale: 'Stale'
+    stale_only: 'Stale only'
+    sort_label: 'Order'
+    sort:
+        updated: 'Last changed'
+        expected_close: 'Expected close'
+        amount: 'Amount'
+    hidden: 'Not visible to you'
+    probability: 'Probability'
+    weighted: 'Weighted value'
+    history_title: 'Stage history'
+    history:
+        created: 'Created'
+        days: '%days% days in the stage before'
+        via: 'via %via%'
+    form:
+        title: 'Title'
+        stage: 'Stage'
+        company: 'Company'
+        contact: 'Contact'
+        owner: 'Owner'
+        amount: 'Amount'
+        currency: 'Currency (ISO 4217)'
+        probability: 'Probability override (%)'
+        expected_close: 'Expected close'
+        none: '— None —'
+    move:
+        title: 'Move to a stage'
+        save: 'Move'
+        stage: 'Stage'
+        lost_reason: 'Lost reason'
+        lost_note: 'Lost note'
+board:
+    title: 'Board'
+    intro: 'The deals of this funnel by stage.'
+    empty: 'No deals.'
+    more: 'The board shows the first 100 deals.'
+    list: 'See all in the list'
+next_action:
+    title: 'Next actions'
+    empty: 'No next actions.'
+    add: 'Add a next action'
+    save: 'Add'
+    done: 'Done'
+    cancel: 'Cancel'
+    added: 'Next action added.'
+    closed: 'Next action closed.'
+    refused: 'The task service refused the next action. Nothing was saved.'
+    task: 'Open the task'
+    task_hidden: 'Task not visible to you'
+    status:
+        open: 'Open'
+        done: 'Done'
+        cancelled: 'Cancelled'
+    form:
+        title: 'Title'
+        due_at: 'Due'
+        assignee: 'Assignee'
+        me: '— Me —'
+lifecycle:
+    title: 'Lifecycle'
+    none: 'Not in this funnel'
+    save: 'Set stage'
+    saved: 'Lifecycle stage saved.'
+    form:
+        stage: 'Lifecycle stage'
+funnels:
+    title: 'Funnels'
+    intro: 'Deal funnels and lifecycle funnels of companies and contacts.'
+    empty: 'No funnels yet.'
+funnel:
+    add: 'New funnel'
+    save: 'Create'
+    edit: 'Edit'
+    created: 'Funnel created.'
+    saved: 'Funnel saved.'
+    stages: 'Stages'
+    form:
+        name: 'Name'
+        kind: 'Kind'
+        archived: 'Archived'
+    kind:
+        deal: 'Deals'
+        party_company: 'Company lifecycle'
+        party_contact: 'Contact lifecycle'
+stage:
+    add: 'New stage'
+    save: 'Save'
+    edit: 'Edit'
+    created: 'Stage added.'
+    saved: 'Stage saved.'
+    move_up: 'Move up'
+    move_down: 'Move down'
+    form:
+        name: 'Name'
+        kind: 'Kind'
+        probability: 'Default probability (%)'
+        rot_days: 'Stale after (days)'
+        archived: 'Archived'
+    kind:
+        open: 'Open'
+        won: 'Won'
+        lost: 'Lost'
+    default:
+        open: 'Qualified'
+        won: 'Won'
+        lost: 'Lost'
+        first: 'New'
+stats:
+    title: 'Statistics'
+    title_of: 'Statistics of %name%'
+    filter:
+        at: 'At a past moment'
+        from: 'Closed from'
+        to: 'Closed until'
+    at: 'At %at%'
+    now: 'Now (%at%)'
+    conversion: 'To the next stage'
+    average_days: 'Average days in the stage'
+    win_rate: 'Won from the first stage: %rate% %'
+    closed: 'Closed in the period: %won% won, %lost% lost'
+    csv:
+        stage: 'Stage'
+        kind: 'Kind'
+        count: 'Deals'
+        stale: 'Stale'
+        currency: 'Currency'
+        value: 'Value'
+        weighted: 'Weighted value'
+lost_reason:
+    price: 'Price'
+    timing: 'Timing'
+    competitor: 'Competitor'
+    no_decision: 'No decision'
+    other: 'Other'

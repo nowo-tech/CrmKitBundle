@@ -1,0 +1,27 @@
+{#
+  One funnel (manage, 0.3.0): rename / archive, its stages (edit, archive, order) and the add-stage form. Variables:
+  page (FormPage), funnel (FunnelView), stages (list of {stage, form, up, down}), add (FormView).
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {%- set _b = 'NowoCrmKitBundle' -%}
+    {{ parent() }}
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-stages">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'funnel.stages'|trans({}, _d) }}</h2>
+            {% for row in stages %}
+                <article data-testid="crm-stage" data-kind="{{ row.stage.kind.value }}"{% if row.stage.archived %} data-archived="1"{% endif %}>
+                    <h3>{{ row.stage.name }} · {{ ('stage.kind.' ~ row.stage.kind.value)|trans({}, _d) }} · {{ row.stage.probability }} %</h3>
+                    {{ include(nowo_ui_partial('action', _b), {action: row.up, context: 'row', bundle: _b}) }}
+                    {{ include(nowo_ui_partial('action', _b), {action: row.down, context: 'row', bundle: _b}) }}
+                    <details><summary>{{ 'stage.edit'|trans({}, _d) }}</summary>
+                        {{ include('@NowoCrmKit/_form.html.twig', {form: row.form, title: null, submit: 'stage.save', action: path('nowo_crm_kit_stage_edit', {id: row.stage.id, funnel: funnel.id}), testid: 'crm-stage-edit', variant: 'btn_secondary'}) }}
+                    </details>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+    {{ include('@NowoCrmKit/_form.html.twig', {form: add, title: 'stage.add', submit: 'stage.save', action: null, testid: 'crm-stage-form', variant: 'btn_secondary'}) }}
+{% endblock %}

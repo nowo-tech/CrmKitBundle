@@ -132,7 +132,10 @@ The tenant is the controller; the bundle is the tool.
   counter is released when the contact was active. An erased contact cannot be edited, restored or merged.
 - **Retention** (`nowo:crm-kit:purge`): trashed records after `trash_days` with every child row, timeline entries
   after `timeline_years`, import rows after `import_keep_days`, merge snapshots after `merge_keep_days`; one audit
-  entry per tenant with counts only.
+  entry per tenant with counts only. **(0.2.1)** Every committed batch of deleted records (trashed records and merge
+  tombstones) is announced after its commit with `RecordsPurged` (tenant and the records' type + id only), so a host
+  that derived rows from CRM ids can delete them; a manual `purge()` announces `RecordPurged` per record, an erasure
+  `ContactErased`. `CrmBatchLookupInterface::existing()` lets a host reconcile ids it missed.
 - **Audit and logs** carry ids, counts and codes only, never names, e-mails or note text: role edits are audited as
   `crm.roles.changed` with the added and removed keys, the company's primary contact as
   `crm.affiliation.primary_contact` with the contact id, affiliation saves with the flags and purpose keys, after the

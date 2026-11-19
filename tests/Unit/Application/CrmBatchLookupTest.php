@@ -94,6 +94,27 @@ final class CrmBatchLookupTest extends TestCase
         self::assertSame(2, $store->tagCalls);
     }
 
+    public function testExistingKeepsInputOrderAndObjects(): void
+    {
+        $store  = new RecordingBatchStore();
+        $lookup = new CrmBatchLookup($store, new PartyCatalogue());
+        $tenant = new TenantRef('acme');
+        $ada    = SubjectRef::of(SubjectType::Contact, self::ID_A, 'ana');
+        $acme   = SubjectRef::of(SubjectType::Company, self::ID_B);
+        $gone   = SubjectRef::of(SubjectType::Contact, self::ID_B);
+
+        $store->existing = ['company:' . self::ID_B, 'contact:' . self::ID_A, 'company:' . self::ID_A];
+        self::assertSame([$acme, $ada], $lookup->existing($tenant, [$acme, $gone, $ada, SubjectRef::of(SubjectType::Contact, self::ID_A)]));
+        self::assertSame([3], $store->existingCalls);
+        self::assertSame([], $lookup->existing($tenant, []));
+        self::assertSame([3], $store->existingCalls, 'nothing asked: no query');
+
+        $store->existing = [];
+        $many            = array_map(static fn (int $i): SubjectRef => SubjectRef::of(SubjectType::Contact, sprintf('01900000-0000-7000-8000-%012d', $i)), range(1, 1001));
+        self::assertSame([], $lookup->existing($tenant, $many));
+        self::assertSame([3, 500, 500, 1], $store->existingCalls);
+    }
+
     public function testKeysOfTheLookups(): void
     {
         self::assertSame('ada@acme.test', EmailAddress::lookupKey("\tAda@Acme.TEST "));
@@ -138,6 +159,12 @@ final class RecordingBatchStore implements CrmBatchLookupStoreInterface
 
     public int $tagCalls = 0;
 
+    /** @var list<string> */
+    public array $existing = [];
+
+    /** @var list<int> */
+    public array $existingCalls = [];
+
     public function contactIdsByEmailKeys(TenantRef $tenant, array $emailKeys): array
     {
         $this->calls[] = $emailKeys;
@@ -171,5 +198,12 @@ final class RecordingBatchStore implements CrmBatchLookupStoreInterface
         ++$this->tagCalls;
 
         return $this->rolesAndTags;
+    }
+
+    public function existingKeys(TenantRef $tenant, array $subjects): array
+    {
+        $this->existingCalls[] = count($subjects);
+
+        return $this->existing;
     }
 }

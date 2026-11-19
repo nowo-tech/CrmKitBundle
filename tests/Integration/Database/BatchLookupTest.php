@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
 use DateTimeImmutable;
+use Nowo\CrmKitBundle\Application\RecordPurger;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Event\ContactErased;
 use Nowo\CrmKitBundle\Domain\Event\CrmEvent;
 use Nowo\CrmKitBundle\Domain\Event\HostLinkRemoved;
 use Nowo\CrmKitBundle\Domain\Event\RecordsMerged;
+use Nowo\CrmKitBundle\Domain\Event\RecordsPurged;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Read\RolesAndTags;
 use Nowo\CrmKitBundle\Domain\Service\CrmBatchLookupInterface;
@@ -26,6 +28,7 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\CrmKitEvents;
 use Nowo\CrmKitBundle\Tests\Fixtures\QueryLog;
 use ReflectionObject;
+use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 use function array_fill;
@@ -153,6 +156,15 @@ final class BatchLookupTest extends CrmTestCase
         ], $both);
         self::assertCount(1, $counter->take(), 'one query (UNION ALL)');
 
+        // Rows still present, any status (active, trashed, tombstone, erased); unknown and other tenants' left out.
+        $asked   = [SubjectRef::of(SubjectType::Contact, $eve), SubjectRef::of(SubjectType::Company, $acme, 'leo'), SubjectRef::of(SubjectType::Company, $trashed), SubjectRef::of(SubjectType::Contact, $dup), SubjectRef::of(SubjectType::Contact, $tom), SubjectRef::of(SubjectType::Contact, $gAda), SubjectRef::of(SubjectType::Contact, $acme), SubjectRef::of(SubjectType::Company, '01900000-0000-7000-8000-00000000ffff'), SubjectRef::of(SubjectType::Company, $acme)];
+        $present = $lookup->existing($tenant, $asked);
+        self::assertSame(['contact:' . $eve, 'company:' . $acme, 'company:' . $trashed, 'contact:' . $dup, 'contact:' . $tom], array_map(static fn (SubjectRef $s): string => $s->key(), $present), 'input order, first occurrence');
+        self::assertSame($asked[1], $present[1], 'the input objects as given');
+        self::assertCount(1, $counter->take(), 'one query (UNION ALL of both types)');
+        self::assertSame([], $lookup->existing($tenant, [SubjectRef::of(SubjectType::Contact, $acme)]));
+        self::assertCount(1, $counter->take(), 'one type: one SELECT');
+
         // The other tenant sees its own rows only.
         $globex = new TenantRef('globex');
         self::assertSame(['ada@acme.test' => [$gAda]], $lookup->contactsByEmails($globex, ['ada@acme.test']));
@@ -169,6 +181,7 @@ final class BatchLookupTest extends CrmTestCase
         self::assertSame([], $lookup->subjectsLinkedToMany($tenant, []));
         self::assertSame([], $lookup->affiliationsOf($tenant, ['x']));
         self::assertSame([], $lookup->rolesAndTagsOf($tenant, []));
+        self::assertSame([], $lookup->existing($tenant, []));
         self::assertSame([], $counter->take());
     }
 
@@ -197,6 +210,84 @@ final class BatchLookupTest extends CrmTestCase
         self::assertCount(2, $counter->take());
         self::assertCount(501, $lookup->rolesAndTagsOf($tenant, array_map(static fn (string $id): SubjectRef => SubjectRef::of(SubjectType::Contact, $id), array_slice($ids, 0, 501))));
         self::assertCount(2, $counter->take());
+        self::assertSame([], $lookup->existing($tenant, array_map(static fn (string $id): SubjectRef => SubjectRef::of(SubjectType::Company, $id), $ids)));
+        self::assertCount(3, $counter->take(), '1001 subjects: 3 chunks');
+    }
+
+    public function testTheRetentionPurgeAnnouncesEveryCommittedBatchWithIdsOnly(): void
+    {
+        $this->boot();
+        $this->everything('acme');
+        $kept      = $this->contact('Kept', 'Active', 'kept@x.test');
+        $companies = $this->oldTrashed(SubjectType::Company, 1, 0);
+        $contacts  = $this->oldTrashed(SubjectType::Contact, RecordPurger::BATCH + 1, 100);
+        $this->oldTrashed(SubjectType::Contact, 1, 900, 'globex');
+        $seen = new class {
+            /** @var list<RecordsPurged> */
+            public array $events = [];
+
+            /** @var list<bool> */
+            public array $inTransaction = [];
+
+            public int $count = 0;
+        };
+        $dispatcher = $this->kernel->getContainer()->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+        $dispatcher->addListener(CrmKitEvents::RECORDS_PURGED, function (RecordsPurged $event) use ($seen): void {
+            ++$seen->count;
+            $seen->events[]        = $event;
+            $seen->inTransaction[] = $this->connection()->isTransactionActive();
+        });
+        $purger = $this->service(RecordPurger::class);
+        $acme   = new TenantRef('acme');
+
+        // A batch that fails inside its transaction: rolled back, nothing announced, nothing deleted.
+        $this->ctx()->failOnRemove = true;
+        try {
+            $purger->purge($acme);
+            self::fail('injected failure');
+        } catch (RuntimeException) {
+        }
+        self::assertSame(0, $seen->count, 'no event from a rolled-back batch');
+        self::assertNotContains('RecordsPurged', $this->recorder()->eventNames());
+        self::assertSame(203, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE tenant_id = 'acme'") + $this->int("SELECT COUNT(*) FROM nowo_crm_company WHERE tenant_id = 'acme'"));
+
+        self::assertSame(['records' => 202, 'tombstones' => 0, 'activities' => 0, 'import_rows' => 0, 'merges' => 0], $purger->purge($acme));
+        self::assertCount(3, $seen->events, 'one event per committed batch: companies, then contacts in batches of 200');
+        self::assertSame([false, false, false], $seen->inTransaction, 'dispatched after the commit');
+        $keys = array_map(static fn (RecordsPurged $e): array => array_map(static fn (SubjectRef $s): string => $s->key(), $e->subjects), $seen->events);
+        self::assertSame([array_map(static fn (string $id): string => 'company:' . $id, $companies), array_map(static fn (string $id): string => 'contact:' . $id, array_slice($contacts, 0, RecordPurger::BATCH)), ['contact:' . $contacts[RecordPurger::BATCH]]], $keys);
+        foreach ($seen->events as $event) {
+            self::assertSame('acme', $event->tenant->value);
+            self::assertNull($event->actor, 'a scheduled job: no actor');
+            foreach ($event->subjects as $subject) {
+                self::assertNull($subject->owner, 'ids only');
+            }
+        }
+        self::assertEquals([SubjectRef::of(SubjectType::Contact, $kept)], $this->service(CrmBatchLookupInterface::class)->existing($acme, [SubjectRef::of(SubjectType::Contact, $kept), SubjectRef::of(SubjectType::Contact, $contacts[0]), SubjectRef::of(SubjectType::Company, $companies[0])]));
+        self::assertSame(1, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE tenant_id = 'globex'"), 'another tenant untouched');
+        self::assertNotContains('RecordPurged', $this->recorder()->eventNames(), 'the per-record event stays for manual purges');
+    }
+
+    /**
+     * Stores `$count` records trashed long ago (direct rows: fast), ids ascending from `$from`.
+     *
+     * @return list<string>
+     */
+    private function oldTrashed(SubjectType $type, int $count, int $from, string $tenant = 'acme'): array
+    {
+        $ids = [];
+        for ($i = $from + 1; $i <= $from + $count; ++$i) {
+            $id    = sprintf('01900000-0000-7000-8000-%012d', $i);
+            $ids[] = $id;
+            $row   = ['id' => $id, 'tenant_id' => $tenant, 'custom' => '{}', 'status' => 'trashed', 'version' => 1, 'created_at' => '2026-01-01 10:00:00', 'updated_at' => '2026-01-01 10:00:00', 'trashed_at' => '2026-01-01 10:00:00'];
+            $this->connection()->insert(
+                $type === SubjectType::Company ? 'nowo_crm_company' : 'nowo_crm_contact',
+                $type === SubjectType::Company ? $row + ['name' => 'Old ' . $i, 'name_key' => 'old ' . $i] : $row + ['last_name' => 'Old', 'display_name' => 'Old', 'sort_key' => 'old'],
+            );
+        }
+
+        return $ids;
     }
 
     public function testLifecycleEventsAreDispatchedAfterTheCommitWithIdsOnly(): void

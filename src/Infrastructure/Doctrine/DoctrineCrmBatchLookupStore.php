@@ -166,6 +166,39 @@ final readonly class DoctrineCrmBatchLookupStore implements CrmBatchLookupStoreI
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public function existingKeys(TenantRef $tenant, array $subjects): array
+    {
+        $em     = $this->em();
+        $byType = [];
+        foreach ($subjects as $subject) {
+            $byType[$subject->type->value][] = $subject->id->value;
+        }
+        $sql    = [];
+        $params = [];
+        $types  = [];
+        foreach ($byType as $type => $ids) {
+            // The type literal is a SubjectType value (never input), so PostgreSQL needs no typed parameter here.
+            $company  = $type === SubjectType::Company->value;
+            $sql[]    = "SELECT '" . ($company ? SubjectType::Company->value : SubjectType::Contact->value) . "' AS subject_type, tenant_id, id FROM " . $this->table($em, $company ? Company::class : Contact::class) . ' WHERE tenant_id = ? AND id IN (?)';
+            $params[] = $tenant->value;
+            $params[] = $ids;
+            $types[]  = ParameterType::STRING;
+            $types[]  = ArrayParameterType::STRING;
+        }
+        $rows = $em->getConnection()->fetchAllAssociative(implode(' UNION ALL ', $sql), $params, $types);
+        $keys = [];
+        foreach ($rows as $row) {
+            if ($row['tenant_id'] === $tenant->value && is_string($row['id'])) {
+                $keys[] = self::text($row['subject_type']) . ':' . $row['id'];
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
      * Ids of the tenant's active records of `$class` whose `$column` is one of `$keys`, per key, ascending.
      *
      * @param class-string $class

@@ -436,6 +436,7 @@ carries ids and VOs only.
 | Event | Extra data |
 | --- | --- |
 | `RecordCreated`, `RecordTrashed`, `RecordRestored`, `RecordPurged` | `type`, `id` |
+| `RecordsPurged` (0.2.1) | `subjects` (`list<SubjectRef>`, type + id, no owner); `actor` is null |
 | `RecordUpdated` | `type`, `id`, `changed` (field names) |
 | `RecordsMerged` | `type`, `survivorId`, `mergedId` |
 | `ContactErased` | `contactId` |
@@ -470,10 +471,12 @@ What a host that keeps its own copy of links, e-mails or affiliations listens to
 | A record merged into another | `RecordsMerged` | `type`, `survivorId` (to), `mergedId` (from); the merged record's links, roles, tags and affiliations moved to the survivor (no `HostLinkRemoved` / `HostLinkAdded` for them) |
 | A contact erased (GDPR) | `ContactErased` | `contactId`; its links, tags, roles and affiliations are deleted with it (no `HostLinkRemoved` for them) |
 | A record trashed | `RecordTrashed` | it leaves every batch lookup at once (except `rolesAndTagsOf()`); `RecordRestored` brings it back |
-| A trashed record purged with `purge()` | `RecordPurged` | its links, tags, roles and affiliations are deleted with it; the scheduled retention purge (`nowo:crm-kit:purge`) deletes trashed records without an event (they already left with `RecordTrashed`) |
+| A trashed record purged with `purge()` | `RecordPurged` | one event per record; its links, tags, roles and affiliations are deleted with it |
+| Records deleted by the scheduled retention purge (`nowo:crm-kit:purge`) | `RecordsPurged` (0.2.1) | one event per committed batch (at most 200 records of one type: trashed records past `trash_days`, merge tombstones past `merge_keep_days`), after that batch's commit; a batch that rolls back announces nothing. Delete the rows you derived from these ids (GDPR) |
 
 There is no `CompanyErased`: companies hold no personal data and are not erased; a company leaves through the trash
-(`RecordTrashed`, then `RecordPurged` or the retention purge).
+(`RecordTrashed`, then `RecordPurged` or `RecordsPurged`). As a safety net for missed events, a nightly sweep can
+pass the ids it holds to `CrmBatchLookupInterface::existing()` and drop those that are gone.
 
 ## Batch lookups for host jobs
 
@@ -494,13 +497,14 @@ thread, domain or issue concern?") with **one read query per call** (per chunk o
 | `companiesByDomains(TenantRef, list<string> $domains)` | `array<domainKey, list<companyId>>` (ascending). Keys are `CompanyDomain::key()`: the lowercase host without `www.`, as stored from the website; a URL is accepted. Several companies may share a domain. No free-mail filter: that is the caller's concern. |
 | `subjectsLinkedToMany(TenantRef, list<HostObjectRef>)` | `array<hostKey, list<SubjectRef>>`, the batch form of `subjectsLinkedTo()`. `hostKey` is `HostObjectRef::key()`: `<type>:<id>` (the type never holds `:`, so the first `:` splits it). Link creation order; each `SubjectRef` carries the owner. |
 | `affiliationsOf(TenantRef, list<string> $contactIds)` | `array<contactId, list<companyId>>`: the primary affiliation first, then by affiliation date, then company id. |
+| `existing(TenantRef, list<SubjectRef>)` | `list<SubjectRef>`: the given records whose row still exists in the tenant, **whatever its status** (active, trashed, merge tombstone, erased contact); purged or unknown ids are left out. Input order, first occurrence, the input objects as given. For reconciliation sweeps: what is missing is gone for good. |
 | `rolesAndTagsOf(TenantRef, list<SubjectRef>)` | `array<subjectKey, RolesAndTags>`; `subjectKey` is `SubjectRef::key()` (`company:<id>` / `contact:<id>`); `RolesAndTags::$roles` holds the configured role keys in catalogue order, `$tags` the tag name keys (lowercase) in byte order. |
 
 Shapes: every usable input is a key of the result, with an empty list (or empty `RolesAndTags`) when nothing matched;
 duplicates collapse; unusable inputs (an empty or invalid address, a host-less domain, an id that is not a lowercase
 UUID) are left out. Only **active** records are returned: trashed records, merge tombstones and erased contacts never
-are (an affiliation counts when both the contact and the company are active). `rolesAndTagsOf()` reads the rows of
-the given records whatever their status. Read-only: no write unit, no event, no lock; stateless (worker mode).
+are (an affiliation counts when both the contact and the company are active). `rolesAndTagsOf()` and `existing()` read
+the rows of the given records whatever their status. Read-only: no write unit, no event, no lock; stateless (worker mode).
 
 ```php
 use Nowo\CrmKitBundle\Domain\Service\CrmBatchLookupInterface;

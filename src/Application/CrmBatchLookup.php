@@ -132,6 +132,23 @@ final readonly class CrmBatchLookup implements CrmBatchLookupInterface
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public function existing(TenantRef $tenant, array $subjects): array
+    {
+        $byKey = [];
+        foreach ($subjects as $subject) {
+            $byKey[$subject->key()] ??= $subject;
+        }
+        $found = [];
+        foreach (array_chunk(array_values($byKey), self::CHUNK) as $chunk) {
+            $found += array_fill_keys($this->store->existingKeys($tenant, $chunk), true);
+        }
+
+        return array_values(array_intersect_key($byKey, $found));
+    }
+
+    /**
      * Runs `$query` per chunk of the keys and fills their lists (unknown keys from the store are ignored).
      *
      * @param array<string, list<string>> $keys every usable input, with an empty list

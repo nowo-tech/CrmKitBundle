@@ -14,7 +14,7 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
  * The read queries behind {@see CrmBatchLookup}: one query per call, the inputs already
  * normalised, de-duplicated and at most {@see CrmBatchLookupInterface::CHUNK}
  * long. Every query names the tenant and every row is re-checked against it with `===` (REQ-SEC-006); only active
- * records are returned except by {@see self::rolesAndTags()}.
+ * records are returned except by {@see self::rolesAndTags()} and {@see self::existingKeys()}.
  *
  * @internal
  */
@@ -66,4 +66,13 @@ interface CrmBatchLookupStoreInterface
      *                                                                       that hold one
      */
     public function rolesAndTags(TenantRef $tenant, array $subjects): array;
+
+    /**
+     * The {@see SubjectRef::key()} of the records whose row exists in the tenant, any status.
+     *
+     * @param non-empty-list<SubjectRef> $subjects
+     *
+     * @return list<string>
+     */
+    public function existingKeys(TenantRef $tenant, array $subjects): array;
 }

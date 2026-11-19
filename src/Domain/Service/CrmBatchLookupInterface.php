@@ -21,7 +21,7 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
  *
  * Results are keyed by the normalised input (every usable input appears, with an empty list when nothing matches;
  * unusable inputs are skipped). Only active records are returned: trashed, merged (tombstones) and erased records
- * never are. Read-only, stateless (worker mode).
+ * never are, except by {@see self::existing()}. Read-only, stateless (worker mode).
  */
 interface CrmBatchLookupInterface
 {
@@ -81,4 +81,16 @@ interface CrmBatchLookupInterface
      * @return array<string, RolesAndTags>
      */
     public function rolesAndTagsOf(TenantRef $tenant, array $subjects): array;
+
+    /**
+     * The given records whose row still exists in the tenant, whatever its status (active, trashed, merge tombstone or
+     * erased contact); a record that was purged (manually or by the retention purge) or never existed is left out. For
+     * reconciliation sweeps: what is missing from the result is gone for good. Input order, first occurrence, the
+     * input objects as given.
+     *
+     * @param list<SubjectRef> $subjects
+     *
+     * @return list<SubjectRef>
+     */
+    public function existing(TenantRef $tenant, array $subjects): array;
 }

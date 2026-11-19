@@ -14,6 +14,7 @@ use Nowo\CrmKitBundle\Domain\Event\RecordCreated;
 use Nowo\CrmKitBundle\Domain\Event\RecordPurged;
 use Nowo\CrmKitBundle\Domain\Event\RecordRestored;
 use Nowo\CrmKitBundle\Domain\Event\RecordsMerged;
+use Nowo\CrmKitBundle\Domain\Event\RecordsPurged;
 use Nowo\CrmKitBundle\Domain\Event\RecordTrashed;
 use Nowo\CrmKitBundle\Domain\Event\RecordUpdated;
 use Nowo\CrmKitBundle\Domain\Event\RolesChanged;
@@ -52,8 +53,11 @@ final class CrmKitEvents
     /** {@see RecordRestored}: a record came back from the trash. */
     public const RECORD_RESTORED = RecordRestored::class;
 
-    /** {@see RecordPurged}: a trashed record was deleted for good, with its links, tags, roles and affiliations. */
+    /** {@see RecordPurged}: `purge()` deleted one trashed record for good, with its links, tags, roles and affiliations. */
     public const RECORD_PURGED = RecordPurged::class;
+
+    /** {@see RecordsPurged}: the scheduled retention purge deleted a committed batch of records (list of type + id). */
+    public const RECORDS_PURGED = RecordsPurged::class;
 
     /** {@see RecordsMerged}: type, survivor id, merged id; the merged record's links and affiliations moved to the survivor. */
     public const RECORDS_MERGED = RecordsMerged::class;

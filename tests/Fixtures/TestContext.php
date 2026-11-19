@@ -34,6 +34,9 @@ final class TestContext
     /** Bump the version of the next updated record just before our flush (a racing writer saved first). */
     public bool $bumpVersions = false;
 
+    /** Removing the next company or contact throws (a batch that fails inside its transaction). */
+    public bool $failOnRemove = false;
+
     /** Store a contact with the same e-mail just before ours (a racing writer stored it first). */
     public int $emailRaces = 0;
 

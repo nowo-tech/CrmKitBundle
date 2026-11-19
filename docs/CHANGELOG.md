@@ -51,11 +51,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   configured) sees everything.
 - **Batch lookups for host jobs (0.2.1)**: `CrmBatchLookupInterface` (public alias), a system API for the host's
   backend jobs, tenant-scoped and without access checks: `contactsByEmails()`, `companiesByDomains()`,
-  `subjectsLinkedToMany()` (`<type>:<id>` keys), `affiliationsOf()` (primary first) and `rolesAndTagsOf()` (read model
-  `RolesAndTags`). One read query per call (per chunk of 500 inputs), every usable input answered, active records only.
+  `subjectsLinkedToMany()` (`<type>:<id>` keys), `affiliationsOf()` (primary first), `rolesAndTagsOf()` (read model
+  `RolesAndTags`) and `existing()` (the given records whose row still exists, any status: reconciliation sweeps). One read query per call (per chunk of 500 inputs), every usable input answered, active records only.
   Key helpers `EmailAddress::lookupKey()`, `CompanyDomain::key()` / `fromWebsite()` (the stored domain key now comes
   from it), `HostObjectRef::key()`, `SubjectRef::key()`; persistence port `CrmBatchLookupStoreInterface` with
   `DoctrineCrmBatchLookupStore` (plain SQL, no entity hydrated).
+- **`RecordsPurged`** (0.2.1): the scheduled retention purge announces every committed batch of deleted records
+  (trashed records and merge tombstones, at most 200 of one type) after its commit, with the tenant and the records'
+  type + id only (`CrmKitEvents::RECORDS_PURGED`); a rolled-back batch announces nothing. A manual `purge()` keeps
+  dispatching `RecordPurged` per record.
 - `CrmKitEvents` constants for the domain events dispatched after the commit (`CONTACT_ERASED`, `RECORDS_MERGED`,
   `HOST_LINK_REMOVED`, `RECORD_PURGED`, … : their class names), and the host's view of link, merge, erasure and purge
   changes in USAGE "Events".

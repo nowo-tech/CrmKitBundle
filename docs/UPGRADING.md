@@ -12,7 +12,8 @@
 **0.2.1 (additive, nothing to change).** `CrmBatchLookupInterface` is a new public service for backend jobs: it
 checks no permission and no record visibility, so call it only from trusted server-side code with a tenant your job
 already trusts (USAGE "Batch lookups for host jobs"). `CrmKitEvents` gains constants equal to the domain event class
-names; listeners registered by class name keep working. No schema change.
+names; listeners registered by class name keep working. The retention purge now also dispatches `RecordsPurged` per
+committed batch (no listener: nothing changes); `CrmBatchLookupInterface::existing()` is new. No schema change.
 
 ## To 0.2.0
 

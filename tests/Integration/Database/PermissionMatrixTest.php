@@ -106,14 +106,15 @@ final class PermissionMatrixTest extends CrmTestCase
         // action => the permission it needs (the note is ana's: someone else's note needs manage). The token is valid,
         // so only the permission (or the gate) decides; a refused action changes nothing.
         $actions = [
-            '/crm/companies/' . $company . '/trash'      => 'edit',
-            '/crm/companies/' . $company . '/restore'    => 'edit',
-            '/crm/companies/' . $company . '/purge'      => 'manage',
-            '/crm/contacts/' . $contact . '/erase'       => 'manage',
-            '/crm/contacts/' . $contact . '/gdpr-export' => 'manage',
-            '/crm/notes/' . $note . '/delete'            => 'manage',
-            '/crm/links/' . $link . '/remove'            => 'edit',
-            '/crm/affiliations/' . $aff . '/remove'      => 'edit',
+            '/crm/companies/' . $company . '/trash'                       => 'edit',
+            '/crm/companies/' . $company . '/restore'                     => 'edit',
+            '/crm/companies/' . $company . '/purge'                       => 'manage',
+            '/crm/contacts/' . $contact . '/erase'                        => 'manage',
+            '/crm/contacts/' . $contact . '/gdpr-export'                  => 'manage',
+            '/crm/notes/' . $note . '/delete'                             => 'manage',
+            '/crm/links/' . $link . '/remove'                             => 'edit',
+            '/crm/affiliations/' . $aff . '/remove'                       => 'edit',
+            '/crm/companies/' . $company . '/primary-contact/' . $contact => 'edit',
         ];
         $post = function (string $action) use ($token): int {
             $this->client->request('POST', $action, ['crm_action' => ['_token' => $token]]);
@@ -150,6 +151,7 @@ final class PermissionMatrixTest extends CrmTestCase
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_note'));
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_host_link'));
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation'));
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE is_primary_contact = ?', [true]));
         self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_activity WHERE kind = 'exported'"));
     }
 }

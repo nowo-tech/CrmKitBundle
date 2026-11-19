@@ -31,6 +31,10 @@ list:
     col:
         updated: Atualizado
     filter:
+        role: 'Função'
+        purpose: 'Contacto para'
+        primary_contact: 'Contacto principal'
+        primary_contact_only: 'Só contactos principais'
         q: Pesquisar
         tag: Etiqueta
         owner: Responsável
@@ -40,6 +44,7 @@ list:
         active: Ativos
         trashed: Lixo
 field:
+    roles: 'Funções'
     name: Nome
     contact_name: Nome
     legal_name: Denominação social
@@ -135,6 +140,9 @@ record:
     purged: O registo foi eliminado.
     erased: "Os dados pessoais do contacto foram apagados."
 affiliation:
+    primary_contact: 'Contacto principal'
+    make_primary_contact: 'Tornar contacto principal'
+    primary_contact_set: 'O contacto principal foi alterado.'
     add: Adicionar uma empresa
     save: Adicionar
     added: A empresa foi adicionada.
@@ -142,6 +150,8 @@ affiliation:
     remove: Remover
     primary: Principal
     form:
+        purposes: 'Contacto para'
+        primary_contact: 'Contacto principal da empresa'
         company: Empresa
         role: Função
         primary: Empresa principal
@@ -232,6 +242,8 @@ timeline:
     empty: Ainda não aconteceu nada.
     open: Abrir
 activity:
+    roles_changed: 'Funções alteradas por %actor%'
+    primary_contact: 'Contacto principal alterado por %actor%'
     created: 'Criado por %actor%'
     updated: 'Atualizado por %actor%'
     owner_changed: 'Responsável alterado por %actor%'
@@ -308,6 +320,9 @@ import:
         skip: Ignorar as linhas cujo e-mail já existe
         update: Atualizar o contacto existente
     target:
+        roles: 'Funções (chaves separadas por vírgulas)'
+        purposes: 'Contacto para (chaves separadas por vírgulas)'
+        primary_contact: 'Contacto principal da empresa (sim / não)'
         skip: '(ignorar esta coluna)'
         company: Empresa (existente, por nome)
         tags: Etiquetas (existentes, separadas por vírgulas)
@@ -351,6 +366,9 @@ flash:
         crm_settings_stale: Alguém alterou as definições ao mesmo tempo. Verifique-as e guarde novamente.
         crm_write_conflict: 'Outra alteração dos mesmos dados chegou ao mesmo tempo. Tente novamente.'
 error:
+    role_unknown: 'Função desconhecida.'
+    purpose_unknown: 'Finalidade desconhecida.'
+    not_affiliated: 'Este contacto não está ligado à empresa.'
     required: Este campo é obrigatório.
     invalid: Este valor não é válido.
     host_object_unknown: 'Este objeto não existe ou não o pode ver.'
@@ -376,3 +394,13 @@ error:
     merge_same: Um registo não pode ser unido a si próprio.
     out_of_range: Este valor está fora do intervalo.
     csrf: O formulário expirou. Recarregue a página e tente novamente.
+role:
+    customer: 'Cliente'
+    supplier: 'Fornecedor'
+    partner: 'Parceiro'
+    distributor: 'Distribuidor'
+purpose:
+    billing: 'Faturação'
+    orders: 'Encomendas'
+    technical: 'Técnico'
+    general: 'Geral'

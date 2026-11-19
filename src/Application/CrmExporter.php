@@ -21,7 +21,8 @@ use function str_contains;
 use function str_replace;
 
 /**
- * Exports (contract section 9): CSV of every record matching a list's filters (keyset batches of 500, flat memory;
+ * Exports (contract section 9): CSV of every record matching a list's filters (with the configured role keys, the
+ * format the import reads back) (keyset batches of 500, flat memory;
  * cells starting with `=`, `+`, `-`, `@`, tab or CR prefixed with `'`), and a vCard 4.0 of one contact. Stateless.
  */
 final readonly class CrmExporter implements CrmExporterInterface
@@ -44,7 +45,7 @@ final readonly class CrmExporter implements CrmExporterInterface
         $context = $this->support->access->context(CrmPermission::Manage);
         $fields  = $this->support->read(fn (): array => $this->support->store->fields($context->tenant, $query->type, false));
         $keys    = array_map(static fn (FieldDefinition $f): string => $f->getFieldKey(), $fields);
-        $header  = ['id', ...RecordFields::names($query->type), ...array_map(static fn (string $k): string => 'custom.' . $k, $keys), 'owner', 'tags', 'created_at', 'updated_at'];
+        $header  = ['id', ...RecordFields::names($query->type), ...array_map(static fn (string $k): string => 'custom.' . $k, $keys), 'owner', 'roles', 'tags', 'created_at', 'updated_at'];
 
         yield self::line($header);
         $after = null;
@@ -111,6 +112,7 @@ final readonly class CrmExporter implements CrmExporterInterface
             $cells[] = $view->custom[$key] ?? '';
         }
         $cells[] = $view->ownerName ?? $view->ownerId ?? '';
+        $cells[] = implode(', ', $view->roles);
         $cells[] = implode(', ', array_map(static fn (TagView $t): string => $t->name, $view->tags));
         $cells[] = $view->createdAt->format('Y-m-d H:i:s');
         $cells[] = $view->updatedAt->format('Y-m-d H:i:s');

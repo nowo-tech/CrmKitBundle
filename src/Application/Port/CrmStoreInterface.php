@@ -20,6 +20,7 @@ use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\ImportRow;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
 use Nowo\CrmKitBundle\Domain\Model\Note;
+use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tag;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
@@ -66,6 +67,33 @@ interface CrmStoreInterface
 
     /** The contact holding an e-mail key, any status. */
     public function contactByEmailKey(TenantRef $tenant, string $emailKey): ?Contact;
+
+    /**
+     * The ids of the contacts holding these e-mail keys, any status, in id order.
+     *
+     * @param list<string> $emailKeys
+     *
+     * @return list<string>
+     */
+    public function contactIdsByEmailKeys(TenantRef $tenant, array $emailKeys): array;
+
+    /**
+     * The distinct companies these contacts are affiliated to, in id order (plain ids, no entities loaded).
+     *
+     * @param list<string> $contactIds
+     *
+     * @return list<string>
+     */
+    public function affiliatedCompanyIds(TenantRef $tenant, array $contactIds): array;
+
+    /**
+     * The party roles stored for records of one type (every stored key, configured or not), by id.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<RoleAssignment>
+     */
+    public function roleAssignments(TenantRef $tenant, SubjectType $type, array $ids): array;
 
     /**
      * A page of records and the total.
@@ -262,8 +290,9 @@ interface CrmStoreInterface
     public function setCounter(TenantRef $tenant, string $resource, int $value): void;
 
     /**
-     * Claims the single run of the retention purge (the claim row locked as {@see self::lockCounter()} does, then a
-     * conditional UPDATE): true when free or the claim is older than `$staleBefore` (unix times).
+     * Claims the single run of the retention purge: the claim row locked without waiting (`FOR UPDATE SKIP LOCKED`;
+     * a row locked by the batch of a running purge answers false at once), created when missing, then a conditional
+     * UPDATE: true when free or the claim is older than `$staleBefore` (unix times).
      */
     public function claimPurge(int $now, int $staleBefore): bool;
 

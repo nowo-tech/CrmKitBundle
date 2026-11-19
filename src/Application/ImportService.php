@@ -30,6 +30,7 @@ use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\ImportRow;
+use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use Nowo\CrmKitBundle\Domain\Read\ImportRowView;
 use Nowo\CrmKitBundle\Domain\Read\ImportView;
@@ -43,7 +44,6 @@ use Psr\Clock\ClockInterface;
 
 use function array_filter;
 use function array_map;
-use function array_slice;
 use function array_sum;
 use function array_unique;
 use function array_values;
@@ -72,6 +72,7 @@ final readonly class ImportService implements ImportServiceInterface
         private WriteSupport $support,
         private PlanCounter $counter,
         private ClockInterface $clock,
+        private PartyCatalogue $catalogue = new PartyCatalogue(),
         private int $maxRows = 5000,
         private int $maxBytes = 5242880,
         private int $chunkRows = 100,
@@ -119,10 +120,11 @@ final readonly class ImportService implements ImportServiceInterface
             $fields = $this->activeFields($context->tenant, $import->getSubjectType());
             $views  = [];
             foreach ($this->support->store->importRows($id, max(1, min(100, $rows)), false) as $row) {
-                $errors     = [];
-                $duplicates = [];
-                [$input]    = ImportMapping::input($import->getSubjectType(), $row->getData(), $import->getMapping());
+                $errors                           = [];
+                $duplicates                       = [];
+                [$input, , , $purposes, $primary] = ImportMapping::input($import->getSubjectType(), $row->getData(), $import->getMapping());
                 try {
+                    $this->extras($input->roles, $purposes, $primary);
                     $values = RecordValidator::values($import->getSubjectType(), $input->values, $import->getSubjectType() === SubjectType::Company);
                     if ($import->getSubjectType() === SubjectType::Contact) {
                         RecordValidator::contactName($values);
@@ -286,6 +288,7 @@ final readonly class ImportService implements ImportServiceInterface
         }
         $counts = [];
         $rows   = $store->importRows($id, $this->chunkRows, true);
+        $this->lockParents($context, $import, $rows);
         foreach ($rows as $row) {
             [$outcome, $recordId, $message] = $this->row($context, $import, $row, $fields, $tags);
             if ($store->settleRow($row->getId(), $outcome, $recordId, $message)) {
@@ -314,12 +317,13 @@ final readonly class ImportService implements ImportServiceInterface
      */
     private function row(CrmContext $context, Import $import, ImportRow $row, array $fields, array $tags): array
     {
-        $store                        = $this->support->store;
-        $type                         = $import->getSubjectType();
-        [$input, $tagNames, $company] = ImportMapping::input($type, $row->getData(), $import->getMapping());
+        $store                                             = $this->support->store;
+        $type                                              = $import->getSubjectType();
+        [$input, $tagNames, $company, $purposes, $primary] = ImportMapping::input($type, $row->getData(), $import->getMapping());
         try {
-            $values = RecordValidator::values($type, $input->values, $type === SubjectType::Company);
-            $tagIds = [];
+            [$roles, $purposes, $primaryContact] = $this->extras($input->roles, $purposes, $primary);
+            $values                              = RecordValidator::values($type, $input->values, $type === SubjectType::Company);
+            $tagIds                              = [];
             foreach ($tagNames as $name) {
                 $tagId = $tags[mb_strtolower($name, 'UTF-8')] ?? null;
                 if ($tagId === null) {
@@ -342,7 +346,7 @@ final readonly class ImportService implements ImportServiceInterface
                 RecordValidator::contactName($existing->values());
                 $existing->changeCustom(RecordValidator::custom(($input->custom ?? []) + $existing->getCustom(), $fields, $existing->getCustom()));
                 $existing->touch($context->now, $context->actor->value);
-                $this->attach($context, $existing, $tagIds, $company);
+                $this->attach($context, $existing, $tagIds, $roles, $company, $purposes, $primaryContact);
                 $this->support->activity($context, $type, $existing->getId(), ActivityKind::Imported, ['import' => $import->getId()]);
                 $store->flush();
 
@@ -365,18 +369,21 @@ final readonly class ImportService implements ImportServiceInterface
         $store->add($record); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         $store->flush();
         $this->support->activity($context, $type, $record->getId(), ActivityKind::Imported, ['import' => $import->getId()]);
-        $this->attach($context, $record, $tagIds, $company);
+        $this->attach($context, $record, $tagIds, $roles, $company, $purposes, $primaryContact);
         $store->flush();
 
         return [RowOutcome::Created, $record->getId(), null];
     }
 
     /**
-     * Adds the row's tags and, for a contact, the affiliation to the named company (existing active ones only).
+     * Adds the row's tags and roles (an import only adds them) and, for a contact, the affiliation to the named company
+     * (existing active ones only) with the row's purposes (added to the stored ones) and primary-contact flag.
      *
      * @param list<string> $tagIds
+     * @param list<string> $roles
+     * @param list<string> $purposes
      */
-    private function attach(CrmContext $context, CrmRecord $record, array $tagIds, ?string $company): void
+    private function attach(CrmContext $context, CrmRecord $record, array $tagIds, array $roles, ?string $company, array $purposes, ?bool $primaryContact): void
     {
         $store = $this->support->store;
         $type  = $record::type();
@@ -384,24 +391,108 @@ final readonly class ImportService implements ImportServiceInterface
             $have = array_map(static fn (Tagging $t): string => $t->getTagId(), $store->taggings($context->tenant, $type, [$record->getId()]));
             (new Taggings($this->support))->set($context, $type, $record->getId(), array_values(array_unique([...$have, ...$tagIds])));
         }
+        if ($roles !== []) {
+            $have = array_map(static fn (RoleAssignment $r): string => $r->getRoleKey(), $store->roleAssignments($context->tenant, $type, [$record->getId()]));
+            (new Roles($this->support, $this->catalogue))->set($context, $type, $record->getId(), array_values(array_unique([...$this->catalogue->knownRoles($have), ...$roles])));
+        }
         if ($company === null || !$record instanceof Contact) {
             return;
         }
-        [$matches] = $store->list($context->tenant, new ListQuery(SubjectType::Company, $company, perPage: 5));
-        $named     = array_values(array_map(static fn (CrmRecord $m): string => $m->getId(), array_filter($matches, static fn (CrmRecord $m): bool => mb_strtolower($m->label(), 'UTF-8') === mb_strtolower($company, 'UTF-8'))));
-        // Contact first (locked by row(), or new), then the company: the order of affiliate(); its status re-read
-        // under the lock, so a company merged or trashed meanwhile gets no affiliation.
-        $active = array_values(array_filter($store->lockRecords(SubjectType::Company, $context->tenant, array_slice($named, 0, 1)), static fn (CrmRecord $m): bool => $m->isActive()));
+        // Contact first (locked by lockParents(), or new), then the company: the order of affiliate(); its status
+        // re-read under the lock, so a company merged or trashed meanwhile gets no affiliation.
+        $named  = $this->companyNamed($context, $company);
+        $active = array_values(array_filter($store->lockRecords(SubjectType::Company, $context->tenant, $named === null ? [] : [$named]), static fn (CrmRecord $m): bool => $m->isActive()));
         $match  = $active[0] ?? null;
         if (!$match instanceof CrmRecord) {
             return;
         }
-        foreach ($store->affiliations($context->tenant, SubjectType::Contact, $record->getId()) as $affiliation) {
-            if ($affiliation->getCompanyId() === $match->getId()) {
-                return;
+        $affiliation = null;
+        $others      = $store->affiliations($context->tenant, SubjectType::Contact, $record->getId());
+        foreach ($others as $row) {
+            if ($row->getCompanyId() === $match->getId()) {
+                $affiliation = $row;
             }
         }
-        $store->add(new Affiliation($this->support->id(), $context->tenant->value, $record->getId(), $match->getId(), null, $store->affiliations($context->tenant, SubjectType::Contact, $record->getId()) === [], $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        if (!$affiliation instanceof Affiliation) {
+            $affiliation = new Affiliation($this->support->id(), $context->tenant->value, $record->getId(), $match->getId(), null, $others === [], $context->now);
+            $store->add($affiliation); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        }
+        if ($purposes !== []) {
+            $affiliation->setPurposes([...$affiliation->getPurposes(), ...$purposes]);
+        }
+        if ($primaryContact !== null && $primaryContact !== $affiliation->isPrimaryContact()) {
+            // The company is locked: at most one primary contact per company.
+            if ($primaryContact) {
+                RecordService::markPrimaryContact($store->affiliations($context->tenant, SubjectType::Company, $match->getId()), $record->getId());
+            }
+            $affiliation->setPrimaryContact($primaryContact);
+            $this->support->activity($context, SubjectType::Company, $match->getId(), ActivityKind::PrimaryContact, ['contact' => $primaryContact ? $record->getId() : null]);
+        }
+    }
+
+    /**
+     * The roles, purposes and primary-contact flag of a row, checked against the catalogues.
+     *
+     * @param list<string>|null $roles
+     * @param list<string> $purposes
+     *
+     * @throws InvalidInputException
+     *
+     * @return array{list<string>, list<string>, bool|null}
+     */
+    private function extras(?array $roles, array $purposes, ?string $primary): array
+    {
+        $flag = $primary === null ? null : ImportMapping::yes($primary);
+        if ($primary !== null && $flag === null) {
+            throw InvalidInputException::field('primary_contact', 'error.invalid');
+        }
+
+        return [$this->catalogue->checkRoles($roles ?? []), $this->catalogue->checkPurposes($purposes), $flag];
+    }
+
+    /**
+     * The company a row names: the first active company of the tenant whose name matches exactly, case-insensitively.
+     */
+    private function companyNamed(CrmContext $context, string $name): ?string
+    {
+        [$matches] = $this->support->store->list($context->tenant, new ListQuery(SubjectType::Company, $name, perPage: 5));
+        foreach ($matches as $match) {
+            if (mb_strtolower($match->label(), 'UTF-8') === mb_strtolower($name, 'UTF-8')) {
+                return $match->getId();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Locks, before any row is settled, the records the chunk's rows may change (UD2-L-1): the existing contacts of
+     * their e-mails in id order, then the companies they name in id order. Every lock of the chunk is so taken in the
+     * order of every other path (contacts before companies, each kind by id), never row by row.
+     *
+     * @param list<ImportRow> $rows
+     */
+    private function lockParents(CrmContext $context, Import $import, array $rows): void
+    {
+        if ($import->getSubjectType() !== SubjectType::Contact) {
+            return;
+        }
+        $store     = $this->support->store;
+        $emails    = [];
+        $companies = [];
+        foreach ($rows as $row) {
+            [$input, , $company] = ImportMapping::input(SubjectType::Contact, $row->getData(), $import->getMapping());
+            $email               = mb_strtolower(trim($input->values['email'] ?? ''), 'UTF-8');
+            if ($email !== '') {
+                $emails[$email] = $email;
+            }
+            $named = $company === null ? null : $this->companyNamed($context, $company);
+            if ($named !== null) {
+                $companies[$named] = $named;
+            }
+        }
+        $store->lockRecords(SubjectType::Contact, $context->tenant, $store->contactIdsByEmailKeys($context->tenant, array_values($emails)));
+        $store->lockRecords(SubjectType::Company, $context->tenant, array_values($companies));
     }
 
     private function import(TenantRef $tenant, string $id): Import

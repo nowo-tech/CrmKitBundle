@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
+use Nowo\CrmKitBundle\Application\PartyCatalogue;
 use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Model\RecordFields;
@@ -11,6 +12,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Read\FieldView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
+use Nowo\CrmKitBundle\Domain\Service\CrmCatalogueInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordInput;
 use Nowo\CrmKitBundle\Domain\Value\ActorProfile;
@@ -37,8 +39,38 @@ final readonly class RecordForms
      * @param iterable<CrmHostObjectResolverInterface> $resolvers
      * @param list<string> $purposes consent purposes
      */
-    public function __construct(private UiSupport $ui, private CrmReaderInterface $reader, private iterable $resolvers = [], private array $purposes = [])
+    public function __construct(private UiSupport $ui, private CrmReaderInterface $reader, private iterable $resolvers = [], private array $purposes = [], private CrmCatalogueInterface $catalogue = new PartyCatalogue())
     {
+    }
+
+    /**
+     * Party roles (form and filter choices: label key `role.<key>` => key).
+     *
+     * @return array<string, string>
+     */
+    public function roles(): array
+    {
+        $roles = [];
+        foreach ($this->catalogue->roles() as $role) {
+            $roles['role.' . $role] = $role;
+        }
+
+        return $roles;
+    }
+
+    /**
+     * Affiliation purposes (form and filter choices: label key `purpose.<key>` => key).
+     *
+     * @return array<string, string>
+     */
+    public function affiliationPurposes(): array
+    {
+        $purposes = [];
+        foreach ($this->catalogue->purposes() as $purpose) {
+            $purposes['purpose.' . $purpose] = $purpose;
+        }
+
+        return $purposes;
     }
 
     /**
@@ -89,7 +121,7 @@ final readonly class RecordForms
         $fields = $this->reader->fields($type);
         $data   = [];
         if ($view instanceof RecordView) {
-            $data = $view->values + ['owner' => $view->ownerId, 'tags' => array_map(static fn (TagView $t): string => $t->id, $view->tags), 'version' => (string) $view->version];
+            $data = $view->values + ['owner' => $view->ownerId, 'tags' => array_map(static fn (TagView $t): string => $t->id, $view->tags), 'roles' => $view->roles, 'version' => (string) $view->version];
             foreach ($fields as $field) {
                 $value                         = $view->custom[$field->key] ?? null;
                 $data['custom_' . $field->key] = $field->type === FieldType::Boolean ? $value === '1' : $value;
@@ -107,7 +139,7 @@ final readonly class RecordForms
             $tags[$tag->name] = $tag->id;
         }
 
-        return $this->ui->form(RecordType::class, $data, ['subject_type' => $type, 'fields' => $fields, 'owners' => $owners, 'tags' => $tags, 'versioned' => $view instanceof RecordView], 'crm_record');
+        return $this->ui->form(RecordType::class, $data, ['subject_type' => $type, 'fields' => $fields, 'owners' => $owners, 'tags' => $tags, 'roles' => $this->roles(), 'versioned' => $view instanceof RecordView], 'crm_record');
     }
 
     /**
@@ -128,9 +160,10 @@ final readonly class RecordForms
             $raw                 = $data['custom_' . $field->key] ?? null;
             $custom[$field->key] = is_bool($raw) || is_string($raw) || $raw === null ? $raw : (is_scalar($raw) ? (string) $raw : null);
         }
-        $tags = is_array($data['tags'] ?? null) ? array_values(array_filter($data['tags'], is_string(...))) : ($form->has('tags') ? [] : null);
+        $tags  = is_array($data['tags'] ?? null) ? array_values(array_filter($data['tags'], is_string(...))) : ($form->has('tags') ? [] : null);
+        $roles = is_array($data['roles'] ?? null) ? array_values(array_filter($data['roles'], is_string(...))) : ($form->has('roles') ? [] : null);
 
-        return new RecordInput($type, $values, is_string($data['owner'] ?? null) ? $data['owner'] : null, $custom, $tags);
+        return new RecordInput($type, $values, is_string($data['owner'] ?? null) ? $data['owner'] : null, $custom, $tags, true, $roles);
     }
 
     /**

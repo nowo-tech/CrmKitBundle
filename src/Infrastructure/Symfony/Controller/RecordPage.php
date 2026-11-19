@@ -130,7 +130,7 @@ final readonly class RecordPage
                     $companies[$company->label . ' · ' . substr($company->id, -6)] = $company->id;
                 }
                 if ($companies !== []) {
-                    $forms['affiliation'] = $this->ui->form(AffiliationType::class, null, ['companies' => $companies], 'crm_affiliation')->createView();
+                    $forms['affiliation'] = $this->ui->form(AffiliationType::class, null, ['companies' => $companies, 'purposes' => $this->forms->affiliationPurposes()], 'crm_affiliation')->createView();
                 }
                 $purposes = $this->forms->purposes();
                 if ($purposes !== []) {
@@ -141,7 +141,7 @@ final readonly class RecordPage
 
         $notes   = $this->reader->notes($type, $view->id);
         $links   = $this->reader->links($type, $view->id);
-        $buttons = ['notes' => [], 'links' => [], 'affiliations' => []];
+        $buttons = ['notes' => [], 'links' => [], 'affiliations' => [], 'primary_contact' => []];
         if ($edit) {
             foreach ($notes as $note) {
                 $forms['notes'][$note->id]   = $this->ui->form(NoteType::class, ['body' => $note->body, 'pinned' => $note->pinned, 'version' => (string) $note->version], ['versioned' => true], 'crm_note')->createView();
@@ -152,6 +152,9 @@ final readonly class RecordPage
             }
             foreach ($view->affiliations as $affiliation) {
                 $buttons['affiliations'][$affiliation->id] = $this->post($token, 'delete', 'affiliation.remove', 'nowo_crm_kit_unaffiliate', ['id' => $affiliation->id] + $back);
+                if ($type === SubjectType::Company && !$affiliation->primaryContact) {
+                    $buttons['primary_contact'][$affiliation->id] = $this->post($token, 'custom', 'affiliation.make_primary_contact', 'nowo_crm_kit_primary_contact', ['id' => $view->id, 'contact' => $affiliation->contactId]);
+                }
             }
         }
 

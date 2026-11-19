@@ -16,5 +16,11 @@
         <field name="role" column="role" type="string" length="120" nullable="true"/>
         <field name="primary" column="is_primary" type="boolean"/>
         <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime"/>
+        <field name="primaryContact" column="is_primary_contact" type="boolean">
+            <options><option name="default">0</option></options>
+        </field>
+        <field name="purposeKeys" column="purpose_keys" type="string" length="600">
+            <options><option name="default"></option></options>
+        </field>
     </entity>
 </doctrine-mapping>

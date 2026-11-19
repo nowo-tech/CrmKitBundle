@@ -99,9 +99,12 @@ final readonly class ImportController
                 $targets['field.' . $field] = $field;
             }
             if ($import->subjectType === SubjectType::Contact) {
-                $targets['import.target.company'] = 'company';
+                $targets['import.target.company']         = 'company';
+                $targets['import.target.purposes']        = 'purposes';
+                $targets['import.target.primary_contact'] = 'primary_contact';
             }
-            $targets['import.target.tags'] = 'tags';
+            $targets['import.target.tags']  = 'tags';
+            $targets['import.target.roles'] = 'roles';
             foreach ($this->forms->fields($import->subjectType) as $field) {
                 $targets[$field->label . ' (' . $field->key . ')'] = 'custom.' . $field->key;
             }

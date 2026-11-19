@@ -11,14 +11,15 @@ use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Event\ContactErased;
 use Nowo\CrmKitBundle\Domain\Model\Activity;
+use Nowo\CrmKitBundle\Domain\Model\Affiliation;
 use Nowo\CrmKitBundle\Domain\Model\Consent;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
 use Nowo\CrmKitBundle\Domain\Model\Note;
+use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
-use Nowo\CrmKitBundle\Domain\Read\AffiliationView;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 
 use function array_filter;
@@ -41,7 +42,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
     /**
      * Wires the collaborators.
      */
-    public function __construct(private WriteSupport $support, private CrmReader $reader, private PlanCounter $counter)
+    public function __construct(private WriteSupport $support, private PlanCounter $counter)
     {
     }
 
@@ -59,7 +60,9 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
                 $tags[$tag->getId()] = $tag->getName();
             }
             $data = [
-                'contact'  => ['id' => $record->getId(), 'status' => $record->getStatus()->value, 'values' => $record->values(), 'custom' => $record->getCustom(), 'owner' => $record->getOwnerId(), 'created_at' => $record->getCreatedAt()->format(DATE_ATOM), 'updated_at' => $record->getUpdatedAt()->format(DATE_ATOM)],
+                'contact' => ['id' => $record->getId(), 'status' => $record->getStatus()->value, 'values' => $record->values(), 'custom' => $record->getCustom(), 'owner' => $record->getOwnerId(), 'created_at' => $record->getCreatedAt()->format(DATE_ATOM), 'updated_at' => $record->getUpdatedAt()->format(DATE_ATOM)],
+                // Every stored role, configured or not: the export shows what the database holds about the person.
+                'roles'    => array_map(static fn (RoleAssignment $r): array => ['role' => $r->getRoleKey(), 'since' => $r->getCreatedAt()->format(DATE_ATOM)], $store->roleAssignments($context->tenant, SubjectType::Contact, [$contactId])),
                 'tags'     => array_values(array_map(static fn (Tagging $t): string => $tags[$t->getTagId()] ?? '', $store->taggings($context->tenant, SubjectType::Contact, [$contactId]))),
                 'notes'    => array_map(static fn (Note $n): array => ['body' => $n->getBody(), 'created_at' => $n->getCreatedAt()->format(DATE_ATOM)], $store->notes($context->tenant, SubjectType::Contact, $contactId)),
                 'consents' => array_map(static fn (Consent $c): array => ['purpose' => $c->getPurpose(), 'granted' => $c->isGranted(), 'source' => $c->getSource()->value, 'evidence' => $c->getEvidence(), 'recorded_at' => $c->getRecordedAt()->format(DATE_ATOM)], $store->consents($context->tenant, $contactId)),
@@ -72,7 +75,21 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
 
             return $data;
         });
-        $data['companies'] = array_map(static fn (AffiliationView $a): array => ['company' => $a->companyName, 'role' => $a->role, 'primary' => $a->primary], $this->reader->record(SubjectType::Contact, $contactId)->affiliations);
+        // Every stored affiliation with an active company, every stored purpose (configured or not).
+        $data['companies'] = $this->support->read(function () use ($context, $contactId): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $store        = $this->support->store;
+            $affiliations = $store->affiliations($context->tenant, SubjectType::Contact, $contactId);
+            $companies    = $store->records(SubjectType::Company, $context->tenant, array_values(array_map(static fn (Affiliation $a): string => $a->getCompanyId(), $affiliations)));
+            $rows         = [];
+            foreach ($affiliations as $a) {
+                $company = $companies[$a->getCompanyId()] ?? null;
+                if ($company instanceof CrmRecord && $company->isActive()) {
+                    $rows[] = ['company' => $company->label(), 'role' => $a->getRole(), 'primary' => $a->isPrimary(), 'primary_contact' => $a->isPrimaryContact(), 'purposes' => $a->getPurposes()];
+                }
+            }
+
+            return $rows;
+        });
 
         return $data;
     }
@@ -96,6 +113,9 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
                 $store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             }
             foreach ($store->links($context->tenant, SubjectType::Contact, $contactId) as $row) {
+                $store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+            }
+            foreach ($store->roleAssignments($context->tenant, SubjectType::Contact, [$contactId]) as $row) {
                 $store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             }
             foreach ($store->affiliations($context->tenant, SubjectType::Contact, $contactId) as $row) {

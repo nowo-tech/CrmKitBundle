@@ -34,6 +34,7 @@ use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\ImportRow;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
 use Nowo\CrmKitBundle\Domain\Model\Note;
+use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tag;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
@@ -46,6 +47,7 @@ use function array_keys;
 use function array_map;
 use function array_values;
 use function count;
+use function implode;
 use function in_array;
 use function is_array;
 use function is_numeric;
@@ -162,6 +164,61 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * {@inheritDoc}
      */
+    public function contactIdsByEmailKeys(TenantRef $tenant, array $emailKeys): array
+    {
+        if ($emailKeys === []) {
+            return [];
+        }
+        $rows = $this->em()->createQueryBuilder()->select('r')->from(Contact::class, 'r')
+            ->where('r.tenantId = :tenant')->andWhere('r.emailKey IN (:keys)')->orderBy('r.id')
+            ->setParameter('tenant', $tenant->value)->setParameter('keys', $emailKeys, ArrayParameterType::STRING)
+            ->getQuery()->getResult();
+
+        return array_values(array_map(static fn (Contact $c): string => $c->getId(), array_filter($this->exact($rows, Contact::class, $tenant), static fn (Contact $c): bool => in_array($c->getEmailKey(), $emailKeys, true))));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function affiliatedCompanyIds(TenantRef $tenant, array $contactIds): array
+    {
+        if ($contactIds === []) {
+            return [];
+        }
+        $rows = $this->connection()->fetchAllAssociative(
+            'SELECT DISTINCT tenant_id, contact_id, company_id FROM ' . $this->table(Affiliation::class) . ' WHERE tenant_id = ? AND contact_id IN (?) ORDER BY company_id',
+            [$tenant->value, $contactIds],
+            [ParameterType::STRING, ArrayParameterType::STRING],
+        );
+        $ids = [];
+        foreach ($rows as $row) {
+            if ($row['tenant_id'] === $tenant->value && in_array($row['contact_id'], $contactIds, true) && is_string($row['company_id'])) {
+                $ids[$row['company_id']] = $row['company_id'];
+            }
+        }
+
+        return array_values($ids);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function roleAssignments(TenantRef $tenant, SubjectType $type, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $rows = $this->em()->createQueryBuilder()->select('a')->from(RoleAssignment::class, 'a')
+            ->where('a.tenantId = :tenant')->andWhere('a.subjectType = :type')->andWhere('a.subjectId IN (:ids)')
+            ->setParameter('tenant', $tenant->value)->setParameter('type', $type)->setParameter('ids', $ids, ArrayParameterType::STRING)
+            ->orderBy('a.id')->getQuery()->getResult();
+
+        return array_values(array_filter($this->exact($rows, RoleAssignment::class, $tenant), static fn (RoleAssignment $a): bool => $a->getSubjectType() === $type && in_array($a->getSubjectId(), $ids, true)));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function list(TenantRef $tenant, ListQuery $query): array
     {
         $qb    = $this->filtered($tenant, $query);
@@ -241,7 +298,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         $rows = $this->em()->createQueryBuilder()->select('a')->from(Affiliation::class, 'a')
             ->where('a.tenantId = :tenant')->andWhere($side === SubjectType::Contact ? 'a.contactId = :id' : 'a.companyId = :id')
             ->setParameter('tenant', $tenant->value)->setParameter('id', $id)
-            ->orderBy('a.primary', 'DESC')->addOrderBy('a.createdAt')->addOrderBy('a.id')->getQuery()->getResult();
+            ->orderBy($side === SubjectType::Contact ? 'a.primary' : 'a.primaryContact', 'DESC')->addOrderBy('a.createdAt')->addOrderBy('a.id')->getQuery()->getResult();
 
         return array_values(array_filter($this->exact($rows, Affiliation::class, $tenant), static fn (Affiliation $a): bool => ($side === SubjectType::Contact ? $a->getContactId() : $a->getCompanyId()) === $id));
     }
@@ -582,9 +639,17 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
      */
     public function claimPurge(int $now, int $staleBefore): bool
     {
-        $this->lockedCounter(new TenantRef(self::SYSTEM_TENANT), self::PURGE_CLAIM);
+        // Never wait for the claim row: a running purge holds it during each batch, and a second run that waited would
+        // end in a lock conflict instead of "another purge is running".
+        $system = new TenantRef(self::SYSTEM_TENANT);
+        $value  = $this->connection()->fetchOne('SELECT value FROM ' . $this->table(Counter::class) . ' WHERE tenant_id = ? AND resource = ?' . $this->forUpdate(true), [self::SYSTEM_TENANT, self::PURGE_CLAIM]);
+        // No row came back: either a running batch holds it (busy) or it does not exist yet (created, then locked).
+        $busy = !is_numeric($value) && $this->counterExists($system, self::PURGE_CLAIM);
+        if (!is_numeric($value) && !$busy) {
+            $this->lockedCounter($system, self::PURGE_CLAIM);
+        }
 
-        return $this->connection()->executeStatement(
+        return !$busy && $this->connection()->executeStatement(
             'UPDATE ' . $this->table(Counter::class) . ' SET value = ? WHERE tenant_id = ? AND resource = ? AND value < ?',
             [$now, self::SYSTEM_TENANT, self::PURGE_CLAIM, $staleBefore],
             [0 => ParameterType::INTEGER, 3 => ParameterType::INTEGER],
@@ -779,9 +844,26 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         if ($query->ownerId !== null) {
             $qb->andWhere('r.ownerId = :owner')->setParameter('owner', $query->ownerId);
         }
-        if ($query->companyId !== null && $query->type === SubjectType::Contact) {
-            $qb->andWhere('EXISTS (SELECT 1 FROM ' . Affiliation::class . ' af WHERE af.contactId = r.id AND af.companyId = :company AND af.tenantId = :tenant)')
-                ->setParameter('company', $query->companyId);
+        if ($query->role !== null) {
+            $qb->andWhere('EXISTS (SELECT 1 FROM ' . RoleAssignment::class . ' ro WHERE ro.subjectId = r.id AND ro.subjectType = :roleType AND ro.roleKey = :role AND ro.tenantId = :tenant)')
+                ->setParameter('roleType', $query->type)->setParameter('role', $query->role);
+        }
+        if ($query->type === SubjectType::Contact && ($query->companyId !== null || $query->purpose !== null || $query->primaryContactOnly)) {
+            // One affiliation that matches every affiliation filter at once (company, purpose, primary contact).
+            $conditions = ['af.contactId = r.id', 'af.tenantId = :tenant'];
+            if ($query->companyId !== null) {
+                $conditions[] = 'af.companyId = :company';
+                $qb->setParameter('company', $query->companyId);
+            }
+            if ($query->purpose !== null) {
+                $conditions[] = "af.purposeKeys LIKE :purpose ESCAPE '!'";
+                $qb->setParameter('purpose', '%,' . $this->escapeLike($query->purpose) . ',%');
+            }
+            if ($query->primaryContactOnly) {
+                $conditions[] = 'af.primaryContact = :primaryContact';
+                $qb->setParameter('primaryContact', true);
+            }
+            $qb->andWhere('EXISTS (SELECT 1 FROM ' . Affiliation::class . ' af WHERE ' . implode(' AND ', $conditions) . ')');
         }
 
         return $qb;
@@ -898,9 +980,13 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $text);
     }
 
-    private function forUpdate(): string
+    /**
+     * The row-lock clause of the platform (none on SQLite: one writer at a time); `$skipLocked` leaves out the rows
+     * another transaction holds instead of waiting for them (MySQL 8.0, MariaDB 10.6, PostgreSQL 9.5).
+     */
+    private function forUpdate(bool $skipLocked = false): string
     {
-        return $this->connection()->getDatabasePlatform() instanceof SQLitePlatform ? '' : ' FOR UPDATE';
+        return $this->connection()->getDatabasePlatform() instanceof SQLitePlatform ? '' : ($skipLocked ? ' FOR UPDATE SKIP LOCKED' : ' FOR UPDATE');
     }
 
     /**

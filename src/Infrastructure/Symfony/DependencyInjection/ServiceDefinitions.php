@@ -14,11 +14,13 @@ use Nowo\CrmKitBundle\Application\HostLinkService;
 use Nowo\CrmKitBundle\Application\ImportService;
 use Nowo\CrmKitBundle\Application\MergeService;
 use Nowo\CrmKitBundle\Application\NoteService;
+use Nowo\CrmKitBundle\Application\PartyCatalogue;
 use Nowo\CrmKitBundle\Application\PlanCounter;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Application\RecordPurger;
 use Nowo\CrmKitBundle\Application\RecordService;
 use Nowo\CrmKitBundle\Application\RecordViews;
+use Nowo\CrmKitBundle\Application\Roles;
 use Nowo\CrmKitBundle\Application\SettingsService;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\CrmKitBundle\Application\Taggings;
@@ -34,6 +36,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmCatalogueInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
@@ -159,9 +162,12 @@ final class ServiceDefinitions
         $s->set(WriteSupport::class)->args([service(CrmAccess::class), service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(IdGeneratorInterface::class), service(CrmAuditSinkInterface::class), $events]);
         $s->set(PlanCounter::class)->args([service(CrmStoreInterface::class), service(CrmPlanLimitsInterface::class)])->public();
         $s->set(Taggings::class)->args([service(WriteSupport::class)]);
-        $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class)]);
+        $s->set(PartyCatalogue::class)->args([param($p . 'roles.catalogue'), param($p . 'affiliations.purposes')]);
+        $s->alias(CrmCatalogueInterface::class, PartyCatalogue::class)->public();
+        $s->set(Roles::class)->args([service(WriteSupport::class), service(PartyCatalogue::class)]);
+        $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class), service(PartyCatalogue::class)]);
         $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock])->public();
-        $s->set(RecordService::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(Taggings::class), service(CrmActorDirectoryInterface::class), service(RecordPurger::class)]);
+        $s->set(RecordService::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(Taggings::class), service(CrmActorDirectoryInterface::class), service(RecordPurger::class), service(Roles::class), service(PartyCatalogue::class)]);
         $s->alias(RecordServiceInterface::class, RecordService::class)->public();
         $s->set(CrmReader::class)->args([service(WriteSupport::class), service(RecordViews::class), service(CrmActorDirectoryInterface::class), tagged_iterator(CrmPanelProviderInterface::PANEL_TAG), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), $logger])->public();
         $s->alias(CrmReaderInterface::class, CrmReader::class)->public();
@@ -180,6 +186,7 @@ final class ServiceDefinitions
             service(WriteSupport::class),
             service(PlanCounter::class),
             $clock,
+            service(PartyCatalogue::class),
             param($p . 'import.max_rows'),
             param($p . 'import.max_bytes'),
             param($p . 'import.chunk_rows'),
@@ -190,7 +197,7 @@ final class ServiceDefinitions
         $s->alias(MergeServiceInterface::class, MergeService::class)->public();
         $s->set(CrmExporter::class)->args([service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class)]);
         $s->alias(CrmExporterInterface::class, CrmExporter::class)->public();
-        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(CrmReader::class), service(PlanCounter::class)]);
+        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class)]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
@@ -220,7 +227,7 @@ final class ServiceDefinitions
         $s = $container->services();
         $p = self::P;
         $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmAccess::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size')]);
-        $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes')]);
+        $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class)]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class)])->public()->tag('controller.service_arguments');
         $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class)])->public()->tag('controller.service_arguments');

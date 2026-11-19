@@ -102,7 +102,7 @@ final class KernelBootTest extends KernelTestCase
     public function testLaterPhasesAreRefusedUntilTheirRelease(): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage('nowo_crm_kit.pipeline arrives with 0.2.0');
+        $this->expectExceptionMessage('nowo_crm_kit.pipeline arrives with 0.3.0');
         $this->bootKernel(['pipeline' => ['enabled' => true]]);
     }
 

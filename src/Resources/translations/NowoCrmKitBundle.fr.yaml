@@ -31,6 +31,10 @@ list:
     col:
         updated: Mis à jour
     filter:
+        role: 'Rôle'
+        purpose: 'Contact pour'
+        primary_contact: 'Contact principal'
+        primary_contact_only: 'Contacts principaux uniquement'
         q: Rechercher
         tag: Étiquette
         owner: Responsable
@@ -40,6 +44,7 @@ list:
         active: Actifs
         trashed: Corbeille
 field:
+    roles: 'Rôles'
     name: Nom
     contact_name: Nom
     legal_name: Raison sociale
@@ -135,6 +140,9 @@ record:
     purged: La fiche a été supprimée.
     erased: "Les données personnelles du contact ont été effacées."
 affiliation:
+    primary_contact: 'Contact principal'
+    make_primary_contact: 'Définir comme contact principal'
+    primary_contact_set: 'Le contact principal a été changé.'
     add: Ajouter une société
     save: Ajouter
     added: La société a été ajoutée.
@@ -142,6 +150,8 @@ affiliation:
     remove: Retirer
     primary: Principale
     form:
+        purposes: 'Contact pour'
+        primary_contact: 'Contact principal de l''entreprise'
         company: Société
         role: Rôle
         primary: Société principale
@@ -232,6 +242,8 @@ timeline:
     empty: Rien ne s'est encore passé.
     open: Ouvrir
 activity:
+    roles_changed: 'Rôles modifiés par %actor%'
+    primary_contact: 'Contact principal modifié par %actor%'
     created: 'Créé par %actor%'
     updated: 'Mis à jour par %actor%'
     owner_changed: 'Responsable modifié par %actor%'
@@ -308,6 +320,9 @@ import:
         skip: Ignorer les lignes dont l'e-mail existe déjà
         update: Mettre à jour le contact existant
     target:
+        roles: 'Rôles (clés séparées par des virgules)'
+        purposes: 'Contact pour (clés séparées par des virgules)'
+        primary_contact: 'Contact principal de l''entreprise (oui / non)'
         skip: '(ignorer cette colonne)'
         company: Société (existante, par nom)
         tags: Étiquettes (existantes, séparées par des virgules)
@@ -351,6 +366,9 @@ flash:
         crm_settings_stale: Quelqu'un a modifié les paramètres au même moment. Vérifiez-les et enregistrez à nouveau.
         crm_write_conflict: 'Une autre modification des mêmes données est arrivée au même moment. Réessayez.'
 error:
+    role_unknown: 'Rôle inconnu.'
+    purpose_unknown: 'Objet inconnu.'
+    not_affiliated: 'Ce contact n''est pas lié à l''entreprise.'
     required: Ce champ est obligatoire.
     invalid: Cette valeur n'est pas valide.
     host_object_unknown: 'Cet objet n''existe pas ou vous ne pouvez pas le voir.'
@@ -376,3 +394,13 @@ error:
     merge_same: Une fiche ne peut pas être fusionnée avec elle-même.
     out_of_range: Cette valeur est hors limites.
     csrf: Le formulaire a expiré. Rechargez la page et réessayez.
+role:
+    customer: 'Client'
+    supplier: 'Fournisseur'
+    partner: 'Partenaire'
+    distributor: 'Distributeur'
+purpose:
+    billing: 'Facturation'
+    orders: 'Commandes'
+    technical: 'Technique'
+    general: 'Général'

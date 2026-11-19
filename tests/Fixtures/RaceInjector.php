@@ -12,6 +12,7 @@ use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\CrmSettings;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
+use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tag;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use ReflectionClass;
@@ -97,6 +98,7 @@ final class RaceInjector
             $object instanceof Affiliation     => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'contact_id' => $object->getContactId(), 'company_id' => $object->getCompanyId(), 'is_primary' => 0, 'created_at' => $at],
             $object instanceof CrmSettings     => ['tenant_id' => $object->getTenantId(), 'trash_days' => 30, 'timeline_years' => 5, 'import_keep_days' => 30, 'merge_keep_days' => 90, 'version' => 1, 'updated_at' => $at],
             $object instanceof Tag             => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'name' => $object->getName(), 'name_key' => $object->getNameKey(), 'colour' => 'red', 'version' => 1, 'created_at' => $at],
+            $object instanceof RoleAssignment  => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'role_key' => $object->getRoleKey(), 'created_at' => $at],
             $object instanceof Tagging         => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'tag_id' => $object->getTagId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'created_at' => $at],
             default                            => null,
         };

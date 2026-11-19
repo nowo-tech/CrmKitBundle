@@ -31,6 +31,10 @@ list:
     col:
         updated: Updated
     filter:
+        role: 'Role'
+        purpose: 'Contact for'
+        primary_contact: 'Primary contact'
+        primary_contact_only: 'Primary contacts only'
         q: Search
         tag: Tag
         owner: Owner
@@ -40,6 +44,7 @@ list:
         active: Active
         trashed: Trash
 field:
+    roles: 'Roles'
     name: Name
     contact_name: Name
     legal_name: Legal name
@@ -135,6 +140,9 @@ record:
     purged: The record was deleted.
     erased: "The contact's personal data was erased."
 affiliation:
+    primary_contact: 'Primary contact'
+    make_primary_contact: 'Make primary contact'
+    primary_contact_set: 'The primary contact was changed.'
     add: Add a company
     save: Add
     added: The company was added.
@@ -142,6 +150,8 @@ affiliation:
     remove: Remove
     primary: Primary
     form:
+        purposes: 'Contact for'
+        primary_contact: 'The company''s primary contact'
         company: Company
         role: Role
         primary: Primary company
@@ -232,6 +242,8 @@ timeline:
     empty: Nothing has happened yet.
     open: Open
 activity:
+    roles_changed: 'Roles changed by %actor%'
+    primary_contact: 'Primary contact changed by %actor%'
     created: 'Created by %actor%'
     updated: 'Updated by %actor%'
     owner_changed: 'Owner changed by %actor%'
@@ -308,6 +320,9 @@ import:
         skip: Skip rows whose e-mail exists
         update: Update the existing contact
     target:
+        roles: 'Roles (keys, comma separated)'
+        purposes: 'Contact for (keys, comma separated)'
+        primary_contact: 'Primary contact of the company (yes / no)'
         skip: '(skip this column)'
         company: Company (existing, by name)
         tags: Tags (existing, comma separated)
@@ -351,6 +366,9 @@ flash:
         crm_settings_stale: Someone changed the settings at the same moment. Check them and save again.
         crm_write_conflict: 'Another change of the same data arrived at the same moment. Try again.'
 error:
+    role_unknown: 'Unknown role.'
+    purpose_unknown: 'Unknown purpose.'
+    not_affiliated: 'This contact is not linked to the company.'
     required: This field is required.
     invalid: This value is not valid.
     host_object_unknown: 'This object does not exist or you cannot see it.'
@@ -376,3 +394,13 @@ error:
     merge_same: A record cannot be merged into itself.
     out_of_range: This value is out of range.
     csrf: The form expired. Reload the page and try again.
+role:
+    customer: 'Customer'
+    supplier: 'Supplier'
+    partner: 'Partner'
+    distributor: 'Distributor'
+purpose:
+    billing: 'Billing'
+    orders: 'Orders'
+    technical: 'Technical'
+    general: 'General'

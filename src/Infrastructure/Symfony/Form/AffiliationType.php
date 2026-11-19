@@ -15,7 +15,7 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
- * A contact's company, role and primary flag.
+ * A contact's company, role, primary-company flag, purposes and the company's primary-contact flag.
  *
  * @extends AbstractType<mixed>
  */
@@ -35,6 +35,10 @@ final class AffiliationType extends AbstractType
             $this->addTypedField('company', ChoiceType::class, ['label' => 'affiliation.form.company', 'choices' => $options['companies'], 'choice_translation_domain' => false]);
             $this->addTypedField('role', TextType::class, ['label' => 'affiliation.form.role', 'required' => false, 'attr' => ['maxlength' => 120]]);
             $this->addTypedField('primary', CheckboxType::class, ['label' => 'affiliation.form.primary', 'required' => false]);
+            if ($options['purposes'] !== []) {
+                $this->addTypedField('purposes', ChoiceType::class, ['label' => 'affiliation.form.purposes', 'choices' => $options['purposes'], 'multiple' => true, 'expanded' => true, 'required' => false]);
+            }
+            $this->addTypedField('primary_contact', CheckboxType::class, ['label' => 'affiliation.form.primary_contact', 'required' => false]);
         });
     }
 
@@ -50,6 +54,7 @@ final class AffiliationType extends AbstractType
             'allow_extra_fields' => false,
             'translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN,
             'companies'          => [],
+            'purposes'           => [],
         ]);
     }
 

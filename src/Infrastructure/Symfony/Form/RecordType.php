@@ -27,7 +27,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 use function array_combine;
 
 /**
- * A company or contact: the core fields of its type ({@see RecordFields}), the owner, the tags and one field per active
+ * A company or contact: the core fields of its type ({@see RecordFields}), the owner, the party roles, the tags and one field per active
  * custom field (`custom_<key>`). The service validates; the form only shapes the input.
  *
  * @extends AbstractType<mixed>
@@ -61,6 +61,9 @@ final class RecordType extends AbstractType
                 $this->addTypedField($name, $class, ['label' => 'field.' . $name, 'required' => $name === 'name', 'attr' => ['maxlength' => $max]] + $extra);
             }
             $this->addTypedField('owner', ChoiceType::class, ['label' => 'field.owner', 'choices' => $options['owners'], 'required' => false, 'placeholder' => 'field.owner_none', 'choice_translation_domain' => false]);
+            if ($options['roles'] !== []) {
+                $this->addTypedField('roles', ChoiceType::class, ['label' => 'field.roles', 'choices' => $options['roles'], 'multiple' => true, 'expanded' => true, 'required' => false]);
+            }
             if ($options['tags'] !== []) {
                 $this->addTypedField('tags', ChoiceType::class, ['label' => 'field.tags', 'choices' => $options['tags'], 'multiple' => true, 'expanded' => true, 'required' => false, 'choice_translation_domain' => false]);
             }
@@ -98,6 +101,7 @@ final class RecordType extends AbstractType
             'versioned'          => false,
             'owners'             => [],
             'tags'               => [],
+            'roles'              => [],
             'fields'             => [],
         ]);
         $resolver->setRequired('subject_type');

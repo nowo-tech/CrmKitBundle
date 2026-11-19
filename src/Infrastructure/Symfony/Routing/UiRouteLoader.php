@@ -69,6 +69,7 @@ final class UiRouteLoader extends Loader
         $this->add($routes, 'link_add', $base . '/{type}/{id}/links', $p . 'addLink', ['POST'], $seg + $id);
         $this->add($routes, 'link_remove', $base . '/links/{id}/remove', $p . 'removeLink', ['POST'], $id);
         $this->add($routes, 'affiliate', $base . '/contacts/{id}/affiliations', $p . 'affiliate', ['POST'], $id);
+        $this->add($routes, 'primary_contact', $base . '/companies/{id}/primary-contact/{contact}', $p . 'primaryContact', ['POST'], $id + ['contact' => RecordId::REQUIREMENT]);
         $this->add($routes, 'unaffiliate', $base . '/affiliations/{id}/remove', $p . 'unaffiliate', ['POST'], $id);
         $this->add($routes, 'consent', $base . '/contacts/{id}/consent', $p . 'consent', ['POST'], $id);
         $this->add($routes, 'vcard', $base . '/contacts/{id}/vcard', $p . 'vcard', ['GET'], $id);

@@ -62,7 +62,7 @@ final class MergeTest extends CrmTestCase
         self::assertFalse($byField['first_name']);
         self::assertTrue($byField['custom.shoe']);
         self::assertFalse($byField['custom.tier']);
-        self::assertSame(['notes' => 1, 'tags' => 2, 'links' => 2, 'affiliations' => 2, 'activities' => 8, 'consents' => 1], $preview->moves);
+        self::assertSame(['notes' => 1, 'tags' => 2, 'links' => 2, 'affiliations' => 2, 'roles' => 0, 'activities' => 8, 'consents' => 1], $preview->moves);
 
         $merges->merge(SubjectType::Contact, $keep, $other, ['email', 'phone', 'custom.tier', 'custom.nope'], $preview->survivor->version, $preview->other->version);
         $reader = $this->service(CrmReaderInterface::class);

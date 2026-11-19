@@ -12,6 +12,7 @@ use Nowo\CrmKitBundle\Domain\Event\RecordsMerged;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
+use Nowo\CrmKitBundle\Domain\Model\Affiliation;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
@@ -68,6 +69,7 @@ final readonly class MergeService implements MergeServiceInterface
                 'tags'         => count($store->taggings($context->tenant, $type, [$otherId])),
                 'links'        => count($store->links($context->tenant, $type, $otherId)),
                 'affiliations' => count($store->affiliations($context->tenant, $type, $otherId)),
+                'roles'        => count($store->roleAssignments($context->tenant, $type, [$otherId])),
                 'activities'   => count($store->allActivities($context->tenant, $type, $otherId)),
             ];
             if ($type === SubjectType::Contact) {
@@ -94,7 +96,12 @@ final readonly class MergeService implements MergeServiceInterface
             if ($survivor->getVersion() !== $survivorVersion || $other->getVersion() !== $otherVersion) {
                 throw new ConflictException(ConflictException::MERGE_STALE, $survivorId);
             }
-            $store    = $this->support->store;
+            $store = $this->support->store;
+            if ($type === SubjectType::Contact) {
+                // The companies of both contacts, after the contacts (the lock order of affiliate()), in id order: their
+                // primary-contact flags move with the affiliations.
+                $store->lockRecords(SubjectType::Company, $context->tenant, $store->affiliatedCompanyIds($context->tenant, [$survivorId, $otherId]));
+            }
             $snapshot = ['values' => $other->values(), 'custom' => $other->getCustom(), 'owner' => $other->getOwnerId(), 'created_at' => $other->getCreatedAt()->format(DATE_ATOM)];
             $values   = [];
             $custom   = $survivor->getCustom();
@@ -166,30 +173,18 @@ final readonly class MergeService implements MergeServiceInterface
                 $link->moveTo($toId);
             }
         }
-        $counterparts = [];
-        foreach ($store->affiliations($tenant, $type, $toId) as $affiliation) {
-            $counterparts[$type === SubjectType::Contact ? $affiliation->getCompanyId() : $affiliation->getContactId()] = true;
+        $have = [];
+        foreach ($store->roleAssignments($tenant, $type, [$toId]) as $assignment) {
+            $have[$assignment->getRoleKey()] = true;
         }
-        $survivorHasPrimary = false;
-        foreach ($store->affiliations($tenant, $type, $toId) as $affiliation) {
-            $survivorHasPrimary = $survivorHasPrimary || ($type === SubjectType::Contact && $affiliation->isPrimary());
-        }
-        foreach ($store->affiliations($tenant, $type, $fromId) as $affiliation) {
-            $counterpart = $type === SubjectType::Contact ? $affiliation->getCompanyId() : $affiliation->getContactId();
-            if (isset($counterparts[$counterpart]) || $counterpart === $toId) {
-                $store->remove($affiliation); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
-
-                continue;
-            }
-            if ($survivorHasPrimary) {
-                $affiliation->setPrimary(false);
-            }
-            if ($type === SubjectType::Contact) {
-                $affiliation->moveTo($toId, null);
+        foreach ($store->roleAssignments($tenant, $type, [$fromId]) as $assignment) {
+            if (isset($have[$assignment->getRoleKey()])) {
+                $store->remove($assignment); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             } else {
-                $affiliation->moveTo(null, $toId);
+                $assignment->moveTo($toId);
             }
         }
+        $this->moveAffiliations($context, $type, $fromId, $toId);
         // Unique children first (deletes before moves), then the rest.
         $store->flush();
         foreach ($store->notes($tenant, $type, $fromId) as $note) {
@@ -201,6 +196,52 @@ final readonly class MergeService implements MergeServiceInterface
         if ($type === SubjectType::Contact) {
             foreach ($store->consents($tenant, $fromId) as $consent) {
                 $consent->moveTo($toId);
+            }
+        }
+    }
+
+    /**
+     * Moves the affiliations of the merged record: a pair the survivor already has is deleted after its purposes and
+     * its primary-contact flag went to the survivor's row; at most one primary company per contact and one primary
+     * contact per company stay (the survivor's win). The companies involved are locked by the caller.
+     */
+    private function moveAffiliations(CrmContext $context, SubjectType $type, string $fromId, string $toId): void
+    {
+        $store    = $this->support->store;
+        $survivor = [];
+        $primary  = false;
+        $contact  = false;
+        foreach ($store->affiliations($context->tenant, $type, $toId) as $affiliation) {
+            $survivor[$type === SubjectType::Contact ? $affiliation->getCompanyId() : $affiliation->getContactId()] = $affiliation;
+            $primary                                                                                                = $primary || $affiliation->isPrimary();
+            $contact                                                                                                = $contact || $affiliation->isPrimaryContact();
+        }
+        foreach ($store->affiliations($context->tenant, $type, $fromId) as $affiliation) {
+            $counterpart = $type === SubjectType::Contact ? $affiliation->getCompanyId() : $affiliation->getContactId();
+            $kept        = $survivor[$counterpart] ?? null;
+            if ($kept instanceof Affiliation) {
+                $kept->setPurposes([...$kept->getPurposes(), ...$affiliation->getPurposes()]);
+                // Contacts: the same company, whose primary contact was the merged one. Companies: the same person,
+                // primary contact of the merged company, when the survivor has none.
+                if ($affiliation->isPrimaryContact() && ($type === SubjectType::Contact || !$contact)) {
+                    $kept->setPrimaryContact(true);
+                    $contact = true;
+                }
+                $store->remove($affiliation); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+
+                continue;
+            }
+            if ($type === SubjectType::Contact && $primary) {
+                $affiliation->setPrimary(false);
+            }
+            if ($type === SubjectType::Company && $affiliation->isPrimaryContact()) {
+                $affiliation->setPrimaryContact(!$contact);
+                $contact = true;
+            }
+            if ($type === SubjectType::Contact) {
+                $affiliation->moveTo($toId, null);
+            } else {
+                $affiliation->moveTo(null, $toId);
             }
         }
     }

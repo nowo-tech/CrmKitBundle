@@ -33,6 +33,11 @@ final readonly class ListQuery
     /**
      * @param string|null $text free text (name, e-mail, tax id, domain)
      * @param RecordStatus $status Active or Trashed
+     * @param string|null $role only records holding this party role (a key of `roles.catalogue`)
+     * @param string|null $purpose contacts only: only contacts with an affiliation of this purpose (a key of
+     *                             `affiliations.purposes`)
+     * @param bool $primaryContactOnly contacts only: only contacts that are the primary contact of a company (of
+     *                                 `$companyId` when set)
      */
     public function __construct(
         public SubjectType $type,
@@ -45,6 +50,9 @@ final readonly class ListQuery
         int $page = 1,
         int $perPage = 25,
         public ?string $companyId = null,
+        public ?string $role = null,
+        public ?string $purpose = null,
+        public bool $primaryContactOnly = false,
     ) {
         $this->sort      = in_array($sort, self::SORTS, true) ? $sort : 'name';
         $this->direction = $direction === 'desc' ? 'desc' : 'asc';

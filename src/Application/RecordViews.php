@@ -32,12 +32,12 @@ final readonly class RecordViews
     /**
      * Wires the collaborators.
      */
-    public function __construct(private CrmStoreInterface $store, private CrmActorDirectoryInterface $directory)
+    public function __construct(private CrmStoreInterface $store, private CrmActorDirectoryInterface $directory, private PartyCatalogue $catalogue = new PartyCatalogue())
     {
     }
 
     /**
-     * Views of records of one type, with tags (and affiliations when `$withAffiliations`).
+     * Views of records of one type, with tags and configured roles (and affiliations when `$withAffiliations`).
      *
      * @param list<CrmRecord> $records
      *
@@ -65,6 +65,10 @@ final readonly class RecordViews
                 }
             }
         }
+        $roles = [];
+        foreach ($this->store->roleAssignments($tenant, $type, $ids) as $assignment) {
+            $roles[$assignment->getSubjectId()][] = $assignment->getRoleKey();
+        }
         $owners = [];
         $views  = [];
         foreach ($records as $record) {
@@ -88,6 +92,7 @@ final readonly class RecordViews
                 $record->getUpdatedAt(),
                 $record->getTrashedAt(),
                 $withAffiliations ? $this->affiliations($tenant, $type, $record->getId()) : [],
+                $this->catalogue->knownRoles($roles[$record->getId()] ?? []),
             );
         }
 
@@ -132,6 +137,8 @@ final readonly class RecordViews
                 $type === SubjectType::Company ? $selfLabel : $counterpart->label(),
                 $link->getRole(),
                 $link->isPrimary(),
+                $link->isPrimaryContact(),
+                $this->catalogue->knownPurposes($link->getPurposes()),
             );
         }
 

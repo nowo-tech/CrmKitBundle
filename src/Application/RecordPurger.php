@@ -67,6 +67,9 @@ final readonly class RecordPurger
         foreach ($this->store->links($tenant, $type, $id) as $row) {
             $this->store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
+        foreach ($this->store->roleAssignments($tenant, $type, [$id]) as $row) {
+            $this->store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        }
         foreach ($this->store->affiliations($tenant, $type, $id) as $row) {
             $this->store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }

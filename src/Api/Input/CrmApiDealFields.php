@@ -22,10 +22,6 @@ use function preg_replace;
  */
 final class CrmApiDealFields
 {
-    private function __construct()
-    {
-    }
-
     /**
      * `amount` (decimal string) and `currency` (ISO 4217) together, or null when both are absent / null.
      *

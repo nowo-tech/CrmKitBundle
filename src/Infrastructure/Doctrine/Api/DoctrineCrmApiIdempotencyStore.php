@@ -56,7 +56,7 @@ final readonly class DoctrineCrmApiIdempotencyStore implements CrmApiIdempotency
         return $this->guard(function () use ($claim): ?CrmApiIdempotencyRecord {
             $connection = $this->connection();
             $table      = $this->table();
-            $connection->executeStatement('DELETE FROM ' . $table . ' WHERE scope_hash = ? AND key_hash = ? AND expires_at < ?', [$claim->scopeHash, $claim->keyHash, self::second($claim->now)]);
+            $connection->executeStatement('DELETE FROM ' . $table . ' WHERE scope_hash = ? AND key_hash = ? AND expires_at < ?', [$claim->scopeHash, $claim->keyHash, $this->second($claim->now)]);
             $columns  = 'scope_hash, key_hash, tenant_id, operation, fingerprint, outcome, result_ids, created_at, expires_at';
             $values   = '?, ?, ?, ?, ?, NULL, NULL, ?, ?';
             $platform = $connection->getDatabasePlatform();
@@ -65,12 +65,9 @@ final readonly class DoctrineCrmApiIdempotencyStore implements CrmApiIdempotency
                 $platform instanceof AbstractMySQLPlatform => 'INSERT INTO ' . $table . ' (' . $columns . ') VALUES (' . $values . ') ON DUPLICATE KEY UPDATE scope_hash = scope_hash',
                 default                                    => 'INSERT OR IGNORE INTO ' . $table . ' (' . $columns . ') VALUES (' . $values . ')',
             };
-            $inserted = $connection->executeStatement($sql, [$claim->scopeHash, $claim->keyHash, $claim->tenant, $claim->operation, $claim->fingerprint, self::micro($claim->now), self::second($claim->expiresAt)]);
-            if ($inserted === 1) {
-                return null;
-            }
+            $inserted = $connection->executeStatement($sql, [$claim->scopeHash, $claim->keyHash, $claim->tenant, $claim->operation, $claim->fingerprint, $this->micro($claim->now), $this->second($claim->expiresAt)]);
 
-            return $this->row($claim->scopeHash, $claim->keyHash, null, true) ?? throw new CrmApiStoreFailure();
+            return $inserted === 1 ? null : ($this->row($claim->scopeHash, $claim->keyHash, null, true) ?? throw CrmApiRefusal::of(CrmApiCode::IDEMP_STORE));
         });
     }
 
@@ -108,10 +105,10 @@ final readonly class DoctrineCrmApiIdempotencyStore implements CrmApiIdempotency
     {
         return $this->guard(function () use ($now, $limit): int {
             $connection = $this->connection();
-            $rows       = $connection->fetchAllAssociative('SELECT scope_hash, key_hash FROM ' . $this->table() . ' WHERE expires_at < ? ORDER BY expires_at LIMIT ' . max(1, $limit), [self::second($now)]);
+            $rows       = $connection->fetchAllAssociative('SELECT scope_hash, key_hash FROM ' . $this->table() . ' WHERE expires_at < ? ORDER BY expires_at LIMIT ' . max(1, $limit), [$this->second($now)]);
             $deleted    = 0;
             foreach ($rows as $row) {
-                $deleted += (int) $connection->executeStatement('DELETE FROM ' . $this->table() . ' WHERE scope_hash = ? AND key_hash = ? AND expires_at < ?', [$row['scope_hash'], $row['key_hash'], self::second($now)]);
+                $deleted += (int) $connection->executeStatement('DELETE FROM ' . $this->table() . ' WHERE scope_hash = ? AND key_hash = ? AND expires_at < ?', [$row['scope_hash'], $row['key_hash'], $this->second($now)]);
             }
 
             return $deleted;
@@ -130,16 +127,12 @@ final readonly class DoctrineCrmApiIdempotencyStore implements CrmApiIdempotency
         if (!is_array($row) || !is_string($row['operation'] ?? null) || !is_string($row['fingerprint'] ?? null)) {
             return null;
         }
-        if ($now !== null && is_string($row['expires_at'] ?? null) && $row['expires_at'] < self::second($now)) {
+        if ($now instanceof DateTimeImmutable && is_string($row['expires_at'] ?? null) && $row['expires_at'] < $this->second($now)) {
             return null;
         }
         $ids = [];
         if (is_string($row['result_ids'] ?? null)) {
-            try {
-                $decoded = json_decode($row['result_ids'], true, 4, JSON_THROW_ON_ERROR);
-            } catch (JsonException) {
-                $decoded = [];
-            }
+            $decoded = json_decode($row['result_ids'], true, 4);
             foreach (is_array($decoded) && ($decoded === [] || !array_is_list($decoded)) ? $decoded : [] as $name => $value) {
                 if (is_string($name) && is_string($value)) {
                     $ids[$name] = $value;
@@ -164,12 +157,8 @@ final readonly class DoctrineCrmApiIdempotencyStore implements CrmApiIdempotency
     {
         try {
             return $work();
-        } catch (CrmApiStoreFailure|DbalException|JsonException $e) {
-            if (CrmReader::transient($e)) {
-                throw $e;
-            }
-
-            throw CrmApiRefusal::of(CrmApiCode::IDEMP_STORE, [], $e);
+        } catch (DbalException|JsonException $e) {
+            throw CrmReader::transient($e) ? $e : CrmApiRefusal::of(CrmApiCode::IDEMP_STORE, [], $e);
         }
     }
 
@@ -183,12 +172,12 @@ final readonly class DoctrineCrmApiIdempotencyStore implements CrmApiIdempotency
         return $this->runner->manager()->getConnection();
     }
 
-    private static function second(DateTimeImmutable $at): string
+    private function second(DateTimeImmutable $at): string
     {
         return $at->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
     }
 
-    private static function micro(DateTimeImmutable $at): string
+    private function micro(DateTimeImmutable $at): string
     {
         return $at->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s.u');
     }

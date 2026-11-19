@@ -14,10 +14,6 @@ use DateTimeZone;
  */
 final class CrmApiTime
 {
-    private function __construct()
-    {
-    }
-
     /**
      * The instant as `Y-m-d\TH:i:s.uP` in UTC, or null.
      */

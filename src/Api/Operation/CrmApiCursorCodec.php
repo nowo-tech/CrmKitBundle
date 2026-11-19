@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Api\Operation;
 
-use JsonException;
 use Nowo\CrmKitBundle\Api\CrmApiCode;
 use Nowo\CrmKitBundle\Api\CrmApiOperation;
 use Nowo\CrmKitBundle\Api\CrmApiRefusal;
 use Nowo\CrmKitBundle\Api\Input\CrmApiCursor;
 use SensitiveParameter;
-use SodiumException;
 
 use function base64_decode;
 use function base64_encode;
@@ -83,12 +81,9 @@ final readonly class CrmApiCursorCodec
         if ($raw === false || strlen($raw) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {
             throw CrmApiRefusal::of(CrmApiCode::INPUT_CURSOR);
         }
-        try {
-            $plain = sodium_crypto_secretbox_open(substr($raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), substr($raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), $this->key());
-            $data  = $plain === false ? null : json_decode($plain, true, 8, JSON_THROW_ON_ERROR);
-        } catch (JsonException|SodiumException) {
-            $data = null;
-        }
+        // The box authenticates the plaintext: only a cursor this codec sealed opens, and it is always valid JSON.
+        $plain = sodium_crypto_secretbox_open(substr($raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), substr($raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), $this->key());
+        $data  = $plain === false ? null : json_decode($plain, true, 8);
         if (!is_array($data) || ($data['v'] ?? null) !== 1 || ($data['op'] ?? null) !== $operation->value || ($data['f'] ?? null) !== $filterHash || !is_array($data['k'] ?? null)) {
             throw CrmApiRefusal::of(CrmApiCode::INPUT_CURSOR);
         }

@@ -9,6 +9,7 @@ use Nowo\CrmKitBundle\Api\CrmApiCode;
 use Nowo\CrmKitBundle\Api\CrmApiOperation;
 use Nowo\CrmKitBundle\Api\CrmApiPrincipal;
 use Nowo\CrmKitBundle\Api\CrmApiRefusal;
+use Nowo\CrmKitBundle\Api\Input\CrmApiCursor;
 use Nowo\CrmKitBundle\Api\Input\CrmApiDealChanges;
 use Nowo\CrmKitBundle\Api\Input\CrmApiDealDraft;
 use Nowo\CrmKitBundle\Api\Input\CrmApiDealQuery;
@@ -26,7 +27,11 @@ use Nowo\CrmKitBundle\Application\Pipeline\DealQuery;
 use Nowo\CrmKitBundle\Domain\Enum\FunnelKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
+use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealPage;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealView;
+use Nowo\CrmKitBundle\Domain\Read\Pipeline\FunnelStats;
+use Nowo\CrmKitBundle\Domain\Read\Pipeline\FunnelView;
+use Nowo\CrmKitBundle\Domain\Value\Money;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
@@ -64,8 +69,8 @@ final readonly class CrmApiDealOperations
             $call->require(CrmApiCapability::ReadAmounts);
         }
         $filter = CrmApiCursorCodec::filterHash($query->filters());
-        $key    = $query->page->cursor === null ? null : $this->cursors->open($query->page->cursor, CrmApiOperation::DealSearch, $filter);
-        if ($key !== null && (!is_string($key['id'] ?? null) || !(($key['v'] ?? null) === null || is_string($key['v'])))) {
+        $key    = $query->page->cursor instanceof CrmApiCursor ? $this->cursors->open($query->page->cursor, CrmApiOperation::DealSearch, $filter) : null;
+        if ($key !== null && (!is_string($key['id'] ?? null) || ($key['v'] ?? null) !== null && !is_string($key['v']))) {
             throw CrmApiRefusal::of(CrmApiCode::INPUT_CURSOR);
         }
         /** @var array{v: ?string, id: string}|null $after */
@@ -81,7 +86,7 @@ final readonly class CrmApiDealOperations
             $query->staleOnly,
             $query->sort,
         );
-        $page = CrmApiErrors::run(static fn () => $pipeline->deals->as($call->caller)->deals($dq, $after, $query->page->limit));
+        $page = CrmApiErrors::run(static fn (): DealPage => $pipeline->deals->as($call->caller)->deals($dq, $after, $query->page->limit));
 
         return new CrmApiPage(array_map(CrmApiPresenter::deal(...), $page->deals), $page->next === null ? null : $this->cursors->seal(CrmApiOperation::DealSearch, $filter, $page->next));
     }
@@ -118,13 +123,13 @@ final readonly class CrmApiDealOperations
     {
         $call     = $this->guard->call($principal, $tenant, CrmApiOperation::FunnelStats);
         $pipeline = $this->pipeline();
-        $funnel   = CrmApiErrors::run(static fn () => $pipeline->funnels->as($call->caller)->funnel($query->funnelId->value));
+        $funnel   = CrmApiErrors::run(static fn (): FunnelView => $pipeline->funnels->as($call->caller)->funnel($query->funnelId->value));
         if ($funnel->kind !== FunnelKind::Deal) {
             throw CrmApiRefusal::notFound();
         }
         $call->require(CrmApiCapability::Read);
 
-        return CrmApiPresenter::stats(CrmApiErrors::run(static fn () => $pipeline->statistics->as($call->caller)->stats($query->funnelId->value, $query->at, $query->ownerId?->value, $query->role?->value, $query->tagId?->value)));
+        return CrmApiPresenter::stats(CrmApiErrors::run(static fn (): FunnelStats => $pipeline->statistics->as($call->caller)->stats($query->funnelId->value, $query->at, $query->ownerId?->value, $query->role?->value, $query->tagId?->value)));
     }
 
     /**
@@ -141,10 +146,10 @@ final readonly class CrmApiDealOperations
             CrmApiOperation::DealCreate,
             $draft->canonical(),
             201,
-            static fn (mixed $id): array => ['deal' => is_string($id) ? $id : ''],
-            function (CrmApiCall $bound) use ($call, $draft): CrmApiWritten {
+            static fn (mixed $id): array => ['deal' => is_string($id) ? $id : ''], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($call, $draft): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $bound->require(CrmApiCapability::Create);
-                if ($draft->amount !== null || $draft->probability !== null) {
+                if ($draft->amount instanceof Money || $draft->probability !== null) {
                     $bound->require(CrmApiCapability::WriteAmounts);
                 }
                 $input = new DealInput($draft->title, $draft->funnelId->value, $draft->stageId->value, $draft->companyId?->value, $draft->contactId?->value, $draft->owner->resolve($bound->principal->actor), $draft->amount, $draft->probability, $draft->expectedClose);
@@ -152,7 +157,7 @@ final readonly class CrmApiDealOperations
 
                 return new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $id)), false, true, 201);
             },
-            fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $r->ids['deal'] ?? '')), true, true, $r->status),
+            fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $r->ids['deal'] ?? '')), true, true, $r->status), // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
         );
     }
 
@@ -170,19 +175,19 @@ final readonly class CrmApiDealOperations
             CrmApiOperation::DealUpdate,
             ['id' => $id->value, 'base' => $base->value] + $changes->canonical(),
             200,
-            static fn (): array => ['deal' => $id->value],
-            function (CrmApiCall $bound) use ($call, $id, $base, $changes): CrmApiWritten {
+            static fn (): array => ['deal' => $id->value], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($call, $id, $base, $changes): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $view = $this->view($bound, $id->value);
-                $bound->require(CrmApiCapability::Edit, self::subject($view));
+                $bound->require(CrmApiCapability::Edit, $this->subject($view));
                 if ($changes->touchesAmounts()) {
-                    $bound->require(CrmApiCapability::WriteAmounts, self::subject($view));
+                    $bound->require(CrmApiCapability::WriteAmounts, $this->subject($view));
                 }
                 $input   = new DealInput($changes->title, null, null, $changes->companyId?->value, $changes->contactId?->value, $changes->owner?->resolve($bound->principal->actor), $changes->amount, $changes->probability, $changes->expectedClose, $changes->fields);
                 $version = CrmApiErrors::run(fn (): int => $this->pipeline()->dealService->as($bound->caller)->update($id->value, $input, $base->value), $this->stale($call, $id->value));
 
                 return new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $id->value)), false, $version !== $base->value);
             },
-            fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $id->value)), true, true, $r->status),
+            fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $id->value)), true, true, $r->status), // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
         );
     }
 
@@ -201,15 +206,15 @@ final readonly class CrmApiDealOperations
             CrmApiOperation::DealMoveStage,
             ['id' => $id->value, 'base' => $base?->value] + $move->canonical(),
             200,
-            static fn (mixed $changed): array => ['deal' => $id->value, 'changed' => $changed === true ? '1' : '0'],
-            function (CrmApiCall $bound) use ($call, $id, $move, $base): CrmApiWritten {
+            static fn (mixed $changed): array => ['deal' => $id->value, 'changed' => $changed === true ? '1' : '0'], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($call, $id, $move, $base): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $view = $this->view($bound, $id->value);
-                $bound->require(CrmApiCapability::Edit, self::subject($view));
+                $bound->require(CrmApiCapability::Edit, $this->subject($view));
                 $changed = CrmApiErrors::run(fn (): bool => $this->pipeline()->dealService->as($bound->caller)->moveStage($id->value, $move->stageId->value, $move->lostReason?->value, $move->lostNote, $base?->value), $this->stale($call, $id->value));
 
                 return new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $id->value)), false, $changed);
             },
-            fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $id->value)), true, ($r->ids['changed'] ?? '1') === '1', $r->status),
+            fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten(CrmApiPresenter::deal($this->view($call, $id->value)), true, ($r->ids['changed'] ?? '1') === '1', $r->status), // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
         );
     }
 
@@ -228,15 +233,15 @@ final readonly class CrmApiDealOperations
             CrmApiOperation::DealTrash,
             ['id' => $id->value, 'base' => $base?->value],
             200,
-            static fn (): array => ['deal' => $id->value],
-            function (CrmApiCall $bound) use ($call, $id, $base, $trashed): CrmApiWritten {
+            static fn (): array => ['deal' => $id->value], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($call, $id, $base, $trashed): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $view = $this->view($bound, $id->value);
-                $bound->require(CrmApiCapability::Trash, self::subject($view));
+                $bound->require(CrmApiCapability::Trash, $this->subject($view));
                 CrmApiErrors::run(fn () => $this->pipeline()->dealService->as($bound->caller)->trash($id->value, $base?->value), $this->stale($call, $id->value));
 
                 return new CrmApiWritten($trashed, false, true);
             },
-            static fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten($trashed, true, true, $r->status),
+            static fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten($trashed, true, true, $r->status), // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
         );
     }
 
@@ -248,7 +253,7 @@ final readonly class CrmApiDealOperations
         return RecordId::isValid($id) ? CrmApiErrors::run(fn (): DealView => $this->pipeline()->deals->as($call->caller)->deal($id)) : throw CrmApiRefusal::notFound();
     }
 
-    private static function subject(DealView $view): SubjectRef
+    private function subject(DealView $view): SubjectRef
     {
         return SubjectRef::of(SubjectType::Deal, $view->id, $view->ownerId);
     }
@@ -268,15 +273,6 @@ final readonly class CrmApiDealOperations
      */
     private function stale(CrmApiCall $call, string $id): callable
     {
-        return function (ConflictException $e) use ($call, $id): array {
-            if ($e->errorCode !== ConflictException::STALE) {
-                return [];
-            }
-            try {
-                return ['current_version' => $this->view($call, $id)->version];
-            } catch (CrmApiRefusal) {
-                return [];
-            }
-        };
+        return fn (ConflictException $e): array => $e->errorCode === ConflictException::STALE ? ['current_version' => $this->view($call, $id)->version] : [];
     }
 }

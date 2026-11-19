@@ -12,8 +12,6 @@ use Nowo\CrmKitBundle\Domain\Exception\CrmTaskRefusedException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 
-use function in_array;
-
 /**
  * Turns the CRM's domain exceptions into API refusals (0.3.0, design §11): not available ⇒ `ACCESS_001`, refused ⇒
  * `ACCESS_002`, invalid input ⇒ `INPUT_004` with the fields (a missing lost reason ⇒ `CRM_007`), domain conflicts ⇒
@@ -24,10 +22,6 @@ use function in_array;
  */
 final class CrmApiErrors
 {
-    private function __construct()
-    {
-    }
-
     /**
      * Runs `$work`, converting its domain exceptions.
      *
@@ -48,7 +42,7 @@ final class CrmApiErrors
         } catch (AccessDeniedException $e) {
             throw CrmApiRefusal::denied($e);
         } catch (InvalidInputException $e) {
-            if (in_array($e->errors['lost_reason'] ?? null, ['error.lost_reason_required'], true)) {
+            if (($e->errors['lost_reason'] ?? null) === 'error.lost_reason_required') {
                 throw CrmApiRefusal::of(CrmApiCode::LOST_REASON, [], $e);
             }
 

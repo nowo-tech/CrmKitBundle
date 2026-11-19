@@ -207,7 +207,8 @@ enum CrmApiOperation: string
         if ($this->needsBaseVersion() === self::VERSION_REQUIRED) {
             $codes[] = CrmApiCode::VERSION_MISSING;
         }
-        $codes = [...$codes, ...match ($this) {
+
+        return [...$codes, ...match ($this) {
             self::CompanyCreate, self::ContactCreate => [CrmApiCode::LIMIT, CrmApiCode::TRASHED, CrmApiCode::HIDDEN_DUPLICATE, CrmApiCode::MERGED],
             self::DealCreate                         => [CrmApiCode::LIMIT, CrmApiCode::STAGE],
             self::DealMoveStage                      => [CrmApiCode::LOST_REASON, CrmApiCode::STAGE],
@@ -217,7 +218,5 @@ enum CrmApiOperation: string
             self::CompanyUpdate, self::ContactUpdate, self::AffiliationSet, self::AffiliationRemove, self::NoteAdd, self::TagAdd, self::TagRemove, self::RecordTrash => [CrmApiCode::MERGED],
             default                                                                                                                                                  => [],
         }];
-
-        return $codes;
     }
 }

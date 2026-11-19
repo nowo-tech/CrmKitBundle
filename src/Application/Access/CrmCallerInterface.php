@@ -35,9 +35,6 @@ interface CrmCallerInterface
      */
     public function visibleOwners(TenantRef $tenant, ActorRef $actor): ?array;
 
-    /** `web`, `api`, `mcp`, …: the audit and the "via" timeline parameter. */
-    public function channel(): string;
-
     /** The token behind the call (null for the CRM's pages). */
     public function origin(): ?AuditOrigin;
 

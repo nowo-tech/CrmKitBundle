@@ -20,6 +20,7 @@ use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Value\AuditEntry;
+use Nowo\CrmKitBundle\Domain\Value\AuditOrigin;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -144,7 +145,7 @@ final readonly class WriteSupport
      */
     public function activity(CrmContext $context, SubjectType $type, string $id, ActivityKind $kind, array $params = []): void
     {
-        if ($context->origin !== null) {
+        if ($context->origin instanceof AuditOrigin) {
             $params['via']   = $context->origin->channel;
             $params['token'] = $context->origin->tokenName;
         }

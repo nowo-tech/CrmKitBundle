@@ -68,9 +68,9 @@ final readonly class CrmApiRelationOperations
             CrmApiOperation::AffiliationSet,
             $spec->canonical(),
             200,
-            static fn (mixed $id): array => ['affiliation' => is_string($id) ? $id : ''],
-            fn (CrmApiCall $bound): CrmApiWritten => new CrmApiWritten($this->affiliationOf($call, $spec, $this->apply($bound, $spec)), false, true),
-            function (CrmApiReplay $r) use ($call, $spec): CrmApiWritten {
+            static fn (mixed $id): array => ['affiliation' => is_string($id) ? $id : ''], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            fn (CrmApiCall $bound): CrmApiWritten => new CrmApiWritten($this->affiliationOf($call, $spec, $this->apply($bound, $spec)), false, true), // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiReplay $r) use ($call, $spec): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $this->records->probe($call, SubjectType::Contact, $spec->contactId);
 
                 return new CrmApiWritten($this->affiliationOf($call, $spec, $r->ids['affiliation'] ?? ''), true, true, $r->status);
@@ -116,8 +116,8 @@ final readonly class CrmApiRelationOperations
             CrmApiOperation::AffiliationRemove,
             ['contact_id' => $contactId->value, 'company_id' => $companyId->value],
             200,
-            static fn (): array => ['removed' => '1'],
-            function (CrmApiCall $bound) use ($contactId, $companyId): CrmApiWritten {
+            static fn (): array => ['removed' => '1'], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($contactId, $companyId): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $contact = $this->records->probe($bound, SubjectType::Contact, $contactId);
                 $this->records->probe($bound, SubjectType::Company, $companyId);
                 $bound->require(CrmApiCapability::Edit, $contact);
@@ -129,7 +129,7 @@ final readonly class CrmApiRelationOperations
 
                 return new CrmApiWritten(new CrmApiItem('removed', ['removed' => true]), false, true);
             },
-            static fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten(new CrmApiItem('removed', ['removed' => true]), true, true, $r->status),
+            static fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten(new CrmApiItem('removed', ['removed' => true]), true, true, $r->status), // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
         );
     }
 
@@ -138,7 +138,7 @@ final readonly class CrmApiRelationOperations
      */
     public function addNote(CrmApiPrincipal $principal, TenantRef $tenant, IdempotencyKey $key, SubjectType $type, RecordId $id, CrmApiNoteDraft $note): CrmApiWritten
     {
-        self::record($type);
+        $this->record($type);
         $call = $this->guard->call($principal, $tenant, CrmApiOperation::NoteAdd);
 
         return $this->writer->write(
@@ -147,15 +147,15 @@ final readonly class CrmApiRelationOperations
             CrmApiOperation::NoteAdd,
             ['type' => $type->value, 'id' => $id->value] + $note->canonical(),
             201,
-            static fn (mixed $noteId): array => ['note' => is_string($noteId) ? $noteId : '', 'subject' => $id->value],
-            function (CrmApiCall $bound) use ($call, $type, $id, $note): CrmApiWritten {
+            static fn (mixed $noteId): array => ['note' => is_string($noteId) ? $noteId : '', 'subject' => $id->value], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($call, $type, $id, $note): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $subject = $this->records->probe($bound, $type, $id);
                 $bound->require(CrmApiCapability::Edit, $subject);
-                $noteId = CrmApiErrors::run(fn (): string => $this->notes->as($bound->caller)->add($type, $id->value, $note->body, false));
+                $noteId = CrmApiErrors::run(fn (): string => $this->notes->as($bound->caller)->add($type, $id->value, $note->body, false)); // @igor-ignore - a stateless service bound to this call only
 
                 return new CrmApiWritten($this->note($call, $noteId), false, true, 201);
             },
-            function (CrmApiReplay $r) use ($call, $type, $id): CrmApiWritten {
+            function (CrmApiReplay $r) use ($call, $type, $id): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $this->records->probe($call, $type, $id);
 
                 return new CrmApiWritten($this->note($call, $r->ids['note'] ?? ''), true, true, $r->status);
@@ -182,7 +182,7 @@ final readonly class CrmApiRelationOperations
 
     private function tag(CrmApiOperation $operation, CrmApiPrincipal $principal, TenantRef $tenant, IdempotencyKey $key, SubjectType $type, RecordId $id, CrmApiTagRef $tag, bool $add): CrmApiWritten
     {
-        self::record($type);
+        $this->record($type);
         $call = $this->guard->call($principal, $tenant, $operation);
 
         return $this->writer->write(
@@ -191,8 +191,8 @@ final readonly class CrmApiRelationOperations
             $operation,
             ['type' => $type->value, 'id' => $id->value] + $tag->canonical(),
             200,
-            static fn (mixed $changed): array => ['changed' => $changed === true ? '1' : '0'],
-            function (CrmApiCall $bound) use ($type, $id, $tag, $add): CrmApiWritten {
+            static fn (mixed $changed): array => ['changed' => $changed === true ? '1' : '0'], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($type, $id, $tag, $add): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $subject = $this->records->probe($bound, $type, $id);
                 $bound->require(CrmApiCapability::Edit, $subject);
                 $tagId   = $this->tagId($bound, $tag);
@@ -200,7 +200,7 @@ final readonly class CrmApiRelationOperations
 
                 return new CrmApiWritten(new CrmApiItem('tagging', ['type' => $type->value, 'id' => $id->value, 'tag_id' => $tagId, 'changed' => $changed]), false, $changed);
             },
-            function (CrmApiReplay $r) use ($call, $type, $id, $tag): CrmApiWritten {
+            function (CrmApiReplay $r) use ($call, $type, $id, $tag): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $this->records->probe($call, $type, $id);
                 $changed = ($r->ids['changed'] ?? '0') === '1';
 
@@ -218,7 +218,7 @@ final readonly class CrmApiRelationOperations
         $tags    = $support->read(static fn (): array => $support->store->tags($call->context->tenant));
         $key     = $ref->name === null ? null : (new TagName($ref->name))->key();
         foreach ($tags as $tag) {
-            if ($tag instanceof Tag && (($ref->id !== null && $tag->getId() === $ref->id->value) || ($key !== null && $tag->getNameKey() === $key))) {
+            if ($tag instanceof Tag && (($ref->id instanceof RecordId && $tag->getId() === $ref->id->value) || ($key !== null && $tag->getNameKey() === $key))) {
                 return $tag->getId();
             }
         }
@@ -272,7 +272,7 @@ final readonly class CrmApiRelationOperations
         return CrmApiPresenter::note(new NoteView($note->getId(), $note->getBody(), $note->isPinned(), $author, $this->views->actorName($call->context->tenant, $author), $note->getVersion(), $note->getCreatedAt(), $note->getUpdatedAt()));
     }
 
-    private static function record(SubjectType $type): void
+    private function record(SubjectType $type): void
     {
         if (!in_array($type, [SubjectType::Company, SubjectType::Contact], true)) {
             throw CrmApiRefusal::malformed('type');

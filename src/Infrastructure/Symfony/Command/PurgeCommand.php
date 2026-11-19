@@ -54,7 +54,7 @@ final class PurgeCommand extends Command
 
             return Command::SUCCESS;
         }
-        if ($this->idempotency !== null && $this->clock !== null && $input->getOption('dry-run') !== true) {
+        if ($this->idempotency instanceof CrmApiIdempotencyStoreInterface && $this->clock instanceof ClockInterface && $input->getOption('dry-run') !== true) {
             // 0.3.0: the API's expired idempotency keys, outside any write unit.
             $output->writeln(sprintf('expired idempotency keys: %d', ApiPurgeIdempotencyCommand::purge($this->idempotency, $this->clock)));
         }

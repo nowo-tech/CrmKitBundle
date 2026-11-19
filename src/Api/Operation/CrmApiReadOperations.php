@@ -8,9 +8,11 @@ use Nowo\CrmKitBundle\Api\CrmApiCapability;
 use Nowo\CrmKitBundle\Api\CrmApiOperation;
 use Nowo\CrmKitBundle\Api\CrmApiPrincipal;
 use Nowo\CrmKitBundle\Api\CrmApiRefusal;
+use Nowo\CrmKitBundle\Api\Input\CrmApiCursor;
 use Nowo\CrmKitBundle\Api\Input\CrmApiPageRequest;
 use Nowo\CrmKitBundle\Api\Input\CrmApiSearchQuery;
 use Nowo\CrmKitBundle\Api\Input\CrmApiSort;
+use Nowo\CrmKitBundle\Api\Input\CrmApiStageFilter;
 use Nowo\CrmKitBundle\Api\Read\CrmApiItem;
 use Nowo\CrmKitBundle\Api\Read\CrmApiList;
 use Nowo\CrmKitBundle\Api\Read\CrmApiPage;
@@ -28,8 +30,10 @@ use Nowo\CrmKitBundle\Domain\Read\ActivityView;
 use Nowo\CrmKitBundle\Domain\Read\AffiliationView;
 use Nowo\CrmKitBundle\Domain\Read\NoteView;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealView;
+use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
+use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 
 use function array_map;
@@ -73,11 +77,11 @@ final readonly class CrmApiReadOperations
     {
         $call = $this->guard->call($principal, $tenant, CrmApiOperation::Search);
         $call->require(CrmApiCapability::Read);
-        if ($query->stage !== null && $this->pipeline === null) {
+        if ($query->stage instanceof CrmApiStageFilter && !$this->pipeline instanceof CrmApiPipeline) {
             throw CrmApiRefusal::malformed('stage');
         }
         $filter = CrmApiCursorCodec::filterHash($query->filters());
-        $key    = $query->page->cursor === null ? null : $this->cursors->open($query->page->cursor, CrmApiOperation::Search, $filter);
+        $key    = $query->page->cursor instanceof CrmApiCursor ? $this->cursors->open($query->page->cursor, CrmApiOperation::Search, $filter) : null;
         $phase  = is_int($key['p'] ?? null) ? $key['p'] : 0;
         $after  = is_string($key['v'] ?? null) && is_string($key['id'] ?? null) ? ['v' => $key['v'], 'id' => $key['id']] : null;
         if ($key !== null && ($phase < 0 || $phase >= count($query->types) || $after === null)) {
@@ -134,16 +138,16 @@ final readonly class CrmApiReadOperations
      */
     public function present(CrmApiCall $call, SubjectType $type, string $id): CrmApiItem
     {
-        $view      = CrmApiErrors::run(fn () => $this->reader->as($call->caller)->record($type, $id));
+        $view      = CrmApiErrors::run(fn (): RecordView => $this->reader->as($call->caller)->record($type, $id));
         $lifecycle = [];
         $actions   = [];
         $amounts   = null;
         $hidden    = false;
-        if ($this->pipeline !== null) {
+        if ($this->pipeline instanceof CrmApiPipeline) {
             $lifecycle = CrmApiErrors::run(fn (): array => $this->pipeline->partyStages->as($call->caller)->stages($type, $id));
             $actions   = CrmApiErrors::run(fn (): array => $this->pipeline->nextActions->as($call->caller)->list($type, $id, true));
             if ($call->can(CrmApiCapability::ReadAmounts)) {
-                $amounts = self::openAmounts(CrmApiErrors::run(fn (): array => $this->pipeline->deals->as($call->caller)->ofRecord($type, $id)));
+                $amounts = $this->openAmounts(CrmApiErrors::run(fn (): array => $this->pipeline->deals->as($call->caller)->ofRecord($type, $id)));
             } else {
                 $hidden = true;
             }
@@ -160,10 +164,10 @@ final readonly class CrmApiReadOperations
     {
         $call   = $this->guard->call($principal, $tenant, CrmApiOperation::Timeline);
         $filter = CrmApiCursorCodec::filterHash(['type' => $type->value, 'id' => $id->value]);
-        $key    = $page->cursor === null ? null : $this->cursors->open($page->cursor, CrmApiOperation::Timeline, $filter);
+        $key    = $page->cursor instanceof CrmApiCursor ? $this->cursors->open($page->cursor, CrmApiOperation::Timeline, $filter) : null;
         $before = is_string($key['id'] ?? null) && RecordId::isValid($key['id']) ? $key['id'] : ($key === null ? null : throw CrmApiRefusal::of('INPUT_003'));
         if ($type === SubjectType::Deal) {
-            if ($this->pipeline === null) {
+            if (!$this->pipeline instanceof CrmApiPipeline) {
                 throw CrmApiRefusal::notFound();
             }
             CrmApiErrors::run(fn (): DealView => $this->pipeline->deals->as($call->caller)->deal($id->value));
@@ -201,7 +205,7 @@ final readonly class CrmApiReadOperations
         $this->records->probe($call, $type, $id);
         $call->require(CrmApiCapability::Read);
         $filter  = CrmApiCursorCodec::filterHash(['type' => $type->value, 'id' => $id->value]);
-        $key     = $page->cursor === null ? null : $this->cursors->open($page->cursor, CrmApiOperation::NotesList, $filter);
+        $key     = $page->cursor instanceof CrmApiCursor ? $this->cursors->open($page->cursor, CrmApiOperation::NotesList, $filter) : null;
         $after   = $key === null ? null : (is_bool($key['pinned'] ?? null) && is_string($key['id'] ?? null) ? ['pinned' => $key['pinned'], 'id' => $key['id']] : throw CrmApiRefusal::of('INPUT_003'));
         $support = $this->support->as($call->caller);
         $rows    = $support->read(static fn (): array => $support->store->notesAfter($call->context->tenant, $type, $id->value, $after, $page->limit + 1));
@@ -265,7 +269,7 @@ final readonly class CrmApiReadOperations
         $this->records->probe($call, $side, $id);
         $call->require(CrmApiCapability::Read);
         $filter = CrmApiCursorCodec::filterHash(['side' => $side->value, 'id' => $id->value]);
-        $key    = $page->cursor === null ? null : $this->cursors->open($page->cursor, CrmApiOperation::AffiliationsList, $filter);
+        $key    = $page->cursor instanceof CrmApiCursor ? $this->cursors->open($page->cursor, CrmApiOperation::AffiliationsList, $filter) : null;
         if ($key !== null && (!is_string($key['v'] ?? null) || !is_string($key['id'] ?? null))) {
             throw CrmApiRefusal::of('INPUT_003');
         }
@@ -316,7 +320,7 @@ final readonly class CrmApiReadOperations
         $merged  = null;
         $subject = $this->records->probe($call, $type, $id, true, $merged);
         $call->require(CrmApiCapability::Read);
-        if ($subject === null) {
+        if (!$subject instanceof SubjectRef) {
             return CrmApiPresenter::tombstone($type, $id->value, $merged['version'] ?? 0, $merged['id'] ?? null);
         }
 
@@ -344,7 +348,7 @@ final readonly class CrmApiReadOperations
      *
      * @return list<array{currency: string, open: string}>
      */
-    private static function openAmounts(array $deals): array
+    private function openAmounts(array $deals): array
     {
         $sums = [];
         foreach ($deals as $deal) {

@@ -6,6 +6,8 @@ namespace Nowo\CrmKitBundle\Tests\Fixtures;
 
 use Nowo\CrmKitBundle\Api\CrmApiPrincipal;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\CrmApiAuthenticatorInterface;
+use Nowo\TransactionDoctrine\TransientFailureKind;
+use Nowo\TransactionDoctrine\WriteUnit\ConcurrencyConflict;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -20,6 +22,9 @@ final readonly class TestApiAuthenticator implements CrmApiAuthenticatorInterfac
 
     public function authenticate(Request $request): ?CrmApiPrincipal
     {
+        if ($this->state->conflict !== null) {
+            throw new ConcurrencyConflict(3, TransientFailureKind::LockWaitTimeout, null, new RuntimeException('lock'), $this->state->conflict);
+        }
         if ($this->state->fail) {
             throw new RuntimeException('boom with secret details');
         }

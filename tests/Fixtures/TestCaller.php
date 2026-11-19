@@ -41,11 +41,6 @@ final readonly class TestCaller implements CrmCallerInterface
         return $this->inner->visibleOwners($tenant, $actor);
     }
 
-    public function channel(): string
-    {
-        return $this->origin->channel;
-    }
-
     public function origin(): AuditOrigin
     {
         return $this->origin;

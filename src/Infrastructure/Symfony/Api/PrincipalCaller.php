@@ -65,7 +65,7 @@ final readonly class PrincipalCaller implements CrmCallerInterface
     public function isGranted(CrmPermission $permission, TenantRef $tenant, ?SubjectRef $subject = null): bool
     {
         $capability = CrmApiCapability::forPermission($permission);
-        if ($capability === null || !$capability->allows($this->principal->grant) || $tenant->value !== $this->tenant->value || !$this->area($permission, $tenant)) {
+        if (!$capability instanceof CrmApiCapability || !$capability->allows($this->principal->grant) || $tenant->value !== $this->tenant->value || !$this->area($permission, $tenant)) {
             return false;
         }
 
@@ -83,14 +83,6 @@ final readonly class PrincipalCaller implements CrmCallerInterface
     /**
      * {@inheritDoc}
      */
-    public function channel(): string
-    {
-        return $this->principal->channel;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public function origin(): AuditOrigin
     {
         return $this->principal->origin();
@@ -101,7 +93,7 @@ final readonly class PrincipalCaller implements CrmCallerInterface
      */
     public function selfOwners(TenantRef $tenant): ?array
     {
-        return $this->self === null ? null : [$this->self];
+        return $this->self instanceof ActorProfile ? [$this->self] : null;
     }
 
     /**

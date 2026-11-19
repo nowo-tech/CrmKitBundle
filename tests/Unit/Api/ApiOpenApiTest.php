@@ -46,8 +46,8 @@ final class ApiOpenApiTest extends TestCase
         $routed     = [];
         $operations = [];
         foreach ((new CrmApiRouteLoader(true, '', true))->load('.')->all() as $route) {
-            $routed[$route->getMethods()[0] . ' ' . $route->getPath()]                       = $route->getDefault(CrmApiRouteLoader::OPERATION_ATTRIBUTE);
-            $operation = $route->getDefault(CrmApiRouteLoader::OPERATION_ATTRIBUTE);
+            $routed[$route->getMethods()[0] . ' ' . $route->getPath()] = $route->getDefault(CrmApiRouteLoader::OPERATION_ATTRIBUTE);
+            $operation                                                 = $route->getDefault(CrmApiRouteLoader::OPERATION_ATTRIBUTE);
             self::assertIsString($operation);
             $operations[$operation] = true;
         }

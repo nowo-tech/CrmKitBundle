@@ -131,7 +131,4 @@ final class CrmApiCode
         self::TRASHED         => ['record_id'],
     ];
 
-    private function __construct()
-    {
-    }
 }

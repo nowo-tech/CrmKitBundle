@@ -18,8 +18,12 @@ use Nowo\CrmKitBundle\Api\Input\CrmApiSearchQuery;
 use Nowo\CrmKitBundle\Api\Input\CrmApiSort;
 use Nowo\CrmKitBundle\Api\Input\CrmApiTagRef;
 use Nowo\CrmKitBundle\Api\Input\RecordVersion;
+use Nowo\CrmKitBundle\Api\Port\CrmApiCallerFactoryInterface;
 use Nowo\CrmKitBundle\Api\Read\CrmApiItem;
+use Nowo\CrmKitBundle\Api\Read\CrmApiList;
 use Nowo\CrmKitBundle\Api\Read\CrmApiPage;
+use Nowo\CrmKitBundle\Api\Read\CrmApiWritten;
+use Nowo\CrmKitBundle\Application\HostLinkService;
 use Nowo\CrmKitBundle\Domain\Enum\ConsentSource;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
@@ -72,7 +76,7 @@ final class ApiRecordsTest extends ApiTestCase
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_company'));
         self::assertCount($audit, $this->recorder()->audit);
         // The same key with another input.
-        $this->refused(CrmApiCode::IDEMP_MISMATCH, fn () => $this->writes()->createCompany($p, $t, $key, CrmApiRecordDraft::fromArray(SubjectType::Company, ['name' => 'Other'])));
+        $this->refused(CrmApiCode::IDEMP_MISMATCH, fn (): CrmApiWritten => $this->writes()->createCompany($p, $t, $key, CrmApiRecordDraft::fromArray(SubjectType::Company, ['name' => 'Other'])));
         // Another key: the domain matches, the existing company comes back and nothing is created.
         $dup = $this->writes()->createCompany($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Company, ['name' => 'Acme Tools SL', 'website' => 'https://www.acme.test/x']));
         self::assertSame([200, false, false], [$dup->status, $dup->replayed, $dup->changed]);
@@ -91,8 +95,8 @@ final class ApiRecordsTest extends ApiTestCase
         self::assertSame(['api', 'Agent tok-1'], [$params['via'] ?? null, $params['token'] ?? null]);
 
         // Update: the base version is required and checked.
-        $this->refused(CrmApiCode::STALE, fn () => $this->writes()->updateCompany($p, $t, $this->key(), new RecordId($id), new RecordVersion(9), CrmApiRecordChanges::fromArray(SubjectType::Company, ['city' => 'Madrid'])));
-        $refusal = $this->refused(CrmApiCode::STALE, fn () => $this->writes()->updateCompany($p, $t, $this->key(), new RecordId($id), new RecordVersion(7), new CrmApiRecordChanges(SubjectType::Company, ['city' => 'x'])));
+        $this->refused(CrmApiCode::STALE, fn (): CrmApiWritten => $this->writes()->updateCompany($p, $t, $this->key(), new RecordId($id), new RecordVersion(9), CrmApiRecordChanges::fromArray(SubjectType::Company, ['city' => 'Madrid'])));
+        $refusal = $this->refused(CrmApiCode::STALE, fn (): CrmApiWritten => $this->writes()->updateCompany($p, $t, $this->key(), new RecordId($id), new RecordVersion(7), new CrmApiRecordChanges(SubjectType::Company, ['city' => 'x'])));
         self::assertSame(['current_version' => 1], $refusal->extra);
         $updated = $this->writes()->updateCompany($p, $t, $this->key('upd'), new RecordId($id), new RecordVersion(1), CrmApiRecordChanges::fromArray(SubjectType::Company, ['city' => 'Madrid', 'owner' => 'none']));
         self::assertTrue($updated->changed);
@@ -103,18 +107,18 @@ final class ApiRecordsTest extends ApiTestCase
         $same = $this->writes()->updateCompany($p, $t, $this->key(), new RecordId($id), new RecordVersion(2), CrmApiRecordChanges::fromArray(SubjectType::Company, ['city' => 'Madrid']));
         self::assertFalse($same->changed);
         self::assertTrue($this->writes()->updateCompany($p, $t, $this->key('upd'), new RecordId($id), new RecordVersion(1), CrmApiRecordChanges::fromArray(SubjectType::Company, ['city' => 'Madrid', 'owner' => 'none']))->replayed);
-        $this->refused(CrmApiCode::INPUT_REFUSED, fn () => $this->writes()->updateCompany($p, $t, $this->key(), new RecordId($id), new RecordVersion(2), CrmApiRecordChanges::fromArray(SubjectType::Company, ['name' => ''])));
-        $this->refused(CrmApiCode::INPUT_MALFORMED, static fn () => CrmApiRecordChanges::fromArray(SubjectType::Company, ['nope' => 1]));
-        $this->refused(CrmApiCode::INPUT_MALFORMED, fn () => $this->writes()->updateContact($p, $t, $this->key(), new RecordId($id), new RecordVersion(2), new CrmApiRecordChanges(SubjectType::Company)));
+        $this->refused(CrmApiCode::INPUT_REFUSED, fn (): CrmApiWritten => $this->writes()->updateCompany($p, $t, $this->key(), new RecordId($id), new RecordVersion(2), CrmApiRecordChanges::fromArray(SubjectType::Company, ['name' => ''])));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, static fn (): CrmApiRecordChanges => CrmApiRecordChanges::fromArray(SubjectType::Company, ['nope' => 1]));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, fn (): CrmApiWritten => $this->writes()->updateContact($p, $t, $this->key(), new RecordId($id), new RecordVersion(2), new CrmApiRecordChanges(SubjectType::Company)));
 
         // Trash: destructive; afterwards the record is out of reach, and the same key replays.
-        $this->refused(CrmApiCode::TOKEN, fn () => $this->writes()->trash($this->principal(destructive: false), $t, $this->key(), SubjectType::Company, new RecordId($id), null));
+        $this->refused(CrmApiCode::TOKEN, fn (): CrmApiWritten => $this->writes()->trash($this->principal(destructive: false), $t, $this->key(), SubjectType::Company, new RecordId($id), null));
         $trash = $this->writes()->trash($p, $t, $this->key('trash'), SubjectType::Company, new RecordId($id), null);
         self::assertEquals(['type' => 'company', 'id' => $id, 'status' => 'trashed', 'text' => (object) [], 'replayed' => false, 'changed' => true], (array) json_decode((string) json_encode($trash), false));
         self::assertTrue($this->writes()->trash($p, $t, $this->key('trash'), SubjectType::Company, new RecordId($id), null)->replayed);
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $this->writes()->trash($p, $t, $this->key(), SubjectType::Company, new RecordId($id), null));
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $this->reads()->company($p, $t, new RecordId($id)));
-        $this->refused(CrmApiCode::INPUT_MALFORMED, fn () => $this->writes()->trash($p, $t, $this->key(), SubjectType::Deal, new RecordId($id), null));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiWritten => $this->writes()->trash($p, $t, $this->key(), SubjectType::Company, new RecordId($id), null));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiItem => $this->reads()->company($p, $t, new RecordId($id)));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, fn (): CrmApiWritten => $this->writes()->trash($p, $t, $this->key(), SubjectType::Deal, new RecordId($id), null));
         self::assertContains('crm.company.trashed', $this->recorder()->actions());
     }
 
@@ -147,11 +151,11 @@ final class ApiRecordsTest extends ApiTestCase
         // A hidden duplicate: CRM_006 without an id; a trashed visible one: CRM_003 with its id.
         $hidden                = $this->contact('Hid', 'Den', 'hid@x.test');
         $this->ctx()->denied[] = 'view:' . $hidden;
-        $refusal               = $this->refused(CrmApiCode::HIDDEN_DUPLICATE, fn () => $this->writes()->createContact($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Contact, ['last_name' => 'X', 'email' => 'hid@x.test'])));
+        $refusal               = $this->refused(CrmApiCode::HIDDEN_DUPLICATE, fn (): CrmApiWritten => $this->writes()->createContact($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Contact, ['last_name' => 'X', 'email' => 'hid@x.test'])));
         self::assertSame([], $refusal->extra);
         $gone = $this->contact('Gone', 'G', 'gone@x.test');
         $this->records()->trash(SubjectType::Contact, $gone, 1);
-        self::assertSame(['record_id' => $gone], $this->refused(CrmApiCode::TRASHED, fn () => $this->writes()->createContact($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Contact, ['last_name' => 'X', 'email' => 'gone@x.test'])))->extra);
+        self::assertSame(['record_id' => $gone], $this->refused(CrmApiCode::TRASHED, fn (): CrmApiWritten => $this->writes()->createContact($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Contact, ['last_name' => 'X', 'email' => 'gone@x.test'])))->extra);
 
         // Company rules: tax id first, a name only without tax id and website.
         $this->writes()->createCompany($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Company, ['name' => 'Beta', 'tax_id' => 'B-123']));
@@ -163,10 +167,10 @@ final class ApiRecordsTest extends ApiTestCase
         self::assertSame('name', $byName->result->fact('duplicate_of'));
         $namesake = $this->writes()->createCompany($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Company, ['name' => 'acme', 'tax_id' => 'Z9']));
         self::assertTrue($namesake->changed);
-        $this->refused(CrmApiCode::INPUT_MALFORMED, fn () => $this->writes()->createCompany($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Contact, ['last_name' => 'x'])));
-        $this->refused(CrmApiCode::INPUT_MALFORMED, static fn () => CrmApiRecordDraft::fromArray(SubjectType::Company, ['company' => []]));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, fn (): CrmApiWritten => $this->writes()->createCompany($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Contact, ['last_name' => 'x'])));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, static fn (): CrmApiRecordDraft => CrmApiRecordDraft::fromArray(SubjectType::Company, ['company' => []]));
         $this->ctx()->limits['contacts'] = 1;
-        $this->refused(CrmApiCode::LIMIT, fn () => $this->writes()->createContact($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Contact, ['last_name' => 'Limit'])));
+        $this->refused(CrmApiCode::LIMIT, fn (): CrmApiWritten => $this->writes()->createContact($p, $t, $this->key(), CrmApiRecordDraft::fromArray(SubjectType::Contact, ['last_name' => 'Limit'])));
     }
 
     public function testReadsPagesAndTombstones(): void
@@ -193,11 +197,11 @@ final class ApiRecordsTest extends ApiTestCase
         self::assertCount(3, $updated->items);
         self::assertNotNull($updated->nextCursor);
         // A cursor for other filters, another operation or tampered: INPUT_003.
-        $this->refused(CrmApiCode::INPUT_CURSOR, fn () => $this->reads()->search($p, $t, new CrmApiSearchQuery([SubjectType::Contact], page: new CrmApiPageRequest(new CrmApiCursor((string) $updated->nextCursor)))));
-        $this->refused(CrmApiCode::INPUT_CURSOR, fn () => $this->reads()->notes($p, $t, SubjectType::Contact, new RecordId($contact), new CrmApiPageRequest(new CrmApiCursor((string) $updated->nextCursor))));
-        $this->refused(CrmApiCode::INPUT_MALFORMED, static fn () => new CrmApiSearchQuery(segment: 'vip'));
-        $this->refused(CrmApiCode::INPUT_MALFORMED, static fn () => new CrmApiSearchQuery([SubjectType::Deal]));
-        $text = $this->reads()->search($p, $t, new CrmApiSearchQuery(text: 'ALP', role: null));
+        $this->refused(CrmApiCode::INPUT_CURSOR, fn (): CrmApiPage => $this->reads()->search($p, $t, new CrmApiSearchQuery([SubjectType::Contact], page: new CrmApiPageRequest(new CrmApiCursor($updated->nextCursor)))));
+        $this->refused(CrmApiCode::INPUT_CURSOR, fn (): CrmApiPage => $this->reads()->notes($p, $t, SubjectType::Contact, new RecordId($contact), new CrmApiPageRequest(new CrmApiCursor($updated->nextCursor))));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, static fn (): CrmApiSearchQuery => new CrmApiSearchQuery(segment: 'vip'));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, static fn (): CrmApiSearchQuery => new CrmApiSearchQuery([SubjectType::Deal]));
+        $text = $this->reads()->search($p, $t, new CrmApiSearchQuery(text: 'ALP'));
         self::assertCount(1, $text->items);
         self::assertCount(0, $this->reads()->search($p, $t, new CrmApiSearchQuery(text: '%'))->items);
         self::assertCount(0, $this->reads()->search($p, $t, new CrmApiSearchQuery(role: new RoleKey('supplier')))->items);
@@ -209,13 +213,13 @@ final class ApiRecordsTest extends ApiTestCase
         $notes->add(SubjectType::Contact, $contact, 'third');
         $page1 = $this->reads()->notes($p, $t, SubjectType::Contact, new RecordId($contact), new CrmApiPageRequest(null, 2));
         $page2 = $this->reads()->notes($p, $t, SubjectType::Contact, new RecordId($contact), new CrmApiPageRequest(new CrmApiCursor((string) $page1->nextCursor), 2));
-        self::assertSame(['pinned one', 'third', 'first'], array_map(static fn (CrmApiItem $i): mixed => $i->text['body'], [...self::items($page1), ...self::items($page2)]));
+        self::assertSame(['pinned one', 'third', 'first'], array_map(static fn (CrmApiItem $i): mixed => $i->text['body'], [...$this->items($page1), ...$this->items($page2)]));
         self::assertNull($page2->nextCursor);
         $this->service(ConsentServiceInterface::class)->record($contact, 'newsletter', true, ConsentSource::Form, 'form #1');
         $consents = $this->reads()->consents($p, $t, new RecordId($contact), true);
         self::assertCount(3, (array) $consents->fact('purposes'));
         self::assertCount(1, (array) $consents->fact('history'));
-        $this->refused(CrmApiCode::TOKEN, fn () => $this->reads()->consents($this->principal(consents: false), $t, new RecordId($contact)));
+        $this->refused(CrmApiCode::TOKEN, fn (): CrmApiItem => $this->reads()->consents($this->principal(consents: false), $t, new RecordId($contact)));
         $this->service(HostLinkServiceInterface::class)->link(SubjectType::Contact, $contact, new HostObjectRef('project', 'p1'));
         self::assertCount(1, $this->reads()->links($p, $t, SubjectType::Contact, new RecordId($contact))->items);
         $tag = $this->service(TagServiceInterface::class)->create('VIP', 'red');
@@ -224,10 +228,10 @@ final class ApiRecordsTest extends ApiTestCase
         self::assertTrue($tagged->changed);
         self::assertTrue($this->relations()->addTag($p, $t, $this->key('tag'), SubjectType::Contact, new RecordId($contact), CrmApiTagRef::byName('vip'))->replayed);
         self::assertFalse($this->relations()->addTag($p, $t, $this->key(), SubjectType::Contact, new RecordId($contact), CrmApiTagRef::byId(new RecordId($tag)))->changed);
-        $this->refused(CrmApiCode::INPUT_REFUSED, fn () => $this->relations()->addTag($p, $t, $this->key(), SubjectType::Contact, new RecordId($contact), CrmApiTagRef::byName('nope')));
+        $this->refused(CrmApiCode::INPUT_REFUSED, fn (): CrmApiWritten => $this->relations()->addTag($p, $t, $this->key(), SubjectType::Contact, new RecordId($contact), CrmApiTagRef::byName('nope')));
         self::assertTrue($this->relations()->removeTag($p, $t, $this->key(), SubjectType::Contact, new RecordId($contact), CrmApiTagRef::byId(new RecordId($tag)))->changed);
         self::assertFalse($this->relations()->removeTag($p, $t, $this->key(), SubjectType::Contact, new RecordId($contact), CrmApiTagRef::byId(new RecordId($tag)))->changed);
-        $this->refused(CrmApiCode::INPUT_MALFORMED, fn () => $this->relations()->addTag($p, $t, $this->key(), SubjectType::Deal, new RecordId($contact), CrmApiTagRef::byName('x')));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, fn (): CrmApiWritten => $this->relations()->addTag($p, $t, $this->key(), SubjectType::Deal, new RecordId($contact), CrmApiTagRef::byName('x')));
 
         $acme = $this->company('Acme');
         $set  = $this->relations()->setAffiliation($p, $t, $this->key('aff'), new CrmApiAffiliationSpec(new RecordId($contact), new CrmApiCompanyLink(new RecordId($acme), 'CTO', true, true, ['billing'])));
@@ -249,8 +253,8 @@ final class ApiRecordsTest extends ApiTestCase
         self::assertInstanceOf(CrmApiItem::class, $note->result);
         self::assertSame([201, 'Hello', false], [$note->status, $note->result->text['body'], $note->result->fact('pinned')]);
         self::assertTrue($this->relations()->addNote($p, $t, $this->key('n'), SubjectType::Contact, new RecordId($contact), new CrmApiNoteDraft(' Hello '))->replayed);
-        $this->refused(CrmApiCode::INPUT_REFUSED, fn () => $this->relations()->addNote($p, $t, $this->key(), SubjectType::Contact, new RecordId($contact), new CrmApiNoteDraft('  ')));
-        $this->refused(CrmApiCode::INPUT_MALFORMED, fn () => $this->relations()->addNote($p, $t, $this->key(), SubjectType::Deal, new RecordId($contact), new CrmApiNoteDraft('x')));
+        $this->refused(CrmApiCode::INPUT_REFUSED, fn (): CrmApiWritten => $this->relations()->addNote($p, $t, $this->key(), SubjectType::Contact, new RecordId($contact), new CrmApiNoteDraft('  ')));
+        $this->refused(CrmApiCode::INPUT_MALFORMED, fn (): CrmApiWritten => $this->relations()->addNote($p, $t, $this->key(), SubjectType::Deal, new RecordId($contact), new CrmApiNoteDraft('x')));
 
         $identity = $this->reads()->identity($p, $t);
         self::assertSame(['ana', 'acme'], [$identity->fact('actor_id'), $identity->fact('tenant')]);
@@ -261,10 +265,10 @@ final class ApiRecordsTest extends ApiTestCase
         $this->service(MergeServiceInterface::class)->merge(SubjectType::Company, $acme, $other, [], $this->int('SELECT version FROM nowo_crm_company WHERE id = ?', [$acme]), 1);
         $tomb = $this->reads()->company($p, $t, new RecordId($other));
         self::assertSame(['merged', $acme], [$tomb->fact('status'), $tomb->fact('merged_into_id')]);
-        self::assertSame(['merged_into_id' => $acme], $this->refused(CrmApiCode::MERGED, fn () => $this->relations()->addNote($p, $t, $this->key(), SubjectType::Company, new RecordId($other), new CrmApiNoteDraft('x')))->extra);
+        self::assertSame(['merged_into_id' => $acme], $this->refused(CrmApiCode::MERGED, fn (): CrmApiWritten => $this->relations()->addNote($p, $t, $this->key(), SubjectType::Company, new RecordId($other), new CrmApiNoteDraft('x')))->extra);
         $timeline = $this->reads()->timeline($p, $t, SubjectType::Contact, new RecordId($contact), new CrmApiPageRequest(null, 2));
         self::assertNotNull($timeline->nextCursor);
-        self::assertCount(2, $this->reads()->timeline($p, $t, SubjectType::Contact, new RecordId($contact), new CrmApiPageRequest(new CrmApiCursor((string) $timeline->nextCursor), 2))->items);
+        self::assertCount(2, $this->reads()->timeline($p, $t, SubjectType::Contact, new RecordId($contact), new CrmApiPageRequest(new CrmApiCursor($timeline->nextCursor), 2))->items);
     }
 
     public function testTheAccessMatrix(): void
@@ -278,53 +282,53 @@ final class ApiRecordsTest extends ApiTestCase
         $read = fn (CrmApiPrincipal $p, string $c): CrmApiItem => $this->reads()->company($p, $t, $id($c));
 
         // Out of reach: another tenant, unknown tenant, feature off, a reach without the tenant.
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $this->reads()->company($this->principal(), new TenantRef('beta'), $id($mine)));
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $read($this->principal(tenants: ['beta']), $mine));
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $read($this->principal(tenants: []), $mine));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiItem => $this->reads()->company($this->principal(), new TenantRef('beta'), $id($mine)));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiItem => $read($this->principal(tenants: ['beta']), $mine));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiItem => $read($this->principal(tenants: []), $mine));
         $this->ctx()->enabled['acme'] = false;
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $read($this->principal(), $mine));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiItem => $read($this->principal(), $mine));
         $this->ctx()->enabled['acme'] = true;
         self::assertSame($mine, $read($this->principal(tenants: ['acme']), $mine)->fact('id'));
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $read($this->principal(), '00000000-0000-4000-8000-000000000000'));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiItem => $read($this->principal(), '00000000-0000-4000-8000-000000000000'));
 
         // Scoping: an edit token of a manager sees what a non-manager sees; a manage token sees everything (QA-1).
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $read($this->principal(CrmApiLevel::Edit), $leos));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiItem => $read($this->principal(CrmApiLevel::Edit), $leos));
         self::assertSame($leos, $read($this->principal(CrmApiLevel::Manage), $leos)->fact('id'));
         self::assertSame($free, $read($this->principal(CrmApiLevel::View), $free)->fact('id'));
         $search = $this->reads()->search($this->principal(CrmApiLevel::Edit), $t, new CrmApiSearchQuery([SubjectType::Company]));
-        self::assertSame(['Free', 'Mine'], array_map(static fn (CrmApiItem $i): mixed => $i->text['label'], self::items($search)));
+        self::assertSame(['Free', 'Mine'], array_map(static fn (CrmApiItem $i): mixed => $i->text['label'], $this->items($search)));
         self::assertCount(3, $this->reads()->search($this->principal(CrmApiLevel::Manage), $t, new CrmApiSearchQuery([SubjectType::Company]))->items);
 
         // The grant: a view token may not write; a person may not do what the token allows.
-        $this->refused(CrmApiCode::TOKEN, fn () => $this->relations()->addNote($this->principal(CrmApiLevel::View), $t, $this->key(), SubjectType::Company, $id($mine), new CrmApiNoteDraft('x')));
-        $this->refused(CrmApiCode::TOKEN, fn () => $this->writes()->createCompany($this->principal(CrmApiLevel::View), $t, $this->key(), new CrmApiRecordDraft(SubjectType::Company, ['name' => 'X'])));
+        $this->refused(CrmApiCode::TOKEN, fn (): CrmApiWritten => $this->relations()->addNote($this->principal(CrmApiLevel::View), $t, $this->key(), SubjectType::Company, $id($mine), new CrmApiNoteDraft('x')));
+        $this->refused(CrmApiCode::TOKEN, fn (): CrmApiWritten => $this->writes()->createCompany($this->principal(CrmApiLevel::View), $t, $this->key(), new CrmApiRecordDraft(SubjectType::Company, ['name' => 'X'])));
         $this->ctx()->grants['acme']['ana'] = ['view'];
-        $this->refused(CrmApiCode::DENIED, fn () => $this->relations()->addNote($this->principal(), $t, $this->key(), SubjectType::Company, $id($mine), new CrmApiNoteDraft('x')));
-        $this->refused(CrmApiCode::DENIED, fn () => $this->writes()->createCompany($this->principal(), $t, $this->key(), new CrmApiRecordDraft(SubjectType::Company, ['name' => 'X'])));
+        $this->refused(CrmApiCode::DENIED, fn (): CrmApiWritten => $this->relations()->addNote($this->principal(), $t, $this->key(), SubjectType::Company, $id($mine), new CrmApiNoteDraft('x')));
+        $this->refused(CrmApiCode::DENIED, fn (): CrmApiWritten => $this->writes()->createCompany($this->principal(), $t, $this->key(), new CrmApiRecordDraft(SubjectType::Company, ['name' => 'X'])));
         $this->actAs('ana', 'view', 'edit', 'manage', 'amounts_view');
         // A record listener's deny: view ⇒ 404, edit ⇒ 403; the listener sees the channel and the token.
         $this->ctx()->denied = ['api:edit:' . $mine];
-        $this->refused(CrmApiCode::DENIED, fn () => $this->relations()->addNote($this->principal(), $t, $this->key(), SubjectType::Company, $id($mine), new CrmApiNoteDraft('x')));
+        $this->refused(CrmApiCode::DENIED, fn (): CrmApiWritten => $this->relations()->addNote($this->principal(), $t, $this->key(), SubjectType::Company, $id($mine), new CrmApiNoteDraft('x')));
         self::assertContains('api|tok-1', $this->ctx()->seenChannels);
         self::assertContains('visibility:api|tok-1', $this->ctx()->seenChannels);
         // A bound host-link service (0.3.0) answers as the caller.
-        $caller = $this->service(\Nowo\CrmKitBundle\Api\Port\CrmApiCallerFactoryInterface::class)->for($this->principal(), $t);
-        self::assertSame([], $this->service(\Nowo\CrmKitBundle\Application\HostLinkService::class)->as($caller)->subjectsLinkedTo(new \Nowo\CrmKitBundle\Domain\Value\HostObjectRef('project', 'p1')));
+        $caller = $this->service(CrmApiCallerFactoryInterface::class)->for($this->principal(), $t);
+        self::assertSame([], $this->service(HostLinkService::class)->as($caller)->subjectsLinkedTo(new HostObjectRef('project', 'p1')));
         $this->ctx()->denied = ['view:' . $mine];
-        $this->refused(CrmApiCode::NOT_FOUND, fn () => $read($this->principal(), $mine));
+        $this->refused(CrmApiCode::NOT_FOUND, fn (): CrmApiItem => $read($this->principal(), $mine));
         $this->ctx()->denied = [];
         // Amounts: hidden without the tick or the person's permission.
         self::assertTrue($read($this->principal(amounts: false), $mine)->fact('amounts_hidden'));
         $this->ctx()->grants['acme']['ana'] = ['view', 'edit', 'manage'];
         self::assertTrue($read($this->principal(), $mine)->fact('amounts_hidden'));
         // An unknown actor of the area checker sees nothing at all.
-        $this->refused(CrmApiCode::DENIED, fn () => $this->reads()->tags($this->principal(actor: 'zoe'), $t));
+        $this->refused(CrmApiCode::DENIED, fn (): CrmApiList => $this->reads()->tags($this->principal(actor: 'zoe'), $t));
     }
 
     /**
      * @return list<CrmApiItem>
      */
-    private static function items(CrmApiPage $page): array
+    private function items(CrmApiPage $page): array
     {
         $items = [];
         foreach ($page->items as $item) {

@@ -66,11 +66,8 @@ final readonly class CrmApiRecords
     /**
      * The id of a record when the principal may view it (an active one), else null.
      */
-    public function visibleId(CrmApiCall $call, SubjectType $type, ?string $id): ?string
+    public function visibleId(CrmApiCall $call, SubjectType $type, string $id): ?string
     {
-        if ($id === null || !RecordId::isValid($id)) {
-            return null;
-        }
         $support = $this->support->as($call->caller);
         $record  = $support->read(static fn (): ?CrmRecord => $support->store->record($type, $call->context->tenant, $id));
 

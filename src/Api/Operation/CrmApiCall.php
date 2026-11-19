@@ -43,14 +43,6 @@ final readonly class CrmApiCall
     }
 
     /**
-     * Whether the grant covers the capability.
-     */
-    public function grants(CrmApiCapability $capability): bool
-    {
-        return $capability->allows($this->principal->grant);
-    }
-
-    /**
      * Requires the person's permission, tenant-wide or on one record (403 `ACCESS_002`).
      */
     public function person(CrmPermission $permission, ?SubjectRef $subject = null): void

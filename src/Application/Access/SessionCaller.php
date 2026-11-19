@@ -67,14 +67,6 @@ final readonly class SessionCaller implements CrmCallerInterface
     /**
      * {@inheritDoc}
      */
-    public function channel(): string
-    {
-        return self::CHANNEL;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public function origin(): ?AuditOrigin
     {
         return null;

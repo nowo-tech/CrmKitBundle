@@ -20,6 +20,7 @@ use Nowo\CrmKitBundle\Domain\Read\Pipeline\StageStats;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\StageView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
+use Nowo\CrmKitBundle\Domain\Value\Money;
 
 use function array_map;
 use function array_slice;
@@ -39,10 +40,6 @@ final class CrmApiPresenter
     public const MAX_TAGS = 50;
 
     public const MAX_NEXT_ACTIONS = 10;
-
-    private function __construct()
-    {
-    }
 
     /**
      * A company or contact.
@@ -229,7 +226,7 @@ final class CrmApiPresenter
             'company'               => $view->companyHidden ? ['id' => null, 'hidden' => true] : ['id' => $view->companyId, 'hidden' => false],
             'contact'               => $view->contactHidden ? ['id' => null, 'hidden' => true] : ['id' => $view->contactId, 'hidden' => false],
             'owner_id'              => $view->ownerId,
-            'amount'                => $view->amount === null ? null : ['amount' => $view->amount->amount, 'currency' => $view->amount->currency],
+            'amount'                => $view->amount instanceof Money ? ['amount' => $view->amount->amount, 'currency' => $view->amount->currency] : null,
             'probability'           => $view->amountsHidden ? null : $view->probability,
             'effective_probability' => $view->amountsHidden ? null : $view->effectiveProbability,
             'weighted_value'        => $view->weightedValue,

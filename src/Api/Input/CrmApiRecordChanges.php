@@ -68,7 +68,7 @@ final readonly class CrmApiRecordChanges implements CrmApiInput
             'custom'  => $this->custom !== null,
             'roles'   => $this->roles !== null,
             'tag_ids' => $this->tagIds !== null,
-            'owner'   => $this->owner !== null,
+            'owner'   => $this->owner instanceof CrmApiOwner,
             default   => array_key_exists($field, $this->values),
         };
     }

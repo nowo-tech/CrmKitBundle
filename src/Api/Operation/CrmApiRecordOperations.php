@@ -10,6 +10,8 @@ use Nowo\CrmKitBundle\Api\CrmApiOperation;
 use Nowo\CrmKitBundle\Api\CrmApiPrincipal;
 use Nowo\CrmKitBundle\Api\CrmApiRefusal;
 use Nowo\CrmKitBundle\Api\Input\CrmApiAffiliationSpec;
+use Nowo\CrmKitBundle\Api\Input\CrmApiCompanyLink;
+use Nowo\CrmKitBundle\Api\Input\CrmApiOwner;
 use Nowo\CrmKitBundle\Api\Input\CrmApiRecordChanges;
 use Nowo\CrmKitBundle\Api\Input\CrmApiRecordDraft;
 use Nowo\CrmKitBundle\Api\Input\IdempotencyKey;
@@ -108,8 +110,8 @@ final readonly class CrmApiRecordOperations
             CrmApiOperation::RecordTrash,
             ['type' => $type->value, 'id' => $id->value, 'base' => $base?->value],
             200,
-            static fn (): array => ['record' => $id->value],
-            function (CrmApiCall $call) use ($type, $id, $base, $trashed): CrmApiWritten {
+            static fn (): array => ['record' => $id->value], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $call) use ($type, $id, $base, $trashed): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $subject = $this->records->probe($call, $type, $id);
                 $call->require(CrmApiCapability::Trash, $subject);
                 $version = $base instanceof RecordVersion ? $base->value : ($this->records->version($call, $type, $id->value) ?? 0);
@@ -117,14 +119,14 @@ final readonly class CrmApiRecordOperations
 
                 return new CrmApiWritten($trashed, false, true);
             },
-            static fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten($trashed, true, true, $r->status),
+            static fn (CrmApiReplay $r): CrmApiWritten => new CrmApiWritten($trashed, true, true, $r->status), // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
         );
     }
 
     private function create(CrmApiOperation $operation, CrmApiPrincipal $principal, TenantRef $tenant, IdempotencyKey $key, CrmApiRecordDraft $draft): CrmApiWritten
     {
         $type = $operation === CrmApiOperation::CompanyCreate ? SubjectType::Company : SubjectType::Contact;
-        if ($draft->type !== $type || ($type === SubjectType::Company && $draft->company !== null)) {
+        if ($draft->type !== $type || ($type === SubjectType::Company && $draft->company instanceof CrmApiCompanyLink)) {
             throw CrmApiRefusal::malformed('type');
         }
         $call = $this->guard->call($principal, $tenant, $operation);
@@ -135,10 +137,10 @@ final readonly class CrmApiRecordOperations
             $operation,
             $draft->canonical(),
             201,
-            static fn (mixed $id): array => ['record' => is_string($id) ? $id : ''],
-            function (CrmApiCall $bound) use ($call, $type, $draft): CrmApiWritten {
+            static fn (mixed $id): array => ['record' => is_string($id) ? $id : ''], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($call, $type, $draft): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $bound->require(CrmApiCapability::Create);
-                if ($draft->company !== null) {
+                if ($draft->company instanceof CrmApiCompanyLink) {
                     // Affiliating needs `edit`; the company must be one the principal sees.
                     $bound->require(CrmApiCapability::Edit);
                     $this->records->probe($bound, SubjectType::Company, $draft->company->companyId);
@@ -153,7 +155,7 @@ final readonly class CrmApiRecordOperations
 
                 return new CrmApiWritten($this->created($call, $type, $id, null, $this->hints($call, $type, $id)), false, true, 201);
             },
-            function (CrmApiReplay $r) use ($call, $type, $draft): CrmApiWritten {
+            function (CrmApiReplay $r) use ($call, $type, $draft): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $id = $r->ids['record'] ?? '';
                 $this->records->probe($call, $type, RecordId::isValid($id) ? new RecordId($id) : throw CrmApiRefusal::notFound());
                 // The affiliation is a second unit: a replay repeats it (set semantics), so it ends done.
@@ -177,16 +179,16 @@ final readonly class CrmApiRecordOperations
             $operation,
             ['id' => $id->value, 'base' => $base->value] + $changes->canonical(),
             200,
-            static fn (): array => ['record' => $id->value],
-            function (CrmApiCall $call) use ($type, $id, $base, $changes): CrmApiWritten {
+            static fn (): array => ['record' => $id->value], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $call) use ($type, $id, $base, $changes): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $subject = $this->records->probe($call, $type, $id);
                 $call->require(CrmApiCapability::Edit, $subject);
-                $input   = new RecordInput($type, $changes->values, $changes->owner?->resolve($call->principal->actor), $changes->custom, $changes->tagIds, $changes->owner !== null, $changes->roles);
+                $input   = new RecordInput($type, $changes->values, $changes->owner?->resolve($call->principal->actor), $changes->custom, $changes->tagIds, $changes->owner instanceof CrmApiOwner, $changes->roles);
                 $version = CrmApiErrors::run(fn (): int => $this->service->as($call->caller)->update($id->value, $input, $base->value), $this->stale($call, $type, $id->value));
 
                 return new CrmApiWritten($this->reads->present($call, $type, $id->value), false, $version !== $base->value);
             },
-            function (CrmApiReplay $r) use ($call, $type, $id): CrmApiWritten {
+            function (CrmApiReplay $r) use ($call, $type, $id): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $this->records->probe($call, $type, $id);
 
                 return new CrmApiWritten($this->reads->present($call, $type, $id->value), true, true, $r->status);
@@ -240,7 +242,7 @@ final readonly class CrmApiRecordOperations
      */
     private function affiliateNew(CrmApiCall $call, string $contactId, CrmApiRecordDraft $draft): void
     {
-        if ($draft->company === null) {
+        if (!$draft->company instanceof CrmApiCompanyLink) {
             return;
         }
         $this->relations->apply($call, new CrmApiAffiliationSpec(new RecordId($contactId), $draft->company));

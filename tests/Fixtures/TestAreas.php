@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Tests\Fixtures;
 
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\RecordAccessCheckEvent;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\RecordVisibilityEvent;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\TenantAwareCrmKitAccessCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
@@ -85,7 +86,7 @@ final readonly class TestAreas implements TenantAwareCrmKitAccessCheckerInterfac
     /**
      * `RECORD_VISIBILITY`: notes the channel and the token of the read.
      */
-    public function onVisibility(\Nowo\CrmKitBundle\Infrastructure\Symfony\Event\RecordVisibilityEvent $event): void
+    public function onVisibility(RecordVisibilityEvent $event): void
     {
         $this->context->seenChannels[] = 'visibility:' . $event->getChannel() . '|' . ($event->getTokenId() ?? '');
     }

@@ -28,6 +28,7 @@ use Throwable;
 
 use function array_replace_recursive;
 use function hash;
+use function str_starts_with;
 
 /**
  * Races of the API on two connections (0.3.0, design §17.3; MySQL 8.4, MariaDB 11.4, PostgreSQL 16): a second kernel
@@ -50,7 +51,7 @@ final class ApiRaceTest extends ApiTestCase
         }
         $id    = new RecordId($this->company('Acme'));
         $other = $this->second();
-        $ops   = self::svc($other, CrmApiRecordOperations::class);
+        $ops   = $this->svc($other, CrmApiRecordOperations::class);
         // A lock held by the first connection: the second's update gives up, nothing committed.
         $this->hold('SELECT id FROM nowo_crm_company WHERE id = ? FOR UPDATE', [$id->value], function () use ($ops, $id): void {
             try {
@@ -64,7 +65,7 @@ final class ApiRaceTest extends ApiTestCase
         $client = $other->getContainer()->get('test.client');
         self::assertInstanceOf(KernelBrowser::class, $client);
         $client->disableReboot();
-        self::svc($other, TestApiState::class, 'test.api_state')->principal = $this->principal();
+        $this->svc($other, TestApiState::class, 'test.api_state')->principal = $this->principal();
         $this->hold('SELECT id FROM nowo_crm_company WHERE id = ? FOR UPDATE', [$id->value], static function () use ($client, $id): void {
             $client->request('PATCH', '/api/crm/v1/companies/' . $id->value, [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_IDEMPOTENCY_KEY' => 'lock-2', 'HTTP_IF_MATCH' => '1'], '{"city":"Madrid"}');
             $response = $client->getResponse();
@@ -85,7 +86,7 @@ final class ApiRaceTest extends ApiTestCase
             return;
         }
         $other = $this->second();
-        $ops   = self::svc($other, CrmApiRecordOperations::class);
+        $ops   = $this->svc($other, CrmApiRecordOperations::class);
         $draft = new CrmApiRecordDraft(SubjectType::Company, ['name' => 'Acme']);
         $p     = $this->principal();
         $scope = CrmApiIdempotency::scope($p->channel, $p->tokenId);
@@ -112,7 +113,7 @@ final class ApiRaceTest extends ApiTestCase
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_company'));
 
         // A first writer that rolled back leaves nothing: the second writes once.
-        $this->hold('INSERT INTO nowo_crm_api_idempotency (scope_hash, key_hash, tenant_id, operation, fingerprint, outcome, result_ids, created_at, expires_at) VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?)', [$scope, hash('sha256', "acme\nrolled"), 'acme', 'company.create', $print, '2026-11-18 10:00:00.000000', '2026-11-19 10:00:00'], static fn () => null);
+        $this->hold('INSERT INTO nowo_crm_api_idempotency (scope_hash, key_hash, tenant_id, operation, fingerprint, outcome, result_ids, created_at, expires_at) VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?)', [$scope, hash('sha256', "acme\nrolled"), 'acme', 'company.create', $print, '2026-11-18 10:00:00.000000', '2026-11-19 10:00:00'], static fn (): null => null);
         self::assertFalse($ops->createCompany($p, $this->acme(), new IdempotencyKey('rolled'), new CrmApiRecordDraft(SubjectType::Company, ['name' => 'Beta']))->replayed);
         self::assertSame(2, $this->int('SELECT COUNT(*) FROM nowo_crm_company'));
     }
@@ -123,7 +124,7 @@ final class ApiRaceTest extends ApiTestCase
             return;
         }
         $other = $this->second();
-        $ops   = self::svc($other, CrmApiRecordOperations::class);
+        $ops   = $this->svc($other, CrmApiRecordOperations::class);
         $p     = $this->principal();
         $this->company('Seed');
         // The counter row serialises the creates of a type: a held counter makes the second give up.
@@ -172,7 +173,11 @@ final class ApiRaceTest extends ApiTestCase
         $connection = $this->connection();
         $connection->beginTransaction();
         try {
-            $connection->executeStatement($sql, $params);
+            if (str_starts_with($sql, 'SELECT')) {
+                $connection->fetchAllAssociative($sql, $params);
+            } else {
+                $connection->executeStatement($sql, $params);
+            }
             $during();
             if ($commit !== null) {
                 $connection->executeStatement($commit, $commitParams);
@@ -193,10 +198,10 @@ final class ApiRaceTest extends ApiTestCase
         /** @var array<string, mixed> $config */
         $config          = array_replace_recursive(TestServices::PORTS, ['ui' => ['enabled' => true]], self::CONFIG);
         $kernel          = $this->bootKernel(Host::standard()->bundleConfig($config), Host::standard()->configure());
-        $context         = self::svc($kernel, TestContext::class, 'test.context');
+        $context         = $this->svc($kernel, TestContext::class, 'test.context');
         $context->owners = $this->ctx()->owners;
         $context->grant('acme', 'ana', 'view', 'edit', 'manage', 'amounts_view');
-        self::boundLockWaits(self::svc($kernel, DoctrineTransactionRunner::class)->manager()->getConnection(), 1);
+        self::boundLockWaits($this->svc($kernel, DoctrineTransactionRunner::class)->manager()->getConnection(), 1);
 
         return $kernel;
     }
@@ -208,7 +213,7 @@ final class ApiRaceTest extends ApiTestCase
      *
      * @return T
      */
-    private static function svc(TestKernel $kernel, string $class, ?string $id = null): object
+    private function svc(TestKernel $kernel, string $class, ?string $id = null): object
     {
         $container = $kernel->getContainer()->get('test.service_container');
         self::assertInstanceOf(ContainerInterface::class, $container);

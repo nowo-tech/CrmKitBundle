@@ -23,10 +23,6 @@ use function preg_match;
  */
 final class CrmApiCustom
 {
-    private function __construct()
-    {
-    }
-
     /**
      * The custom values of an input array, or null when absent.
      *

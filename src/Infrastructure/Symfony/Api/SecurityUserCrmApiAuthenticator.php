@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Api;
 
-use InvalidArgumentException;
 use Nowo\CrmKitBundle\Api\CrmApiGrant;
 use Nowo\CrmKitBundle\Api\CrmApiLevel;
 use Nowo\CrmKitBundle\Api\CrmApiPrincipal;
@@ -49,17 +48,14 @@ final readonly class SecurityUserCrmApiAuthenticator implements CrmApiAuthentica
         if (!ExactId::isValid($id) || ActorRef::isReserved($id)) {
             return null;
         }
-        try {
-            return new CrmApiPrincipal(
-                $user,
-                new ActorRef($id),
-                new CrmApiGrant(CrmApiLevel::from($this->grant['level']), $this->grant['amounts'], $this->grant['consents'], $this->grant['destructive']),
-                CrmApiReach::everything(),
-                'session:' . hash('sha256', $user->getUserIdentifier()),
-                'API',
-            );
-        } catch (InvalidArgumentException) {
-            return null;
-        }
+
+        return new CrmApiPrincipal(
+            $user,
+            new ActorRef($id),
+            new CrmApiGrant(CrmApiLevel::from($this->grant['level']), $this->grant['amounts'], $this->grant['consents'], $this->grant['destructive']),
+            CrmApiReach::everything(),
+            'session:' . hash('sha256', $user->getUserIdentifier()),
+            'API',
+        );
     }
 }

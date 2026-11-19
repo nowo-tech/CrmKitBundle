@@ -56,14 +56,14 @@ final readonly class CrmApiNextActionOperations
             CrmApiOperation::NextActionSet,
             $draft->canonical(),
             201,
-            static fn (mixed $id): array => ['next_action' => is_string($id) ? $id : ''],
-            function (CrmApiCall $bound) use ($call, $draft, $dedupe, $pipeline): CrmApiWritten {
+            static fn (mixed $id): array => ['next_action' => is_string($id) ? $id : ''], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiCall $bound) use ($call, $draft, $dedupe, $pipeline): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $bound->require(CrmApiCapability::Edit, $this->subject($bound, $draft));
-                $id = CrmApiErrors::run(static fn (): string => $pipeline->nextActions->as($bound->caller)->set($draft->type, $draft->subjectId->value, $draft->title, $draft->dueAt, $draft->assignee?->value, $dedupe, $bound->principal->hostContext));
+                $id = CrmApiErrors::run(static fn (): string => $pipeline->nextActions->as($bound->caller)->set($draft->type, $draft->subjectId->value, $draft->title, $draft->dueAt, $draft->assignee?->value, $dedupe, $bound->principal->hostContext)); // @igor-ignore - a stateless service bound to this call only
 
                 return new CrmApiWritten($this->action($call, $draft, $id), false, true, 201);
             },
-            function (CrmApiReplay $r) use ($call, $draft): CrmApiWritten {
+            function (CrmApiReplay $r) use ($call, $draft): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $this->subject($call, $draft);
 
                 return new CrmApiWritten($this->action($call, $draft, $r->ids['next_action'] ?? ''), true, true, $r->status);

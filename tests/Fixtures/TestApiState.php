@@ -15,4 +15,7 @@ final class TestApiState
 
     /** The authenticator throws (an unexpected failure). */
     public bool $fail = false;
+
+    /** The authenticator throws a lock conflict (committed or not). */
+    public ?bool $conflict = null;
 }

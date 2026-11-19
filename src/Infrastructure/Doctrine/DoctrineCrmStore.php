@@ -267,12 +267,12 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         $qb->orderBy($field, $dir)->addOrderBy('r.id', $dir)->setMaxResults($limit); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         if ($after !== null) {
             $op = $byUpdated ? '<' : '>';
-            $qb->andWhere('(' . $field . ' ' . $op . ' :kv OR (' . $field . ' = :kv AND r.id ' . $op . ' :kid))')
+            $qb->andWhere('(' . $field . ' ' . $op . ' :kv OR (' . $field . ' = :kv AND r.id ' . $op . ' :kid))') // @igor-ignore - a query builder local to this call
                 ->setParameter('kv', $byUpdated ? new DateTimeImmutable($after['v'], new DateTimeZone('UTC')) : $after['v'], $byUpdated ? UtcMicroDateTimeImmutableType::NAME : null)
                 ->setParameter('kid', $after['id']);
         }
         if ($stage !== null) {
-            $qb->andWhere('EXISTS (SELECT 1 FROM ' . PartyStage::class . ' ps WHERE ps.subjectId = r.id AND ps.subjectType = :psType AND ps.funnelId = :psFunnel AND ps.stageId = :psStage AND ps.tenantId = :tenant)')
+            $qb->andWhere('EXISTS (SELECT 1 FROM ' . PartyStage::class . ' ps WHERE ps.subjectId = r.id AND ps.subjectType = :psType AND ps.funnelId = :psFunnel AND ps.stageId = :psStage AND ps.tenantId = :tenant)') // @igor-ignore - a query builder local to this call
                 ->setParameter('psType', $query->type)->setParameter('psFunnel', $stage['funnel'])->setParameter('psStage', $stage['stage']);
         }
 

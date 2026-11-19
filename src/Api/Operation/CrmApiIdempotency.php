@@ -67,7 +67,7 @@ final readonly class CrmApiIdempotency
      */
     public function stored(CrmApiPrincipal $principal, TenantRef $tenant, CrmApiOperation $operation, IdempotencyKey $key, array $canonical): ?CrmApiReplay
     {
-        $record = $this->store->find(self::scope($principal->channel, $principal->tokenId), self::key($tenant, $key), $this->clock->now()->setTimezone(new DateTimeZone('UTC')));
+        $record = $this->store->find(self::scope($principal->channel, $principal->tokenId), $this->key($tenant, $key), $this->clock->now()->setTimezone(new DateTimeZone('UTC')));
 
         return $record instanceof CrmApiIdempotencyRecord ? $this->answer($record, $operation, self::fingerprint($operation, $canonical)) : null;
     }
@@ -82,7 +82,7 @@ final readonly class CrmApiIdempotency
     public function hooks(CrmApiPrincipal $principal, TenantRef $tenant, CrmApiOperation $operation, IdempotencyKey $key, array $canonical, int $status, callable $ids): CrmApiUnitHooks
     {
         $scope       = self::scope($principal->channel, $principal->tokenId);
-        $keyHash     = self::key($tenant, $key);
+        $keyHash     = $this->key($tenant, $key);
         $fingerprint = self::fingerprint($operation, $canonical);
 
         return new CrmApiUnitHooks(
@@ -102,7 +102,7 @@ final readonly class CrmApiIdempotency
     /**
      * The key hash: `sha256(tenant . "\n" . key)`.
      */
-    private static function key(TenantRef $tenant, IdempotencyKey $key): string
+    private function key(TenantRef $tenant, IdempotencyKey $key): string
     {
         return hash('sha256', $tenant->value . "\n" . $key->value);
     }

@@ -31,10 +31,6 @@ use function preg_match;
  */
 final class CrmApiFields
 {
-    private function __construct()
-    {
-    }
-
     /**
      * Refuses keys outside `$allowed`.
      *

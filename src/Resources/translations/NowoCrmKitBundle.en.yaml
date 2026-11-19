@@ -140,6 +140,10 @@ record:
     purged: The record was deleted.
     erased: "The contact's personal data was erased."
 affiliation:
+    edit: 'Edit'
+    update: 'Save'
+    clear_primary_contact: 'Remove as primary contact'
+    primary_contact_cleared: 'The company has no primary contact now.'
     primary_contact: 'Primary contact'
     make_primary_contact: 'Make primary contact'
     primary_contact_set: 'The primary contact was changed.'
@@ -366,6 +370,7 @@ flash:
         crm_settings_stale: Someone changed the settings at the same moment. Check them and save again.
         crm_write_conflict: 'Another change of the same data arrived at the same moment. Try again.'
 error:
+    forbidden: 'You may not change this.'
     role_unknown: 'Unknown role.'
     purpose_unknown: 'Unknown purpose.'
     not_affiliated: 'This contact is not linked to the company.'

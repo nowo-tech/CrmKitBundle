@@ -140,6 +140,10 @@ record:
     purged: Het record is verwijderd.
     erased: "De persoonsgegevens van het contact zijn gewist."
 affiliation:
+    edit: 'Bewerken'
+    update: 'Opslaan'
+    clear_primary_contact: 'Als hoofdcontact verwijderen'
+    primary_contact_cleared: 'Het bedrijf heeft nu geen hoofdcontact.'
     primary_contact: 'Hoofdcontact'
     make_primary_contact: 'Hoofdcontact maken'
     primary_contact_set: 'Het hoofdcontact is gewijzigd.'
@@ -366,6 +370,7 @@ flash:
         crm_settings_stale: Iemand heeft de instellingen op hetzelfde moment gewijzigd. Controleer ze en sla opnieuw op.
         crm_write_conflict: 'Een andere wijziging van dezelfde gegevens kwam op hetzelfde moment binnen. Probeer het opnieuw.'
 error:
+    forbidden: 'U mag dit niet wijzigen.'
     role_unknown: 'Onbekende rol.'
     purpose_unknown: 'Onbekend doel.'
     not_affiliated: 'Dit contact is niet aan het bedrijf gekoppeld.'

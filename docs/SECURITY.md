@@ -48,7 +48,7 @@ purposes (contract section 6.8) with the same model: no new permission, deny by 
 | --- | --- | --- | --- |
 | Lists, 360° pages, timeline, notes, links, panels, consents, duplicates, vCard of one contact, header search | ✓ | | |
 | Create / edit / trash / restore records, notes, tag assignment, **roles** (0.2.0), host links, affiliations with their purposes, consent records, import, merge (on both records), host timeline entries | | ✓ | |
-| The company's primary contact (0.2.0): `edit` on the company (the contact needs `view`; through the affiliation form also `edit` on the contact) | | ✓ | |
+| The company's primary contact (0.2.0): `edit` on the company (the contact needs `view`; through the affiliation form also `edit` on the contact; an import row that changes it also needs `edit` on the company, else `invalid`) | | ✓ | |
 | Edit or delete another person's note | | ✓ + ✓ | ✓ |
 | Tag and field administration, settings, purge from the trash, CSV export of lists, GDPR export and erasure | | | ✓ |
 

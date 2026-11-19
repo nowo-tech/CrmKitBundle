@@ -126,6 +126,6 @@ final class RolesAndPurposesTest extends TestCase
         self::assertSame([null, [], null], [$input->roles, $purposes, $key]);
         self::assertContains('roles', ImportMapping::targets(SubjectType::Company, []));
         self::assertNotContains('purposes', ImportMapping::targets(SubjectType::Company, []));
-        self::assertSame(['Role' => 'roles', 'Purpose' => 'purposes', 'Primary' => 'primary_contact'], ImportMapping::detect(['Role', 'Purpose', 'Primary'], ImportMapping::targets(SubjectType::Contact, [])));
+        self::assertSame(['Role' => 'roles', 'Purpose' => 'purposes', 'Primary' => '', 'Primary contact' => 'primary_contact'], ImportMapping::detect(['Role', 'Purpose', 'Primary', 'Primary contact'], ImportMapping::targets(SubjectType::Contact, [])));
     }
 }

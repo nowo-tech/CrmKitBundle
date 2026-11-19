@@ -15,7 +15,7 @@ earlier order B → C → D → E → F → G.
 | --- | --- | --- | --- | --- |
 | **A** companies and contacts | 0.1.0 | Companies; contacts with affiliations (role, one primary company); owners; tags; custom fields; notes; activity timeline; host links and host panels on a 360° page; CSV and vCard import with preview; duplicate hints and merging; CSV / vCard export; GDPR (consent per purpose, export, erasure, retention); trash with restore; plan-limit counters; SearchKit providers; audit events | always on | Released |
 | **A2** roles and purposes | 0.2.0 | Party roles (many per company or contact, configurable catalogue: customer, supplier, partner; distributor opt-in); the company's primary contact; affiliation purposes (billing, orders, technical, general); role / purpose filters; import and export columns; UD-2 concurrency follow-ups | always on | In review |
-| **B** funnels | 0.3.0 | Deal funnels and party lifecycle funnels (lead → prospect → customer → recurring → former) with ordered stages, default probabilities, rotting age, won / lost terminal stages; stage history; per-stage statistics (count now and at a past date, sum and weighted value, conversion, time in stage, stale items, won / lost with reasons; filters period, owner, role, tag; chart, table, CSV); next actions through `CrmTaskPort` (TaskBoard adapter, built-in fallback) | `pipeline.enabled` | Planned |
+| **B** funnels | 0.3.0 | Deal funnels and party lifecycle funnels (lead → prospect → customer → recurring → former) with ordered stages, default probabilities, rotting age, won / lost terminal stages; stage history; per-stage statistics (count now and at a past date, sum and weighted value, conversion, time in stage, stale items, won / lost with reasons; filters period, owner, role, tag; chart, table, CSV); next actions through `CrmTaskPort` (TaskBoard adapter, built-in fallback); the public JSON API `/crm/v1` | `pipeline.enabled` | Planned |
 | **B2** tasks and agenda | 0.4.0 | Tasks from any record; opt-in automations from TaskBoard templates; meetings and calls with attendees in TaskBoard's calendar (timed event source, TaskBoard 2.24); "my agenda"; NotifyKit reminders; ICS invites; done meetings on the timeline; links never grant access | own switch | Planned |
 | **C** quotes | 0.5.0 | Catalogue; quotes from a deal or on a company / contact; versions, PDF, signed expiring accept / reject link, e-sign hook; accepted ⇒ deal won, rejected ⇒ lost reason; shown on the deal and the 360° page | `quotes.enabled` | Planned |
 | **D** invoices | 0.6.0 | From accepted quotes, host billable lines or by hand; atomic numbering per series; corrective invoices (issued invoices never edited or deleted); VeriFactu and SEPA after commit; payment status and reminders; overdue ⇒ collection task (opt-in); totals per customer; create / issue / void permissions; GDPR keeps issued invoices for the legal period | `invoices.enabled` | Planned |
@@ -32,7 +32,7 @@ processing, native apps.
 
 ## Phase A follow-ups
 
-- The public JSON API `/crm/v1` (contract Q-O6 / Q-O16: recommended with 0.3.0).
+- The public JSON API `/crm/v1` (contract Q-O6 / Q-O16: decided for 0.3.0 by the owner on 2026-11-19).
 - A Messenger handler that runs large imports outside the request (0.1.0 runs them in requests and in
   `nowo:crm-kit:import:resume`).
 - A link picker on the 360° page that uses `CrmHostObjectResolverInterface::search()` (0.1.0 asks for the host id).

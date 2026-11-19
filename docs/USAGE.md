@@ -417,8 +417,8 @@ Since 0.2.0 ([CONFIGURATION.md](CONFIGURATION.md#roles-and-affiliation-purposes)
   and suppliers: a supplier that also buys is a company with both roles. A private customer is a contact with the
   `customer` role and no company. Prospect and former customer are lifecycle stages of the customer role (funnels,
   0.3.0); a competitor is a tag.
-- **The company's primary contact**: at most one per company, set from the company page ("Make primary contact"), in
-  the affiliation form of the contact, through `setPrimaryContact()` / `affiliate(…, primaryContact: true)` or by an
+- **The company's primary contact**: at most one per company, set from the company page ("Make primary contact",
+  "Remove as primary contact"), in the affiliation form of the contact (an unticked box keeps it), through `setPrimaryContact()` / `affiliate(…, primaryContact: true)` or by an
   import column; the previous one is cleared.
 - **Purposes** say what a contact is the company's contact for (several per affiliation).
 
@@ -439,7 +439,9 @@ $primaries = $reader->list(new ListQuery(SubjectType::Contact, role: 'customer',
 `RecordView::$roles` holds the configured role keys of a record (catalogue order) and every `AffiliationView` its
 `primaryContact` flag and `purposes`. A key removed from the configuration stays in the database but is hidden; the
 GDPR export lists every stored role. The list pages filter by `role` (and, for contacts, `purpose` and
-`primary_contact=1`); unknown keys in the URL are ignored.
+`primary_contact=1`); unknown keys in the URL are ignored, while `ListQuery` itself refuses a string that is not a
+valid key (`InvalidInputException`). An affiliation edit replaces only the configured purposes; stored ones no longer
+configured stay.
 
 ## Pages and routes
 
@@ -462,7 +464,7 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 | `tags_assign` | `/{type}/{id}/tags` | POST | edit |
 | `link_add`, `link_remove` | `/{type}/{id}/links`, `/links/{id}/remove` | POST | edit |
 | `affiliate`, `unaffiliate` | `/contacts/{id}/affiliations`, `/affiliations/{id}/remove` | POST | edit |
-| `primary_contact` (0.2.0) | `/companies/{id}/primary-contact/{contact}` (action token) | POST | edit on the company |
+| `primary_contact`, `primary_contact_clear` (0.2.0) | `/companies/{id}/primary-contact/{contact}`, `/companies/{id}/primary-contact/clear` (action token) | POST | edit on the company |
 | `consent` | `/contacts/{id}/consent` | POST | edit |
 | `vcard` | `/contacts/{id}/vcard` | GET | view |
 | `gdpr_export`, `erase` | `/contacts/{id}/gdpr-export` (JSON download), `/contacts/{id}/erase` | POST (both with the action token `crm_action[_token]`) | manage |
@@ -485,7 +487,8 @@ template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the bra
    contacts, `company` (affiliates to an existing active company with exactly that name, case-insensitive), or skip.
    0.2.0: `roles` (role keys separated by `,` or `;`, both types; added to the stored ones), and for contacts
    `purposes` (purpose keys of the affiliation to the named company, added to the stored ones) and `primary_contact`
-   (`yes` / `no`, also `1`, `true`, `x` / empty, `0`, `false`: makes the contact the company's primary contact).
+   (`yes` / `no`, also `1`, `true`, `x` / empty, `0`, `false`: makes the contact the company's primary contact; a row
+   that changes it needs `edit` on that company, else it is `invalid` with `error.forbidden`).
    Keys must equal configured keys exactly; an unknown key or an unreadable yes / no makes the row `invalid`.
 3. **Confirm** with the duplicate policy: `skip` (a contact whose e-mail exists becomes `duplicate`) or `update` (the
    existing active contact is updated; a trashed one stays `duplicate`). Companies have no duplicate key: every valid

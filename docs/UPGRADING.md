@@ -22,7 +22,7 @@ or apply this DDL (default prefix `nowo_`):
 -- MySQL 8.0+ (MariaDB 10.6+: utf8mb4_nopad_bin instead of utf8mb4_0900_bin)
 ALTER TABLE nowo_crm_affiliation
     ADD is_primary_contact TINYINT(1) DEFAULT 0 NOT NULL,
-    ADD purpose_keys VARCHAR(600) CHARACTER SET utf8mb4 DEFAULT '' NOT NULL COLLATE `utf8mb4_0900_bin`;
+    ADD purpose_keys VARCHAR(1100) CHARACTER SET utf8mb4 DEFAULT '' NOT NULL COLLATE `utf8mb4_0900_bin`;
 CREATE TABLE nowo_crm_role_assignment (
     id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
     tenant_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
@@ -38,7 +38,7 @@ CREATE TABLE nowo_crm_role_assignment (
 
 -- PostgreSQL 9.5+
 ALTER TABLE nowo_crm_affiliation ADD is_primary_contact BOOLEAN DEFAULT false NOT NULL;
-ALTER TABLE nowo_crm_affiliation ADD purpose_keys VARCHAR(600) DEFAULT '' NOT NULL;
+ALTER TABLE nowo_crm_affiliation ADD purpose_keys VARCHAR(1100) DEFAULT '' NOT NULL;
 CREATE TABLE nowo_crm_role_assignment (
     id VARCHAR(36) NOT NULL,
     tenant_id VARCHAR(128) NOT NULL,
@@ -54,10 +54,14 @@ CREATE INDEX nowo_crm_role_assignment_role ON nowo_crm_role_assignment (tenant_i
 ```
 
 Contract section 17 allows only nullable columns or indexes on an earlier table; the two new columns are `NOT NULL`
-**with a default**, which needs no data change and no backfill on any supported database.
+**with a default**, which needs no backfill. On MySQL 8.0+, MariaDB 10.6+ and PostgreSQL 11+ adding them is a metadata
+change; **on PostgreSQL 9.5 – 10, `ADD COLUMN … NOT NULL DEFAULT` rewrites the whole table** under an exclusive lock:
+run it in a maintenance window on a large `crm_affiliation`.
 
 **Database versions.** MySQL 8.0, MariaDB 10.6 or PostgreSQL 9.5 at least (`FOR UPDATE SKIP LOCKED` in the purge
-claim). MySQL 5.7 and MariaDB before 10.6 are no longer supported.
+claim). MySQL 5.7 and MariaDB before 10.6 are no longer supported. Doctrine DBAL sets its own floor too: DBAL 3.9 has
+platforms for PostgreSQL from 9.4, while **DBAL 4 starts at PostgreSQL 10** (its lowest platform, `PostgreSQLPlatform`,
+is "for version 10.0 and above"; MySQL from 5.7.9, MariaDB from 10.4.3), so with DBAL 4 the minimum is PostgreSQL 10.
 
 **Configuration** (optional): `roles.catalogue` (default `[customer, supplier, partner]`) and
 `affiliations.purposes` (default `[billing, orders, technical, general]`), see
@@ -80,7 +84,12 @@ claim). MySQL 5.7 and MariaDB before 10.6 are no longer supported.
 
 **Behaviour.**
 
-- `affiliate()` updates an existing pair in place (the affiliation keeps its id) instead of deleting and re-inserting it.
+- `affiliate()` updates an existing pair in place (the affiliation keeps its id) instead of deleting and re-inserting it;
+  its `purposes` replace only the configured purposes (stored ones no longer configured are kept).
+- `ListQuery` refuses a `role` or `purpose` that is not a valid key (`InvalidInputException`).
+- Every write of a company or contact moves its version, also a role-, tag- or affiliation-only change in the same
+  second as the previous write: the edit time then moves one second on (`updated_at` may run up to a few seconds
+  ahead under a burst of writes).
 - A second `nowo:crm-kit:purge` started while a batch of the first holds the claim row prints "Another purge is
   running" at once instead of failing with a lock conflict.
 - An import chunk locks the existing contacts and the named companies of all its rows first (in id order), then settles

@@ -49,7 +49,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   two optional arguments; `CrmStoreInterface` (internal) gains `contactIdsByEmailKeys()`, `affiliatedCompanyIds()`
   and `roleAssignments()`.
 - The CSV export has a `roles` column after `owner`.
-- The minimum database versions are MySQL 8.0, MariaDB 10.6 and PostgreSQL 9.5 (`SKIP LOCKED`).
+- The minimum database versions are MySQL 8.0, MariaDB 10.6 and PostgreSQL 9.5 (`SKIP LOCKED`; PostgreSQL 10 with
+  DBAL 4).
+- Every write of a company or contact moves its optimistic version: a write in the same second as the previous one
+  (a role-, tag- or affiliation-only change) moves the edit time one second on, since the ORM compares the stored
+  whole-second value.
+
+### Fixed (audit UL, before the release)
+
+- An affiliation edit replaced every purpose: purposes no longer configured are now kept (only the configured ones
+  are replaced).
+- Re-sending an affiliation with "primary contact" unticked cleared the company's primary contact (403 without `edit`
+  on the company): unticked now keeps it; clearing is a "Remove as primary contact" action on the company page
+  (`/companies/{id}/primary-contact/clear`), and each linked company has its own form, filled with the stored role,
+  flags and purposes (the add form lists only companies not linked yet).
+- `crm_affiliation.purpose_keys` is `VARCHAR(1100)` (32 keys of 32 characters fit).
+- An import row that changes a company's primary contact needs `edit` on that company, else it is `invalid`
+  (`error.forbidden`); the ambiguous column alias `primary` is gone (`primary_contact` stays).
+- Imports announce role changes (`RolesChanged`) and audit them (`crm.roles.changed`).
+- The GDPR export lists affiliations to trashed companies too, with `company_status`.
+- `ListQuery` refuses a role or purpose that is not a valid key.
+- A contact merge moves the primary-company flag of a company both contacts are linked to when the survivor had none.
 
 ## [0.1.0] - 2026-11-19
 

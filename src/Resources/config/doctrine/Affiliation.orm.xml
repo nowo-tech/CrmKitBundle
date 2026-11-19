@@ -19,7 +19,7 @@
         <field name="primaryContact" column="is_primary_contact" type="boolean">
             <options><option name="default">0</option></options>
         </field>
-        <field name="purposeKeys" column="purpose_keys" type="string" length="600">
+        <field name="purposeKeys" column="purpose_keys" type="string" length="1100">
             <options><option name="default"></option></options>
         </field>
     </entity>

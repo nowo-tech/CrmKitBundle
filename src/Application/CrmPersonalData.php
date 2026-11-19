@@ -75,7 +75,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
 
             return $data;
         });
-        // Every stored affiliation with an active company, every stored purpose (configured or not).
+        // Every stored affiliation (active or trashed company, with its status), every stored purpose (configured or not).
         $data['companies'] = $this->support->read(function () use ($context, $contactId): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $store        = $this->support->store;
             $affiliations = $store->affiliations($context->tenant, SubjectType::Contact, $contactId);
@@ -83,8 +83,8 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
             $rows         = [];
             foreach ($affiliations as $a) {
                 $company = $companies[$a->getCompanyId()] ?? null;
-                if ($company instanceof CrmRecord && $company->isActive()) {
-                    $rows[] = ['company' => $company->label(), 'role' => $a->getRole(), 'primary' => $a->isPrimary(), 'primary_contact' => $a->isPrimaryContact(), 'purposes' => $a->getPurposes()];
+                if ($company instanceof CrmRecord) {
+                    $rows[] = ['company' => $company->label(), 'company_status' => $company->getStatus()->value, 'role' => $a->getRole(), 'primary' => $a->isPrimary(), 'primary_contact' => $a->isPrimaryContact(), 'purposes' => $a->getPurposes()];
                 }
             }
 

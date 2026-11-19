@@ -1,6 +1,6 @@
 {#
   The 360° page of a company or contact (contract section 9). Variables: page (ShowPage), record (RecordView),
-  segment, can_edit, can_manage, forms (note, notes[id], tags, link, affiliation, consent), buttons (notes, links,
+  segment, can_edit, can_manage, forms (note, notes[id], tags, link, affiliation, affiliations[id], consent), buttons (notes, links,
   affiliations, primary_contact: View\Action per affiliation id), back (return params), notes, timeline, links, panels, duplicates, consents.
 #}
 {% extends '@NowoUiKit/page/show.html.twig' %}
@@ -35,6 +35,11 @@
                         {% if a.purposes is not empty %} · <span data-testid="crm-purposes">{% for p in a.purposes %}{{ ('purpose.' ~ p)|trans({}, _d) }}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}
                         {% if buttons.primary_contact[a.id] is defined %}{{ include(nowo_ui_partial('action', _b), {action: buttons.primary_contact[a.id], context: 'row', bundle: _b}) }}{% endif %}
                         {% if buttons.affiliations[a.id] is defined %}{{ include(nowo_ui_partial('action', _b), {action: buttons.affiliations[a.id], context: 'row', bundle: _b}) }}{% endif %}
+                        {% if forms.affiliations[a.id] is defined %}
+                            <details><summary>{{ 'affiliation.edit'|trans({}, _d) }}</summary>
+                                {{ include('@NowoCrmKit/_form.html.twig', {form: forms.affiliations[a.id], title: null, submit: 'affiliation.update', action: path('nowo_crm_kit_affiliate', {id: record.id}), testid: 'crm-affiliation-edit', variant: 'btn_secondary'}) }}
+                            </details>
+                        {% endif %}
                     </li>
                 {% endfor %}
                 </ul>

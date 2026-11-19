@@ -140,6 +140,10 @@ record:
     purged: Se ha eliminado el registro.
     erased: "Se han borrado los datos personales del contacto."
 affiliation:
+    edit: 'Editar'
+    update: 'Guardar'
+    clear_primary_contact: 'Quitar como contacto principal'
+    primary_contact_cleared: 'La empresa ya no tiene contacto principal.'
     primary_contact: 'Contacto principal'
     make_primary_contact: 'Hacer contacto principal'
     primary_contact_set: 'Se cambió el contacto principal.'
@@ -366,6 +370,7 @@ flash:
         crm_settings_stale: Alguien ha modificado los ajustes al mismo tiempo. Revísalos y vuelve a guardar.
         crm_write_conflict: 'Otro cambio de los mismos datos llegó al mismo tiempo. Inténtalo de nuevo.'
 error:
+    forbidden: 'No puedes cambiar esto.'
     role_unknown: 'Rol desconocido.'
     purpose_unknown: 'Finalidad desconocida.'
     not_affiliated: 'Este contacto no está vinculado a la empresa.'

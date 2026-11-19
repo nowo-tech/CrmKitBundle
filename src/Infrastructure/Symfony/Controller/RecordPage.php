@@ -10,6 +10,7 @@ use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Model\RecordFields;
+use Nowo\CrmKitBundle\Domain\Read\AffiliationView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
@@ -30,6 +31,7 @@ use Nowo\UiKitBundle\View\ShowPage;
 use Symfony\Component\HttpFoundation\Response;
 
 use function array_map;
+use function in_array;
 use function substr;
 
 /**
@@ -125,9 +127,17 @@ final readonly class RecordPage
                 $forms['link'] = $this->ui->form(HostLinkType::class, null, ['types' => $types], 'crm_link')->createView();
             }
             if ($type === SubjectType::Contact) {
+                // The add form offers the companies the contact is not linked to yet; a linked one has its own form below,
+                // filled with the stored role, flags and purposes.
+                $linked    = array_map(static fn (AffiliationView $a): string => $a->companyId, $view->affiliations);
                 $companies = [];
                 foreach ($this->reader->list(new ListQuery(SubjectType::Company, perPage: 100))->rows as $company) {
-                    $companies[$company->label . ' · ' . substr($company->id, -6)] = $company->id;
+                    if (!in_array($company->id, $linked, true)) {
+                        $companies[$company->label . ' · ' . substr($company->id, -6)] = $company->id;
+                    }
+                }
+                foreach ($view->affiliations as $affiliation) {
+                    $forms['affiliations'][$affiliation->id] = $this->ui->form(AffiliationType::class, ['company' => $affiliation->companyId, 'role' => $affiliation->role, 'primary' => $affiliation->primary, 'purposes' => $affiliation->purposes, 'primary_contact' => $affiliation->primaryContact], ['companies' => [$affiliation->companyName => $affiliation->companyId], 'purposes' => $this->forms->affiliationPurposes()], 'crm_affiliation')->createView();
                 }
                 if ($companies !== []) {
                     $forms['affiliation'] = $this->ui->form(AffiliationType::class, null, ['companies' => $companies, 'purposes' => $this->forms->affiliationPurposes()], 'crm_affiliation')->createView();
@@ -152,8 +162,10 @@ final readonly class RecordPage
             }
             foreach ($view->affiliations as $affiliation) {
                 $buttons['affiliations'][$affiliation->id] = $this->post($token, 'delete', 'affiliation.remove', 'nowo_crm_kit_unaffiliate', ['id' => $affiliation->id] + $back);
-                if ($type === SubjectType::Company && !$affiliation->primaryContact) {
-                    $buttons['primary_contact'][$affiliation->id] = $this->post($token, 'custom', 'affiliation.make_primary_contact', 'nowo_crm_kit_primary_contact', ['id' => $view->id, 'contact' => $affiliation->contactId]);
+                if ($type === SubjectType::Company) {
+                    $buttons['primary_contact'][$affiliation->id] = $affiliation->primaryContact
+                        ? $this->post($token, 'custom', 'affiliation.clear_primary_contact', 'nowo_crm_kit_primary_contact_clear', ['id' => $view->id])
+                        : $this->post($token, 'custom', 'affiliation.make_primary_contact', 'nowo_crm_kit_primary_contact', ['id' => $view->id, 'contact' => $affiliation->contactId]);
                 }
             }
         }

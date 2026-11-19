@@ -11,6 +11,7 @@ use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Event\RolesChanged;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
+use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Read\AffiliationView;
 use Nowo\CrmKitBundle\Domain\Read\ImportRowView;
@@ -60,14 +61,11 @@ final class RolesAndPurposesTest extends CrmTestCase
         self::assertSame([], $this->reader()->record(SubjectType::Company, $beta)->roles);
         self::assertSame(1, $this->int("SELECT COUNT(*) FROM nowo_crm_activity WHERE kind = 'roles_changed' AND subject_id = ?", [$acme]));
 
-        // Set semantics; an update with roles bumps the version once (the clock moves: versions follow the edit time).
-        $this->clock()->sleep(1);
+        // Set semantics: a change bumps the record's version once, an unchanged set writes nothing.
         $this->records()->setRoles(SubjectType::Company, $beta, ['partner', 'distributor']);
-        $this->clock()->sleep(1);
         $this->records()->setRoles(SubjectType::Company, $beta, ['partner', 'distributor']);
         self::assertSame(['partner', 'distributor'], $this->reader()->record(SubjectType::Company, $beta)->roles);
         self::assertSame(2, $this->reader()->record(SubjectType::Company, $beta)->version, 'an unchanged set writes nothing');
-        $this->clock()->sleep(1);
         $version = $this->records()->update($beta, new RecordInput(SubjectType::Company, [], roles: ['customer']), 2);
         self::assertSame(3, $version);
         self::assertSame(['customer'], $this->reader()->record(SubjectType::Company, $beta)->roles);
@@ -173,6 +171,10 @@ final class RolesAndPurposesTest extends CrmTestCase
         self::assertSame([$bob], $ids(new ListQuery(SubjectType::Contact, companyId: $acme, purpose: 'technical')));
         self::assertSame([], $ids(new ListQuery(SubjectType::Contact, purpose: 'billing')), 'the billing purpose was replaced');
         self::assertSame([], $ids(new ListQuery(SubjectType::Contact, purpose: 'order_')), 'a LIKE wildcard is literal');
+        $this->records()->affiliate($bob, $acme, null, true, null, ['technical', 'billing']);
+        self::assertSame([], $ids(new ListQuery(SubjectType::Contact, purpose: 'bill')), '"bill" never matches ",billing,"');
+        self::assertSame([$bob], $ids(new ListQuery(SubjectType::Contact, purpose: 'billing')));
+        $this->records()->affiliate($bob, $acme, null, true, null, ['technical']);
         self::assertSame([$bob], $ids(new ListQuery(SubjectType::Contact, primaryContactOnly: true)));
         self::assertSame([], $ids(new ListQuery(SubjectType::Contact, purpose: 'orders', primaryContactOnly: true)), 'one affiliation matches all filters');
 
@@ -191,7 +193,13 @@ final class RolesAndPurposesTest extends CrmTestCase
         $roles  = $export['roles'] ?? null;
         self::assertIsArray($roles);
         self::assertSame(['customer'], array_column($roles, 'role'));
-        self::assertSame([['company' => 'Acme', 'role' => null, 'primary' => true, 'primary_contact' => true, 'purposes' => ['technical']]], $export['companies']);
+        self::assertSame([['company' => 'Acme', 'company_status' => 'active', 'role' => null, 'primary' => true, 'primary_contact' => true, 'purposes' => ['technical']]], $export['companies']);
+        $gone = $this->company('Gone');
+        $this->records()->affiliate($bob, $gone, null, false);
+        $this->records()->trash(SubjectType::Company, $gone, $this->reader()->record(SubjectType::Company, $gone)->version);
+        $companies = $this->service(CrmPersonalDataInterface::class)->export($bob)['companies'] ?? null;
+        self::assertIsArray($companies);
+        self::assertSame(['active', 'trashed'], array_column($companies, 'company_status'), 'a trashed company is listed with its status');
         $this->service(CrmPersonalDataInterface::class)->erase($bob);
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_role_assignment WHERE subject_id = ?', [$bob]));
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE contact_id = ?', [$bob]));
@@ -224,6 +232,15 @@ final class RolesAndPurposesTest extends CrmTestCase
         self::assertSame([[$acme, true, true, ['billing', 'orders']], [$beta, false, true, ['technical']]], array_map(static fn (AffiliationView $a): array => [$a->companyId, $a->primary, $a->primaryContact, $a->purposes], $view->affiliations));
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_role_assignment WHERE subject_id = ?', [$other]));
 
+        // A shared company that was the merged contact's primary one becomes the survivor's primary one (it had none).
+        $zed = $this->company('Zed');
+        $p1  = $this->contact('Pat', 'P');
+        $p2  = $this->contact('Pat', 'P');
+        $this->records()->affiliate($p1, $zed, null, false);
+        $this->records()->affiliate($p2, $zed, null, true);
+        $merges->merge(SubjectType::Contact, $p1, $p2, [], $this->reader()->record(SubjectType::Contact, $p1)->version, $this->reader()->record(SubjectType::Contact, $p2)->version);
+        self::assertSame([true], array_map(static fn (AffiliationView $a): bool => $a->primary, $this->reader()->record(SubjectType::Contact, $p1)->affiliations));
+
         // Companies: the survivor keeps its primary contact; the merged company's one becomes a plain contact.
         $gamma = $this->company('Gamma');
         $cyd   = $this->contact('Cyd', 'C');
@@ -254,10 +271,10 @@ final class RolesAndPurposesTest extends CrmTestCase
         $this->contact('Old', 'Primary', 'old@x.test');
         $this->records()->affiliate($this->reader()->list(new ListQuery(SubjectType::Contact, 'old@'))->rows[0]->id, $acme, null, true, true);
         $imports = $this->service(ImportServiceInterface::class);
-        $csv     = "Email,Last name,Company,Role,Purpose,Primary\nada@x.test,A,Acme,customer;supplier,billing,yes\nbob@x.test,B,Acme,customer,orders,no\ncyd@x.test,C,,Customer,,\ndee@x.test,D,Acme,,vendor,\neve@x.test,E,Acme,,,maybe\nold@x.test,Primary,Acme,partner,technical,\n";
+        $csv     = "Email,Last name,Company,Role,Purpose,Primary contact\nada@x.test,A,Acme,customer;supplier,billing,yes\nbob@x.test,B,Acme,customer,orders,no\ncyd@x.test,C,,Customer,,\ndee@x.test,D,Acme,,vendor,\neve@x.test,E,Acme,,,maybe\nold@x.test,Primary,Acme,partner,technical,\n";
         $id      = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'p.csv', $csv);
         $preview = $imports->preview($id);
-        self::assertEquals(['Email' => 'email', 'Last name' => 'last_name', 'Company' => 'company', 'Role' => 'roles', 'Purpose' => 'purposes', 'Primary' => 'primary_contact'], $preview->mapping);
+        self::assertEquals(['Email' => 'email', 'Last name' => 'last_name', 'Company' => 'company', 'Role' => 'roles', 'Purpose' => 'purposes', 'Primary contact' => 'primary_contact'], $preview->mapping);
         self::assertSame([[], [], ['roles' => 'error.role_unknown'], ['purposes' => 'error.purpose_unknown'], ['primary_contact' => 'error.invalid']], array_map(static fn (ImportRowView $r): array => $r->errors, array_slice($preview->rows, 0, 5)));
         $imports->confirm($id, $preview->mapping, DuplicatePolicy::Update, $preview->version);
         self::assertTrue($imports->run($id));
@@ -268,6 +285,24 @@ final class RolesAndPurposesTest extends CrmTestCase
         self::assertSame([[$ada->id, true, ['billing']]], array_values(array_map(static fn (AffiliationView $a): array => [$a->contactId, $a->primaryContact, $a->purposes], array_filter($company->affiliations, static fn (AffiliationView $a): bool => $a->primaryContact))));
         self::assertSame(['partner'], $this->reader()->list(new ListQuery(SubjectType::Contact, 'old@'))->rows[0]->roles, 'an import adds roles');
         self::assertSame(',technical,', $this->text("SELECT a.purpose_keys FROM nowo_crm_affiliation a JOIN nowo_crm_contact c ON c.id = a.contact_id WHERE c.email_key = 'old@x.test'"));
+        self::assertContains('RolesChanged', $this->recorder()->eventNames(), 'an import announces its role changes');
+        self::assertContains('crm.roles.changed', $this->recorder()->actions());
+
+        // Setting a company's primary contact needs edit on that company, in an import too: the row is refused.
+        $beta = $this->company('Beta');
+        $hal  = $this->contact('Hal', 'H', 'hal@x.test');
+        $this->records()->affiliate($hal, $beta, null, true, true);
+        $this->actAs('ivy', 'view', 'edit');
+        $this->ctx()->denied = ['edit:' . $beta];
+        $denied              = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'd.csv', "Email,Last name,Company,Primary contact\nfay@x.test,F,Beta,yes\ngus@x.test,G,Beta,no\nhal@x.test,H,Beta,no\n");
+        $imports->confirm($denied, $imports->preview($denied)->mapping, DuplicatePolicy::Update, $imports->preview($denied)->version);
+        self::assertTrue($imports->run($denied));
+        self::assertSame(['created' => 1, 'updated' => 0, 'duplicate' => 0, 'invalid' => 2, 'limit' => 0], $imports->preview($denied)->counts);
+        self::assertSame(['error.forbidden', null, 'error.forbidden'], array_map(static fn (ImportRowView $r): ?string => $r->message, $imports->preview($denied)->rows));
+        self::assertSame([$hal], $this->column('SELECT contact_id FROM nowo_crm_affiliation WHERE company_id = ? AND is_primary_contact = ?', [$beta, true]), 'unchanged');
+        $this->ctx()->denied = [];
+        $this->admin();
+
         // A company import with roles.
         $cid = $imports->upload(SubjectType::Company, ImportFormat::Csv, 'c.csv', "Name,Roles\nZeta,supplier\n");
         $imports->confirm($cid, ['Name' => 'name', 'Roles' => 'roles'], DuplicatePolicy::Skip, $imports->preview($cid)->version);
@@ -294,9 +329,14 @@ final class RolesAndPurposesTest extends CrmTestCase
         self::assertSame(['customer', 'partner'], $show->filter('[data-testid="crm-roles"] [data-role]')->each(static fn ($n): string => (string) $n->attr('data-role')));
         self::assertStringContainsString('Primary contact', $show->filter('[data-testid="crm-primary-contact"]')->text());
         self::assertStringContainsString('Billing', $show->filter('[data-testid="crm-affiliations"]')->text());
+        // The primary contact (ada, from the import) is cleared by its own action, another one is made primary.
+        $this->client->submit($show->filter('form[action$="/primary-contact/clear"]')->form());
+        self::assertSame(303, $this->client->getResponse()->getStatusCode());
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE company_id = ? AND is_primary_contact = ?', [$acme, true]));
+        $show = $this->client->request('GET', '/crm/companies/' . $acme);
         $this->client->submit($show->filter('form[action*="/primary-contact/"]')->first()->form());
         self::assertSame(303, $this->client->getResponse()->getStatusCode());
-        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE is_primary_contact = ?', [true]));
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE company_id = ? AND is_primary_contact = ?', [$acme, true]));
         $list = $this->client->request('GET', '/crm/companies?role=partner');
         self::assertStringContainsString('Partner', $list->filter('[data-testid="crm-list-company"]')->text());
         self::assertStringNotContainsString('Zeta', $list->filter('[data-testid="crm-list-company"]')->text());
@@ -304,20 +344,74 @@ final class RolesAndPurposesTest extends CrmTestCase
         self::assertStringContainsString('Zeta', $list->filter('[data-testid="crm-list-company"]')->text(), 'an unknown role is ignored');
         $this->client->request('GET', '/crm/contacts?purpose=billing&primary_contact=1');
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        // The contact page: a linked company has its own form, filled with the stored values; the add form omits it.
         $contact = $this->client->request('GET', '/crm/contacts/' . $ada->id);
-        $form    = $contact->filter('[data-testid="crm-affiliation-form"] form')->form(['crm_affiliation[company]' => $acme, 'crm_affiliation[primary_contact]' => '1']);
-        $box     = $form['crm_affiliation[purposes]'];
+        self::assertStringNotContainsString($acme, $contact->filter('[data-testid="crm-affiliation-form"]')->html(''));
+        $form = $contact->filter('[data-testid="crm-affiliation-edit"] form')->form();
+        self::assertSame($acme, $form->getValues()['crm_affiliation[company]'] ?? null);
+        self::assertSame('billing', $form->getValues()['crm_affiliation[purposes][0]'] ?? null, 'pre-filled');
+        $box = $form['crm_affiliation[purposes]'];
         self::assertIsArray($box);
         foreach ($box as $field) {
             self::assertInstanceOf(ChoiceFormField::class, $field);
-            if (($field->availableOptionValues()[0] ?? '') === 'orders') {
-                $field->tick();
-            }
+            ($field->availableOptionValues()[0] ?? '') === 'orders' ? $field->tick() : $field->untick();
         }
+        $primary = $form['crm_affiliation[primary_contact]'];
+        self::assertInstanceOf(ChoiceFormField::class, $primary);
+        $primary->tick();
         $this->client->submit($form);
         self::assertSame(303, $this->client->getResponse()->getStatusCode());
         self::assertSame(',orders,', $this->text('SELECT purpose_keys FROM nowo_crm_affiliation WHERE contact_id = ? AND company_id = ?', [$ada->id, $acme]));
-        self::assertSame([$ada->id], $this->column('SELECT contact_id FROM nowo_crm_affiliation WHERE is_primary_contact = ?', [true]));
+        self::assertSame([$ada->id], $this->column('SELECT contact_id FROM nowo_crm_affiliation WHERE company_id = ? AND is_primary_contact = ?', [$acme, true]));
+        // Sent again with the box unticked: the company keeps its primary contact (clearing is the company page's action).
+        $form    = $this->client->request('GET', '/crm/contacts/' . $ada->id)->filter('[data-testid="crm-affiliation-edit"] form')->form();
+        $primary = $form['crm_affiliation[primary_contact]'];
+        self::assertInstanceOf(ChoiceFormField::class, $primary);
+        $primary->untick();
+        $this->client->submit($form);
+        self::assertSame(303, $this->client->getResponse()->getStatusCode());
+        self::assertSame([$ada->id], $this->column('SELECT contact_id FROM nowo_crm_affiliation WHERE company_id = ? AND is_primary_contact = ?', [$acme, true]));
+    }
+
+    public function testHiddenPurposesStayAndVersionsMoveWithRoles(): void
+    {
+        $this->boot(['affiliations' => ['purposes' => ['billing', 'orders', 'legacy']]]);
+        $this->admin();
+        $acme = $this->company('Acme');
+        $ada  = $this->contact('Ada', 'A');
+        $this->records()->affiliate($ada, $acme, null, true, null, ['billing', 'legacy']);
+
+        // A role change moves the version: a form that still shows the old version is stale.
+        $before = $this->reader()->record(SubjectType::Company, $acme)->version;
+        $this->records()->setRoles(SubjectType::Company, $acme, ['customer']);
+        try {
+            $this->records()->update($acme, new RecordInput(SubjectType::Company, ['city' => 'Madrid']), $before);
+            self::fail('a lost update after a role change');
+        } catch (ConflictException $e) {
+            self::assertSame(ConflictException::STALE, $e->errorCode);
+        }
+
+        // The purpose "legacy" leaves the configuration: hidden, and kept by a later affiliation edit.
+        $this->kernel->shutdown();
+        $this->kernel = $this->bootKernel($this->host()->bundleConfig(['affiliations' => ['purposes' => ['billing', 'orders']]] + TestServices::PORTS + ['ui' => ['enabled' => true]]), $this->host()->configure());
+        $this->admin();
+        self::assertSame([['billing']], array_map(static fn (AffiliationView $a): array => $a->purposes, $this->reader()->record(SubjectType::Company, $acme)->affiliations));
+        $this->records()->affiliate($ada, $acme, null, true, null, ['orders']);
+        self::assertSame(',legacy,orders,', $this->text('SELECT purpose_keys FROM nowo_crm_affiliation WHERE contact_id = ?', [$ada]));
+        self::assertSame([['orders']], array_map(static fn (AffiliationView $a): array => $a->purposes, $this->reader()->record(SubjectType::Company, $acme)->affiliations));
+        $companies = $this->service(CrmPersonalDataInterface::class)->export($ada)['companies'] ?? null;
+        self::assertIsArray($companies);
+        self::assertSame([['legacy', 'orders']], array_column($companies, 'purposes'), 'the GDPR export shows every stored purpose');
+
+        // Keys that are not keys are refused by the query itself.
+        foreach ([static fn (): ListQuery => new ListQuery(SubjectType::Company, role: "customer\n"), static fn (): ListQuery => new ListQuery(SubjectType::Contact, purpose: 'Billing')] as $query) {
+            try {
+                $query();
+                self::fail('an invalid key was accepted');
+            } catch (InvalidInputException) {
+            }
+        }
     }
 
     private function reader(): CrmReaderInterface

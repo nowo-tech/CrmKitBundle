@@ -115,6 +115,7 @@ final class PermissionMatrixTest extends CrmTestCase
             '/crm/links/' . $link . '/remove'                             => 'edit',
             '/crm/affiliations/' . $aff . '/remove'                       => 'edit',
             '/crm/companies/' . $company . '/primary-contact/' . $contact => 'edit',
+            '/crm/companies/' . $company . '/primary-contact/clear'       => 'edit',
         ];
         $post = function (string $action) use ($token): int {
             $this->client->request('POST', $action, ['crm_action' => ['_token' => $token]]);

@@ -133,7 +133,8 @@ and MariaDB, so `diff` and `schema:update` keep it:
 | PostgreSQL, SQLite | the default (exact already) | No collation is declared |
 
 Minimum database versions (0.2.0): MySQL 8.0, MariaDB 10.6, PostgreSQL 9.5 (the purge claim is read with
-`FOR UPDATE SKIP LOCKED`); SQLite for development and tests.
+`FOR UPDATE SKIP LOCKED`; with Doctrine DBAL 4, PostgreSQL 10, its lowest platform); SQLite for development and
+tests.
 
 The collation is chosen from the platform when the metadata loads, so the platform must be known at cache warm-up: set
 `doctrine.dbal.server_version` (for example `8.4`, `11.4.2-MariaDB` or `16`), or keep the database reachable. The
@@ -260,7 +261,7 @@ CREATE TABLE nowo_crm_affiliation (
     is_primary TINYINT(1) NOT NULL,
     created_at DATETIME NOT NULL,
     is_primary_contact TINYINT(1) DEFAULT 0 NOT NULL,
-    purpose_keys VARCHAR(600) CHARACTER SET utf8mb4 DEFAULT '' NOT NULL COLLATE `utf8mb4_0900_bin`,
+    purpose_keys VARCHAR(1100) CHARACTER SET utf8mb4 DEFAULT '' NOT NULL COLLATE `utf8mb4_0900_bin`,
     UNIQUE INDEX nowo_crm_affiliation_pair (contact_id, company_id),
     INDEX nowo_crm_affiliation_company (tenant_id, company_id),
     PRIMARY KEY (id)
@@ -539,7 +540,7 @@ CREATE TABLE nowo_crm_affiliation (
     is_primary BOOLEAN NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
     is_primary_contact BOOLEAN DEFAULT false NOT NULL,
-    purpose_keys VARCHAR(600) DEFAULT '' NOT NULL,
+    purpose_keys VARCHAR(1100) DEFAULT '' NOT NULL,
     PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX nowo_crm_affiliation_pair ON nowo_crm_affiliation (contact_id, company_id);

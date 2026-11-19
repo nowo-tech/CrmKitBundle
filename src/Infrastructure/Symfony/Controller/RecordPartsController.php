@@ -189,7 +189,8 @@ final readonly class RecordPartsController
                 is_string($data['company'] ?? null) ? $data['company'] : '',
                 is_string($data['role'] ?? null) ? $data['role'] : null,
                 ($data['primary'] ?? false) === true,
-                ($data['primary_contact'] ?? false) === true,
+                // Unticked keeps the company's primary contact as it is: clearing it is an explicit action of the company page.
+                ($data['primary_contact'] ?? false) === true ? true : null,
                 is_array($data['purposes'] ?? null) ? array_values(array_filter($data['purposes'], is_string(...))) : null,
             );
             $this->ui->flash($request, 'success', 'affiliation.added');
@@ -199,17 +200,18 @@ final readonly class RecordPartsController
     }
 
     /**
-     * Makes a contact the company's primary contact (a POST with the action token).
+     * Makes a contact the company's primary contact, or clears it (`$contact` null: the `primary_contact_clear` route); a
+     * POST with the action token.
      */
     #[AsWriteUnit]
-    public function primaryContact(Request $request, string $id, string $contact): Response
+    public function primaryContact(Request $request, string $id, ?string $contact = null): Response
     {
         $back = $this->ui->toRecord(SubjectType::Company, $id);
 
         return $this->ui->act($request, function () use ($request, $id, $contact, $back): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->submitted($request, ActionType::class, 'crm_action');
             $this->records->setPrimaryContact($id, $contact); // @igor-ignore - a write through a stateless service; nothing is kept on the controller
-            $this->ui->flash($request, 'success', 'affiliation.primary_contact_set');
+            $this->ui->flash($request, 'success', $contact === null ? 'affiliation.primary_contact_cleared' : 'affiliation.primary_contact_set');
 
             return $back;
         }, $back);

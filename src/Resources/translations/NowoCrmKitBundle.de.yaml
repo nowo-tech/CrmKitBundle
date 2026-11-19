@@ -140,6 +140,10 @@ record:
     purged: Der Datensatz wurde gelöscht.
     erased: "Die personenbezogenen Daten des Kontakts wurden gelöscht."
 affiliation:
+    edit: 'Bearbeiten'
+    update: 'Speichern'
+    clear_primary_contact: 'Als Hauptansprechpartner entfernen'
+    primary_contact_cleared: 'Das Unternehmen hat jetzt keinen Hauptansprechpartner.'
     primary_contact: 'Hauptansprechpartner'
     make_primary_contact: 'Zum Hauptansprechpartner machen'
     primary_contact_set: 'Der Hauptansprechpartner wurde geändert.'
@@ -366,6 +370,7 @@ flash:
         crm_settings_stale: Jemand hat die Einstellungen gleichzeitig geändert. Prüfen Sie sie und speichern Sie erneut.
         crm_write_conflict: 'Eine andere Änderung derselben Daten kam im selben Moment an. Versuchen Sie es erneut.'
 error:
+    forbidden: 'Sie dürfen das nicht ändern.'
     role_unknown: 'Unbekannte Rolle.'
     purpose_unknown: 'Unbekannter Zweck.'
     not_affiliated: 'Dieser Kontakt ist nicht mit dem Unternehmen verknüpft.'

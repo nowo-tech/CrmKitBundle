@@ -202,7 +202,7 @@ final readonly class MergeService implements MergeServiceInterface
 
     /**
      * Moves the affiliations of the merged record: a pair the survivor already has is deleted after its purposes and
-     * its primary-contact flag went to the survivor's row; at most one primary company per contact and one primary
+     * its primary flags went to the survivor's row; at most one primary company per contact and one primary
      * contact per company stay (the survivor's win). The companies involved are locked by the caller.
      */
     private function moveAffiliations(CrmContext $context, SubjectType $type, string $fromId, string $toId): void
@@ -221,6 +221,11 @@ final readonly class MergeService implements MergeServiceInterface
             $kept        = $survivor[$counterpart] ?? null;
             if ($kept instanceof Affiliation) {
                 $kept->setPurposes([...$kept->getPurposes(), ...$affiliation->getPurposes()]);
+                // Contacts: the merged contact's primary company is this shared one and the survivor has none.
+                if ($type === SubjectType::Contact && $affiliation->isPrimary() && !$primary) {
+                    $kept->setPrimary(true);
+                    $primary = true;
+                }
                 // Contacts: the same company, whose primary contact was the merged one. Companies: the same person,
                 // primary contact of the merged company, when the survivor has none.
                 if ($affiliation->isPrimaryContact() && ($type === SubjectType::Contact || !$contact)) {

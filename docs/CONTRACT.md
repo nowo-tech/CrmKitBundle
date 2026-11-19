@@ -195,7 +195,7 @@ Invalid; Limit }` (**0.1.0**: no `Skipped`; a skipped duplicate is `Duplicate`),
 | `<p>crm_settings` | PK `tenant_id`; `trash_days` (7–365, 30), `timeline_years` (1–10, 5), `import_keep_days` (1–90, 30), `merge_keep_days` (1–365, 90), `version`, `updated_by_id`, `updated_at` | — | Upsert under version |
 | `<p>crm_company` | `tenant_id`, `name` (200), `name_key` (200, lowercase, duplicate hints), `legal_name` (200) NULL, `tax_id` (64) NULL, `tax_id_key` (64) NULL (uppercase, no spaces / dots / dashes), `website` (255) NULL, `domain_key` (190) NULL (host of the website, no `www.`), `email` (254) NULL, `phone` (40) NULL, `street` (255), `postal_code` (20), `city` (120), `region` (120), `country` (2) NULL, `industry` (80) NULL, `description` (text ≤ 5000) NULL, `owner_id` NULL, `custom` (json), `status`, `merged_into_id` NULL, `trashed_at` NULL, `version`, `created_at`, `created_by_id` NULL, `updated_at`, `updated_by_id` NULL | idx `(tenant_id, status, name_key)`, `(tenant_id, domain_key)`, `(tenant_id, tax_id_key)`, `(tenant_id, owner_id)` | Version on every edit |
 | `<p>crm_contact` | `tenant_id`, `first_name` (120), `last_name` (120), `display_name` (241), `sort_key` (241, lowercase "last first"), `email` (254) NULL, `email_key` (254) NULL, `phone` (40) NULL, `mobile` (40) NULL, `job_title` (120) NULL, `street`, `postal_code`, `city`, `region`, `country` NULL, `owner_id` NULL, `custom` (json), `status`, `merged_into_id` NULL, `trashed_at` NULL, `erased_at` NULL, `version`, `created_at`, `created_by_id`, `updated_at`, `updated_by_id` | **unique `(tenant_id, email_key)`** (NULLs allowed); idx `(tenant_id, status, sort_key)`, `(tenant_id, owner_id)` | Version; erasure blanks the personal columns |
-| `<p>crm_affiliation` | `tenant_id`, `contact_id`, `company_id`, `role` (120) NULL, `is_primary` (the contact's primary company), `created_at`, **(0.2.0)** `is_primary_contact` (the company's primary contact, default false), `purpose_keys` (600, default `''`: the purposes as `,billing,orders,`) | **unique `(contact_id, company_id)`**; idx `(tenant_id, company_id)` | Insert / delete; primary flag changed under the contact's version |
+| `<p>crm_affiliation` | `tenant_id`, `contact_id`, `company_id`, `role` (120) NULL, `is_primary` (the contact's primary company), `created_at`, **(0.2.0)** `is_primary_contact` (the company's primary contact, default false), `purpose_keys` (1100: 32 keys × 33 characters + 1, default `''`: the purposes as `,billing,orders,`) | **unique `(contact_id, company_id)`**; idx `(tenant_id, company_id)` | Insert / delete; primary flag changed under the contact's version |
 | `<p>crm_role_assignment` **(0.2.0)** | `tenant_id`, `subject_type`, `subject_id`, `role_key` (32), `created_at`, `created_by_id` NULL | **unique `(tenant_id, subject_id, role_key)`**; idx `(tenant_id, role_key, subject_type)` | Insert / delete under the record's lock (set semantics); a racing duplicate ⇒ one more run |
 | `<p>crm_tag` | `tenant_id`, `name` (60), `name_key` (60), `colour` (UiKit palette token), `version`, `created_at` | **unique `(tenant_id, name_key)`** | Version on rename |
 | `<p>crm_tagging` | `tenant_id`, `tag_id`, `subject_type`, `subject_id`, `created_at` | **unique `(tag_id, subject_type, subject_id)`**; idx `(tenant_id, subject_type, subject_id)` | Insert (duplicate = already tagged) / delete |
@@ -279,14 +279,16 @@ first, keyset-paged by `id` (UUIDv7, so time order; **0.1.0**); a company page i
   affiliation purposes.
 - **Affiliations.** At most one **primary company per contact** (`is_primary`, unchanged) and at most one **primary
   contact per company** (`is_primary_contact`), enforced under the company's row lock (lock order contact → company,
-  as `affiliate()`); one or more **purposes** from `affiliations.purposes` (built in: `billing`, `orders`,
+  as `affiliate()`; an unticked box in the affiliation form keeps it, clearing is the company page's own action);
+  one or more **purposes** from `affiliations.purposes` (built in: `billing`, `orders`,
   `technical`, `general`; same key rule, labels `purpose.<key>`), stored sorted and distinct in `purpose_keys` as
   `,billing,orders,` so a filter is one exact `LIKE` with escaped wildcards.
 - **Filters.** `ListQuery::$role` (companies and contacts), `ListQuery::$purpose` and `ListQuery::$primaryContactOnly`
   (contacts; one affiliation must match every affiliation filter, with `companyId` too); list pages filter by role,
   purpose and "primary contacts only"; an unknown key in the URL is ignored.
 - **Import.** Columns `roles` (keys separated by `,` or `;`, both types), and for contacts `purposes` and
-  `primary_contact` (yes / no: `1`, `true`, `yes`, `y`, `x` / empty, `0`, `false`, `no`, `n`) of the affiliation to
+  `primary_contact` (a row that changes the company's primary contact needs `edit` on that company, else it is
+  `invalid` with `error.forbidden`; yes / no: `1`, `true`, `yes`, `y`, `x` / empty, `0`, `false`, `no`, `n`) of the affiliation to
   the named company. Keys are compared exactly (never case folded); an unknown key makes the row `invalid`
   (`error.role_unknown`, `error.purpose_unknown`). An import only adds roles and purposes, never removes them.
 - **Export.** The CSV of a list has a `roles` column (configured keys, the format the import reads back).
@@ -498,7 +500,7 @@ the import prefix **and** `ui.path`.
 | `/companies/{id}/merge` (pick; `?other=<id>` preview and confirm) | GET, POST | edit |
 | `/contacts…` | the same set | the same |
 | `/contacts/{id}/affiliations`, `/affiliations/{id}/remove` | POST | edit |
-| `/companies/{id}/primary-contact/{contact}` **(0.2.0)** (action token) | POST | edit on the company |
+| `/companies/{id}/primary-contact/{contact}`, `/companies/{id}/primary-contact/clear` **(0.2.0)** (action token) | POST | edit on the company |
 | `/contacts/{id}/consent` | POST | edit |
 | `/contacts/{id}/vcard` | GET | view |
 | `/contacts/{id}/gdpr-export`, `/contacts/{id}/erase` | POST (both with the action token) | manage |
@@ -511,7 +513,7 @@ the import prefix **and** `ui.path`.
 | `/{companies\|contacts}/export.csv` **(0.1.0)** | GET | manage |
 | `/admin/settings` **(0.1.0)** | GET, POST | manage |
 
-### 11.2 Public JSON API (versioned, off by default, Q-O6; **not in 0.2.0**: its release is open, Q-O16)
+### 11.2 Public JSON API (versioned, off by default, Q-O6; **0.3.0**, decided by the owner on 2026-11-19, Q-O16)
 
 `<api.prefix>/crm/v1/{companies,contacts}` (list with filters and keyset cursor, get, create, update, trash),
 `/companies/{id}/contacts`, `/contacts/{id}/consents`, `/links`, `/tags`. Auth: the host's firewall (ApiToken bundle in
@@ -850,7 +852,7 @@ logo data URI, tokens), per call.
 | Q-O3 | A contact's e-mail is **unique per tenant** (case-insensitive key); duplicates are merged, not stored twice? | **Yes** (imports and campaigns need one person per address) | Duplicates allowed, merge only by hint |
 | Q-O4 | Deleting is **trash first** (restore for `trash_days`, default 30, then purged), purge from the trash needs `manage`? | **Yes** | Immediate hard delete |
 | Q-O5 | Bulk CSV export of lists needs `manage` (it exports personal data in bulk); one contact's vCard needs `view`? | **Yes** | `view` for everything |
-| Q-O6 | Phase A ships the UI and the PHP services; the public JSON API `/api/crm/v1` arrives in a later release (first planned for 0.2.0; moved by the phase plan of 2026-11-19, Q-O16), off by default, with `If-Match` versions and `Idempotency-Key`? | **Yes** | API in 0.1.0 |
+| Q-O6 | Phase A ships the UI and the PHP services; the public JSON API `/api/crm/v1` arrives later, off by default, with `If-Match` versions and `Idempotency-Key`? | **Yes; decided for 0.3.0 (owner, 2026-11-19, Q-O16)** | API in 0.1.0 |
 | Q-O7 | Plan limits are enforced by atomic counters per tenant and resource (companies, contacts; deals in B); the default is unlimited? | **Yes** | Count queries (racy) |
 | Q-O8 | GDPR erasure keeps the consent history **without evidence text** as proof (art. 7.1), deletes notes / timeline / links of the contact; an inactive-contact review is a phase G report, not an automatic deletion? | **Yes** | Delete consents too; automatic deletion of inactive contacts |
 | Q-O9 | Attachments wait until StorageKit stores non-image files (its roadmap), through a port with a StorageKit bridge in phase B? | **Yes** | A file store of the CRM's own now |
@@ -860,9 +862,9 @@ logo data URI, tokens), per call.
 | Q-O13 | Releases: 0.1.0 = phase A after `bundle-req-audit` of the scaffold and a SEC-004 audit (permissions, GDPR erasure, merge = data loss paths are audited immediately, batch rule 2026-11-07)? | **Yes** | One audit at 1.0.0 |
 | Q-O14 | Invoices (D) keep their own numbering per series in the CRM (VerifactuBundle has none) and the CRM models payment status (SepaPaymentBundle has none)? | **Yes** | Numbering in SerialNumberBundle |
 | Q-O15 | Campaigns (E) are built in the CRM (segments, suppression, unsubscribe, consent) on top of MailKit's sending and tracking, not in MailKit? | **Yes** (MailKit stays a transport / log / tracking layer) | Add campaigns to MailKit |
-| Q-O16 **(0.2.0)** | The public JSON API (Q-O6) was planned for 0.2.0; the phase plan of 2026-11-19 does not name it. Ship it with phase B (0.3.0), where the deal endpoints need it, with role / purpose filters from the start? | **Yes, with 0.3.0** | Its own release, or before 0.3.0 |
-| Q-O17 **(0.2.0)** | A role removed from `roles.catalogue` (and a removed purpose): its rows are kept and **hidden** everywhere except the GDPR export, and come back when the key is configured again? | **Yes** (built so) | Show them as "unknown role" / delete them with a command |
-| Q-O18 **(0.2.0)** | Roles apply to every contact, not only to contacts without a company (a person can be a private customer and a company's contact at once)? | **Yes** (built so) | Only standalone contacts |
+| Q-O16 **(0.2.0)** | The public JSON API (Q-O6) was planned for 0.2.0; the phase plan of 2026-11-19 does not name it. Ship it with phase B (0.3.0)? | **Decided (owner, 2026-11-19): 0.3.0** | — |
+| Q-O17 **(0.2.0)** | A role or purpose removed from the configuration: its rows are kept and **hidden** everywhere except the GDPR export, and come back when the key is configured again (edits of the configured keys never drop them)? | **Decided (owner, 2026-11-19): hidden but kept** | — |
+| Q-O18 **(0.2.0)** | Roles apply to every contact, not only to contacts without a company? | **Decided (owner, 2026-11-19): any contact** | — |
 
 ## 23. Questions for Beacon (Q-B) — confirmed by Beacon 2026-11-19 (B1–B15)
 
@@ -907,7 +909,7 @@ differs is applied in the next commit and noted here with the date._
   POST with the action token; host links confirmed by their resolver; upload size checked before reading; the owner
   check skipped when unchanged; field archive with the shown version; "Continue" attributed to the clicking person.
 - Open items for later releases: the Messenger import handler, the link picker
-  (`CrmHostObjectResolverInterface::search()`), the public JSON API (Q-O6; its release is open, Q-O16).
+  (`CrmHostObjectResolverInterface::search()`), the public JSON API (Q-O6: 0.3.0, decided 2026-11-19).
 
 ### Status 2026-11-19 (0.2.0)
 
@@ -917,7 +919,16 @@ differs is applied in the next commit and noted here with the date._
   and the UD-2 follow-ups (UD2-L-1: an import chunk locks its parents in id order before any row; UD2-L-2: the
   replay note in §15 and INSTALLATION; UD2-L-3: a second purge answers "Another purge is running" at once). The
   later releases follow §25.
-- Open: Q-O16 (JSON API release), Q-O17 and Q-O18 (built as recommended).
+- Owner decisions (2026-11-19, after audit UL): MySQL 8.0 / MariaDB 10.6 minimums and the CSV `roles` column
+  accepted; roles and purposes removed from the configuration are hidden but kept (Q-O17); the JSON API ships in
+  0.3.0 (Q-O16); roles apply to any contact (Q-O18).
+- Audit UL fixes (2026-11-19): an affiliation edit keeps the stored purposes that are no longer configured; an
+  unticked "primary contact" keeps the company's primary contact (clearing is the company page's own action, and a
+  linked company has a pre-filled form); `purpose_keys` is 1100 characters; an import row that changes a company's
+  primary contact needs `edit` on that company (else `invalid`, `error.forbidden`); every write of a record moves its
+  version (a write in the same second moves the edit time one second on); imports announce and audit role changes;
+  the GDPR export lists affiliations to trashed companies with their status; `ListQuery` refuses invalid role and
+  purpose keys; a contact merge moves the primary-company flag of a shared company.
 
 ## Q-B answers from Beacon (2026-11-19): B1–B15 confirmed as implemented
 - B9: Beacon resolves the organisation from the header context (D-20261118-01). It answers 404 in Personal or when the feature is off.

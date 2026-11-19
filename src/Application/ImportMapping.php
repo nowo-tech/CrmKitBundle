@@ -61,7 +61,6 @@ final class ImportMapping
         'role'         => 'roles',
         'party_roles'  => 'roles',
         'purpose'      => 'purposes',
-        'primary'      => 'primary_contact',
     ];
 
     /** Cells read as "yes" in a `primary_contact` column (trimmed, lowercase). */

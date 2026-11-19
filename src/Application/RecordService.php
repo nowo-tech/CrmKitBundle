@@ -30,6 +30,7 @@ use Nowo\CrmKitBundle\Domain\Value\ActorProfile;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 
+use function array_diff;
 use function array_filter;
 use function array_map;
 use function array_merge;
@@ -343,7 +344,8 @@ final readonly class RecordService implements RecordServiceInterface
             $store->add($existing); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
         if ($purposes !== null) {
-            $existing->setPurposes($purposes);
+            // Purposes no longer configured are hidden, never dropped: only the configured ones are replaced.
+            $existing->setPurposes([...array_diff($existing->getPurposes(), $this->catalogue->purposes()), ...$purposes]);
         }
         $primaryChanged = false;
         if ($primaryContact !== null && $primaryContact !== $existing->isPrimaryContact()) {

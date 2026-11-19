@@ -3,12 +3,21 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.2.1](#to-021)
 - [To 0.2.0](#to-020)
 - [To 0.2.0](#to-020-1)
 - [To 0.1.0](#to-010)
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.2.1
+
+From **0.2.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 **0.2.1 (additive, nothing to change).** `CrmBatchLookupInterface` is a new public service for backend jobs: it
 checks no permission and no record visibility, so call it only from trusted server-side code with a tenant your job

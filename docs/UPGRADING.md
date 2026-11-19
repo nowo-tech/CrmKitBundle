@@ -4,10 +4,19 @@
 
 - [Unreleased](#unreleased)
 - [To 0.2.0](#to-020)
+- [To 0.2.0](#to-020-1)
 - [To 0.1.0](#to-010)
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.2.0
+
+From **0.1.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 ## To 0.2.0
 

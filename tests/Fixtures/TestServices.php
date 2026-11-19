@@ -63,6 +63,11 @@ final class TestServices
             $recorder->tag('kernel.event_listener', ['event' => $event, 'method' => 'onEvent']);
         }
         $s->set('test.actor_resolver', TestActorResolver::class)->public();
+        $s->set('test.api_state', TestApiState::class)->public();
+        $s->set('test.api_authenticator', TestApiAuthenticator::class)->args([service('test.api_state')])->public();
+        $s->set('test.areas', TestAreas::class)->args([service('test.context')])->public()
+            ->tag('kernel.event_listener', ['event' => 'nowo_crm_kit.record_access_check', 'method' => 'onRecord'])
+            ->tag('kernel.event_listener', ['event' => 'nowo_crm_kit.record_visibility', 'method' => 'onVisibility']);
         $s->set('test.task_port', TestTaskPort::class)->public();
         $s->set('test.queries', QueryLog::class)->public();
         $s->set('test.query_counter', QueryCounter::class)->args([service('test.queries')])->tag('doctrine.middleware');

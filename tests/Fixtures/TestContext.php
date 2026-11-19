@@ -55,6 +55,9 @@ final class TestContext
      */
     public array $denied = [];
 
+    /** @var list<string> channel|token of the record events seen (API tests) */
+    public array $seenChannels = [];
+
     /** A panel provider throws. */
     public bool $panelFails = false;
 

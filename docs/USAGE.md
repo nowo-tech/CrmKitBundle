@@ -710,6 +710,17 @@ template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the bra
 
 No Messenger handler ships in 0.1.0: imports always run in requests and in the resume command.
 
+## The API (0.3.0)
+
+The `Api\Operation` services and the `/crm/v1` JSON API are off by default. [API.md](API.md) covers:
+
+- the principal, the grant and the order of checks;
+- every operation and the duplicate check of creates;
+- idempotency keys, base versions and the audit with the token name;
+- sealed keyset cursors, untrusted text and the error codes;
+- what is never exposed;
+- the setup for a plain Symfony host and for an MCP host.
+
 ## SearchKit
 
 With `nowo-tech/search-kit-bundle` **^1.9** installed (it needs PHP >= 8.3), `ui.enabled` and `search.enabled`

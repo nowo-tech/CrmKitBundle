@@ -34,6 +34,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   its deals and deletes the rest. Merges point deals and funnel rows at the survivor; a purged record's deals are
   unlinked. `nowo:crm-kit:counters:rebuild` and `nowo:crm-kit:purge` know deals.
 
+### Added (0.3.0: the API)
+
+- **`Api\Operation` layer** (`api.enabled`, off by default): the operations an in-process caller (an MCP host's
+  `crm_*` tools) and the JSON API share. It covers search, company / contact get, timeline, notes, consents
+  (read-only), tags, links, affiliations, identity, creates with the duplicate check first, updates with a required
+  base version, trash, affiliation set / remove, note add, tag add / remove, next actions, deals (search, get, create,
+  update, stage move, trash) and funnels with statistics. `CrmApiPrincipal` carries the security user, the CRM actor, a
+  grant (`view` / `edit` / `manage` + amounts, consents and destructive ticks), the reach (tenants) and the token. The
+  checks run in a fixed order: out of reach 404 `ACCESS_001`, then the grant 403 `TOKEN_001`, then the person 403
+  `ACCESS_002`. Codes are `ABC_123`-shaped, and read models keep untrusted text under `text`. See
+  [API.md](API.md).
+- **Idempotency**: every write needs an `Idempotency-Key`. The claim is the first statement of the write unit and the
+  outcome its last (table `crm_api_idempotency`, ids only, 24 h by default), so a concurrent duplicate waits and
+  replays. A key reused with another input is 409 `IDEMP_002`. `nowo:crm-kit:api:purge-idempotency` and the daily
+  purge delete expired keys.
+- **Sealed keyset cursors** (`ext-sodium`, key derived from `kernel.secret`) on every API list. There is no offset and
+  no total, and a cursor of another query is 400 `INPUT_003`.
+- **Audit with the token**: `AuditEntry::$origin` (`AuditOrigin`: channel, token id, token name). API writes add `via` and
+  `token` to their timeline entries, and the 360° page shows "via agent ‹token›" (7 locales).
+- **`/crm/v1` JSON API** (`api.http.enabled`, off by default; route type `nowo_crm_kit_api` under `api.http.prefix`;
+  parameters `nowo_crm_kit.api_prefix` and `nowo_crm_kit.api_path`). It has host hooks `CrmApiAuthenticatorInterface`
+  and `CrmApiTenantResolverInterface`, sends `ETag`, `X-Error-Code` and `Idempotency-Replayed`, and answers lock
+  conflicts per REQ-RUNTIME-003 rule 6. The OpenAPI 3.1 document is `docs/openapi/crm-v1.yaml`.
+- **Shipped contract**: `tests/Contract/crm-api-v1.json` (the operation catalogue) and `tests/Support/CrmApiConformance`
+  (the grant matrix a host can run against its own kernel).
+- `RecordAccessCheckEvent` and `RecordVisibilityEvent` gain `getChannel()` and `getTokenId()`.
+  `ScopedRecordVisibility::visibleOwnersFor()`, `CrmResourceAccessChecker::decide()`, `CrmAccess::bind()` and
+  `as($caller)` on the Application services run a call as a given caller. New keyset indexes on companies, contacts and
+  notes.
+
+### Removed (0.3.0)
+
+- The root configuration key `access_checker` (a 0.1.0 `CrmAccessCheckerInterface`, deprecated since 0.2.0),
+  `LegacyCrmAccessChecker` and `CrmPermission::legacy()`.
+
 ### Changed (0.3.0: header search)
 
 - **SearchKit groups on SearchKit's provider base (SearchKit ^1.9, PHP >= 8.3)**: `crm_companies` and `crm_contacts`

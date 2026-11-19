@@ -39,6 +39,38 @@ same keys. No column of an earlier table changes and no backfill is needed; the 
 on the first deal.
 
 
+**The API (0.3.0, `api.enabled`, `api.http.enabled`).** Nothing changes while both stay off. No table is mapped and
+no route is added.
+
+- **Removed**: the root key `access_checker` (deprecated since 0.2.0) and `LegacyCrmAccessChecker`. Move a 0.1.0 checker
+  to `security.access_checker` (a `CrmKitAccessCheckerInterface`), and move record rules to
+  `nowo_crm_kit.record_access_check` listeners. `CrmPermission::legacy()` is removed too.
+- **`ext-sodium`** is needed for the API's sealed cursors. It ships with PHP and is on by default.
+- **Turn the API on.** Set `api.enabled: true` and create the idempotency table and the keyset indexes:
+
+```sql
+-- MySQL 8.4 / MariaDB 11.4 (MariaDB: utf8mb4_nopad_bin); <p> = nowo_
+CREATE TABLE nowo_crm_api_idempotency (scope_hash VARCHAR(64) NOT NULL, key_hash VARCHAR(64) NOT NULL, tenant_id VARCHAR(128) NOT NULL, operation VARCHAR(48) NOT NULL, fingerprint VARCHAR(64) NOT NULL, outcome SMALLINT DEFAULT NULL, result_ids JSON DEFAULT NULL, created_at DATETIME(6) NOT NULL, expires_at DATETIME NOT NULL, INDEX nowo_crm_api_idem_expires (expires_at), PRIMARY KEY (scope_hash, key_hash));
+CREATE INDEX nowo_crm_company_keyset_name    ON nowo_crm_company (tenant_id, status, name_key, id);
+CREATE INDEX nowo_crm_company_keyset_updated ON nowo_crm_company (tenant_id, status, updated_at, id);
+CREATE INDEX nowo_crm_contact_keyset_name    ON nowo_crm_contact (tenant_id, status, sort_key, id);
+CREATE INDEX nowo_crm_contact_keyset_updated ON nowo_crm_contact (tenant_id, status, updated_at, id);
+CREATE INDEX nowo_crm_note_keyset            ON nowo_crm_note (tenant_id, subject_type, subject_id, pinned, id);
+```
+
+  The hash, operation and id columns use the binary collation (the metadata listener sets it, and
+  `doctrine:migrations:diff --em=nowo_crm_kit` produces the same DDL). PostgreSQL 16 uses `JSON` and
+  `TIMESTAMP(6) WITHOUT TIME ZONE` / `TIMESTAMP(0) WITHOUT TIME ZONE`. SQLite uses `CLOB` / `DATETIME`. The five
+  indexes are created on every install: they also serve the pages.
+- **JSON API.** Set `api.http.enabled: true`, import the routes (`resource: .`, `type: nowo_crm_kit_api`) and protect
+  `^%nowo_crm_kit.api_path%/` with a firewall. Without `api.http.authenticator`, the firewall's user is the principal,
+  with `api.http.default_grant` (view only by default).
+- **Listeners**: `RecordAccessCheckEvent` / `RecordVisibilityEvent` gain `getChannel()` (`web`, `api`, `mcp`) and
+  `getTokenId()`. A deny for agents only looks like `if ($event->getChannel() !== 'web') { $event->deny(); }`.
+- **`AuditEntry`** gains `?AuditOrigin $origin` (the last constructor argument). A host sink that copies fields keeps
+  working; one that wants the token reads `$entry->origin`.
+- **`CrmCallerInterface`** is new and internal. A host never implements it: the bundle builds the callers.
+
 **Header search (0.3.0).** The SearchKit groups need **SearchKit ^1.9** (`composer require nowo-tech/search-kit-bundle:^1.9`,
 PHP >= 8.3); with an older SearchKit they are not registered. Their keys stay `crm_companies` and `crm_contacts`, plus
 `crm_deals` with `pipeline.enabled`; `nowo_search_kit.groups.<key>` switches one off. The services

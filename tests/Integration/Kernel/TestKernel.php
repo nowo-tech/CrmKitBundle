@@ -119,6 +119,7 @@ final class TestKernel extends Kernel
     protected function configureRoutes(RoutingConfigurator $routes): void
     {
         $routes->import('.', 'nowo_crm_kit_ui');
+        $routes->import('.', 'nowo_crm_kit_api');
     }
 
     public static function baseDir(): string

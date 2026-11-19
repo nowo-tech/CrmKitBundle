@@ -55,4 +55,14 @@ final readonly class TestCaller implements CrmCallerInterface
     {
         return null;
     }
+
+    public function beginUnit(): void
+    {
+        $this->inner->beginUnit();
+    }
+
+    public function endUnit(mixed $result): void
+    {
+        $this->inner->endUnit($result);
+    }
 }

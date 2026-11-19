@@ -9,6 +9,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Batch lookups for host jobs**: `CrmBatchLookupInterface` (public alias), a system API for the host's
+  backend jobs, tenant-scoped and without access checks: `contactsByEmails()`, `companiesByDomains()`,
+  `subjectsLinkedToMany()` (`<type>:<id>` keys), `affiliationsOf()` (primary first), `rolesAndTagsOf()` (read model
+  `RolesAndTags`) and `existing()` (the given records whose row still exists, any status: reconciliation sweeps). One
+  read query per call (per chunk of 500 inputs), every usable input answered, active records only.
+  Key helpers `EmailAddress::lookupKey()`, `CompanyDomain::key()` / `fromWebsite()` (the stored domain key now comes
+  from it), `HostObjectRef::key()`, `SubjectRef::key()`; persistence port `CrmBatchLookupStoreInterface` with
+  `DoctrineCrmBatchLookupStore` (plain SQL, no entity hydrated).
+- **`RecordsPurged`**: the scheduled retention purge announces every committed batch of deleted records
+  (trashed records and merge tombstones, at most 200 of one type) after its commit, with the tenant and the records'
+  type + id only (`CrmKitEvents::RECORDS_PURGED`); a rolled-back batch announces nothing. A manual `purge()` keeps
+  dispatching `RecordPurged` per record.
+- `CrmKitEvents` constants for the domain events dispatched after the commit (`CONTACT_ERASED`, `RECORDS_MERGED`,
+  `HOST_LINK_REMOVED`, `RECORD_PURGED`, … : their class names), and the host's view of link, merge, erasure and purge
+  changes in USAGE "Events".
+
+## [0.2.0] - 2026-11-19
+
+### Added
+
 - **Party roles**: a company or a contact holds any number of roles from `roles.catalogue` (built in: `customer`,
   `supplier`, `partner`; `distributor` translated and opt-in), stored in the new table `crm_role_assignment` (unique
   per tenant, record and role; binary NO PAD key). Roles are edited in the record form, through
@@ -49,21 +69,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   SQL (port `CrmRecordVisibilityInterface`, default `ScopedRecordVisibility`); the same set is the default of a
   decision on one record. Whoever may manage the settings (the area checker's `canManageSettings`, the host's when
   configured) sees everything.
-- **Batch lookups for host jobs (0.2.1)**: `CrmBatchLookupInterface` (public alias), a system API for the host's
-  backend jobs, tenant-scoped and without access checks: `contactsByEmails()`, `companiesByDomains()`,
-  `subjectsLinkedToMany()` (`<type>:<id>` keys), `affiliationsOf()` (primary first), `rolesAndTagsOf()` (read model
-  `RolesAndTags`) and `existing()` (the given records whose row still exists, any status: reconciliation sweeps). One read query per call (per chunk of 500 inputs), every usable input answered, active records only.
-  Key helpers `EmailAddress::lookupKey()`, `CompanyDomain::key()` / `fromWebsite()` (the stored domain key now comes
-  from it), `HostObjectRef::key()`, `SubjectRef::key()`; persistence port `CrmBatchLookupStoreInterface` with
-  `DoctrineCrmBatchLookupStore` (plain SQL, no entity hydrated).
-- **`RecordsPurged`** (0.2.1): the scheduled retention purge announces every committed batch of deleted records
-  (trashed records and merge tombstones, at most 200 of one type) after its commit, with the tenant and the records'
-  type + id only (`CrmKitEvents::RECORDS_PURGED`); a rolled-back batch announces nothing. A manual `purge()` keeps
-  dispatching `RecordPurged` per record.
-- `CrmKitEvents` constants for the domain events dispatched after the commit (`CONTACT_ERASED`, `RECORDS_MERGED`,
-  `HOST_LINK_REMOVED`, `RECORD_PURGED`, … : their class names), and the host's view of link, merge, erasure and purge
-  changes in USAGE "Events".
-
 ### Changed
 
 - **Breaking (configuration):** `access.roles` is replaced by `security.*_roles` (defaults `[ROLE_ADMIN]`); the root
@@ -117,6 +122,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Removing the affiliation of a company's primary contact needs `edit` on the company, locks it and records the
   `primary_contact` timeline entry.
 - The scoping bypass asks the area checker (`canManageSettings`), so a host checker decides it too.
+
+### Fixed (audit UP-2, before the release)
+
+- `nowo:crm-kit:import:resume` (nobody signed in) settled every row needing a decision on one record as
+  `error.forbidden`: it now stops before such a row (an update of an existing contact, a named company) and leaves it
+  pending for a person's "Continue".
+- A taken e-mail (form error, import preview) names the other contact only to someone who may see it.
+- An import resolves a named company among the companies the importer may see (an invisible one is unknown), once,
+  and links exactly the company it checked.
+- More than 1 000 visible owners is refused with a clear `LogicException` (one SQL parameter each).
+- Docs: `RECORD_VISIBILITY` runs per access check; lists follow it, single records `RECORD_ACCESS_CHECK`; the
+  microsecond `ALTER`s are run by hand on DBAL 4; the GDPR export lists every affiliated company.
 
 ### Security
 

@@ -174,6 +174,11 @@ final readonly class TeamVisibility
 }
 ```
 
+Lists follow only `RECORD_VISIBILITY` (owner-based); `RECORD_ACCESS_CHECK` decides single-record pages and writes. To
+hide a record from lists, give it an owner the person does not see. A visibility above 1 000 owners is refused: use
+`allowAll()` and record checks instead. The GDPR export of a contact lists every company it is affiliated to (also
+companies the person exporting may not see), since it is the person's own data.
+
 **In your own controllers**, `Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard` answers the same
 questions: `requireGranted(CrmPermission, ?SubjectRef)` (404 when the CRM is not available, 403 when refused),
 `isGranted()` and `grants()` (every permission's decision, for menus).
@@ -632,7 +637,8 @@ template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the bra
    row creates a company.
 4. **Run**: the confirm request runs `import.sync_rows` rows in chunks of `import.chunk_rows`; a larger import shows
    "Continue" (`do=run`, the same amount again). A worker that stopped leaves the import `running`;
-   `nowo:crm-kit:import:resume` takes over claims older than `import.stale_claim_seconds`. Rows end as `created`,
+   `nowo:crm-kit:import:resume` takes over claims older than `import.stale_claim_seconds`; with nobody signed in it
+   stops before a row that updates an existing contact or names a company, which waits for a person's "Continue". Rows end as `created`,
    `updated`, `duplicate`, `invalid` (with the first error key) or `limit` (plan limit reached). Each chunk first
    locks the existing contacts and the named companies of all its rows (contacts, then companies, each in id order),
    then settles the rows ([CONCURRENCY.md](CONCURRENCY.md#import)).

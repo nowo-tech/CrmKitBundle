@@ -433,7 +433,8 @@ final readonly class RecordService implements RecordServiceInterface
             } catch (DuplicateRowException $e) {
                 $other = $email === '' ? null : $this->support->read(fn (): ?CrmRecord => $this->support->store->contactByEmailKey($context->tenant, $email));
                 if ($other instanceof CrmRecord && $other->getId() !== $id) {
-                    throw InvalidInputException::field('email', 'error.email_taken', ['%id%' => $other->getId()]);
+                    // The other contact is named only to someone who may see it (audit UP2-2).
+                    throw $this->support->access->can(CrmPermission::View, SubjectRef::of(SubjectType::Contact, $other->getId(), $other->getOwnerId())) ? InvalidInputException::field('email', 'error.email_taken', ['%id%' => $other->getId()]) : InvalidInputException::field('email', 'error.email_taken');
                 }
                 if ($attempt === 2) {
                     throw new ConflictException(ConflictException::WRITE_CONFLICT, null, $e);

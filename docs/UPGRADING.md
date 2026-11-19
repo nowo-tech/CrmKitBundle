@@ -4,6 +4,7 @@
 
 - [Unreleased](#unreleased)
 - [To 0.2.0](#to-020)
+- [To 0.2.0](#to-020-1)
 - [To 0.1.0](#to-010)
 - [Policy for later releases](#policy-for-later-releases)
 
@@ -14,6 +15,14 @@ checks no permission and no record visibility, so call it only from trusted serv
 already trusts (USAGE "Batch lookups for host jobs"). `CrmKitEvents` gains constants equal to the domain event class
 names; listeners registered by class name keep working. The retention purge now also dispatches `RecordsPurged` per
 committed batch (no listener: nothing changes); `CrmBatchLookupInterface::existing()` is new. No schema change.
+
+## To 0.2.0
+
+From **0.1.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 ## To 0.2.0
 
@@ -77,7 +86,10 @@ ALTER TABLE nowo_crm_note ALTER COLUMN updated_at TYPE TIMESTAMP(6) WITHOUT TIME
 ALTER TABLE nowo_crm_settings ALTER COLUMN updated_at TYPE TIMESTAMP(6) WITHOUT TIME ZONE;
 ```
 
-`doctrine:migrations:diff` produces them too (the metadata listener declares the column). On MySQL / MariaDB the
+Run these by hand or put them in a migration: on DBAL 4 `doctrine:migrations:diff` does **not** produce them (the
+schema comparator ignores the column definition the metadata listener declares, so the existing whole-second column
+looks unchanged); on DBAL 3 the diff emits them once. A fresh schema (`doctrine:schema:create`, a first migration)
+gets the microsecond columns directly. On MySQL / MariaDB the
 `MODIFY` copies the table and PostgreSQL may rewrite it: run it in a maintenance window on large tables.
 
 Contract section 17 allows only nullable columns or indexes on an earlier table; the two new columns are `NOT NULL`
@@ -150,7 +162,13 @@ is "for version 10.0 and above"; MySQL from 5.7.9, MariaDB from 10.4.3), so with
   its `purposes` replace only the configured purposes (stored ones no longer configured are kept).
 - `ListQuery` refuses a `role` or `purpose` that is not a valid key (`InvalidInputException`).
 - An import with the `update` policy needs `edit` on each existing contact it updates (and `view` on a company it
-  names): a row the importer may not change ends `invalid` (`error.forbidden`).
+  names; a company the importer may not see under resource scoping counts as unknown): a row the importer may not
+  change ends `invalid` (`error.forbidden`).
+- `nowo:crm-kit:import:resume` runs with nobody signed in: it settles the rows that need no decision on one record and
+  stops before the first row that updates an existing contact or names a company, leaving it pending for the next
+  person's "Continue" on the import page.
+- More than 1 000 visible owners from `nowo_crm_kit.record_visibility` listeners is refused (`LogicException`): use
+  `allowAll()` for such a person and decide single records with `nowo_crm_kit.record_access_check`.
 - A merge needs `delete` on the merged record too.
 - A second `nowo:crm-kit:purge` started while a batch of the first holds the claim row prints "Another purge is
   running" at once instead of failing with a lock conflict.

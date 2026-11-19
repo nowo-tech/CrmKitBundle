@@ -172,6 +172,9 @@ warm-up). See [INSTALLATION.md](INSTALLATION.md#schema-and-migrations).
 - `import.max_rows` / `import.max_bytes`: limits of one file; a larger file is refused at upload with a form error.
 - `import.sync_rows` / `import.chunk_rows`: the confirm request runs `max(1, sync_rows / chunk_rows)` chunks; a larger
   import shows "Continue", which runs the same number again. Each chunk is one transaction.
+- `nowo:crm-kit:import:resume` runs with nobody signed in, so it settles only rows that need no decision on one record
+  and stops before the first update of an existing contact or the first named company; those wait for a person's
+  "Continue" (their own access decides).
 - `import.stale_claim_seconds`: when a running import has made no progress for this long, `nowo:crm-kit:import:resume`
   (run it every few minutes) takes it over, and anyone with `edit` may cancel it from its page.
 - `gdpr.purposes`: the consent purposes the UI offers and the service accepts.

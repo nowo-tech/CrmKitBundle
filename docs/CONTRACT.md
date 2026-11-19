@@ -182,7 +182,8 @@ Invalid; Limit }` (**0.1.0**: no `Skipped`; a skipped duplicate is `Duplicate`),
   needs the platform at metadata load (`doctrine.dbal.server_version`). Every read, export, erasure or
   bulk write keyed by such a value re-checks `===` in PHP (REQ-SEC-006 rule 2).
 - Instants: `datetime_immutable` UTC (second precision); **(0.2.0)** the `updated_at` of companies, contacts, notes and
-  settings to the microsecond (`DATETIME(6)` / `TIMESTAMP(6)`), so every write moves the optimistic version. Optimistic `version` (int, ORM `version="true"`) on every
+  settings to the microsecond (`DATETIME(6)` / `TIMESTAMP(6)`), so every write moves the optimistic version
+  (`touch()` keeps the exact instant, one microsecond later only on an exact tie). Optimistic `version` (int, ORM `version="true"`) on every
   editable row.
 - No foreign keys to host tables. Internal relations are plain id columns (no ORM associations), so the bundle never
   loads a graph and children move by primary key.
@@ -586,7 +587,8 @@ the port at a host service (deprecated, removed in 0.3.0), with the new permissi
 | (E2) Send a circular | `campaigns_send` | `canSendCampaigns` (`campaigns_roles`) |
 
 Every area also needs `canAccess`. Notes: the author edits / deletes own notes with `edit`; others' notes need
-`manage`. Beacon maps its `crm.*` permissions in a host area checker (or keeps its 0.1.0 port for 0.2.0).
+`manage`. Lists follow only `RECORD_VISIBILITY` (owner-based); `RECORD_ACCESS_CHECK` decides single-record pages and
+writes; to hide a record from lists, use its owner. Beacon maps its `crm.*` permissions in a host area checker (or keeps its 0.1.0 port for 0.2.0).
 
 ## 14. Events (dispatched after commit, ids and VOs only; REQ-ARCH-001 rules 4 / 7)
 
@@ -973,7 +975,8 @@ differs is applied in the next commit and noted here with the date._
   linked company has a pre-filled form); `purpose_keys` is 1100 characters; an import row that changes a company's
   primary contact needs `edit` on that company (else `invalid`, `error.forbidden`); every write of a record moves its
   version on every write (owner decision 2026-11-19: `updated_at` of companies, contacts, notes and settings kept to
-  the microsecond, `DATETIME(6)` / `TIMESTAMP(6)`); imports announce and audit role changes;
+  the microsecond, `DATETIME(6)` / `TIMESTAMP(6)`; `touch()` keeps the exact instant and moves it by one
+  microsecond only on an exact tie with the stored one); imports announce and audit role changes;
   the GDPR export lists affiliations to trashed companies with their status; `ListQuery` refuses invalid role and
   purpose keys; a contact merge moves the primary-company flag of a shared company.
 

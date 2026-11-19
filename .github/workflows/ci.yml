@@ -69,6 +69,9 @@ jobs:
       - name: Override Composer platform PHP (composer.json pins the minimum PHP for the lock)
         run: composer config platform.php "${{ matrix.php }}.99"
 
+      - name: SearchKit on PHP >= 8.3 (optional; the SearchKit groups are skipped on 8.2)
+        run: bash .github/ci/search-kit.sh
+
       - name: Install dependencies with Symfony ${{ matrix.symfony }}
         run: |
           req=""; dev=""
@@ -168,8 +171,10 @@ jobs:
           php-version: '8.4'
           tools: composer:v2
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
+      - name: Install dependencies (locked, plus SearchKit for the SearchKit groups, PHP >= 8.3)
+        run: |
+          bash .github/ci/search-kit.sh
+          composer update nowo-tech/search-kit-bundle --with-all-dependencies --prefer-dist --no-progress --no-interaction
 
       - name: Run PHPStan (REQ-CS-006)
         run: composer phpstan
@@ -227,8 +232,10 @@ jobs:
           extensions: json, pdo_sqlite, pdo_mysql, pdo_pgsql
           tools: composer:v2
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
+      - name: Install dependencies (locked, plus SearchKit for the SearchKit groups, PHP >= 8.3)
+        run: |
+          bash .github/ci/search-kit.sh
+          composer update nowo-tech/search-kit-bundle --with-all-dependencies --prefer-dist --no-progress --no-interaction
 
       - name: Database suite on SQLite (identifier columns compare exactly, audit LQ)
         run: vendor/bin/phpunit --no-coverage --testsuite Database
@@ -322,13 +329,16 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          # 0.3.0: 8.4, so SearchKit (PHP >= 8.3) is installed and the SearchKit groups are covered (.github/ci/search-kit.sh).
+          php-version: '8.4'
           extensions: json, pdo_sqlite, sodium
           coverage: pcov
           tools: composer:v2
 
-      - name: Install dependencies (locked, Symfony 7.4)
-        run: composer install --prefer-dist --no-progress --no-interaction
+      - name: Install dependencies (locked, Symfony 7.4, plus SearchKit)
+        run: |
+          bash .github/ci/search-kit.sh
+          composer update nowo-tech/search-kit-bundle --with-all-dependencies --prefer-dist --no-progress --no-interaction
 
       - name: Run tests with coverage (fails below 100%, REQ-TEST-003)
         env:

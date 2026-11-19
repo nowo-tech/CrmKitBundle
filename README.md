@@ -47,7 +47,7 @@ Phase A (0.1.0), always on when the bundle is enabled:
 - **GDPR**: consent per contact and purpose (append-only), a JSON export, an erasure that keeps consent proof without
   its evidence, and a retention purge.
 - **Plan limits**: atomic counters per tenant, so two creates at the limit can never both pass.
-- **Header search**: two SearchKit providers when `nowo-tech/search-kit-bundle` is installed.
+- **Header search**: SearchKit groups of companies, contacts and deals when `nowo-tech/search-kit-bundle` ^1.9 is installed.
 - **Private entity manager** `nowo_crm_kit`, declared by the Flex recipe, so the bundle never flushes the host's
   unit of work; every write is a transaction-doctrine write unit (409 with `CONFLICT_001` / `CONFLICT_002`).
 
@@ -97,7 +97,7 @@ Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION
 - Doctrine DBAL 3.8+ / 4 and ORM 3.7+ with DoctrineBundle
 - `nowo-tech/ui-kit-bundle` ^2.55, `nowo-tech/form-kit-bundle` ^2.23, `nowo-tech/transaction-doctrine` ^1.6,
   `nowo-tech/transaction-contract` ^1.0
-- Optional: `nowo-tech/search-kit-bundle` ^1.7 (header search; SearchKit needs PHP >= 8.3), `symfony/security-bundle`
+- Optional: `nowo-tech/search-kit-bundle` ^1.9 (header search; SearchKit needs PHP >= 8.3), `symfony/security-bundle`
   (default access checker and actor directory)
 
 ## Demo

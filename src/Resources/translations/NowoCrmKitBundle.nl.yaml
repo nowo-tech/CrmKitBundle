@@ -367,6 +367,7 @@ search:
     group:
         companies: Bedrijven
         contacts: Contacten
+        deals: 'Deals'
     see_all: 'Alle %count% tonen'
 flash:
     conflict:

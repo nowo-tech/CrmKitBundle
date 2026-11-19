@@ -367,6 +367,7 @@ search:
     group:
         companies: Aziende
         contacts: Contatti
+        deals: 'Trattative'
     see_all: 'Mostra tutti i %count%'
 flash:
     conflict:

@@ -91,7 +91,7 @@
         "symfony/yaml": "^7.4 || ^8.0"
     },
     "suggest": {
-        "nowo-tech/search-kit-bundle": "Header search provider for companies and contacts (SearchKit >= 1.7, PHP >= 8.3)",
+        "nowo-tech/search-kit-bundle": "^1.9 — header search groups for companies, contacts and deals (needs PHP >= 8.3)",
         "symfony/security-bundle": "Default role-map access checker and actor directory",
         "symfony/flex": "Automatic recipe installation (declares the private entity manager)"
     },
@@ -124,6 +124,7 @@
             "/docs/images",
             "/igor.json",
             "/phpstan.neon.dist",
+            "/phpstan-search-kit.php",
             "/phpunit.xml.dist",
             "/rector.php",
             "/specs",
@@ -147,8 +148,8 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "scripts": {
-        "test": "@php -d memory_limit=512M vendor/bin/phpunit --color=always",
-        "test-coverage": "@php -d memory_limit=512M vendor/bin/phpunit --color=always --coverage-html coverage --coverage-clover coverage.xml --coverage-text",
+        "test": "@php -d memory_limit=1G vendor/bin/phpunit --color=always",
+        "test-coverage": "@php -d memory_limit=1G vendor/bin/phpunit --color=always --coverage-html coverage --coverage-clover coverage.xml --coverage-text",
         "test-coverage-100": [
             "@test-coverage",
             "php .scripts/check-coverage.php coverage.xml --min-percent=100"

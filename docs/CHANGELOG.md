@@ -34,6 +34,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   its deals and deletes the rest. Merges point deals and funnel rows at the survivor; a purged record's deals are
   unlinked. `nowo:crm-kit:counters:rebuild` and `nowo:crm-kit:purge` know deals.
 
+### Changed (0.3.0: header search)
+
+- **SearchKit groups on SearchKit's provider base (SearchKit ^1.9, PHP >= 8.3)**: `crm_companies` and `crm_contacts`
+  are now `EntitySearchDefinition`s (`Bridge\SearchKit\CrmRecordSearchDefinition`) instead of `CrmSearchProvider`, and
+  a new group `crm_deals` (`CrmDealSearchDefinition`, with `pipeline.enabled`) finds deals by title, company and stage,
+  with the amount shown only to people with `amounts_view`. Every candidate passes `nowo_crm_kit.record_access_check`
+  after the SQL visibility filter; SearchKit's `nowo_search_kit.item_visibility` event, group switches, paged results and
+  revalidated recents apply. SearchKit stays optional and out of `composer.json` (`.github/ci/search-kit.sh` adds it to
+  the PHP >= 8.3 CI jobs).
+
 ## [0.2.1] - 2026-11-19
 
 ### Added

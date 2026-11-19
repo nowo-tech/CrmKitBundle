@@ -367,6 +367,7 @@ search:
     group:
         companies: Companies
         contacts: Contacts
+        deals: 'Deals'
     see_all: 'See all %count%'
 flash:
     conflict:

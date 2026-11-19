@@ -712,14 +712,27 @@ No Messenger handler ships in 0.1.0: imports always run in requests and in the r
 
 ## SearchKit
 
-With `nowo-tech/search-kit-bundle` installed (it needs PHP >= 8.3), `ui.enabled` and `search.enabled` (default), the
-bundle registers two providers, `nowo_crm_kit.search.company` (group `crm_companies`, priority 60) and
-`nowo_crm_kit.search.contact` (group `crm_contacts`, priority 59). Per call each resolves the tenant, the feature gate
-and `view`, searches active records of that tenant only (companies: name, legal name, website domain, e-mail, tax id;
-contacts: name, e-mail, phone, mobile) with escaped `LIKE` wildcards, returns at most SearchKit's limit with the
-visible total and a "see all" link to the filtered list, and answers `null` for any refusal (no 403, no hint). A scope
-that is the id of an active company of the tenant narrows contacts to that company's; any other scope answers `null`.
-The bundle's tests exercise the bridge with SearchKit stubs (`tests/Stubs/SearchKit`).
+With `nowo-tech/search-kit-bundle` **^1.9** installed (it needs PHP >= 8.3), `ui.enabled` and `search.enabled`
+(default), the bundle registers three groups on SearchKit's entity provider base (`EntitySearchDefinition`, tag
+`nowo_search_kit.entity_definition`): `crm_companies` (priority 60), `crm_contacts` (59) and, with
+`pipeline.enabled`, `crm_deals` (58). On every search each group:
+
+- resolves the tenant and the feature gate of the CRM and checks `view` (any refusal: no group, no count, no hint);
+- searches only rows of that tenant, in SQL: active companies (name, legal name, tax id key, website domain, e-mail),
+  active contacts (sort and display name, e-mail key, phone and mobile as typed) or deals outside the trash (title,
+  company name, stage name; never the amount), with escaped `LIKE` wildcards and the record visibility of
+  `security.resource_scoping` (ownerless records and the visible owners);
+- then asks `nowo_crm_kit.record_access_check` for every candidate (at most SearchKit's candidate window, 100), so a
+  host deny hides the row and it is not counted; SearchKit's own `nowo_search_kit.item_visibility` event follows;
+- shows a "see all" link to the filtered list (`/companies?q=`, `/contacts?q=`, `/deals?q=`) and the visible total.
+
+A scope that is the id of an active company of the tenant narrows contacts to that company's; any other scope, and any
+scope on companies or deals, finds nothing. A deal shows its stage, its company (only when the person may view the
+company: a hidden company's name is neither shown nor used as a match) and, only with `amounts_view`, its amount.
+Recents are revalidated: a stored result is shown again only while its record is still visible.
+
+Switch one group off, or reorder the groups, with SearchKit's own `nowo_search_kit.groups.<key>` (`enabled`,
+`priority`); `search.enabled: false` registers none.
 
 ## UiKit context menus and focus mode
 

@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler;
 
 use LogicException;
-use Nowo\CrmKitBundle\Application\CrmReader;
-use Nowo\CrmKitBundle\Bridge\SearchKit\CrmSearchProvider;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\CrmTaskBoardUserResolverInterface;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\TaskBoardCrmTaskPort;
-use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
@@ -18,7 +15,6 @@ use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
-use Nowo\SearchKitBundle\Contract\SearchProviderInterface;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiReadOperations;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiTaskOperations;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponsePolicy;
@@ -28,15 +24,13 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
 use function class_exists;
-use function interface_exists;
 use function is_string;
 
 /**
  * Points the port aliases at the host's services and wires the optional infrastructure (contract sections 8 and 10):
  * a configured service id replaces each default; transaction-doctrine's write unit (its bundle is required: the
  * container build fails with the fix without it) and the 409 fallback listener when its conflict responder is turned
- * off; the clock; the SearchKit
- * providers when SearchKit is installed, the UI is on and `search.enabled`.
+ * off; the clock; the task port of the next actions. (The SearchKit groups are registered by the extension, 0.3.0.)
  *
  * @internal
  */
@@ -77,14 +71,6 @@ final class CrmPortsPass implements CompilerPassInterface
         }
         if ($container->getParameter($p . 'pipeline.enabled') === true) {
             $this->taskPort($container);
-        }
-        if ($container->getParameter($p . 'ui.enabled') === true && $container->getParameter($p . 'search.enabled') === true && interface_exists(SearchProviderInterface::class) && $container->has('router') && $container->has('translator')) {
-            foreach ([SubjectType::Company, SubjectType::Contact] as $i => $type) {
-                $container->setDefinition($p . 'search.' . $type->value, (new Definition(CrmSearchProvider::class))
-                    ->setArguments([$type, new Reference(CrmReader::class), new Reference('router'), new Reference('translator')])
-                    ->addTag('nowo_search_kit.provider', ['priority' => 60 - $i])
-                    ->setPublic(true));
-            }
         }
     }
 

@@ -39,6 +39,14 @@ same keys. No column of an earlier table changes and no backfill is needed; the 
 on the first deal.
 
 
+**Header search (0.3.0).** The SearchKit groups need **SearchKit ^1.9** (`composer require nowo-tech/search-kit-bundle:^1.9`,
+PHP >= 8.3); with an older SearchKit they are not registered. Their keys stay `crm_companies` and `crm_contacts`, plus
+`crm_deals` with `pipeline.enabled`; `nowo_search_kit.groups.<key>` switches one off. The services
+`nowo_crm_kit.search.company` / `.contact` are now `EntitySearchDefinition`s (tag `nowo_search_kit.entity_definition`)
+and `Bridge\SearchKit\CrmSearchProvider` is removed: a host that decorated or called it uses SearchKit's generated
+provider (`nowo_search_kit.entity_provider.nowo_crm_kit.search.company`, …) instead. Results now also pass SearchKit's
+`nowo_search_kit.item_visibility` event.
+
 ## To 0.2.1
 
 From **0.2.0**:

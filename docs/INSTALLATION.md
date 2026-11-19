@@ -172,8 +172,8 @@ Every read keyed by such a value is also re-checked with `===` in PHP (REQ-SEC-0
 
 ## Optional packages
 
-- `nowo-tech/search-kit-bundle` ^1.7 (PHP >= 8.3): header search of companies and contacts; nothing to wire beyond
-  `ui.enabled` ([USAGE.md](USAGE.md#searchkit)).
+- `nowo-tech/search-kit-bundle` ^1.9 (PHP >= 8.3): header search of companies, contacts and deals; nothing to wire
+  beyond `ui.enabled` ([USAGE.md](USAGE.md#searchkit)).
 - `symfony/security-bundle`: the default access checker and actor directory read the security token.
 
 ## Reference DDL

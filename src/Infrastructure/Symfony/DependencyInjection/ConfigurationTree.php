@@ -102,7 +102,7 @@ final class ConfigurationTree
             ->end()
         ->end()->end();
         $children->arrayNode('search')->addDefaultsIfNotSet()->children()
-            ->booleanNode('enabled')->defaultTrue()->info('SearchKit providers when SearchKit is installed (and the UI is on).')->end()
+            ->booleanNode('enabled')->defaultTrue()->info('SearchKit groups crm_companies, crm_contacts and (with pipeline.enabled) crm_deals, when SearchKit >= 1.9 (PHP >= 8.3) is installed and the UI is on; switch one group off with nowo_search_kit.groups.<key>.')->end()
         ->end()->end();
         $children->arrayNode('ui')->addDefaultsIfNotSet()->children()
             ->booleanNode('enabled')->defaultFalse()->info('Routes are opt-in (REQ-UI-001).')->end()

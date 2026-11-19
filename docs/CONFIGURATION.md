@@ -65,7 +65,7 @@ nowo_crm_kit:
     affiliations:
         purposes: [billing, orders, technical, general]   # what a contact is a company's contact for; same rule
     search:
-        enabled: true              # SearchKit providers when SearchKit is installed and the UI is on
+        enabled: true              # SearchKit groups (SearchKit >= 1.9) when it is installed and the UI is on
     ui:
         enabled: false             # routes are opt-in (REQ-UI-001)
         path: /crm                 # starts with "/"; base path of the routes (under the import prefix)
@@ -207,10 +207,11 @@ trailing newline); anything else fails the container build. Keys are compared by
 
 ## Search
 
-`search.enabled` registers two SearchKit providers, `nowo_crm_kit.search.company` and `nowo_crm_kit.search.contact`
-(tag `nowo_search_kit.provider`, priorities 60 and 59), when SearchKit is installed **and** `ui.enabled` is true (the
-results link to the CRM pages). SearchKit needs PHP >= 8.3. The number of results per group is SearchKit's query
-limit.
+`search.enabled` registers the SearchKit groups `crm_companies`, `crm_contacts` and, with `pipeline.enabled`,
+`crm_deals` (services `nowo_crm_kit.search.company`, `.contact`, `.deal`; tag `nowo_search_kit.entity_definition`,
+priorities 60, 59 and 58) when SearchKit **>= 1.9** is installed **and** `ui.enabled` is true (the results link to the
+CRM pages). SearchKit needs PHP >= 8.3. Per group, `nowo_search_kit.groups.<key>.enabled` and `.priority` (SearchKit's
+configuration) switch it off or reorder it; the number of results per page and the candidate window are SearchKit's.
 
 ## UI
 

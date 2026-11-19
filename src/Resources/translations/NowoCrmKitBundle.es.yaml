@@ -367,6 +367,7 @@ search:
     group:
         companies: Empresas
         contacts: Contactos
+        deals: 'Oportunidades'
     see_all: 'Ver los %count%'
 flash:
     conflict:

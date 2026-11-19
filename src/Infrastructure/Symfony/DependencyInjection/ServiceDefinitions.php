@@ -42,6 +42,9 @@ use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\CrmKitBundle\Application\Taggings;
 use Nowo\CrmKitBundle\Application\TagService;
 use Nowo\CrmKitBundle\Application\WriteSupport;
+use Nowo\CrmKitBundle\Bridge\SearchKit\CrmDealSearchDefinition;
+use Nowo\CrmKitBundle\Bridge\SearchKit\CrmRecordSearchDefinition;
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
@@ -136,6 +139,7 @@ use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseFormatterInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
+use function class_exists;
 use function intdiv;
 use function interface_exists;
 use function is_array;
@@ -155,6 +159,12 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_it
  */
 final class ServiceDefinitions
 {
+    /** SearchKit's entity search definition (a literal: SearchKit is optional and only `Bridge` imports it). */
+    public const SEARCH_DEFINITION_CLASS = 'Nowo\\SearchKitBundle\\Provider\\Entity\\EntitySearchDefinition';
+
+    /** SearchKit's `EntitySearchDefinition::TAG` (a literal: SearchKit is optional). */
+    public const SEARCH_DEFINITION_TAG = 'nowo_search_kit.entity_definition';
+
     /** Prefix of the bundle's service ids and parameters. */
     public const P = NowoCrmKitBundle::ALIAS . '.';
 
@@ -295,6 +305,29 @@ final class ServiceDefinitions
         }
         if ($ui && $pipeline) {
             self::pipelineUi($container);
+        }
+        $search = is_array($config['search'] ?? null) && ($config['search']['enabled'] ?? false) === true;
+        if ($ui && $search && class_exists(self::SEARCH_DEFINITION_CLASS)) {
+            self::search($container, $pipeline);
+        }
+    }
+
+    /**
+     * The SearchKit groups (0.3.0, SearchKit >= 1.9 installed, `ui.enabled` and `search.enabled`): `crm_companies`,
+     * `crm_contacts` and, with `pipeline.enabled`, `crm_deals`, tagged for SearchKit's entity provider pass. Switch a
+     * group off or reorder it with `nowo_search_kit.groups.<key>`.
+     */
+    private static function search(ContainerConfigurator $container, bool $pipeline): void
+    {
+        $s    = $container->services();
+        $p    = self::P;
+        $args = [service(CrmAccess::class), service(DoctrineTransactionRunner::class), service('router'), service('translator')->nullOnInvalid()];
+        foreach ([SubjectType::Company, SubjectType::Contact] as $i => $type) {
+            $s->set($p . 'search.' . $type->value, CrmRecordSearchDefinition::class)->args([$type, ...$args])
+                ->tag(self::SEARCH_DEFINITION_TAG, ['priority' => 60 - $i])->public();
+        }
+        if ($pipeline) {
+            $s->set($p . 'search.deal', CrmDealSearchDefinition::class)->args($args)->tag(self::SEARCH_DEFINITION_TAG, ['priority' => 58])->public();
         }
     }
 

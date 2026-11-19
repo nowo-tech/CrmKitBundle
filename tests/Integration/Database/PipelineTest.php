@@ -370,10 +370,10 @@ final class PipelineTest extends CrmTestCase
         $deal    = $this->service(DealService::class)->create(new DealInput('D', $funnel->id, companyId: $acme));
         $actions = $this->service(NextActionService::class);
         $key     = str_repeat('a', 64);
-        $due     = new DateTimeImmutable('2026-11-20 09:00:00');
+        $due     = new DateTimeImmutable('2026-11-20 09:00:00', new DateTimeZone('UTC'));
         $id      = $actions->set(SubjectType::Deal, $deal, ' Call back ', $due, null, $key, null, '/crm/deals/' . $deal);
         self::assertSame($id, $actions->set(SubjectType::Deal, $deal, 'Call back', $due, null, $key), 'the same key adopts the row');
-        $actions->set(SubjectType::Deal, $deal, 'Earlier', new DateTimeImmutable('2026-11-19 09:00:00'), 'leo', str_repeat('b', 64));
+        $actions->set(SubjectType::Deal, $deal, 'Earlier', new DateTimeImmutable('2026-11-19 09:00:00', new DateTimeZone('UTC')), 'leo', str_repeat('b', 64));
         $reader = $this->service(DealReader::class);
         self::assertEquals(new DateTimeImmutable('2026-11-19 09:00:00', new DateTimeZone('UTC')), $reader->deal($deal)->nextActionAt);
         $list = $actions->list(SubjectType::Deal, $deal);

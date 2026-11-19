@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use Nowo\CrmKitBundle\Application\CrmAccess;
 use Nowo\CrmKitBundle\Application\Pipeline\DealInput;
 use Nowo\CrmKitBundle\Application\Pipeline\DealQuery;
@@ -293,7 +294,7 @@ final readonly class PipelineController
             $forms = [];
             if ($edit) {
                 $forms['move']   = $this->ui->form(StageMoveType::class, ['stage' => $deal->stageId, 'version' => (string) $deal->version], ['stages' => $this->forms->stages($funnel), 'reasons' => $this->forms->reasons()], 'crm_stage_move')->createView();
-                $forms['action'] = $this->ui->form(NextActionType::class, ['dedupe' => PipelineForms::dedupe(), 'due_at' => (new DateTimeImmutable('tomorrow 09:00'))], ['owners' => $this->forms->owners()], 'crm_next_action')->createView();
+                $forms['action'] = $this->ui->form(NextActionType::class, ['dedupe' => PipelineForms::dedupe(), 'due_at' => (new DateTimeImmutable('tomorrow 09:00', new DateTimeZone('UTC')))], ['owners' => $this->forms->owners()], 'crm_next_action')->createView();
             }
             $buttons = [];
             if ($edit) {

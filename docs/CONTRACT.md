@@ -202,8 +202,9 @@ Invalid; Limit }` (**0.1.0**: no `Skipped`; a skipped duplicate is `Duplicate`),
 ### 6.3 Records, statuses and duplicates
 
 - `Active` → `Trashed` (restore within `trash_days`, then purged) → hard delete with children. `Active` → `Merged`
-  (tombstone: `merged_into_id`, `email_key` NULL, no children; a GET of a merged id redirects to the survivor, a write
-  answers 409 `crm_record_merged`). Contacts: `Active | Trashed` → `Erased` (GDPR, §16.3).
+  (tombstone: `merged_into_id`, `email_key` NULL, no children, **(0.1.0)** every personal column blanked: only id,
+  tenant, status and survivor stay, the snapshot lives in `crm_merge`; deleted by the retention purge after
+  `merge_keep_days`; a GET of a merged id redirects to the survivor, a write answers 409 `crm_record_merged`). Contacts: `Active | Trashed` → `Erased` (GDPR, §16.3).
 - A contact's e-mail is **unique per tenant** (`email_key`); creating or editing a contact with an e-mail of another
   active or trashed contact is refused with a link to it (restore or merge). A trashed record keeps its keys.
 - **Duplicate hints** (`CrmReaderInterface::duplicates()`, read only): companies with the same `name_key`,
@@ -448,7 +449,7 @@ the import prefix **and** `ui.path`.
 | `/contacts/{id}/affiliations`, `/affiliations/{id}/remove` | POST | edit |
 | `/contacts/{id}/consent` | POST | edit |
 | `/contacts/{id}/vcard` | GET | view |
-| `/contacts/{id}/gdpr-export`, `/contacts/{id}/erase` | GET / POST | manage |
+| `/contacts/{id}/gdpr-export`, `/contacts/{id}/erase` | POST (both with the action token) | manage |
 | `/{type}/{id}/notes`, `/notes/{id}/edit`, `/notes/{id}/delete` | POST | edit |
 | `/{type}/{id}/tags` | POST | edit |
 | `/{type}/{id}/links`, `/links/{id}/remove` | POST | edit |
@@ -529,30 +530,33 @@ manager, flushed before the commit, replayed up to 3 times after a deadlock / lo
 entity manager cleared after the unit. A final conflict answers **409** through transaction-doctrine's responder with
 `CONFLICT_001` + `Retry-After` + `X-Conflict-Code` (or `CONFLICT_002` without `Retry-After` when the request already
 committed part of its work: request commit watermark, transaction-doctrine 1.6); JSON on the bundle's routes keeps
-`{"error": "concurrency_conflict", "code": "CONFLICT_001"}`. When transaction-doctrine's bundle is not registered, a
-fallback listener on the bundle's routes gives the same status, codes and headers. A unit never holds an entity from an
-earlier attempt (ids only), never flushes or clears the host's entity manager (single-EM hosts: the runner detaches only
-the bundle's entities and refuses to start while the host has pending changes) and never does HTTP, mail or file I/O
-inside a transaction.
+`{"error": "concurrency_conflict", "code": "CONFLICT_001"}`. **(0.1.0)** transaction-doctrine's bundle is required (its
+commit ledger, DBAL middleware and request watermark produce `CONFLICT_002`): the container build fails with the fix
+without it; when the host turns its conflict responder off, a fallback listener on the bundle's routes gives the same
+status, codes and headers. A unit never holds an entity from an earlier attempt (ids only), never flushes, clears or
+closes the host's entity manager (single-EM hosts: the runner begins, flushes and commits itself, rolls back and
+detaches only the bundle's entities on a failure, and refuses to start while the host has pending changes), never
+runs inside a transaction that is already open (a host's on the same connection: refused, since its events and audit
+are released after its own commit), and never does HTTP, mail or file I/O inside a transaction.
 
 | Write path | Transaction | Control | Conflict answer |
 |---|---|---|---|
-| Create company / contact | 1 unit | plan counter `UPDATE … WHERE value < limit` (§15.1); contact `email_key` unique **(0.1.0)**: on the unique refusal the other row is re-read in a fresh read; it exists ⇒ "e-mail in use" form error naming it; it vanished ⇒ one more run; refused again with no row ⇒ `WriteConflictException` `crm_write_conflict` (a lock conflict) | limit ⇒ 409 `crm_limit_reached` (no Retry-After); lock ⇒ CONFLICT_001 |
+| Create company / contact | 1 unit | plan counter `UPDATE … WHERE value < limit` (§15.1); contact `email_key` unique **(0.1.0)**: on the unique refusal the other row is re-read in a fresh read; it exists ⇒ "e-mail in use" form error naming it; it vanished ⇒ one more run; refused again with no row ⇒ domain conflict `crm_write_conflict` (409, no `X-Conflict-Code`: nothing committed, a retry is safe); on an edit the form error appears only when another record (not the edited one) holds the e-mail | limit ⇒ 409 `crm_limit_reached` (no Retry-After); twice refused ⇒ 409 `crm_write_conflict` |
 | Edit company / contact (fields, owner, tags in the form) | 1 unit | `version` posted, compared before the change, ORM version at flush; tags by unique `(tag, subject)` | stale ⇒ 409 `crm_record_stale`, form re-rendered |
 | Trash / restore / purge | 1 unit | version on trash; status checked under `FOR UPDATE`; counter −1 / +1 (restore checks the limit) | stale / limit ⇒ 409 |
-| Affiliate / unaffiliate, primary company | 1 unit | unique `(contact, company)`; every affiliate / unaffiliate locks the contact row (`FOR UPDATE`) and bumps its version; an existing pair is updated (role, primary) | racing duplicate ⇒ one more run as an update; lock ⇒ CONFLICT_001 |
+| Affiliate / unaffiliate, primary company | 1 unit | unique `(contact, company)`; affiliate locks the contact row, then the company row (`FOR UPDATE`, always in that order; imports too); unaffiliate locks the contact; both bump the contact's version; an existing pair is updated (role, primary); a merged or non-active parent ⇒ 409 | racing duplicate ⇒ one more run as an update, refused again ⇒ 409 `crm_write_conflict`; lock ⇒ CONFLICT_001 |
 | Tag create / rename / delete; assign | 1 unit | unique `(tenant, name_key)`; version on rename; assign = set difference, insert with unique catch (idempotent) | duplicate name ⇒ form error; stale ⇒ 409 |
-| Field define / update / archive | 1 unit | unique `(tenant, subject_type, field_key)`; version; count ≤ `max_per_subject` **(0.1.0)** read inside the unit without a lock (two racing defines may pass the bound by one) | duplicate ⇒ form error; stale ⇒ 409 |
-| Note add / edit / delete | 1 unit | version on edit; delete by id (gone ⇒ 404) | stale ⇒ 409 |
-| Host link add / remove | 1 unit | unique 5-column key (idempotent add) | — |
-| Consent record | 1 unit | insert only; the current state is the latest `(recorded_at, id)` per purpose (UUIDv7 ordering breaks ties) | lock ⇒ CONFLICT_001 |
+| Field define / update / archive | 1 unit | unique `(tenant, subject_type, field_key)`; version (archive: the version the page showed); count ≤ `max_per_subject` **(0.1.0)** counted after locking the `fields.<type>` counter row of the tenant (`FOR UPDATE`), so two racing defines cannot pass the bound | duplicate ⇒ form error; stale ⇒ 409 |
+| Note add / edit / delete | 1 unit | the parent record locked first (`FOR UPDATE`); version on edit; delete by id (gone ⇒ 404) | merged / non-active parent ⇒ 409; stale ⇒ 409 |
+| Host link add / remove, host timeline entry | 1 unit | the parent record locked first; unique 5-column key (idempotent add); a type with a resolver links only an object the resolver confirms (byte-exact id) | merged / non-active parent ⇒ 409; unknown object ⇒ form error |
+| Consent record | 1 unit | the contact locked first; insert only; the current state is the latest `(recorded_at, id)` per purpose (UUIDv7 ordering breaks ties) | merged / erased contact ⇒ 409; lock ⇒ CONFLICT_001 |
 | Settings | 1 unit | upsert: insert with PK catch, then version | stale ⇒ 409 `crm_settings_stale` |
 | Import upload | 1 unit | rows inserted with the import row (unique `(import_id, row_no)`) | — |
 | **Import confirm / run** | **claim unit + one unit per chunk** | §15.4 | second confirm ⇒ 409 `crm_import_running` or the finished result; lock in a chunk ⇒ that chunk replays |
 | **Merge** | **1 unit** | §15.3 | stale / merged ⇒ 409 `crm_merge_stale` |
-| GDPR erasure | 1 unit | contact `FOR UPDATE`; status checked; children deleted by primary key after an exact re-select | already erased ⇒ idempotent |
-| Retention purge (command) | 1 unit per batch of 200 | trashed records re-selected and re-checked (status, dates) under `FOR UPDATE`; timeline, import rows and merges deleted by id after a tenant re-check **(0.1.0)**: no single-run claim; a parallel run deletes nothing twice | batch replays |
-| Counter rebuild (command) | 1 unit per tenant and resource | **(0.1.0)** `COUNT(*)` of active rows, then the counter row (created if missing) `FOR UPDATE`, then set | — |
+| GDPR erasure | 1 unit | contact `FOR UPDATE`; status checked; children deleted by primary key after an exact re-select; the merge tombstones pointing at it (recursively) locked `FOR UPDATE` and blanked, their merge traces deleted | already erased ⇒ idempotent |
+| Retention purge (command) | 1 unit per batch of 200 | **(0.1.0)** single-run claim (claim row `FOR UPDATE`, conditional `UPDATE`, refreshed in every batch, released only while it is still the run's); trashed records and merge tombstones re-selected and re-checked (status, dates) under `FOR UPDATE`; timeline, import rows and merges deleted by id after a tenant re-check | second run ⇒ "another purge is running"; a run whose claim was taken over stops; batch replays |
+| Counter rebuild (command) | 1 unit per tenant and resource | **(0.1.0)** the counter row `FOR UPDATE` first (selected, inserted only when missing, selected again), then `COUNT(*)` of active rows, then set | — |
 
 ### 15.1 Plan-limit counters
 
@@ -586,7 +590,7 @@ merge(type, survivorId, otherId, take, vS, vO):
     children of other, selected by (tenant_id, subject_type, subject_id) and re-checked === in PHP, moved by PK:
       taggings / affiliations / host links: delete the ones the survivor already has, move the rest
       notes, activities, consents: move
-    other.status = Merged, merged_into_id = survivor; survivor.version++ (ORM); counter −1
+    other.status = Merged, merged_into_id = survivor, personal columns blanked; survivor.version++ (ORM); counter −1
     insert crm_merge (snapshot of other, taken fields); activity "merged" on survivor
   after commit: RecordsMerged, audit crm.records.merged
 ```
@@ -789,7 +793,7 @@ logo data URI, tokens), per call.
 | Q-O14 | Invoices (D) keep their own numbering per series in the CRM (VerifactuBundle has none) and the CRM models payment status (SepaPaymentBundle has none)? | **Yes** | Numbering in SerialNumberBundle |
 | Q-O15 | Campaigns (E) are built in the CRM (segments, suppression, unsubscribe, consent) on top of MailKit's sending and tracking, not in MailKit? | **Yes** (MailKit stays a transport / log / tracking layer) | Add campaigns to MailKit |
 
-## 23. Questions for Beacon (Q-B)
+## 23. Questions for Beacon (Q-B) — confirmed by Beacon 2026-11-19 (B1–B15)
 
 | # | Question | Recommendation (assumed for the build) |
 |---|---|---|
@@ -813,3 +817,36 @@ logo data URI, tokens), per call.
 
 _Empty until the owner and Beacon answer. The build of phase A follows the recommendations above; an answer that
 differs is applied in the next commit and noted here with the date._
+
+### Status 2026-11-18
+
+- The owner approved the bundle; the repository `nowo-tech/CrmKitBundle` exists (public).
+- Phase A is built on `feat/phase-a-companies-contacts` with every recommended answer above assumed. Places where
+  0.1.0 differs from this text are marked **(0.1.0)**.
+- The tag constants of the two host extension points are `CrmPanelProviderInterface::PANEL_TAG` and
+  `CrmHostObjectResolverInterface::HOST_OBJECT_TAG`, so one host class can implement both.
+- Done after the first review (2026-11-19): the route × profile permission-matrix test, the `__purge__` single-run
+  claim, the counter row locked before the recount, a `crm_counter` row lock for `fields.max_per_subject`, audit
+  entries for notes, tag assignments, links, affiliations and host timeline entries, a dependency-floor CI job.
+- Done after audit UD (2026-11-19): merge tombstones without personal values, erased with their survivor (recursively)
+  and purged after `merge_keep_days`; child writes lock their parent (affiliations: contact, then company); the shared
+  entity manager is never closed by a refused write; writes inside an open transaction are refused;
+  `NowoTransactionDoctrineBundle` required; `crm_write_conflict` is a domain 409; counter and claim rows locked
+  before any insert; the purge claim refreshed per batch and released only while it is the run's; the GDPR export a
+  POST with the action token; host links confirmed by their resolver; upload size checked before reading; the owner
+  check skipped when unchanged; field archive with the shown version; "Continue" attributed to the clicking person.
+- Open items for later releases: the Messenger import handler, the link picker
+  (`CrmHostObjectResolverInterface::search()`), the public JSON API (0.2.0, Q-O6).
+
+## Q-B answers from Beacon (2026-11-19): B1–B15 confirmed as implemented
+- B9: Beacon resolves the organisation from the header context (D-20261118-01). It answers 404 in Personal or when the feature is off.
+- B5: Beacon checks each 360° panel with its own permission. Deny by default, with a neutral placeholder when the panel is not visible.
+- B7: a one-time import of the spec 229 address book is welcome.
+- B11: audit through UserActionRecorder, recording ids (`recordIdsAndFlush`).
+- The integration findings are accepted: invoice numbering, payment state, unsubscribe and reminders live inside the CRM.
+- Fit of the ports (bundle side, 2026-11-19): `CrmAuditSinkInterface::record(AuditEntry)` receives ids, codes and
+  counts only and is called after the bundle's commit, outside its unit of work, so a recorder that writes and flushes
+  its own entity manager (`recordIdsAndFlush`) fits without touching the bundle's transaction. A panel provider that
+  denies its panel returns `null` (nothing shown) or a `Panel` with no items and an `emptyText` (the neutral
+  placeholder); both render.
+

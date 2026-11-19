@@ -1,0 +1,107 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nowo\CrmKitBundle\Tests\Fixtures;
+
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\Event\LifecycleEventArgs;
+use Nowo\CrmKitBundle\Domain\Model\Affiliation;
+use Nowo\CrmKitBundle\Domain\Model\Contact;
+use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
+use Nowo\CrmKitBundle\Domain\Model\CrmSettings;
+use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
+use Nowo\CrmKitBundle\Domain\Model\HostLink;
+use Nowo\CrmKitBundle\Domain\Model\Tag;
+use Nowo\CrmKitBundle\Domain\Model\Tagging;
+use ReflectionClass;
+
+use function str_pad;
+
+use const STR_PAD_LEFT;
+
+/**
+ * Doctrine listener of the race tests: a racing writer acts inside our flush, as a concurrent request would.
+ * - `emailRaces`: stores another contact with the same e-mail key just before ours (the unique key refuses ours);
+ * - `bumpVersions`: moves the version of the record we update (our optimistic lock fails).
+ */
+final class RaceInjector
+{
+    private int $twins = 0;
+
+    public function __construct(private readonly TestContext $context)
+    {
+    }
+
+    /**
+     * @param LifecycleEventArgs<EntityManagerInterface> $args
+     */
+    public function prePersist(LifecycleEventArgs $args): void
+    {
+        $object = $args->getObject();
+        $short  = (new ReflectionClass($object))->getShortName();
+        if (($this->context->races[$short] ?? 0) > 0) {
+            --$this->context->races[$short];
+            $this->insertTwin($args->getObjectManager(), $object);
+        }
+        if (!$object instanceof Contact || $this->context->emailRaces <= 0 || $object->getEmailKey() === null) {
+            return;
+        }
+        --$this->context->emailRaces;
+        $em = $args->getObjectManager();
+        $em->getConnection()->insert($em->getClassMetadata(Contact::class)->getTableName(), [
+            'id'           => '01900000-0000-7000-8000-' . str_pad((string) $this->context->emailRaces, 12, '0', STR_PAD_LEFT),
+            'tenant_id'    => $object->getTenantId(),
+            'last_name'    => 'Racer',
+            'display_name' => 'Racer',
+            'sort_key'     => 'racer',
+            'email'        => $object->value('email'),
+            'email_key'    => $object->getEmailKey(),
+            'custom'       => '{}',
+            'status'       => 'active',
+            'version'      => 1,
+            'created_at'   => '2026-11-18 10:00:00',
+            'updated_at'   => '2026-11-18 10:00:00',
+        ]);
+    }
+
+    /**
+     * @param LifecycleEventArgs<EntityManagerInterface> $args
+     */
+    public function preUpdate(LifecycleEventArgs $args): void
+    {
+        $object = $args->getObject();
+        if ($object instanceof Tag && ($this->context->races['TagRename'] ?? 0) > 0) {
+            --$this->context->races['TagRename'];
+            $this->insertTwin($args->getObjectManager(), $object);
+        }
+        if (!$object instanceof CrmRecord || !$this->context->bumpVersions) {
+            return;
+        }
+        $this->context->bumpVersions = false;
+        $em                          = $args->getObjectManager();
+        $em->getConnection()->executeStatement('UPDATE ' . $em->getClassMetadata($object::class)->getTableName() . ' SET version = version + 1 WHERE id = ?', [$object->getId()]);
+    }
+
+    /**
+     * Stores a row with the same unique key as `$object` (another writer's), on our connection.
+     */
+    private function insertTwin(EntityManagerInterface $em, object $object): void
+    {
+        $id    = '01900000-0000-7000-8000-' . str_pad((string) ++$this->twins, 12, '0', STR_PAD_LEFT);
+        $at    = '2026-11-18 10:00:00';
+        $table = $em->getClassMetadata($object::class)->getTableName();
+        $row   = match (true) {
+            $object instanceof FieldDefinition => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'subject_type' => $object->getSubjectType()->value, 'field_key' => $object->getFieldKey(), 'label' => 'Racer', 'type' => 'text', 'choices' => '[]', 'required' => 0, 'position' => 0, 'archived' => 0, 'version' => 1, 'created_at' => $at],
+            $object instanceof HostLink        => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'host_type' => $object->getHostType(), 'host_id' => $object->getHostId(), 'created_at' => $at],
+            $object instanceof Affiliation     => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'contact_id' => $object->getContactId(), 'company_id' => $object->getCompanyId(), 'is_primary' => 0, 'created_at' => $at],
+            $object instanceof CrmSettings     => ['tenant_id' => $object->getTenantId(), 'trash_days' => 30, 'timeline_years' => 5, 'import_keep_days' => 30, 'merge_keep_days' => 90, 'version' => 1, 'updated_at' => $at],
+            $object instanceof Tag             => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'name' => $object->getName(), 'name_key' => $object->getNameKey(), 'colour' => 'red', 'version' => 1, 'created_at' => $at],
+            $object instanceof Tagging         => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'tag_id' => $object->getTagId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'created_at' => $at],
+            default                            => null,
+        };
+        if ($row !== null) {
+            $em->getConnection()->insert($table, $row);
+        }
+    }
+}

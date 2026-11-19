@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nowo\CrmKitBundle\Domain\Value;
+
+use InvalidArgumentException;
+
+use function preg_match;
+
+/**
+ * An object of the host (a project, a ticket…), referenced by type and id (contract section 6.5).
+ */
+final readonly class HostObjectRef
+{
+    /** Host type pattern (anchored, `/D`). */
+    public const TYPE_PATTERN = '/\A[a-z][a-z0-9_.-]{0,63}\z/D';
+
+    /**
+     * @param string $type the host object type, e.g. `project`
+     * @param string $id the host id, exact
+     */
+    public function __construct(public string $type, public string $id)
+    {
+        if (preg_match(self::TYPE_PATTERN, $type) !== 1) {
+            throw new InvalidArgumentException('A host object type is 1-64 characters of a-z, 0-9, ".", "_" or "-", starting with a letter.');
+        }
+        if (!ExactId::isValid($id)) {
+            throw new InvalidArgumentException('A host object id must be 1-128 bytes of UTF-8 without control, format or edge whitespace characters.');
+        }
+    }
+}

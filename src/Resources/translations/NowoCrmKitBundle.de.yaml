@@ -1,0 +1,378 @@
+# CRM-Kit, Phase A (Unternehmen und Kontakte). Domain NowoCrmKitBundle. Parameter stehen in %.
+nav:
+    label: CRM
+    companies: Unternehmen
+    contacts: Kontakte
+    import: Import
+    tags: Tags
+    fields: Benutzerdefinierte Felder
+    settings: Einstellungen
+type:
+    company: Unternehmen
+    contact: Kontakt
+status:
+    trashed: Im Papierkorb
+    erased: Personenbezogene Daten gelöscht
+value:
+    'yes': 'Ja'
+    'no': 'Nein'
+form:
+    save: Speichern
+    cancel: Abbrechen
+list:
+    title:
+        company: Unternehmen
+        contact: Kontakte
+    empty:
+        company: Noch keine Unternehmen.
+        contact: Noch keine Kontakte.
+    empty_hint: Legen Sie einen an oder importieren Sie eine CSV- oder vCard-Datei.
+    export: CSV exportieren
+    col:
+        updated: Aktualisiert
+    filter:
+        q: Suchen
+        tag: Tag
+        owner: Verantwortlich
+        status: Anzeigen
+        any: Alle
+    status:
+        active: Aktiv
+        trashed: Papierkorb
+field:
+    name: Name
+    contact_name: Name
+    legal_name: Firmenname
+    tax_id: Steuernummer
+    website: Website
+    email: E-Mail
+    phone: Telefon
+    mobile: Mobil
+    industry: Branche
+    street: Straße
+    postal_code: Postleitzahl
+    city: Ort
+    region: Region
+    country: Land (ISO-Code)
+    description: Beschreibung
+    first_name: Vorname
+    last_name: Nachname
+    job_title: Position
+    owner: Verantwortlich
+    owner_none: Keine verantwortliche Person
+    tags: Tags
+    active: Aktiv
+    archived: Archiviert
+    archive: Archivieren
+    restore: Wiederherstellen
+    archived_flash: Das Feld ist archiviert. Seine Werte bleiben erhalten und sind ausgeblendet.
+    restored: Das Feld wurde wiederhergestellt.
+    defined: Das Feld wurde hinzugefügt.
+    saved: Das Feld wurde gespeichert.
+    save: Feld speichern
+    edit: Feld bearbeiten
+    edit_title: 'Feld: %name%'
+    add:
+        company: Neues Feld für Unternehmen
+        contact: Neues Feld für Kontakte
+    error:
+        required: Dieses Feld ist erforderlich.
+        type: Dieser Wert passt nicht zum Feld.
+    form:
+        key: Schlüssel
+        key_help: 'Kleinbuchstaben, Ziffern und "_"; später nicht mehr änderbar.'
+        label: Bezeichnung
+        type: Typ
+        choices: Auswahlmöglichkeiten
+        choices_help: Eine Möglichkeit pro Zeile (nur bei Auswahlfeldern).
+        required: Pflichtfeld
+        position: Position
+field_type:
+    text: Text
+    textarea: Langer Text
+    number: Zahl
+    date: Datum
+    boolean: Ja / Nein
+    choice: Auswahl
+    url: Link
+    email: E-Mail
+fields:
+    title: Benutzerdefinierte Felder
+    intro: Eigene Felder für Unternehmen und Kontakte. Archivierte Felder behalten ihre Werte.
+    empty: Noch keine benutzerdefinierten Felder.
+    define_for: 'Feld definieren für:'
+    col:
+        subject: Für
+        state: Status
+record:
+    new:
+        company: Neues Unternehmen
+        contact: Neuer Kontakt
+    edit_title: '%name% bearbeiten'
+    open: Öffnen
+    edit: Bearbeiten
+    merge: Zusammenführen
+    merge_with: In diesen Datensatz zusammenführen
+    trash: In den Papierkorb verschieben
+    trash_confirm: Diesen Datensatz in den Papierkorb verschieben? Er kann eine Zeit lang wiederhergestellt werden.
+    restore: Wiederherstellen
+    purge: Endgültig löschen
+    purge_confirm: Diesen Datensatz und alles, was daran hängt, endgültig löschen?
+    erase: Personenbezogene Daten löschen
+    erase_confirm: "Die personenbezogenen Daten dieses Kontakts löschen? Notizen, Verknüpfungen und der Verlauf werden gelöscht; dies kann nicht rückgängig gemacht werden."
+    vcard: vCard
+    gdpr_export: Export personenbezogener Daten
+    details: Details
+    custom: Weitere Felder
+    contacts: Kontakte
+    companies: Unternehmen
+    affiliations_empty: Noch keine.
+    duplicates: Mögliche Duplikate
+    created: Der Datensatz wurde angelegt.
+    saved: Der Datensatz wurde gespeichert.
+    trashed: Der Datensatz liegt im Papierkorb.
+    restored: Der Datensatz wurde wiederhergestellt.
+    purged: Der Datensatz wurde gelöscht.
+    erased: "Die personenbezogenen Daten des Kontakts wurden gelöscht."
+affiliation:
+    add: Unternehmen hinzufügen
+    save: Hinzufügen
+    added: Das Unternehmen wurde hinzugefügt.
+    removed: Das Unternehmen wurde entfernt.
+    remove: Entfernen
+    primary: Primär
+    form:
+        company: Unternehmen
+        role: Rolle
+        primary: Primäres Unternehmen
+link:
+    title: Verknüpft
+    add: Verknüpfen mit
+    save: Verknüpfen
+    added: Die Verknüpfung wurde hinzugefügt.
+    removed: Die Verknüpfung wurde entfernt.
+    remove: Entfernen
+    form:
+        type: Typ
+        id: ID
+        label: Bezeichnung
+panel:
+    empty: Noch nichts vorhanden.
+    more: Alle anzeigen
+note:
+    title: Notizen
+    add: Notiz hinzufügen
+    save: Notiz speichern
+    added: Die Notiz wurde hinzugefügt.
+    saved: Die Notiz wurde gespeichert.
+    deleted: Die Notiz wurde gelöscht.
+    delete: Notiz löschen
+    delete_confirm: Diese Notiz löschen?
+    edit: Bearbeiten
+    empty: Noch keine Notizen.
+    pinned: Angeheftet
+    form:
+        body: Notiz
+        pinned: Oben anheften
+tags:
+    title: Tags
+    title_record: Tags
+    intro: Tags gruppieren Unternehmen und Kontakte; Listen lassen sich danach filtern.
+    empty: Noch keine Tags.
+    save: Tags speichern
+    saved: Die Tags wurden gespeichert.
+    form:
+        tags: Tags
+tag:
+    add: Neuer Tag
+    save: Tag speichern
+    created: Der Tag wurde angelegt.
+    saved: Der Tag wurde gespeichert.
+    deleted: Der Tag wurde gelöscht.
+    delete: Tag löschen
+    edit: Bearbeiten
+    edit_title: 'Tag: %name%'
+    form:
+        name: Name
+        colour: Farbe
+colour:
+    neutral: Grau
+    blue: Blau
+    green: Grün
+    yellow: Gelb
+    orange: Orange
+    red: Rot
+    purple: Violett
+    teal: Petrol
+consent:
+    title: Einwilligung
+    add: Einwilligungsentscheidung erfassen
+    save: Erfassen
+    recorded: Die Entscheidung wurde erfasst.
+    empty: Keine Einwilligung erfasst.
+    granted: Erteilt
+    withdrawn: Widerrufen
+    form:
+        purpose: Zweck
+        decision: Entscheidung
+        evidence: Nachweis
+        evidence_help: 'Woher sie stammt, z. B. "unterschriebenes Formular 2026-11-18" (keine weiteren personenbezogenen Daten).'
+    purpose:
+        marketing_email: Marketing-E-Mails
+        newsletter: Newsletter
+        tracking: Tracking von E-Mail-Öffnungen und -Klicks
+    source:
+        form: Formular
+        import: Import
+        manual: Manuell erfasst
+        portal: Kundenportal
+        api: API
+timeline:
+    title: Verlauf
+    empty: Noch ist nichts passiert.
+    open: Öffnen
+activity:
+    created: 'Angelegt von %actor%'
+    updated: 'Aktualisiert von %actor%'
+    owner_changed: 'Verantwortliche Person geändert von %actor%'
+    trashed: 'In den Papierkorb verschoben von %actor%'
+    restored: 'Wiederhergestellt von %actor%'
+    merged: 'Ein anderer Datensatz wurde von %actor% in diesen zusammengeführt'
+    note_added: 'Notiz hinzugefügt von %actor%'
+    note_edited: 'Notiz bearbeitet von %actor%'
+    note_deleted: 'Notiz gelöscht von %actor%'
+    tagged: 'Tag hinzugefügt von %actor%'
+    untagged: 'Tag entfernt von %actor%'
+    linked: 'Verknüpft von %actor%'
+    unlinked: 'Verknüpfung entfernt von %actor%'
+    affiliated: 'Unternehmensverknüpfung hinzugefügt von %actor%'
+    unaffiliated: 'Unternehmensverknüpfung entfernt von %actor%'
+    consent_given: 'Einwilligung erteilt (erfasst von %actor%)'
+    consent_withdrawn: 'Einwilligung widerrufen (erfasst von %actor%)'
+    imported: 'Importiert von %actor%'
+    exported: 'Personenbezogene Daten exportiert von %actor%'
+    host: 'Aktualisierung'
+merge:
+    title: 'In %name% zusammenführen'
+    intro: 'Haken Sie die Werte an, die aus dem anderen Datensatz übernommen werden; alles, was daran hängt, wird hierher verschoben, und er wird zu einem Verweis auf diesen Datensatz.'
+    pick_intro: Wählen Sie den Datensatz, der in diesen zusammengeführt werden soll.
+    duplicates: Mögliche Duplikate
+    preview: Vergleichen
+    confirm: Zusammenführen
+    done: Die Datensätze wurden zusammengeführt.
+    compare: '%other% in %survivor%'
+    moves: '%notes% Notizen, %tags% Tags, %links% Verknüpfungen, %affiliations% Unternehmensverknüpfungen und %activities% Verlaufseinträge werden verschoben.'
+    col:
+        field: Feld
+    form:
+        other: ID des anderen Datensatzes
+        other_help: Die ID in der Adresse seiner Seite.
+import:
+    title: Import
+    intro: 'Eine CSV-Datei (Kopfzeile, "," oder ";", UTF-8) oder eine vCard-Datei mit Kontakten.'
+    upload: Hochladen und Vorschau
+    show_title: 'Import: %file%'
+    preview: Erste Zeilen
+    confirm: Importieren
+    continue: Fortsetzen
+    cancel: Import abbrechen
+    cancelled: Der Import wurde abgebrochen.
+    back: Zurück zur Liste
+    done: Der Import ist abgeschlossen.
+    running: 'Der Import läuft: Setzen Sie fort, um die nächsten Zeilen zu verarbeiten.'
+    ok: Bereit
+    duplicate_of: 'Gleiche E-Mail wie %name%'
+    summary: '%done% von %total% Zeilen verarbeitet.'
+    status:
+        preview: Prüfen Sie die Zuordnung und importieren Sie dann.
+        running: Läuft
+        done: Abgeschlossen
+        failed: Fehlgeschlagen
+        cancelled: Abgebrochen
+    outcome:
+        pending: Wartend
+        created: Angelegt
+        updated: Aktualisiert
+        duplicate: Bereits vorhanden
+        invalid: Ungültig
+        limit: Über dem Limit des Tarifs
+    col:
+        check: Prüfung
+    subject:
+        contacts: Kontakte
+        companies: Unternehmen
+    format:
+        csv: CSV
+        vcard: vCard
+    policy:
+        skip: Zeilen überspringen, deren E-Mail bereits existiert
+        update: Vorhandenen Kontakt aktualisieren
+    target:
+        skip: '(diese Spalte überspringen)'
+        company: Unternehmen (vorhanden, nach Name)
+        tags: Tags (vorhanden, durch Komma getrennt)
+    form:
+        subject: Import
+        format: Format
+        file: Datei
+        file_help: Bis zu 5 000 Zeilen.
+        policy: Vorhandene E-Mails
+    error:
+        read: Die Datei konnte nicht gelesen werden.
+        too_large: Die Datei ist zu groß.
+        too_many_rows: Die Datei hat zu viele Zeilen.
+        encoding: Die Datei ist kein UTF-8-Text.
+        header: 'Die Kopfzeile fehlt, hat eine leere Spalte oder eine doppelte Spalte.'
+        empty: Die Datei enthält keine Zeilen.
+        vcard_contacts: vCard-Dateien importieren nur Kontakte.
+        mapping: 'Ordnen Sie mindestens eine Spalte zu, jedes Feld nur einmal.'
+settings:
+    title: Einstellungen
+    intro: Wie lange das CRM aufbewahrt, was es nicht mehr braucht.
+    saved: Die Einstellungen wurden gespeichert.
+    form:
+        trash_days: Tage, die ein Datensatz im Papierkorb wiederherstellbar bleibt (7-365)
+        timeline_years: Jahre, die der Verlauf aufbewahrt wird (1-10)
+        import_keep_days: Tage, die die Zeilen eines abgeschlossenen Imports aufbewahrt werden (1-90)
+        merge_keep_days: Tage, die eine Zusammenführung die Werte des zusammengeführten Datensatzes behält (1-365)
+search:
+    group:
+        companies: Unternehmen
+        contacts: Kontakte
+    see_all: 'Alle %count% anzeigen'
+flash:
+    conflict:
+        crm_record_stale: 'Jemand hat diesen Datensatz gleichzeitig geändert. Das Formular zeigt die aktuellen Werte: Prüfen Sie sie und speichern Sie erneut.'
+        crm_record_merged: Dieser Datensatz wurde in einen anderen zusammengeführt.
+        crm_record_trashed: Dieser Datensatz liegt im Papierkorb.
+        crm_merge_stale: Einer der Datensätze wurde inzwischen geändert oder zusammengeführt. Vergleichen Sie erneut.
+        crm_import_running: Dieser Import läuft bereits oder ist abgeschlossen.
+        crm_limit_reached: 'Das Limit Ihres Tarifs ist erreicht: Es können keine weiteren Datensätze dieser Art hinzugefügt werden.'
+        crm_settings_stale: Jemand hat die Einstellungen gleichzeitig geändert. Prüfen Sie sie und speichern Sie erneut.
+        crm_write_conflict: 'Eine andere Änderung derselben Daten kam im selben Moment an. Versuchen Sie es erneut.'
+error:
+    required: Dieses Feld ist erforderlich.
+    invalid: Dieser Wert ist ungültig.
+    host_object_unknown: 'Dieses Objekt existiert nicht oder Sie können es nicht sehen.'
+    too_long: Dieser Wert ist zu lang.
+    unknown_field: Unbekanntes Feld.
+    email: Keine E-Mail-Adresse.
+    url: 'Keine Webadresse (http:// oder https://).'
+    phone: Keine Telefonnummer.
+    country: Verwenden Sie den zweibuchstabigen Ländercode (ES, FR…).
+    contact_name: Ein Kontakt braucht einen Vor- oder Nachnamen.
+    email_taken: Ein anderer Kontakt hat diese E-Mail bereits.
+    owner_unknown: Diese Person kann keine Datensätze verantworten.
+    tag_unknown: Unbekannter Tag.
+    tag_name: Ein Tag-Name hat 1 bis 60 Zeichen.
+    tag_taken: Ein Tag mit diesem Namen existiert bereits.
+    field_key: 'Ein Schlüssel besteht aus 1 bis 40 Kleinbuchstaben, Ziffern oder "_" und beginnt mit einem Buchstaben.'
+    field_key_reserved: Dieser Schlüssel gehört zu einem integrierten Feld.
+    field_key_taken: Ein Feld mit diesem Schlüssel existiert bereits.
+    field_limit: Es können keine weiteren benutzerdefinierten Felder hinzugefügt werden.
+    field_choices: Ein Auswahlfeld braucht 1 bis 50 Möglichkeiten.
+    note_invalid: Eine Notiz hat bis zu 10 000 Zeichen Text.
+    consent_purpose: Unbekannter Zweck.
+    merge_same: Ein Datensatz kann nicht mit sich selbst zusammengeführt werden.
+    out_of_range: Dieser Wert liegt außerhalb des zulässigen Bereichs.
+    csrf: Das Formular ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.

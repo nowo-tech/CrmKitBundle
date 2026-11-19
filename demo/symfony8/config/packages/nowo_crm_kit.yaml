@@ -1,0 +1,14 @@
+# Demo configuration: the CRM on a private entity manager, UI routes on under /crm, the demo's people as owners, a
+# host panel and a host object resolver ("projects") to show the 360° page extension points.
+nowo_crm_kit:
+    doctrine:
+        entity_manager: nowo_crm_kit
+    actor_directory: App\Crm\DemoActors
+    access:
+        roles:
+            view: [ROLE_USER]
+            edit: [ROLE_SALES]
+            manage: [ROLE_ADMIN]
+    ui:
+        enabled: true
+        path: /crm

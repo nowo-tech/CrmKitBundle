@@ -1,0 +1,378 @@
+# CRM kit, phase A (sociétés et contacts). Domaine NowoCrmKitBundle. Les paramètres sont entourés de %.
+nav:
+    label: CRM
+    companies: Sociétés
+    contacts: Contacts
+    import: Importer
+    tags: Étiquettes
+    fields: Champs personnalisés
+    settings: Paramètres
+type:
+    company: Société
+    contact: Contact
+status:
+    trashed: Dans la corbeille
+    erased: Données personnelles effacées
+value:
+    'yes': 'Oui'
+    'no': 'Non'
+form:
+    save: Enregistrer
+    cancel: Annuler
+list:
+    title:
+        company: Sociétés
+        contact: Contacts
+    empty:
+        company: Aucune société pour le moment.
+        contact: Aucun contact pour le moment.
+    empty_hint: Créez-en un ou importez un fichier CSV ou vCard.
+    export: Exporter en CSV
+    col:
+        updated: Mis à jour
+    filter:
+        q: Rechercher
+        tag: Étiquette
+        owner: Responsable
+        status: Afficher
+        any: Tous
+    status:
+        active: Actifs
+        trashed: Corbeille
+field:
+    name: Nom
+    contact_name: Nom
+    legal_name: Raison sociale
+    tax_id: Numéro fiscal
+    website: Site web
+    email: E-mail
+    phone: Téléphone
+    mobile: Mobile
+    industry: Secteur
+    street: Rue
+    postal_code: Code postal
+    city: Ville
+    region: Région
+    country: Pays (code ISO)
+    description: Description
+    first_name: Prénom
+    last_name: Nom de famille
+    job_title: Fonction
+    owner: Responsable
+    owner_none: Aucun responsable
+    tags: Étiquettes
+    active: Actif
+    archived: Archivé
+    archive: Archiver
+    restore: Rétablir
+    archived_flash: Le champ est archivé. Ses valeurs sont conservées et masquées.
+    restored: Le champ a été rétabli.
+    defined: Le champ a été ajouté.
+    saved: Le champ a été enregistré.
+    save: Enregistrer le champ
+    edit: Modifier le champ
+    edit_title: 'Champ : %name%'
+    add:
+        company: Nouveau champ pour les sociétés
+        contact: Nouveau champ pour les contacts
+    error:
+        required: Ce champ est obligatoire.
+        type: Cette valeur ne convient pas au champ.
+    form:
+        key: Clé
+        key_help: 'Lettres minuscules, chiffres et "_" ; elle ne peut plus être modifiée ensuite.'
+        label: Libellé
+        type: Type
+        choices: Choix
+        choices_help: Un choix par ligne (champs à choix uniquement).
+        required: Obligatoire
+        position: Position
+field_type:
+    text: Texte
+    textarea: Texte long
+    number: Nombre
+    date: Date
+    boolean: Oui / non
+    choice: Choix
+    url: Lien
+    email: E-mail
+fields:
+    title: Champs personnalisés
+    intro: Champs propres aux sociétés et aux contacts. Les champs archivés conservent leurs valeurs.
+    empty: Aucun champ personnalisé pour le moment.
+    define_for: 'Définir un champ pour :'
+    col:
+        subject: Pour
+        state: État
+record:
+    new:
+        company: Nouvelle société
+        contact: Nouveau contact
+    edit_title: 'Modifier %name%'
+    open: Ouvrir
+    edit: Modifier
+    merge: Fusionner
+    merge_with: Fusionner dans cette fiche
+    trash: Mettre à la corbeille
+    trash_confirm: Mettre cette fiche à la corbeille ? Elle pourra être restaurée pendant un certain temps.
+    restore: Restaurer
+    purge: Supprimer définitivement
+    purge_confirm: Supprimer définitivement cette fiche et tout ce qui lui est rattaché ?
+    erase: Effacer les données personnelles
+    erase_confirm: "Effacer les données personnelles de ce contact ? Les notes, les liens et la chronologie sont supprimés ; cette action est irréversible."
+    vcard: vCard
+    gdpr_export: Export des données personnelles
+    details: Détails
+    custom: Autres champs
+    contacts: Contacts
+    companies: Sociétés
+    affiliations_empty: Aucune pour le moment.
+    duplicates: Doublons possibles
+    created: La fiche a été créée.
+    saved: La fiche a été enregistrée.
+    trashed: La fiche est dans la corbeille.
+    restored: La fiche a été restaurée.
+    purged: La fiche a été supprimée.
+    erased: "Les données personnelles du contact ont été effacées."
+affiliation:
+    add: Ajouter une société
+    save: Ajouter
+    added: La société a été ajoutée.
+    removed: La société a été retirée.
+    remove: Retirer
+    primary: Principale
+    form:
+        company: Société
+        role: Rôle
+        primary: Société principale
+link:
+    title: Liens
+    add: Lier à
+    save: Lier
+    added: Le lien a été ajouté.
+    removed: Le lien a été retiré.
+    remove: Retirer
+    form:
+        type: Type
+        id: Id
+        label: Libellé
+panel:
+    empty: Rien pour le moment.
+    more: Tout afficher
+note:
+    title: Notes
+    add: Ajouter une note
+    save: Enregistrer la note
+    added: La note a été ajoutée.
+    saved: La note a été enregistrée.
+    deleted: La note a été supprimée.
+    delete: Supprimer la note
+    delete_confirm: Supprimer cette note ?
+    edit: Modifier
+    empty: Aucune note pour le moment.
+    pinned: Épinglée
+    form:
+        body: Note
+        pinned: Épingler en haut
+tags:
+    title: Étiquettes
+    title_record: Étiquettes
+    intro: Les étiquettes regroupent les sociétés et les contacts ; les listes peuvent être filtrées par étiquette.
+    empty: Aucune étiquette pour le moment.
+    save: Enregistrer les étiquettes
+    saved: Les étiquettes ont été enregistrées.
+    form:
+        tags: Étiquettes
+tag:
+    add: Nouvelle étiquette
+    save: Enregistrer l'étiquette
+    created: L'étiquette a été créée.
+    saved: L'étiquette a été enregistrée.
+    deleted: L'étiquette a été supprimée.
+    delete: Supprimer l'étiquette
+    edit: Modifier
+    edit_title: 'Étiquette : %name%'
+    form:
+        name: Nom
+        colour: Couleur
+colour:
+    neutral: Gris
+    blue: Bleu
+    green: Vert
+    yellow: Jaune
+    orange: Orange
+    red: Rouge
+    purple: Violet
+    teal: Turquoise
+consent:
+    title: Consentement
+    add: Enregistrer une décision de consentement
+    save: Enregistrer
+    recorded: La décision a été enregistrée.
+    empty: Aucun consentement enregistré.
+    granted: Accordé
+    withdrawn: Retiré
+    form:
+        purpose: Finalité
+        decision: Décision
+        evidence: Preuve
+        evidence_help: 'Son origine, p. ex. "formulaire signé 2026-11-18" (aucune autre donnée personnelle).'
+    purpose:
+        marketing_email: E-mails de marketing
+        newsletter: Lettre d'information
+        tracking: Suivi des ouvertures et des clics des e-mails
+    source:
+        form: Formulaire
+        import: Import
+        manual: Saisi manuellement
+        portal: Portail client
+        api: API
+timeline:
+    title: Chronologie
+    empty: Rien ne s'est encore passé.
+    open: Ouvrir
+activity:
+    created: 'Créé par %actor%'
+    updated: 'Mis à jour par %actor%'
+    owner_changed: 'Responsable modifié par %actor%'
+    trashed: 'Mis à la corbeille par %actor%'
+    restored: 'Restauré par %actor%'
+    merged: 'Une autre fiche a été fusionnée dans celle-ci par %actor%'
+    note_added: 'Note ajoutée par %actor%'
+    note_edited: 'Note modifiée par %actor%'
+    note_deleted: 'Note supprimée par %actor%'
+    tagged: 'Étiquette ajoutée par %actor%'
+    untagged: 'Étiquette retirée par %actor%'
+    linked: 'Lié par %actor%'
+    unlinked: 'Lien retiré par %actor%'
+    affiliated: 'Lien avec une société ajouté par %actor%'
+    unaffiliated: 'Lien avec une société retiré par %actor%'
+    consent_given: 'Consentement accordé (enregistré par %actor%)'
+    consent_withdrawn: 'Consentement retiré (enregistré par %actor%)'
+    imported: 'Importé par %actor%'
+    exported: 'Données personnelles exportées par %actor%'
+    host: 'Mise à jour'
+merge:
+    title: 'Fusionner dans %name%'
+    intro: "Cochez les valeurs à reprendre de l'autre fiche ; tout ce qui lui est rattaché passe ici et elle devient un renvoi vers cette fiche."
+    pick_intro: Choisissez la fiche à fusionner dans celle-ci.
+    duplicates: Doublons possibles
+    preview: Comparer
+    confirm: Fusionner
+    done: Les fiches ont été fusionnées.
+    compare: '%other% dans %survivor%'
+    moves: '%notes% notes, %tags% étiquettes, %links% liens, %affiliations% liens avec des sociétés et %activities% entrées de la chronologie sont déplacés.'
+    col:
+        field: Champ
+    form:
+        other: Id de l'autre fiche
+        other_help: L'id figurant dans l'adresse de sa page.
+import:
+    title: Importer
+    intro: 'Un fichier CSV (ligne d''en-tête, "," ou ";", UTF-8) ou un fichier vCard de contacts.'
+    upload: Téléverser et prévisualiser
+    show_title: 'Import : %file%'
+    preview: Premières lignes
+    confirm: Importer
+    continue: Continuer
+    cancel: Annuler l'import
+    cancelled: L'import a été annulé.
+    back: Retour à la liste
+    done: L'import est terminé.
+    running: "L'import est en cours : continuez pour traiter les lignes suivantes."
+    ok: Prêt
+    duplicate_of: 'Même e-mail que %name%'
+    summary: '%done% lignes sur %total% traitées.'
+    status:
+        preview: Vérifiez la correspondance, puis importez.
+        running: En cours
+        done: Terminé
+        failed: Échoué
+        cancelled: Annulé
+    outcome:
+        pending: En attente
+        created: Créé
+        updated: Mis à jour
+        duplicate: Déjà présent
+        invalid: Invalide
+        limit: Au-delà de la limite de l'offre
+    col:
+        check: Vérification
+    subject:
+        contacts: Contacts
+        companies: Sociétés
+    format:
+        csv: CSV
+        vcard: vCard
+    policy:
+        skip: Ignorer les lignes dont l'e-mail existe déjà
+        update: Mettre à jour le contact existant
+    target:
+        skip: '(ignorer cette colonne)'
+        company: Société (existante, par nom)
+        tags: Étiquettes (existantes, séparées par des virgules)
+    form:
+        subject: Importer
+        format: Format
+        file: Fichier
+        file_help: Jusqu'à 5 000 lignes.
+        policy: E-mails existants
+    error:
+        read: Le fichier n'a pas pu être lu.
+        too_large: Le fichier est trop volumineux.
+        too_many_rows: Le fichier contient trop de lignes.
+        encoding: Le fichier n'est pas un texte UTF-8.
+        header: "La ligne d'en-tête est absente, contient une colonne vide ou une colonne en double."
+        empty: Le fichier ne contient aucune ligne.
+        vcard_contacts: Les fichiers vCard n'importent que des contacts.
+        mapping: 'Associez au moins une colonne, chaque champ une seule fois.'
+settings:
+    title: Paramètres
+    intro: Combien de temps le CRM conserve ce dont il n'a plus besoin.
+    saved: Les paramètres ont été enregistrés.
+    form:
+        trash_days: Jours pendant lesquels une fiche mise à la corbeille peut être restaurée (7-365)
+        timeline_years: Années de conservation de la chronologie (1-10)
+        import_keep_days: Jours de conservation des lignes d'un import terminé (1-90)
+        merge_keep_days: Jours pendant lesquels une fusion conserve les valeurs de la fiche fusionnée (1-365)
+search:
+    group:
+        companies: Sociétés
+        contacts: Contacts
+    see_all: 'Voir les %count%'
+flash:
+    conflict:
+        crm_record_stale: 'Quelqu''un a modifié cette fiche au même moment. Le formulaire affiche les valeurs actuelles : vérifiez-les et enregistrez à nouveau.'
+        crm_record_merged: Cette fiche a été fusionnée dans une autre.
+        crm_record_trashed: Cette fiche est dans la corbeille.
+        crm_merge_stale: L'une des fiches a été modifiée ou fusionnée entre-temps. Comparez à nouveau.
+        crm_import_running: Cet import est déjà en cours ou terminé.
+        crm_limit_reached: 'La limite de votre offre est atteinte : plus aucune fiche de ce type ne peut être ajoutée.'
+        crm_settings_stale: Quelqu'un a modifié les paramètres au même moment. Vérifiez-les et enregistrez à nouveau.
+        crm_write_conflict: 'Une autre modification des mêmes données est arrivée au même moment. Réessayez.'
+error:
+    required: Ce champ est obligatoire.
+    invalid: Cette valeur n'est pas valide.
+    host_object_unknown: 'Cet objet n''existe pas ou vous ne pouvez pas le voir.'
+    too_long: Cette valeur est trop longue.
+    unknown_field: Champ inconnu.
+    email: Ce n'est pas une adresse e-mail.
+    url: 'Ce n''est pas une adresse web (http:// ou https://).'
+    phone: Ce n'est pas un numéro de téléphone.
+    country: Utilisez le code pays à deux lettres (ES, FR…).
+    contact_name: Un contact doit avoir un prénom ou un nom.
+    email_taken: Un autre contact a déjà cet e-mail.
+    owner_unknown: Cette personne ne peut pas être responsable de fiches.
+    tag_unknown: Étiquette inconnue.
+    tag_name: Le nom d'une étiquette compte de 1 à 60 caractères.
+    tag_taken: Une étiquette portant ce nom existe déjà.
+    field_key: 'Une clé compte de 1 à 40 lettres minuscules, chiffres ou "_", et commence par une lettre.'
+    field_key_reserved: Cette clé correspond à un champ intégré.
+    field_key_taken: Un champ portant cette clé existe déjà.
+    field_limit: Aucun champ personnalisé supplémentaire ne peut être ajouté.
+    field_choices: Un champ à choix requiert de 1 à 50 choix.
+    note_invalid: Une note peut contenir jusqu'à 10 000 caractères de texte.
+    consent_purpose: Finalité inconnue.
+    merge_same: Une fiche ne peut pas être fusionnée avec elle-même.
+    out_of_range: Cette valeur est hors limites.
+    csrf: Le formulaire a expiré. Rechargez la page et réessayez.

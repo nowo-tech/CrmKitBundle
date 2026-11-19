@@ -1,0 +1,141 @@
+{#
+  The 360° page of a company or contact (contract section 9). Variables: page (ShowPage), record (RecordView),
+  segment, can_edit, can_manage, forms (note, notes[id], tags, link, affiliation, consent), buttons (notes, links,
+  affiliations: View\Action per id), back (return params), notes, timeline, links, panels, duplicates, consents.
+#}
+{% extends '@NowoUiKit/page/show.html.twig' %}
+
+{% block nowo_ui_show_after %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {%- set _b = page.bundle -%}
+    <div class="crm-kit-toolbar" data-testid="crm-focus">{{ include(nowo_ui_partial('focus_mode_toggle', _b), {area: 'crm', bundle: _b}) }}</div>
+
+    {% if record.tags is not empty %}
+        <p data-testid="crm-tags">{% for tag in record.tags %}<span class="{{ nowo_ui_class('badge', _b) }} crm-kit-tag crm-kit-tag--{{ tag.colour }}">{{ tag.name }}</span> {% endfor %}</p>
+    {% endif %}
+    {% if forms.tags is defined %}
+        {{ include('@NowoCrmKit/_form.html.twig', {form: forms.tags, title: 'tags.title_record', submit: 'tags.save', action: path('nowo_crm_kit_tags_assign', {type: segment, id: record.id}), testid: 'crm-tags-form', variant: 'btn_secondary'}) }}
+    {% endif %}
+
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-affiliations">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ (record.type.value == 'company' ? 'record.contacts' : 'record.companies')|trans({}, _d) }}</h2>
+            {% if record.affiliations is empty %}
+                <p>{{ 'record.affiliations_empty'|trans({}, _d) }}</p>
+            {% else %}
+                <ul>
+                {% for a in record.affiliations %}
+                    <li data-testid="crm-affiliation">
+                        {% if record.type.value == 'company' %}<a href="{{ path('nowo_crm_kit_show', {type: 'contacts', id: a.contactId}) }}">{{ a.contactName }}</a>{% else %}<a href="{{ path('nowo_crm_kit_show', {type: 'companies', id: a.companyId}) }}">{{ a.companyName }}</a>{% endif %}
+                        {% if a.role %} · {{ a.role }}{% endif %}{% if a.primary %} · <strong>{{ 'affiliation.primary'|trans({}, _d) }}</strong>{% endif %}
+                        {% if buttons.affiliations[a.id] is defined %}{{ include(nowo_ui_partial('action', _b), {action: buttons.affiliations[a.id], context: 'row', bundle: _b}) }}{% endif %}
+                    </li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    </section>
+    {% if forms.affiliation is defined %}
+        {{ include('@NowoCrmKit/_form.html.twig', {form: forms.affiliation, title: 'affiliation.add', submit: 'affiliation.save', action: path('nowo_crm_kit_affiliate', {id: record.id}), testid: 'crm-affiliation-form', variant: 'btn_secondary'}) }}
+    {% endif %}
+
+    {% if links is not empty or forms.link is defined %}
+        <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-links">
+            <div class="{{ nowo_ui_class('card_body', _b) }}">
+                <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'link.title'|trans({}, _d) }}</h2>
+                <ul>
+                {% for link in links %}
+                    <li data-testid="crm-link">{% if link.url and (link.url starts with '/' or link.url starts with 'https://' or link.url starts with 'http://') and not (link.url starts with '//') and not (link.url starts with '/\\') %}<a href="{{ link.url }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}
+                        {% if buttons.links[link.id] is defined %}{{ include(nowo_ui_partial('action', _b), {action: buttons.links[link.id], context: 'row', bundle: _b}) }}{% endif %}</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </section>
+        {% if forms.link is defined %}
+            {{ include('@NowoCrmKit/_form.html.twig', {form: forms.link, title: 'link.add', submit: 'link.save', action: path('nowo_crm_kit_link_add', {type: segment, id: record.id}), testid: 'crm-link-form', variant: 'btn_secondary'}) }}
+        {% endif %}
+    {% endif %}
+
+    {% for item in panels %}
+        {%- set panel = item.panel -%}
+        <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-panel" data-panel="{{ item.key }}" data-position="{{ panel.position }}">
+            <div class="{{ nowo_ui_class('card_body', _b) }}">
+                <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ panel.domain ? panel.title|trans({}, panel.domain) : panel.title }}{% if panel.total is not null %} ({{ panel.total }}){% endif %}</h2>
+                {% if panel.items is empty %}
+                    <p>{{ panel.emptyText ?? 'panel.empty'|trans({}, _d) }}</p>
+                {% else %}
+                    <ul>
+                    {% for row in panel.items %}
+                        <li>{% if row.url and (row.url starts with '/' or row.url starts with 'https://' or row.url starts with 'http://') and not (row.url starts with '//') and not (row.url starts with '/\\') %}<a href="{{ row.url }}">{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}
+                            {% if row.subtitle %} · {{ row.subtitle }}{% endif %}
+                            {% if row.badge %} <span class="{{ nowo_ui_class('badge', _b) }} crm-kit-badge--{{ row.tone|replace({' ': ''}) }}">{{ row.badge }}</span>{% endif %}</li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if panel.moreUrl and (panel.moreUrl starts with '/' and not (panel.moreUrl starts with '//') and not (panel.moreUrl starts with '/\\')) %}<p><a href="{{ panel.moreUrl }}">{{ 'panel.more'|trans({}, _d) }}</a></p>{% endif %}
+            </div>
+        </section>
+    {% endfor %}
+
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-notes">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'note.title'|trans({}, _d) }}</h2>
+            {% if notes is empty %}<p>{{ 'note.empty'|trans({}, _d) }}</p>{% endif %}
+            {% for note in notes %}
+                <article class="crm-kit-note" data-testid="crm-note"{% if note.pinned %} data-pinned="1"{% endif %}>
+                    <p>{{ note.body|nl2br }}</p>
+                    <p><small>{{ note.authorName ?? note.authorId ?? '—' }} · {{ note.createdAt|date('Y-m-d H:i') }}{% if note.pinned %} · {{ 'note.pinned'|trans({}, _d) }}{% endif %}</small></p>
+                    {% if forms.notes[note.id] is defined %}
+                        <details><summary>{{ 'note.edit'|trans({}, _d) }}</summary>
+                            {{ include('@NowoCrmKit/_form.html.twig', {form: forms.notes[note.id], title: null, submit: 'note.save', action: path('nowo_crm_kit_note_edit', {id: note.id}|merge(back)), testid: 'crm-note-edit', variant: 'btn_secondary'}) }}
+                        </details>
+                        {{ include(nowo_ui_partial('action', _b), {action: buttons.notes[note.id], context: 'row', bundle: _b}) }}
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% if forms.note is defined %}
+        {{ include('@NowoCrmKit/_form.html.twig', {form: forms.note, title: 'note.add', submit: 'note.save', action: path('nowo_crm_kit_note_add', {type: segment, id: record.id}), testid: 'crm-note-form'}) }}
+    {% endif %}
+
+    {% if record.type.value == 'contact' %}
+        <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-consents">
+            <div class="{{ nowo_ui_class('card_body', _b) }}">
+                <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'consent.title'|trans({}, _d) }}</h2>
+                {% if consents is empty %}<p>{{ 'consent.empty'|trans({}, _d) }}</p>{% else %}
+                    <ul>{% for c in consents %}<li data-testid="crm-consent">{{ ('consent.purpose.' ~ c.purpose)|trans({}, _d) }}: {{ (c.granted ? 'consent.granted' : 'consent.withdrawn')|trans({}, _d) }} · {{ ('consent.source.' ~ c.source.value)|trans({}, _d) }} · {{ c.recordedAt|date('Y-m-d H:i') }}{% if c.evidence %} · {{ c.evidence }}{% endif %}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+        </section>
+        {% if forms.consent is defined %}
+            {{ include('@NowoCrmKit/_form.html.twig', {form: forms.consent, title: 'consent.add', submit: 'consent.save', action: path('nowo_crm_kit_consent', {id: record.id}), testid: 'crm-consent-form', variant: 'btn_secondary'}) }}
+        {% endif %}
+    {% endif %}
+
+    {% if duplicates is not empty %}
+        <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-duplicates">
+            <div class="{{ nowo_ui_class('card_body', _b) }}">
+                <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'record.duplicates'|trans({}, _d) }}</h2>
+                <ul>{% for d in duplicates %}<li><a href="{{ path('nowo_crm_kit_show', {type: segment, id: d.id}) }}">{{ d.label }}</a>{% if can_edit %} · <a href="{{ path('nowo_crm_kit_merge', {type: segment, id: record.id, other: d.id}) }}" data-testid="crm-merge-link">{{ 'record.merge_with'|trans({}, _d) }}</a>{% endif %}</li>{% endfor %}</ul>
+            </div>
+        </section>
+    {% endif %}
+
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-timeline">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'timeline.title'|trans({}, _d) }}</h2>
+            {% if timeline is empty %}<p>{{ 'timeline.empty'|trans({}, _d) }}</p>{% else %}
+                <ol class="crm-kit-timeline">
+                {% for entry in timeline %}
+                    <li data-testid="crm-activity" data-kind="{{ entry.kind.value }}">
+                        <time datetime="{{ entry.occurredAt|date('c') }}">{{ entry.occurredAt|date('Y-m-d H:i') }}</time> ·
+                        {% if entry.kind.value == 'host' %}{{ (entry.params._label ?? '')|trans(entry.params|filter((v, k) => k starts with '%')) }}{% set _url = entry.params._url ?? '' %}{% if _url starts with '/' and not (_url starts with '//') and not (_url starts with '/\\') %} <a href="{{ _url }}">{{ 'timeline.open'|trans({}, _d) }}</a>{% endif %}{% else %}{{ ('activity.' ~ entry.kind.value)|trans({'%actor%': entry.actorName ?? '—'}, _d) }}{% endif %}
+                        {% if entry.subjectLabel %} · <a href="{{ path('nowo_crm_kit_show', {type: 'contacts', id: entry.subjectId}) }}">{{ entry.subjectLabel }}</a>{% endif %}
+                    </li>
+                {% endfor %}
+                </ol>
+            {% endif %}
+        </div>
+    </section>
+{% endblock %}

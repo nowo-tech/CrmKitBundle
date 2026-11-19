@@ -394,8 +394,9 @@ final readonly class ProjectClientSync
 | --- | --- | --- |
 | `NotAvailableException` | no tenant, feature off, no actor, unknown id or another tenant's record | 404 |
 | `AccessDeniedException` | permission refused inside an enabled tenant | 403 |
-| `ConflictException` (`errorCode`) | domain conflict: `crm_record_stale`, `crm_record_merged` (`recordId` = survivor), `crm_record_trashed`, `crm_merge_stale`, `crm_import_running`, `crm_limit_reached`, `crm_settings_stale` | 409, no `Retry-After`, no `X-Conflict-Code` |
-| `WriteConflictException` (`crm_write_conflict`) | a lock conflict: a racing writer's unique row that one more attempt did not settle | 409 `CONFLICT_001` + `Retry-After` + `X-Conflict-Code` |
+| `ConflictException` (`errorCode`) | domain conflict: `crm_record_stale`, `crm_record_merged` (`recordId` = survivor), `crm_record_trashed`, `crm_merge_stale`, `crm_import_running`, `crm_limit_reached`, `crm_settings_stale`, `crm_write_conflict` (a racing writer's unique row that one more attempt did not settle; nothing committed, a retry is safe) | 409, no `Retry-After`, no `X-Conflict-Code` |
+| transaction-doctrine's `ConcurrencyConflict` | a lock conflict: another writer held the rows and the replays did not settle it | 409 `CONFLICT_001` + `Retry-After` + `X-Conflict-Code` (`CONFLICT_002` when the request already committed part of its work) |
+| `LogicException` | a write called inside a transaction that is already open, or with pending host changes on a shared entity manager | 500 (a programming error: call the CRM outside your transaction) |
 | `InvalidInputException` (`errors`: field ⇒ key) | input refused | form errors; 422 (JSON) / 400 |
 | `ImportFileException` | file refused at upload (size, encoding, header, rows) | form error |
 
@@ -425,7 +426,7 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 | `affiliate`, `unaffiliate` | `/contacts/{id}/affiliations`, `/affiliations/{id}/remove` | POST | edit |
 | `consent` | `/contacts/{id}/consent` | POST | edit |
 | `vcard` | `/contacts/{id}/vcard` | GET | view |
-| `gdpr_export`, `erase` | `/contacts/{id}/gdpr-export` (JSON download), `/contacts/{id}/erase` | GET / POST | manage |
+| `gdpr_export`, `erase` | `/contacts/{id}/gdpr-export` (JSON download), `/contacts/{id}/erase` | POST (both with the action token `crm_action[_token]`) | manage |
 | `import`, `import_show` | `/import`, `/import/{id}` (preview, confirm; `do=run` continue, `do=cancel`) | GET, POST | edit |
 | `tags`, `tag_edit` | `/admin/tags`, `/admin/tags/{id}` (rename, recolour, delete) | GET, POST | manage |
 | `fields`, `field_edit` | `/admin/fields`, `/admin/fields/{id}` (change, archive) | GET, POST | manage |

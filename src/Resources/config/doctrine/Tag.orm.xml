@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Tag" table="crm_tag">
+        <unique-constraints>
+            <unique-constraint name="crm_tag_name" columns="tenant_id,name_key"/>
+        </unique-constraints>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="name" column="name" type="string" length="60"/>
+        <field name="nameKey" column="name_key" type="string" length="60"/>
+        <field name="colour" column="colour" type="string" length="16"/>
+        <field name="version" column="version" type="integer" version="true"/>
+        <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime"/>
+    </entity>
+</doctrine-mapping>

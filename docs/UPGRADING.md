@@ -17,13 +17,23 @@ names; listeners registered by class name keep working. The retention purge now 
 committed batch (no listener: nothing changes); `CrmBatchLookupInterface::existing()` is new. No schema change.
 
 **Actor ids (`security.actor_resolver`).** Nothing changes until you configure a resolver: the default keeps
-`getUserIdentifier()`. `CrmPersonalDataInterface` gains `exportActor()` and `anonymiseActor()` (a class of your own
-that implements the interface must add them); `RecordViews`, `SecurityCrmAccessChecker` and `SecurityActorDirectory`
-take the resolver as a new trailing argument with a default.
+`getUserIdentifier()`. The new system API `CrmActorPersonalDataInterface` (`exportActor()`, `anonymiseActor()`) is a
+separate service: `CrmPersonalDataInterface` is unchanged. `RecordViews`, `SecurityCrmAccessChecker` and
+`SecurityActorDirectory` take the resolver as a new trailing argument with a default.
+
+- The resolver feeds `SecurityCrmAccessChecker` (the default `access_checker` port) and the default directory. With a
+  host `access_checker` of your own (or a 0.1.0 checker wrapped by `LegacyCrmAccessChecker`), the bundle does not ask
+  the resolver for `currentActor()`: return `idOf($user)` from your checker yourself.
+- `nowo_crm_kit.record_visibility` listeners and `record_access_check` listeners compare owners with the actor id:
+  after the switch they must add and compare the new ids.
+- `anonymised` is reserved (`ActorRef::ANONYMISED`): a checker, resolver, directory or visibility listener must never
+  return it (the bundle refuses it anyway: no actor, no owner, no visible owner).
 
 Switching an existing installation from identifiers (e-mails) to stable ids rewrites every stored actor id. Stop the
 writers (maintenance mode, the import resume cron and the retention purge off), take a backup, fill a mapping table
-from your users (old identifier ⇒ new id), run the statements below in one transaction, then deploy the resolver.
+from your users (old identifier ⇒ new id), run the pre-check, run the UPDATEs in one transaction, then deploy the
+resolver. On MySQL and MariaDB `CREATE TABLE` and `DROP TABLE` commit implicitly: create and fill the map first, then
+`START TRANSACTION`, the UPDATEs, `COMMIT`, and drop the map afterwards (PostgreSQL may run it all in one transaction).
 Default prefix `nowo_`; the map uses the same binary collation as the CRM columns so the comparison is exact.
 
 ```sql
@@ -37,6 +47,19 @@ CREATE TABLE crm_actor_map (old_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE ut
 CREATE TABLE crm_actor_map (old_id VARCHAR(128) NOT NULL PRIMARY KEY, new_id VARCHAR(128) NOT NULL);
 
 INSERT INTO crm_actor_map (old_id, new_id) SELECT email, uuid FROM app_user;   -- your users
+
+-- Pre-check: must return no row. A new id may not be the reserved placeholder, nor an identifier already stored that
+-- the map does not replace (it would merge two people).
+WITH stored (id) AS (
+    SELECT owner_id FROM nowo_crm_company UNION SELECT created_by_id FROM nowo_crm_company UNION SELECT updated_by_id FROM nowo_crm_company
+    UNION SELECT owner_id FROM nowo_crm_contact UNION SELECT created_by_id FROM nowo_crm_contact UNION SELECT updated_by_id FROM nowo_crm_contact
+    UNION SELECT author_id FROM nowo_crm_note UNION SELECT actor_id FROM nowo_crm_activity UNION SELECT recorded_by_id FROM nowo_crm_consent
+    UNION SELECT created_by_id FROM nowo_crm_host_link UNION SELECT created_by_id FROM nowo_crm_role_assignment
+    UNION SELECT created_by_id FROM nowo_crm_import UNION SELECT actor_id FROM nowo_crm_merge UNION SELECT updated_by_id FROM nowo_crm_settings
+)
+SELECT m.new_id FROM crm_actor_map m
+ WHERE m.new_id = 'anonymised'
+    OR (m.new_id IN (SELECT id FROM stored) AND m.new_id NOT IN (SELECT old_id FROM crm_actor_map));
 
 -- Every id column (portable SQL). Repeat for each pair below; add ", version = version + 1" on the versioned tables
 -- (company, contact, note, import, settings) so open forms fail as stale.

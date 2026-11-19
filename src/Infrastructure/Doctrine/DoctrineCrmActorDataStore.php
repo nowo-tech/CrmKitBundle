@@ -44,8 +44,9 @@ use const JSON_THROW_ON_ERROR;
 /**
  * {@see CrmActorDataStoreInterface} in plain SQL on the bundle's connection: an id column is matched with `=` (binary
  * collation on MySQL / MariaDB); an owner inside a JSON document (owner-changed timeline entries, merge snapshots) is
- * found with a LIKE pre-filter on the id's longest plain run and confirmed after decoding. In write mode the batch's
- * rows are locked (`FOR UPDATE`) before they change, and a versioned row's version moves, so a form opened before
+ * found with a LIKE pre-filter on the id's longest plain run and confirmed after decoding. Each page is read without a
+ * lock; in write mode only its matched rows are then locked by primary key (`FOR UPDATE`) and checked again before they
+ * change, and a versioned row's version moves, so a form opened before
  * keeps failing as stale instead of writing the old id back. No entity is loaded. Stateless.
  *
  * @internal
@@ -90,7 +91,6 @@ final readonly class DoctrineCrmActorDataStore implements CrmActorDataStoreInter
         $em                                        = $this->runner->manager();
         $db                                        = $em->getConnection();
         $table                                     = $em->getClassMetadata($class)->getTableName();
-        $lock                                      = $replacement !== null && !$db->getDatabasePlatform() instanceof SQLitePlatform ? ' FOR UPDATE' : '';
         // PostgreSQL has no LIKE on json: compare its text.
         $text  = $db->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'CAST(' . $column . ' AS TEXT)' : $column;
         $where = [];
@@ -115,18 +115,21 @@ final readonly class DoctrineCrmActorDataStore implements CrmActorDataStoreInter
             $args[]  = $after;
         }
         $rows = $db->fetchAllAssociative(
-            sprintf('SELECT %s AS row_key, tenant_id, %s AS ref FROM %s%s ORDER BY %s LIMIT %d%s', $key, $column, $table, $where === [] ? '' : ' WHERE ' . implode(' AND ', $where), $key, $limit, $lock),
+            // A keyset page read without a lock: the actor columns have no index, so a locking scan would lock every row
+            // it reads in every tenant on InnoDB (audit VD-2).
+            sprintf('SELECT %s AS row_key, tenant_id, %s AS ref FROM %s%s ORDER BY %s LIMIT %d', $key, $column, $table, $where === [] ? '' : ' WHERE ' . implode(' AND ', $where), $key, $limit),
             $args,
         );
-        $found = [];
-        foreach ($rows as $row) {
-            $document = $path === null ? null : $this->document($row['ref']);
-            $match    = $path === null ? $row['ref'] === $actorId : is_array($document) && ($document[$path] ?? null) === $actorId;
-            if ($match && is_string($row['row_key']) && is_string($row['tenant_id'])) {
-                $found[] = ['tenant' => $row['tenant_id'], 'key' => $row['row_key'], 'document' => $document];
-            }
-        }
-        if ($replacement !== null) {
+        $found = $this->matches($rows, $path, $actorId);
+        if ($replacement !== null && $found !== []) {
+            // Then only the matched rows, by primary key, are locked and checked again before they change.
+            $lock   = $db->getDatabasePlatform() instanceof SQLitePlatform ? '' : ' FOR UPDATE';
+            $locked = $db->fetchAllAssociative(
+                sprintf('SELECT %s AS row_key, tenant_id, %s AS ref FROM %s WHERE %s IN (?) ORDER BY %s%s', $key, $column, $table, $key, $key, $lock),
+                [array_column($found, 'key')],
+                [ArrayParameterType::STRING],
+            );
+            $found = $this->matches($locked, $path, $actorId);
             $this->replace($db, $table, $column, $key, $versioned, $path, $actorId, $replacement, $found);
         }
         $last = $rows === [] ? null : end($rows)['row_key'];
@@ -135,6 +138,27 @@ final readonly class DoctrineCrmActorDataStore implements CrmActorDataStoreInter
             'rows' => array_map(static fn (array $f): array => ['tenant' => $f['tenant'], 'key' => $f['key']], $found),
             'next' => count($rows) === $limit && is_string($last) ? $last : null,
         ];
+    }
+
+    /**
+     * The rows that reference the person exactly (an id column with ===, a JSON owner after decoding).
+     *
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<array{tenant: string, key: string, document: array<mixed>|null}>
+     */
+    private function matches(array $rows, ?string $path, string $actorId): array
+    {
+        $found = [];
+        foreach ($rows as $row) {
+            $document = $path === null ? null : $this->document($row['ref']);
+            $match    = $path === null ? $row['ref'] === $actorId : is_array($document) && ($document[$path] ?? null) === $actorId;
+            if ($match && is_string($row['row_key']) && is_string($row['tenant_id'])) {
+                $found[] = ['tenant' => $row['tenant_id'], 'key' => $row['row_key'], 'document' => $document];
+            }
+        }
+
+        return $found;
     }
 
     /**

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
-use LogicException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
@@ -43,29 +42,8 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
     /**
      * Wires the collaborators.
      */
-    public function __construct(private WriteSupport $support, private PlanCounter $counter, private ?ActorPersonalData $actors = null)
+    public function __construct(private WriteSupport $support, private PlanCounter $counter)
     {
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public function exportActor(string $actorId): array
-    {
-        return $this->actors()->export($actorId);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public function anonymiseActor(string $actorId): int
-    {
-        return $this->actors()->anonymise($actorId);
-    }
-
-    private function actors(): ActorPersonalData
-    {
-        return $this->actors ?? throw new LogicException('CrmPersonalData needs ActorPersonalData for actor exports and anonymisation.');
     }
 
     /**

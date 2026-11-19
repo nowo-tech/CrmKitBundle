@@ -290,6 +290,14 @@ nowo_crm_kit:
 Each profile's ref must be exactly its key; ids the resolver leaves out are named by the actor directory. Switching an
 existing installation to new ids needs a data migration: see [UPGRADING.md](UPGRADING.md#unreleased).
 
+- The resolver feeds the default access checker (`SecurityCrmAccessChecker`) and the default directory. A host
+  `access_checker` of its own (or a 0.1.0 checker under `LegacyCrmAccessChecker`) must return `idOf($user)` from
+  `currentActor()` itself.
+- `nowo_crm_kit.record_visibility` and `record_access_check` listeners compare owners with these ids: add the new ids.
+- `anonymised` (`ActorRef::ANONYMISED`, what anonymisation writes) is reserved: never return it from a checker,
+  resolver, directory or listener. The bundle refuses it anyway (no actor, no owner, no visible owner), and a
+  signed-in person is never the demo's shared actor `anonymous`.
+
 ### Audit sink
 
 ```php
@@ -431,6 +439,7 @@ resolves the tenant and the actor and checks the permission itself (404 / 403); 
 | `CrmPersonalDataInterface` | `export(contactId): array`, `erase(contactId)` (`manage`, idempotent) |
 | `CrmSettingsInterface` | `get(): array{trash_days, timeline_years, import_keep_days, merge_keep_days, version}`, `update(int ×4, int $expectedVersion)` (`manage`) |
 | `CrmBatchLookupInterface` (0.2.1) | a **system API without access checks** for the host's backend jobs: see [Batch lookups for host jobs](#batch-lookups-for-host-jobs) |
+| `CrmActorPersonalDataInterface` (0.2.1) | a **system API without tenant scope or access checks**: `exportActor()`, `anonymiseActor()`; see [A person's references](#a-persons-references-export-and-anonymisation) |
 
 ### Creating and editing a record
 
@@ -528,7 +537,8 @@ pass the ids it holds to `CrmBatchLookupInterface::existing()` and drop those th
 
 ## A person's references (export and anonymisation)
 
-`CrmPersonalDataInterface::exportActor($actorId)` lists every CRM reference to a host person **in every tenant**
+`CrmActorPersonalDataInterface::exportActor($actorId)` (its own service, so the tenant-scoped
+`CrmPersonalDataInterface` stays safe for GDPR pages) lists every CRM reference to a host person **in every tenant**
 (tenant ⇒ kind such as `company.owner`, `note.author`, `activity.actor` ⇒ row keys); `anonymiseActor($actorId)`
 replaces each with `anonymised` in batches of 200 rows, one transaction each, and returns how many it replaced (0
 when run again). Records, notes and everyone else's data stay. After the commits it dispatches `ActorAnonymised`

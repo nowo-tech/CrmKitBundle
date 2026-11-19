@@ -564,8 +564,9 @@ scope (or a scope on the company provider) answers `null`.
 
 ## 13. Permission matrix (deny by default)
 
-Every call (except the **0.2.1** system API `CrmBatchLookupInterface`, §7: tenant-scoped, no actor, no permission or
-visibility check, for trusted backend jobs only): tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404; **0.2.0** on the pages behind a
+Every call (except the **0.2.1** system APIs `CrmBatchLookupInterface`, §7: tenant-scoped, no actor, no permission or
+visibility check, and `CrmActorPersonalDataInterface`, §16.5: no tenant scope at all; trusted backend jobs only, never
+end users, HTTP APIs or agent tools): tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404; **0.2.0** on the pages behind a
 firewall: the firewall's entry point, login redirect or 401) → `isGranted()` (false ⇒ 403); a record of another tenant
 is 404.
 
@@ -783,7 +784,8 @@ phase G (Q-O8).
 
 ### 16.5 A host person's references (0.2.1, system API)
 
-`CrmPersonalDataInterface::exportActor(string $actorId): array` and `anonymiseActor(string $actorId): int` cover every
+`CrmActorPersonalDataInterface::exportActor(string $actorId): array` and `anonymiseActor(string $actorId): int` (their
+own interface, so the tenant-scoped `CrmPersonalDataInterface` stays safe for host GDPR controllers) cover every
 CRM reference to a host person's actor id **in every tenant**: owner, note author, created_by / updated_by, timeline
 actor, consent recorder, host-link and role creator, import uploader, merge actor, and the owner inside owner-changed
 timeline entries and merge snapshots (kinds in `Application\Port\CrmActorDataStoreInterface::KINDS`). The export
@@ -792,7 +794,11 @@ and everyone else's data, moves the version of versioned rows (a form opened bef
 the old id back), and runs in batches of 200 rows, one write unit each (rows locked first; a lock conflict replays the
 batch or answers 409 + `CONFLICT_001` / `CONFLICT_002`, REQ-RUNTIME-003 rule 6); after the last commit it dispatches
 `ActorAnonymised` (tenant, count; never the id) and audits `crm.actor.anonymised` (count) per tenant. Running it again
-changes nothing and returns 0. Like `CrmBatchLookupInterface` it is a **system API**: no tenant, actor or permission
+changes nothing and returns 0; if a batch fails, the batches committed before are still announced and audited, then
+the failure is rethrown. Each page is read without a lock and only its matched rows are locked by primary key (the
+actor columns have no index: a locking scan would block other tenants' writes). The placeholder is reserved
+(`ActorRef::ANONYMISED`): never an actor, an owner input or a visible owner. Like `CrmBatchLookupInterface` it is a
+**system API**: no tenant, actor or permission
 check; never exposed to end users or agent tools (MCP). There is no assignee in 0.2.x (tasks come in 0.4.0, which will
 add theirs to the kinds). Audit entries already written live in the host's audit sink: the host anonymises them.
 
@@ -1023,6 +1029,9 @@ differs is applied in the next commit and noted here with the date._
   its own entity manager (`recordIdsAndFlush`) fits without touching the bundle's transaction. A panel provider that
   denies its panel returns `null` (nothing shown) or a `Panel` with no items and an `emptyText` (the neutral
   placeholder); both render.
+- 0.2.1 for Beacon: an actor resolver for stable user ids (§8.1; Beacon registers its own, its access checker returns
+  `idOf()` itself); `CrmActorPersonalDataInterface` for account deletion (§16.5), called only from a backend job, never
+  from a page or an MCP tool; `CrmBatchLookupInterface` and `RecordsPurged` for derived rows (§7, §14).
 
 ## 25. Phase plan (owner, 2026-11-19)
 

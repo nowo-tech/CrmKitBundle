@@ -63,7 +63,8 @@ final readonly class SecurityCrmAccessChecker implements CrmAccessCheckerInterfa
         if ($user instanceof UserInterface) {
             $id = $this->actors->idOf($user);
 
-            return ExactId::isValid($id) ? new ActorRef($id) : null;
+            // A signed-in person never takes a reserved id: the anonymised placeholder or the demo's shared actor.
+            return ExactId::isValid($id) && !ActorRef::isReserved($id) && $id !== self::ANONYMOUS ? new ActorRef($id) : null;
         }
 
         return $this->allowUnauthenticated ? new ActorRef(self::ANONYMOUS) : null;

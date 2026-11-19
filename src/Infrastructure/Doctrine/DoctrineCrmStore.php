@@ -539,6 +539,18 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * {@inheritDoc}
      */
+    public function cancelImport(TenantRef $tenant, string $id, DateTimeImmutable $now, DateTimeImmutable $staleBefore): bool
+    {
+        return $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Import::class) . ' SET status = ?, finished_at = ?, claim_token = NULL, version = version + 1 WHERE id = ? AND tenant_id = ? AND (status = ? OR (status = ? AND (claim_token IS NULL OR claimed_at < ?)))',
+            [ImportStatus::Cancelled->value, $now, $id, $tenant->value, ImportStatus::Preview->value, ImportStatus::Running->value, $staleBefore],
+            [1 => UtcDateTimeImmutableType::NAME, 6 => UtcDateTimeImmutableType::NAME],
+        ) === 1;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function pauseImport(string $id, string $token, DateTimeImmutable $now): bool
     {
         return $this->connection()->executeStatement(

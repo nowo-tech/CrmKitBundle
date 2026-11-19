@@ -50,6 +50,9 @@ final readonly class ScopedRecordVisibility implements CrmRecordVisibilityInterf
         $event = new RecordVisibilityEvent($user, $actor->value, $tenant->value);
         $this->events?->dispatch($event, CrmKitEvents::RECORD_VISIBILITY);
 
-        return $event->getOwners();
+        $owners = $event->getOwners();
+
+        // A listener can never make the anonymised placeholder an owner the person sees (audit VD-1).
+        return $owners === null ? null : array_values(array_filter($owners, static fn (string $o): bool => !ActorRef::isReserved($o)));
     }
 }

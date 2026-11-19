@@ -69,7 +69,8 @@ final readonly class CrmAccess
             throw new NotAvailableException();
         }
         $actor = $this->checker->currentActor();
-        if (!$actor instanceof ActorRef) {
+        // The anonymised placeholder never acts, whichever checker returned it (audit VD-1).
+        if (!$actor instanceof ActorRef || ActorRef::isReserved($actor->value)) {
             throw new NotAvailableException();
         }
 

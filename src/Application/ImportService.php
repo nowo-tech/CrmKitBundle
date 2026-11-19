@@ -216,9 +216,9 @@ final readonly class ImportService implements ImportServiceInterface
         $context = $this->support->access->context(CrmPermission::Import);
         $this->support->write(function (Effects $effects) use ($context, $id): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $import = $this->import($context->tenant, $id);
-            $stale  = $this->staleBefore($context->now);
-            $from   = $import->getStatus() === ImportStatus::Running && ($import->isAwaitingPerson() || $import->getClaimedAt() < $stale) ? ImportStatus::Running : ImportStatus::Preview;
-            if (!$this->support->store->finishImport($id, ImportStatus::Cancelled, $context->now, $from)) {
+            // One conditional UPDATE decides (audit VD-4): a preview, a paused import or a stale claim is cancelled; a
+            // claim taken meanwhile (a "Continue" or the resume command) answers crm_import_running.
+            if (!$this->support->store->cancelImport($context->tenant, $id, $context->now, $this->staleBefore($context->now))) {
                 throw new ConflictException(ConflictException::IMPORT_RUNNING, $id);
             }
             $this->support->audit($effects, $context, 'crm.import.cancelled', $import->getSubjectType(), $id);

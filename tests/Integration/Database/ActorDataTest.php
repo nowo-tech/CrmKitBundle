@@ -15,7 +15,7 @@ use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Read\ActivityView;
 use Nowo\CrmKitBundle\Domain\Read\NoteView;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
-use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmActorPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmSettingsInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
@@ -121,7 +121,7 @@ final class ActorDataTest extends CrmTestCase
         $this->everything('globex', 'ana');
         $g = $this->company('Globex');
 
-        $data   = $this->service(CrmPersonalDataInterface::class);
+        $data   = $this->service(CrmActorPersonalDataInterface::class);
         $export = $data->exportActor('ana');
         self::assertSame('ana', $export['actor']);
         self::assertSame(['acme', 'globex'], array_keys($export['tenants']));

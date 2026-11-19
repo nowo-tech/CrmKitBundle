@@ -51,7 +51,7 @@ final readonly class SecurityActorDirectory implements CrmActorDirectoryInterfac
     {
         $user = $this->tokens?->getToken()?->getUser();
         $id   = $user instanceof UserInterface ? $this->actors->idOf($user) : '';
-        if (!$user instanceof UserInterface || !ExactId::isValid($id)) {
+        if (!$user instanceof UserInterface || !ExactId::isValid($id) || ActorRef::isReserved($id)) {
             return null;
         }
         $profile = $this->actors->resolve([$id])[$id] ?? null;

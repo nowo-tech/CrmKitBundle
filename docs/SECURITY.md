@@ -152,9 +152,14 @@ The tenant is the controller; the bundle is the tool.
 - A host link URL returned by a resolver is rendered as given (escaped): return local paths or http(s) URLs only.
 - A provider exception is contained (the panel is skipped); a transient storage failure is rethrown so the write unit
   can replay.
-- **`CrmPersonalDataInterface::exportActor()` / `anonymiseActor()` are system APIs (0.2.1)** without any tenant
-  scope: they read or rewrite a host person's references in every tenant and check no permission. Call them only from
-  trusted server-side code; never expose them to end users or agent tools (MCP).
+- **`CrmActorPersonalDataInterface` (`exportActor()` / `anonymiseActor()`) is a system API (0.2.1)** without any
+  tenant scope: it reads or rewrites a host person's references in every tenant and checks no permission. It is a
+  separate service so that a host GDPR controller bound to the tenant-scoped `CrmPersonalDataInterface` cannot reach
+  it. Call it only from trusted server-side code; never expose it to end users or agent tools (MCP).
+- **The placeholder `anonymised` is reserved** (`ActorRef::ANONYMISED`): `CrmAccess` treats it as no actor whatever
+  the checker returns, the default checker and directory never derive it (nor `anonymous`) for a signed-in person,
+  `RecordService` refuses it as an owner and the visibility adapter drops it from listener owners, so nobody can
+  inherit the records of anonymised people (audit VD-1).
 - **Actor ids.** The actor id stored everywhere comes from `CrmActorResolverInterface::idOf()` (default the
   identifier). A host whose identifiers can change or be reused (e-mails) should return a stable id, or a former
   address's new holder inherits the old owner's records under `resource_scoping`.

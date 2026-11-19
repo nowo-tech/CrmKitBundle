@@ -257,8 +257,14 @@ interface CrmStoreInterface
     public function takeOverImport(TenantRef $tenant, string $id, string $token, DateTimeImmutable $now, DateTimeImmutable $staleBefore): bool;
 
     /**
+     * Cancels an import in preview, or a running one without a fresh claim (waiting for a person, or a claim older than
+     * `$staleBefore`), in one conditional UPDATE; whether this call cancelled it.
+     */
+    public function cancelImport(TenantRef $tenant, string $id, DateTimeImmutable $now, DateTimeImmutable $staleBefore): bool;
+
+    /**
      * Releases the claim of `$token` on a running import that waits for a person (claim token emptied, claimed time
-     * kept); whether this call held it. Such an import is left out of {@see self::staleImports()}.
+     * set to now); whether this call held it. Such an import is left out of {@see self::staleImports()}.
      */
     public function pauseImport(string $id, string $token, DateTimeImmutable $now): bool;
 

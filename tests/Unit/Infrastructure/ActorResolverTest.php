@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Unit\Infrastructure;
 
-use LogicException;
-use Nowo\CrmKitBundle\Application\CrmPersonalData;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SecurityActorDirectory;
@@ -15,7 +13,6 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\IdentifierActorResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestActorResolver;
 use PHPUnit\Framework\TestCase;
-use ReflectionClass;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\User\InMemoryUser;
@@ -47,12 +44,5 @@ final class ActorResolverTest extends TestCase
         self::assertNull($directory->actor($tenant, new ActorRef('ana')), 'the identifier is no longer the actor');
         $tokens->setToken(new UsernamePasswordToken(new InMemoryUser('leo', null), 'main'));
         self::assertSame('leo', $directory->owners($tenant)[0]->name, 'unknown to the resolver: named by the identifier');
-    }
-
-    public function testActorPersonalDataNeedsItsService(): void
-    {
-        $data = (new ReflectionClass(CrmPersonalData::class))->newInstanceWithoutConstructor();
-        $this->expectException(LogicException::class);
-        $data->exportActor('ana');
     }
 }

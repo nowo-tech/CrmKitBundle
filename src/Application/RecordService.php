@@ -27,6 +27,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordInput;
 use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
 use Nowo\CrmKitBundle\Domain\Value\ActorProfile;
+use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 
@@ -405,7 +406,7 @@ final readonly class RecordService implements RecordServiceInterface
             return null;
         }
         $owners = array_map(static fn (ActorProfile $p): string => $p->ref->value, $this->directory->owners($context->tenant));
-        if (!in_array($input->owner, $owners, true)) {
+        if (ActorRef::isReserved($input->owner) || !in_array($input->owner, $owners, true)) {
             throw InvalidInputException::field('owner', 'error.owner_unknown');
         }
 

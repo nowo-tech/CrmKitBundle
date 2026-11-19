@@ -41,6 +41,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmActorPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmBatchLookupInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmCatalogueInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
@@ -237,7 +238,8 @@ final class ServiceDefinitions
         $s->set(DoctrineCrmActorDataStore::class)->args([service(DoctrineTransactionRunner::class)]);
         $s->alias(CrmActorDataStoreInterface::class, DoctrineCrmActorDataStore::class);
         $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events]);
-        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(ActorPersonalData::class)]);
+        $s->alias(CrmActorPersonalDataInterface::class, ActorPersonalData::class)->public();
+        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class)]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();

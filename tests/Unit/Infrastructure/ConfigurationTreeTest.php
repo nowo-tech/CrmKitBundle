@@ -50,6 +50,9 @@ final class ConfigurationTreeTest extends TestCase
         yield 'too many roles' => [['roles' => ['catalogue' => array_map(static fn (int $i): string => 'r' . $i, range(1, 33))]], 'roles.catalogue'];
         yield 'purpose dot' => [['affiliations' => ['purposes' => ['bill.ing']]], 'affiliations.purposes'];
         yield 'purpose duplicate' => [['affiliations' => ['purposes' => ['billing', 'billing']]], 'affiliations.purposes'];
+        yield 'no settings role' => [['security' => ['settings_roles' => []]], 'security.settings_roles'];
+        yield 'no export role' => [['security' => ['export_roles' => []]], 'security.export_roles'];
+        yield 'no erase role' => [['security' => ['erase_roles' => []]], 'security.erase_roles'];
         yield 'phase' => [['reports' => ['enabled' => true]], 'phase G'];
         yield 'unknown' => [['nope' => true], 'nope'];
     }

@@ -67,7 +67,7 @@ final readonly class SecurityCrmAccessChecker implements CrmAccessCheckerInterfa
     }
 
     /**
-     * The area decision of a permission (later phases' permissions use the settings area until they get their own).
+     * The area decision of a permission.
      */
     private function area(CrmPermission $permission, ?object $user, TenantRef $tenant): bool
     {
@@ -75,26 +75,30 @@ final readonly class SecurityCrmAccessChecker implements CrmAccessCheckerInterfa
         $t = $tenant->value;
         if ($a instanceof TenantAwareCrmKitAccessCheckerInterface) {
             return match ($permission) {
-                CrmPermission::View   => $a->canAccess($user, $t),
-                CrmPermission::Create => $a->canAccess($user, $t) && $a->canCreate($user, $t),
-                CrmPermission::Edit   => $a->canAccess($user, $t) && $a->canEdit($user, $t),
-                CrmPermission::Delete => $a->canAccess($user, $t) && $a->canDelete($user, $t),
-                CrmPermission::Import => $a->canAccess($user, $t) && $a->canImport($user, $t),
-                CrmPermission::Export => $a->canAccess($user, $t) && $a->canExport($user, $t),
-                CrmPermission::Erase  => $a->canAccess($user, $t) && $a->canErase($user, $t),
-                default               => $a->canAccess($user, $t) && $a->canManageSettings($user, $t),
+                CrmPermission::View          => $a->canAccess($user, $t),
+                CrmPermission::Create        => $a->canAccess($user, $t) && $a->canCreate($user, $t),
+                CrmPermission::Edit          => $a->canAccess($user, $t) && $a->canEdit($user, $t),
+                CrmPermission::Delete        => $a->canAccess($user, $t) && $a->canDelete($user, $t),
+                CrmPermission::Import        => $a->canAccess($user, $t) && $a->canImport($user, $t),
+                CrmPermission::Export        => $a->canAccess($user, $t) && $a->canExport($user, $t),
+                CrmPermission::Erase         => $a->canAccess($user, $t) && $a->canErase($user, $t),
+                CrmPermission::AmountsView   => $a->canAccess($user, $t) && $a->canViewAmounts($user, $t),
+                CrmPermission::CampaignsSend => $a->canAccess($user, $t) && $a->canSendCampaigns($user, $t),
+                CrmPermission::Manage        => $a->canAccess($user, $t) && $a->canManageSettings($user, $t),
             };
         }
 
         return match ($permission) {
-            CrmPermission::View   => $a->canAccess($user),
-            CrmPermission::Create => $a->canAccess($user) && $a->canCreate($user),
-            CrmPermission::Edit   => $a->canAccess($user) && $a->canEdit($user),
-            CrmPermission::Delete => $a->canAccess($user) && $a->canDelete($user),
-            CrmPermission::Import => $a->canAccess($user) && $a->canImport($user),
-            CrmPermission::Export => $a->canAccess($user) && $a->canExport($user),
-            CrmPermission::Erase  => $a->canAccess($user) && $a->canErase($user),
-            default               => $a->canAccess($user) && $a->canManageSettings($user),
+            CrmPermission::View          => $a->canAccess($user),
+            CrmPermission::Create        => $a->canAccess($user) && $a->canCreate($user),
+            CrmPermission::Edit          => $a->canAccess($user) && $a->canEdit($user),
+            CrmPermission::Delete        => $a->canAccess($user) && $a->canDelete($user),
+            CrmPermission::Import        => $a->canAccess($user) && $a->canImport($user),
+            CrmPermission::Export        => $a->canAccess($user) && $a->canExport($user),
+            CrmPermission::Erase         => $a->canAccess($user) && $a->canErase($user),
+            CrmPermission::AmountsView   => $a->canAccess($user) && $a->canViewAmounts($user),
+            CrmPermission::CampaignsSend => $a->canAccess($user) && $a->canSendCampaigns($user),
+            CrmPermission::Manage        => $a->canAccess($user) && $a->canManageSettings($user),
         };
     }
 

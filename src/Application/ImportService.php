@@ -342,9 +342,11 @@ final readonly class ImportService implements ImportServiceInterface
             }
             if ($existing instanceof Contact) {
                 if ($import->getDuplicatePolicy() === DuplicatePolicy::Skip || !$existing->isActive()) {
-                    return [RowOutcome::Duplicate, $existing->getId(), null];
+                    // The id only for a contact the person may see.
+                    return [RowOutcome::Duplicate, $this->may($context, CrmPermission::View, SubjectType::Contact, $existing->getId(), $existing->getOwnerId()) ? $existing->getId() : null, null];
                 }
-                if (!$this->mayChangePrimaryContact($context, $existing, $company, $primaryContact)) {
+                // Updating an existing contact is an edit of that contact (audit UP-M-2), checked before any write.
+                if (!$this->may($context, CrmPermission::Edit, SubjectType::Contact, $existing->getId(), $existing->getOwnerId()) || !$this->mayAttach($context, $existing, $company, $primaryContact)) {
                     return [RowOutcome::Invalid, null, 'error.forbidden'];
                 }
                 $existing->apply($values);
@@ -368,7 +370,7 @@ final readonly class ImportService implements ImportServiceInterface
         } catch (InvalidInputException $e) {
             return [RowOutcome::Invalid, null, array_values($e->errors)[0] ?? 'error.invalid'];
         }
-        if (!$this->mayChangePrimaryContact($context, null, $company, $primaryContact)) {
+        if (!$this->mayAttach($context, null, $company, $primaryContact)) {
             return [RowOutcome::Invalid, null, 'error.forbidden'];
         }
         if (!$this->counter->tryTake($context->tenant, $type)) {
@@ -439,25 +441,38 @@ final readonly class ImportService implements ImportServiceInterface
     }
 
     /**
-     * Whether the row may set the primary-contact flag it carries: when the flag would change for the named company
-     * (a new contact has none), the person running the import needs `edit` on that company, as in the UI. Checked
-     * before the row writes anything.
+     * Whether the row may link the named company: `view` on it, and, when the row's primary-contact flag would change
+     * for it (a new contact has none), `edit` on it, as in the UI. Checked before the row writes anything.
      */
-    private function mayChangePrimaryContact(CrmContext $context, ?Contact $contact, ?string $company, ?bool $primaryContact): bool
+    private function mayAttach(CrmContext $context, ?Contact $contact, ?string $company, ?bool $primaryContact): bool
     {
-        $named = $primaryContact === null || $company === null ? null : $this->companyNamed($context, $company);
+        $named = $company === null ? null : $this->companyNamed($context, $company);
         if ($named === null) {
+            return true;
+        }
+        $owner = $this->support->store->record(SubjectType::Company, $context->tenant, $named)?->getOwnerId();
+        // The named company must be one the person may see (else nothing is linked and nothing is told about it).
+        if (!$this->may($context, CrmPermission::View, SubjectType::Company, $named, $owner)) {
+            return false;
+        }
+        if ($primaryContact === null) {
             return true;
         }
         $current = false;
         foreach ($contact instanceof Contact ? $this->support->store->affiliations($context->tenant, SubjectType::Contact, $contact->getId()) : [] as $affiliation) {
             $current = $current || ($affiliation->getCompanyId() === $named && $affiliation->isPrimaryContact());
         }
-        if ($current === $primaryContact) {
-            return true;
-        }
+
+        return $current === $primaryContact || $this->may($context, CrmPermission::Edit, SubjectType::Company, $named, $owner);
+    }
+
+    /**
+     * Whether the person running the import holds the permission on one record.
+     */
+    private function may(CrmContext $context, CrmPermission $permission, SubjectType $type, string $id, ?string $owner): bool
+    {
         try {
-            $this->support->access->require($context, CrmPermission::Edit, SubjectRef::of(SubjectType::Company, $named, $this->support->store->record(SubjectType::Company, $context->tenant, $named)?->getOwnerId()));
+            $this->support->access->require($context, $permission, SubjectRef::of($type, $id, $owner));
         } catch (AccessDeniedException) {
             return false;
         }

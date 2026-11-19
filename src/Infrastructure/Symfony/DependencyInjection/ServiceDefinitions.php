@@ -33,6 +33,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
@@ -93,6 +94,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterfa
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmResourceAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseFormatterInterface;
@@ -137,10 +139,12 @@ final class ServiceDefinitions
         // REQ-UI-002: the area checker (security.*_roles, or the host's security.access_checker), the record checker
         // with its event, and the port adapter the application asks.
         $auth = service('security.authorization_checker')->nullOnInvalid();
-        $s->set(ConfigurableCrmKitAccessChecker::class)->args([$auth, param($p . 'security.access_roles'), param($p . 'security.manage_roles'), param($p . 'security.settings_roles'), param($p . 'security.export_roles'), param($p . 'security.erase_roles')]);
+        $s->set(ConfigurableCrmKitAccessChecker::class)->args([$auth, param($p . 'security.access_roles'), param($p . 'security.manage_roles'), param($p . 'security.settings_roles'), param($p . 'security.export_roles'), param($p . 'security.erase_roles'), param($p . 'security.amounts_roles'), param($p . 'security.campaigns_roles')]);
         $s->set(AllowAllCrmKitAccessChecker::class);
         $s->alias(CrmKitAccessCheckerInterface::class, ConfigurableCrmKitAccessChecker::class)->public();
-        $s->set(CrmResourceAccessChecker::class)->args([$events, $auth, param($p . 'security.settings_roles'), param($p . 'security.resource_scoping')]);
+        $s->set(ScopedRecordVisibility::class)->args([service(CrmKitAccessCheckerInterface::class), service('security.token_storage')->nullOnInvalid(), $events, param($p . 'security.resource_scoping')]);
+        $s->alias(CrmRecordVisibilityInterface::class, ScopedRecordVisibility::class);
+        $s->set(CrmResourceAccessChecker::class)->args([$events, service(CrmRecordVisibilityInterface::class)]);
         $s->set($p . 'default.access_checker', SecurityCrmAccessChecker::class)
             ->args([service(CrmKitAccessCheckerInterface::class), service(CrmResourceAccessChecker::class), service('security.token_storage')->nullOnInvalid(), param($p . 'security.allow_unauthenticated')]);
         $s->set(CrmKitGuard::class)->args([service(CrmAccess::class)])->public();
@@ -174,7 +178,7 @@ final class ServiceDefinitions
             ->tag('kernel.event_listener', ['event' => 'console.terminate', 'method' => 'clear', 'priority' => -2048]);
 
         // Application.
-        $s->set(CrmAccess::class)->args([service(CrmTenantResolverInterface::class), service(CrmFeatureGateInterface::class), service(CrmAccessCheckerInterface::class), $clock])->public();
+        $s->set(CrmAccess::class)->args([service(CrmTenantResolverInterface::class), service(CrmFeatureGateInterface::class), service(CrmAccessCheckerInterface::class), $clock, service(CrmRecordVisibilityInterface::class)])->public();
         $s->set(WriteSupport::class)->args([service(CrmAccess::class), service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(IdGeneratorInterface::class), service(CrmAuditSinkInterface::class), $events]);
         $s->set(PlanCounter::class)->args([service(CrmStoreInterface::class), service(CrmPlanLimitsInterface::class)])->public();
         $s->set(Taggings::class)->args([service(WriteSupport::class)]);

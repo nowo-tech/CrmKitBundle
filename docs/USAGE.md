@@ -104,6 +104,8 @@ final readonly class OrganizationCrmAreas implements TenantAwareCrmKitAccessChec
     public function canExport(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
     public function canManageSettings(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
     public function canErase(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
+    public function canViewAmounts(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.amounts.view'); }
+    public function canSendCampaigns(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.campaigns.send'); }
 
     private function has(?object $user, ?string $tenant, string $permission): bool
     {
@@ -144,6 +146,29 @@ final readonly class TeamRecordAccess
         if ($event->getAction() === 'erase' && $this->teams->isLegalHold($event->getTenantKey(), $event->getSubjectId())) {
             $event->deny();
         }
+    }
+}
+```
+
+**Lists under resource scoping.** With `security.resource_scoping: true`, every read that returns several records
+(lists and totals, search, duplicates, CSV exports, the related records of a page, `subjectsLinkedTo()`) shows only
+ownerless records, the person's own and the owners a `CrmKitEvents::RECORD_VISIBILITY` listener adds, in SQL; the
+same set is the default of the record decision above, so a team rule belongs here:
+
+```php
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\{CrmKitEvents, RecordVisibilityEvent};
+
+#[AsEventListener(event: CrmKitEvents::RECORD_VISIBILITY)]
+final readonly class TeamVisibility
+{
+    public function __construct(private Teams $teams) {}
+
+    public function __invoke(RecordVisibilityEvent $event): void
+    {
+        foreach ($this->teams->teammates($event->getTenantKey(), $event->getActorId()) as $id) {
+            $event->addOwner($id);
+        }
+        // $event->allowAll() opens every record of the tenant (e.g. a supervisor).
     }
 }
 ```

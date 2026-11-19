@@ -311,6 +311,11 @@ final readonly class RecordService implements RecordServiceInterface
                 throw new NotAvailableException();
             }
             $this->support->load($context, SubjectType::Contact, $affiliation->getContactId(), CrmPermission::Edit, lock: true)->touch($context->now, $context->actor->value);
+            if ($affiliation->isPrimaryContact()) {
+                // The company loses its primary contact: an edit of the company, under its lock (contact, then company).
+                $this->support->load($context, SubjectType::Company, $affiliation->getCompanyId(), CrmPermission::Edit, anyStatus: true, lock: true)->touch($context->now, $context->actor->value);
+                $this->support->activity($context, SubjectType::Company, $affiliation->getCompanyId(), ActivityKind::PrimaryContact, ['contact' => null]);
+            }
             $store->remove($affiliation); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, SubjectType::Contact, $affiliation->getContactId(), ActivityKind::Unaffiliated, ['company' => $affiliation->getCompanyId()]);
             $this->support->activity($context, SubjectType::Company, $affiliation->getCompanyId(), ActivityKind::Unaffiliated, ['contact' => $affiliation->getContactId()]);

@@ -58,4 +58,16 @@ final class AllowAllCrmKitAccessChecker implements TenantAwareCrmKitAccessChecke
     {
         return true;
     }
+
+    /** {@inheritDoc} */
+    public function canViewAmounts(?object $user, ?string $tenantKey = null): bool
+    {
+        return true;
+    }
+
+    /** {@inheritDoc} */
+    public function canSendCampaigns(?object $user, ?string $tenantKey = null): bool
+    {
+        return true;
+    }
 }

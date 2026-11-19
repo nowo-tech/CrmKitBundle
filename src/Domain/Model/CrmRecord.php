@@ -323,11 +323,7 @@ abstract class CrmRecord
      */
     public function touch(DateTimeImmutable $now, ?string $actor): void
     {
-        // Always a change of the stored row, so the optimistic version moves on every write of the record: the ORM
-        // compares the converted column values, the column keeps whole seconds, and two writes in the same second by
-        // the same person would otherwise change nothing. A write in the same second as the previous one moves the
-        // edit time one second on.
-        $this->updatedAt   = $now > $this->updatedAt ? $now : $this->updatedAt->modify('+1 second');
+        $this->updatedAt   = $now;
         $this->updatedById = $actor;
     }
 

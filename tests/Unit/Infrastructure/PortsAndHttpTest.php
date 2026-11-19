@@ -29,6 +29,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ParameterFlatte
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\CrmKitEvents;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\RecordAccessCheckEvent;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\RecordVisibilityEvent;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\CrmConflictFormatter;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\DomainExceptionListener;
@@ -44,7 +45,9 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ConfigurableCrmKitAccessCh
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmResourceAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\LegacyCrmAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\TenantAwareCrmKitAccessCheckerInterface;
 use Nowo\TransactionDoctrine\ConflictCode;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseContext;
 use Nowo\TransactionDoctrine\TransientFailureKind;
@@ -113,18 +116,19 @@ final class PortsAndHttpTest extends TestCase
             }
         };
         // The default area checker: any role of the area's list; an empty list means no role check; fail closed.
-        $areas = new ConfigurableCrmKitAccessChecker($auth, ['ROLE_OTHER', 'ROLE_CRM'], ['ROLE_ADMIN'], [], ['ROLE_CRM'], ['ROLE_ADMIN']);
+        $areas = new ConfigurableCrmKitAccessChecker($auth, ['ROLE_OTHER', 'ROLE_CRM'], ['ROLE_ADMIN'], ['ROLE_ADMIN'], ['ROLE_CRM'], ['ROLE_ADMIN'], ['ROLE_CRM'], []);
         $user  = new InMemoryUser('ana', null, ['ROLE_CRM']);
-        self::assertSame([true, false, false, false, false, true, true, false], [$areas->canAccess($user), $areas->canCreate($user), $areas->canEdit($user), $areas->canDelete($user), $areas->canImport($user), $areas->canExport($user), $areas->canManageSettings($user), $areas->canErase($user)]);
+        self::assertSame([true, false, false, false, false, true, false, false, true, true], [$areas->canAccess($user), $areas->canCreate($user), $areas->canEdit($user), $areas->canDelete($user), $areas->canImport($user), $areas->canExport($user), $areas->canManageSettings($user), $areas->canErase($user), $areas->canViewAmounts($user), $areas->canSendCampaigns($user)]);
         self::assertFalse($areas->canAccess(null), 'nobody signed in');
         self::assertFalse((new ConfigurableCrmKitAccessChecker())->canAccess($user), 'no SecurityBundle: closed');
         self::assertTrue((new ConfigurableCrmKitAccessChecker(null, []))->canAccess(null), 'an empty list asks no role');
         $all = new AllowAllCrmKitAccessChecker();
-        self::assertSame([true, true, true, true, true, true, true, true], [$all->canAccess(null), $all->canCreate(null), $all->canEdit(null), $all->canDelete(null), $all->canImport(null), $all->canExport(null), $all->canManageSettings(null), $all->canErase(null)]);
+        self::assertSame([true, true, true, true, true, true, true, true, true, true], [$all->canAccess(null), $all->canCreate(null), $all->canEdit(null), $all->canDelete(null), $all->canImport(null), $all->canExport(null), $all->canManageSettings(null), $all->canErase(null), $all->canViewAmounts(null), $all->canSendCampaigns(null)]);
 
         // The port adapter: no token ⇒ no actor; a user ⇒ the area of each permission, then the record decision.
         $events   = new EventDispatcher();
-        $resource = new CrmResourceAccessChecker($events, $auth, ['ROLE_ADMIN'], true);
+        $scoped   = new ScopedRecordVisibility($areas, $tokens, $events, true);
+        $resource = new CrmResourceAccessChecker($events, $scoped);
         $checker  = new SecurityCrmAccessChecker($areas, $resource, $tokens);
         self::assertNull($checker->currentActor());
         self::assertFalse($checker->isGranted(CrmPermission::View, $tenant));
@@ -134,8 +138,8 @@ final class PortsAndHttpTest extends TestCase
         self::assertSame('ana', (new SecurityCrmAccessChecker($areas, $resource, $tokens))->currentActor()?->value);
         $map = static fn (SecurityCrmAccessChecker $c): array => array_map(static fn (CrmPermission $p): bool => $c->isGranted($p, $tenant), CrmPermission::cases());
         // view edit manage amounts campaigns create delete import export erase
-        self::assertSame([true, false, true, true, true, false, false, false, true, false], $map($checker));
-        self::assertSame([true, false, true, true, true, false, false, false, true, false], $map(new SecurityCrmAccessChecker(new class implements CrmKitAccessCheckerInterface {
+        self::assertSame([true, false, false, true, true, false, false, false, true, false], $map($checker));
+        self::assertSame([true, false, false, true, true, false, false, false, true, false], $map(new SecurityCrmAccessChecker(new class implements CrmKitAccessCheckerInterface {
             public function canAccess(?object $user): bool
             {
                 return true;
@@ -168,12 +172,22 @@ final class PortsAndHttpTest extends TestCase
 
             public function canManageSettings(?object $user): bool
             {
-                return true;
+                return false;
             }
 
             public function canErase(?object $user): bool
             {
                 return false;
+            }
+
+            public function canViewAmounts(?object $user): bool
+            {
+                return true;
+            }
+
+            public function canSendCampaigns(?object $user): bool
+            {
+                return true;
             }
         }, $resource, $tokens)), 'a checker that is not tenant aware');
 
@@ -200,13 +214,80 @@ final class PortsAndHttpTest extends TestCase
         $denied = new RecordAccessCheckEvent(null, null, 'acme', 'company', 'x', null, 'edit', true);
         $denied->deny();
         self::assertSame([true, false], [$denied->isDenied(), $denied->isGranted()]);
-        self::assertTrue((new CrmResourceAccessChecker(null, $auth, ['ROLE_CRM'], true))->isGranted($user, new ActorRef('ana'), $tenant, CrmPermission::Edit, $theirs), 'settings_roles see every record');
-        self::assertFalse((new CrmResourceAccessChecker(null, null, ['ROLE_CRM'], true))->isGranted($user, new ActorRef('ana'), $tenant, CrmPermission::Edit, $theirs));
-        self::assertFalse((new CrmResourceAccessChecker(null, $auth, ['ROLE_CRM'], true))->isGranted(null, null, $tenant, CrmPermission::Edit, $theirs));
-        self::assertTrue((new CrmResourceAccessChecker())->isGranted(null, null, $tenant, CrmPermission::Edit, $theirs), 'no scoping: the tenant\'s records are shared');
+        // The visibility of lists and the default of one record: the settings area sees everything (the host's checker
+        // when configured), a listener adds owners or opens all, no scoping shares the tenant's records.
+        $managers = new ConfigurableCrmKitAccessChecker($auth, [], [], ['ROLE_CRM']);
+        self::assertTrue((new CrmResourceAccessChecker(null, new ScopedRecordVisibility($managers, $tokens, null, true)))->isGranted($user, new ActorRef('ana'), $tenant, CrmPermission::Edit, $theirs), 'settings_roles see every record');
+        self::assertNull((new ScopedRecordVisibility(new class implements TenantAwareCrmKitAccessCheckerInterface {
+            public function canAccess(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+
+            public function canCreate(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+
+            public function canEdit(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+
+            public function canDelete(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+
+            public function canImport(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+
+            public function canExport(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+
+            public function canManageSettings(?object $user, ?string $tenantKey = null): bool
+            {
+                return $tenantKey === 'acme';
+            }
+
+            public function canErase(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+
+            public function canViewAmounts(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+
+            public function canSendCampaigns(?object $user, ?string $tenantKey = null): bool
+            {
+                return true;
+            }
+        }, $tokens, null, true))->visibleOwners($tenant, new ActorRef('ana')), 'a tenant-aware host checker decides the bypass');
+        self::assertSame(['ana'], (new ScopedRecordVisibility($areas, null, null, true))->visibleOwners($tenant, new ActorRef('ana')));
+        self::assertNull((new ScopedRecordVisibility($areas))->visibleOwners($tenant, new ActorRef('ana')), 'no scoping');
+        self::assertFalse((new CrmResourceAccessChecker(null, $scoped))->isGranted(null, null, $tenant, CrmPermission::Edit, $theirs), 'nobody acting');
+        self::assertTrue((new CrmResourceAccessChecker())->isGranted(null, null, $tenant, CrmPermission::Edit, $theirs), 'no visibility: the tenant\'s records are shared');
+        $visibility = new EventDispatcher();
+        $visibility->addListener(CrmKitEvents::RECORD_VISIBILITY, static function (RecordVisibilityEvent $e): void {
+            self::assertSame(['ana', 'acme'], [$e->getActorId(), $e->getTenantKey()]);
+            self::assertInstanceOf(InMemoryUser::class, $e->getUser());
+            $e->addOwner('leo');
+            $e->addOwner('leo');
+        });
+        self::assertSame(['ana', 'leo'], (new ScopedRecordVisibility($areas, $tokens, $visibility, true))->visibleOwners($tenant, new ActorRef('ana')));
+        self::assertTrue((new CrmResourceAccessChecker(null, new ScopedRecordVisibility($areas, $tokens, $visibility, true)))->isGranted($user, new ActorRef('ana'), $tenant, CrmPermission::Edit, $theirs), 'a team owner added');
+        $visibility->addListener(CrmKitEvents::RECORD_VISIBILITY, static function (RecordVisibilityEvent $e): void {
+            $e->allowAll();
+        });
+        self::assertNull((new ScopedRecordVisibility($areas, $tokens, $visibility, true))->visibleOwners($tenant, new ActorRef('ana')));
         $auth->fail = true;
         self::assertFalse($checker->isGranted(CrmPermission::View, $tenant));
-        self::assertFalse((new CrmResourceAccessChecker(null, $auth, ['ROLE_CRM'], true))->isGranted($user, new ActorRef('ana'), $tenant, CrmPermission::Edit, $theirs));
         $auth->fail = false;
 
         // The deprecated 0.1.0 port: the new permissions reach it as the ones it knew.

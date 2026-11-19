@@ -97,6 +97,13 @@ is "for version 10.0 and above"; MySQL from 5.7.9, MariaDB from 10.4.3), so with
   ```
 
   The new lists default to `[ROLE_ADMIN]` (0.1.0 granted nothing by default). Every area also needs `access_roles`.
+  **An empty list now means "any authenticated user" for that area (in 0.1.0 an empty list denied everything).**
+  `settings_roles`, `export_roles` and `erase_roles` must name at least one role. `amounts_roles` and
+  `campaigns_roles` (default `[ROLE_ADMIN]`) are ready for the later phases' amounts and circulars.
+- `security.resource_scoping: true` limits lists, totals, search, exports, related records and record pages to
+  ownerless records, the person's own and the owners a `nowo_crm_kit.record_visibility` listener adds; people with
+  `settings_roles` (or the host checker's `canManageSettings`) see everything.
+- `security.allow_unauthenticated` is refused in the `prod` environment and turns resource scoping off.
 - With `ui.enabled: true` the build now **fails without SecurityBundle** unless `security.allow_unauthenticated: true`
   (demos only).
 - The root key `access_checker` (a `CrmAccessCheckerInterface` of yours) still works in 0.2.0 and is **deprecated**
@@ -115,9 +122,9 @@ is "for version 10.0 and above"; MySQL from 5.7.9, MariaDB from 10.4.3), so with
 - `affiliate()` updates an existing pair in place (the affiliation keeps its id) instead of deleting and re-inserting it;
   its `purposes` replace only the configured purposes (stored ones no longer configured are kept).
 - `ListQuery` refuses a `role` or `purpose` that is not a valid key (`InvalidInputException`).
-- Every write of a company or contact moves its version, also a role-, tag- or affiliation-only change in the same
-  second as the previous write: the edit time then moves one second on (`updated_at` may run up to a few seconds
-  ahead under a burst of writes).
+- An import with the `update` policy needs `edit` on each existing contact it updates (and `view` on a company it
+  names): a row the importer may not change ends `invalid` (`error.forbidden`).
+- A merge needs `delete` on the merged record too.
 - A second `nowo:crm-kit:purge` started while a batch of the first holds the claim row prints "Another purge is
   running" at once instead of failing with a lock conflict.
 - An import chunk locks the existing contacts and the named companies of all its rows first (in id order), then settles

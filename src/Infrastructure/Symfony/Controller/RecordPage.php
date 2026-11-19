@@ -68,6 +68,9 @@ final readonly class RecordPage
         $actions = [];
         if ($edit) {
             $actions[] = Action::edit($this->ui->url('nowo_crm_kit_edit', ['type' => $seg, 'id' => $view->id]), UiSupport::label('record.edit'));
+        }
+        if ($edit && $delete) {
+            // A merge turns the other record into a tombstone: it needs delete too.
             $actions[] = new Action('custom', UiSupport::label('record.merge'), $this->ui->url('nowo_crm_kit_merge', ['type' => $seg, 'id' => $view->id]), icon: 'merge');
         }
         if ($type === SubjectType::Contact && $view->status !== RecordStatus::Erased) {
@@ -185,6 +188,7 @@ final readonly class RecordPage
             'segment'    => $seg,
             'can_edit'   => $edit,
             'can_manage' => $manage,
+            'can_merge'  => $edit && $delete,
             'forms'      => $forms,
             'notes'      => $notes,
             'timeline'   => $this->reader->timeline($type, $view->id, 30),

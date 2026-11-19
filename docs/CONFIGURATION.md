@@ -39,6 +39,8 @@ nowo_crm_kit:
         settings_roles: [ROLE_ADMIN]   # tags, fields, settings, purge; every record with resource_scoping
         export_roles: [ROLE_ADMIN]     # CSV export of lists, GDPR export
         erase_roles: [ROLE_ADMIN]      # GDPR erasure
+        amounts_roles: [ROLE_ADMIN]    # amounts and totals (phase B on)
+        campaigns_roles: [ROLE_ADMIN]  # sending circulars (phase E2 on)
         resource_scoping: false        # true: records open to their owner (or ownerless) and settings_roles by default
     feature:
         default_enabled: true      # ConfiguredFeatureGate: the CRM is on for every tenant
@@ -108,11 +110,15 @@ the bundle's checkers.
 | `security.settings_roles` | `[ROLE_ADMIN]` | Tags, custom fields, settings, purge from the trash, others' notes (`canManageSettings`); with `resource_scoping`, every record |
 | `security.export_roles` | `[ROLE_ADMIN]` | CSV export of lists, GDPR export (`canExport`) |
 | `security.erase_roles` | `[ROLE_ADMIN]` | GDPR erasure (`canErase`) |
+| `security.amounts_roles` | `[ROLE_ADMIN]` | Deal amounts, quote and invoice totals, revenue figures, from phase B on (`canViewAmounts`) |
+| `security.campaigns_roles` | `[ROLE_ADMIN]` | Sending informative circulars, from phase E2 on (`canSendCampaigns`) |
 | `security.access_checker` | `null` | Service id of your `CrmKitAccessCheckerInterface` (or `TenantAwareCrmKitAccessCheckerInterface`); null = `ConfigurableCrmKitAccessChecker` on the lists above |
-| `security.allow_unauthenticated` | `false` | **DEV/DEMO only**: the pages without SecurityBundle or without signing in; the actor is then `anonymous` and, without SecurityBundle, every area is open |
-| `security.resource_scoping` | `false` | `true`: a record is open by default only to its owner (or when it has none) and to `settings_roles`; `nowo_crm_kit.record_access_check` listeners decide the rest |
+| `security.allow_unauthenticated` | `false` | **DEV/DEMO only, refused in `prod`**: the pages without SecurityBundle or without signing in; the actor is then the shared id `anonymous` (a real user with that identifier would be the same actor), resource scoping is off and, without SecurityBundle, every area is open |
+| `security.resource_scoping` | `false` | `true`: lists and their totals, search, duplicates, CSV exports, a page's related records and record pages show only ownerless records, the person's own and the owners `nowo_crm_kit.record_visibility` listeners add (applied in SQL); whoever may manage the settings sees everything; `nowo_crm_kit.record_access_check` listeners decide each record |
 
-A role list grants its area to **any** of its roles; an empty list means no bundle-level role check for that area.
+A role list grants its area to **any** of its roles. **An empty list means any authenticated user** for that area
+(`access_roles`, `manage_roles`, `amounts_roles`, `campaigns_roles`); `settings_roles`, `export_roles` and
+`erase_roles` must name at least one role.
 With `ui.enabled: true`, the container build fails without SecurityBundle unless `allow_unauthenticated: true`.
 Decisions on one record go through the event `nowo_crm_kit.record_access_check`
 ([USAGE.md](USAGE.md#record-access-listeners)).

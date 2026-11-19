@@ -9,8 +9,9 @@ use Throwable;
 
 /**
  * The default area checker (REQ-UI-002): granted when the security user holds **any** role of the area's list
- * (`security.access_roles`, `manage_roles`, `settings_roles`, `export_roles`, `erase_roles`). An empty list means no
- * bundle-level role check for that area (the firewall and the record checks still apply). Without SecurityBundle, or
+ * (`security.access_roles`, `manage_roles`, `settings_roles`, `export_roles`, `erase_roles`, `amounts_roles`,
+ * `campaigns_roles`). An empty list (allowed for `access_roles`, `manage_roles`, `amounts_roles` and `campaigns_roles`
+ * only) means any authenticated user for that area (the firewall and the record checks still apply). Without SecurityBundle, or
  * without a user, nothing is granted (fail closed), unless the list is empty. Stateless.
  */
 final readonly class ConfigurableCrmKitAccessChecker implements TenantAwareCrmKitAccessCheckerInterface
@@ -21,6 +22,8 @@ final readonly class ConfigurableCrmKitAccessChecker implements TenantAwareCrmKi
      * @param list<string> $settingsRoles
      * @param list<string> $exportRoles
      * @param list<string> $eraseRoles
+     * @param list<string> $amountsRoles
+     * @param list<string> $campaignsRoles
      */
     public function __construct(
         private ?AuthorizationCheckerInterface $authorization = null,
@@ -29,6 +32,8 @@ final readonly class ConfigurableCrmKitAccessChecker implements TenantAwareCrmKi
         private array $settingsRoles = ['ROLE_ADMIN'],
         private array $exportRoles = ['ROLE_ADMIN'],
         private array $eraseRoles = ['ROLE_ADMIN'],
+        private array $amountsRoles = ['ROLE_ADMIN'],
+        private array $campaignsRoles = ['ROLE_ADMIN'],
     ) {
     }
 
@@ -78,6 +83,18 @@ final readonly class ConfigurableCrmKitAccessChecker implements TenantAwareCrmKi
     public function canErase(?object $user, ?string $tenantKey = null): bool
     {
         return $this->any($user, $this->eraseRoles);
+    }
+
+    /** {@inheritDoc} */
+    public function canViewAmounts(?object $user, ?string $tenantKey = null): bool
+    {
+        return $this->any($user, $this->amountsRoles);
+    }
+
+    /** {@inheritDoc} */
+    public function canSendCampaigns(?object $user, ?string $tenantKey = null): bool
+    {
+        return $this->any($user, $this->campaignsRoles);
     }
 
     /**

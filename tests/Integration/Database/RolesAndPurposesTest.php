@@ -66,6 +66,9 @@ final class RolesAndPurposesTest extends CrmTestCase
         $this->records()->setRoles(SubjectType::Company, $beta, ['partner', 'distributor']);
         self::assertSame(['partner', 'distributor'], $this->reader()->record(SubjectType::Company, $beta)->roles);
         self::assertSame(2, $this->reader()->record(SubjectType::Company, $beta)->version, 'an unchanged set writes nothing');
+        // The version follows the stored edit time (whole seconds, kept exact: owner decision 2026-11-19, audit UP): a
+        // second write of the same person in the same second keeps the version, so the clock moves on here.
+        $this->clock()->sleep(1);
         $version = $this->records()->update($beta, new RecordInput(SubjectType::Company, [], roles: ['customer']), 2);
         self::assertSame(3, $version);
         self::assertSame(['customer'], $this->reader()->record(SubjectType::Company, $beta)->roles);
@@ -203,6 +206,14 @@ final class RolesAndPurposesTest extends CrmTestCase
         $this->service(CrmPersonalDataInterface::class)->erase($bob);
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_role_assignment WHERE subject_id = ?', [$bob]));
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE contact_id = ?', [$bob]));
+
+        // Removing the primary contact's affiliation is an edit of the company too (lock, timeline entry).
+        $zeta   = $this->company('Zeta');
+        $zed    = $this->contact('Zed', 'Z');
+        $link   = $this->records()->affiliate($zed, $zeta, null, true, true);
+        $before = $this->int("SELECT COUNT(*) FROM nowo_crm_activity WHERE kind = 'primary_contact' AND subject_id = ?", [$zeta]);
+        $this->records()->unaffiliate($link);
+        self::assertSame($before + 1, $this->int("SELECT COUNT(*) FROM nowo_crm_activity WHERE kind = 'primary_contact' AND subject_id = ?", [$zeta]));
 
         // Purge deletes the roles.
         $this->records()->setRoles(SubjectType::Company, $acme, ['customer']);

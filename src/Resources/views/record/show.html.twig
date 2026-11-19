@@ -1,6 +1,6 @@
 {#
   The 360° page of a company or contact (contract section 9). Variables: page (ShowPage), record (RecordView),
-  segment, can_edit, can_manage, forms (note, notes[id], tags, link, affiliation, affiliations[id], consent), buttons (notes, links,
+  segment, can_edit, can_manage, can_merge, forms (note, notes[id], tags, link, affiliation, affiliations[id], consent), buttons (notes, links,
   affiliations, primary_contact: View\Action per affiliation id), back (return params), notes, timeline, links, panels, duplicates, consents.
 #}
 {% extends '@NowoUiKit/page/show.html.twig' %}
@@ -128,7 +128,7 @@
         <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-duplicates">
             <div class="{{ nowo_ui_class('card_body', _b) }}">
                 <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'record.duplicates'|trans({}, _d) }}</h2>
-                <ul>{% for d in duplicates %}<li><a href="{{ path('nowo_crm_kit_show', {type: segment, id: d.id}) }}">{{ d.label }}</a>{% if can_edit %} · <a href="{{ path('nowo_crm_kit_merge', {type: segment, id: record.id, other: d.id}) }}" data-testid="crm-merge-link">{{ 'record.merge_with'|trans({}, _d) }}</a>{% endif %}</li>{% endfor %}</ul>
+                <ul>{% for d in duplicates %}<li><a href="{{ path('nowo_crm_kit_show', {type: segment, id: d.id}) }}">{{ d.label }}</a>{% if can_merge %} · <a href="{{ path('nowo_crm_kit_merge', {type: segment, id: record.id, other: d.id}) }}" data-testid="crm-merge-link">{{ 'record.merge_with'|trans({}, _d) }}</a>{% endif %}</li>{% endfor %}</ul>
             </div>
         </section>
     {% endif %}

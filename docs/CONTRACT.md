@@ -432,6 +432,8 @@ nowo_crm_kit:
         settings_roles: [ROLE_ADMIN]   # tags, fields, settings, purge; every record with resource_scoping
         export_roles: [ROLE_ADMIN]     # CSV export of lists, GDPR export
         erase_roles: [ROLE_ADMIN]      # GDPR erasure
+        amounts_roles: [ROLE_ADMIN]    # amounts and totals (phase B on)
+        campaigns_roles: [ROLE_ADMIN]  # sending circulars (phase E2 on)
         resource_scoping: false        # true: records open to their owner (or ownerless) and settings_roles by default
     feature:
         default_enabled: true
@@ -560,7 +562,8 @@ default adapter `SecurityCrmAccessChecker` asks, for each permission, the **area
 `canManageSettings`, `canErase`; tenant-aware variant `TenantAwareCrmKitAccessCheckerInterface`; default
 `ConfigurableCrmKitAccessChecker` on `security.*_roles`, `AllowAllCrmKitAccessChecker` for demos and tests, a host
 service through `security.access_checker`), and, for one record, `CrmResourceAccessChecker`: deny by default when
-`security.resource_scoping` is on (owner, ownerless record or `settings_roles`), then the event
+`security.resource_scoping` is on (owner, ownerless record, owners added by `nowo_crm_kit.record_visibility`
+listeners, or `canManageSettings`), then the event
 `CrmKitEvents::RECORD_ACCESS_CHECK` (`RecordAccessCheckEvent`: user, actor, tenant, type, id, owner, action, default;
 `grant()` / `deny()`, a deny wins). `CrmKitGuard` (`requireGranted`, `isGranted`, `grants`) is the pages' gate and a
 `kernel.controller` listener requires `view` on every bundle route. The 0.1.0 root key `access_checker` still points
@@ -576,8 +579,8 @@ the port at a host service (deprecated, removed in 0.3.0), with the new permissi
 | CSV export of lists, GDPR export | `export` | `canExport` (`export_roles`) |
 | Tags and fields administration, settings, purge from the trash, others' notes | `manage` | `canManageSettings` (`settings_roles`) |
 | GDPR erasure | `erase` | `canErase` (`erase_roles`) |
-| (B–D) Deal amounts, quote and invoice totals, revenue reports | `amounts_view` | `canManageSettings` until its phase |
-| (E2) Send a circular | `campaigns_send` | `canManageSettings` until its phase |
+| (B–D) Deal amounts, quote and invoice totals, revenue reports | `amounts_view` | `canViewAmounts` (`amounts_roles`) |
+| (E2) Send a circular | `campaigns_send` | `canSendCampaigns` (`campaigns_roles`) |
 
 Every area also needs `canAccess`. Notes: the author edits / deletes own notes with `edit`; others' notes need
 `manage`. Beacon maps its `crm.*` permissions in a host area checker (or keeps its 0.1.0 port for 0.2.0).
@@ -946,11 +949,19 @@ differs is applied in the next commit and noted here with the date._
   `CrmKitAccessCheckerInterface` (+ tenant-aware variant, configurable and allow-all defaults), the record checker with
   the `nowo_crm_kit.record_access_check` event, `CrmKitGuard`, a route listener, and the compile-time SecurityBundle
   check; the 0.1.0 `access.roles` is removed and the root `access_checker` deprecated (removed in 0.3.0).
+- Audit UP (2026-11-19) and owner decisions: login / 401 for anonymous visitors of the pages accepted; `touch()`
+  keeps `updated_at` exact (no forced version bump); `canViewAmounts()` / `canSendCampaigns()` with
+  `security.amounts_roles` / `campaigns_roles` now; no advisory for the 0.1.0 import update path (CHANGELOG Security
+  line). Fixed: resource scoping applied in SQL to every read that returns several records (port
+  `CrmRecordVisibilityInterface`, event `nowo_crm_kit.record_visibility`); imports need `edit` on a matched contact and
+  `view` on a named company; merges need `delete` on the merged record; removing a primary contact's affiliation needs
+  `edit` on the company; empty role lists mean any authenticated user (settings / export / erase need one);
+  `allow_unauthenticated` refused in prod and turns scoping off.
 - Audit UL fixes (2026-11-19): an affiliation edit keeps the stored purposes that are no longer configured; an
   unticked "primary contact" keeps the company's primary contact (clearing is the company page's own action, and a
   linked company has a pre-filled form); `purpose_keys` is 1100 characters; an import row that changes a company's
   primary contact needs `edit` on that company (else `invalid`, `error.forbidden`); every write of a record moves its
-  version (a write in the same second moves the edit time one second on); imports announce and audit role changes;
+  version when the stored row changes (owner decision 2026-11-19: `updated_at` stays exact, no forced bump); imports announce and audit role changes;
   the GDPR export lists affiliations to trashed companies with their status; `ListQuery` refuses invalid role and
   purpose keys; a contact merge moves the primary-company flag of a shared company.
 

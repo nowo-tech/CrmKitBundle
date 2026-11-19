@@ -37,8 +37,9 @@ purposes (contract section 6.8) with the same model: no new permission, deny by 
   checks: a `kernel.controller` listener requires `view` on every bundle route (nobody signed in ⇒ the firewall's
   entry point), each action asks its own permission through `CrmKitGuard` and the services ask again.
   **`security.allow_unauthenticated: true` is a footgun**: it opens the pages to anonymous visitors (actor
-  `anonymous`), and without SecurityBundle every area; demos only, never in production. Without SecurityBundle and
-  without it, the container build fails.
+  `anonymous`, shared by everybody: a real user with that identifier would be the same actor, and resource scoping is
+  turned off), and without SecurityBundle every area; demos only: it is refused when `kernel.environment` is `prod`.
+  Without SecurityBundle and without it, the container build fails.
 - **Deny by default.** The default area checker grants an area only to the roles of its `security.*_roles` list
   (`ROLE_ADMIN` by default); with `resource_scoping` a record is open by default only to its owner (or when it has
   none) and to `settings_roles`, and a `nowo_crm_kit.record_access_check` listener's deny always wins; without
@@ -64,10 +65,14 @@ purposes (contract section 6.8) with the same model: no new permission, deny by 
 | CSV export of lists, GDPR export | `export` | `canExport` (`export_roles`) |
 | Tag and field administration, settings, purge from the trash, another person's note | `manage` | `canManageSettings` (`settings_roles`) |
 | GDPR erasure | `erase` | `canErase` (`erase_roles`) |
+| (later phases) Amounts and totals / sending circulars | `amounts_view` / `campaigns_send` | `canViewAmounts` (`amounts_roles`) / `canSendCampaigns` (`campaigns_roles`) |
 
 Every area also needs `canAccess`. A check on one record then goes through `CrmResourceAccessChecker` and the
-`nowo_crm_kit.record_access_check` event (a listener's deny wins). `amounts_view` and `campaigns_send` exist for later
-phases and use the settings area until then. Notes: the author edits and deletes their own notes with `edit` on the
+`nowo_crm_kit.record_access_check` event (a listener's deny wins). With `security.resource_scoping`, every read that
+returns several records (lists and totals, search, duplicates, CSV exports, related records, `subjectsLinkedTo()`)
+is filtered in SQL to the same visible owners as the record decision (`nowo_crm_kit.record_visibility`). Imports
+need `edit` on each existing contact they update and `view` on each company they name; a merge needs `delete` on the
+merged record. An empty role list means any authenticated user for that area. Notes: the author edits and deletes their own notes with `edit` on the
 record; another person's note needs `edit` on the record and `manage`.
 
 ## Tenant isolation and exact identifiers

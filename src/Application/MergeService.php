@@ -76,7 +76,9 @@ final readonly class MergeService implements MergeServiceInterface
                 $moves['consents'] = count($store->consents($context->tenant, $otherId));
             }
 
-            return new MergePreview($this->views->one($context->tenant, $survivor), $this->views->one($context->tenant, $other), $fields, $moves);
+            $owners = $this->support->access->visibleOwners($context);
+
+            return new MergePreview($this->views->one($context->tenant, $survivor, $owners), $this->views->one($context->tenant, $other, $owners), $fields, $moves);
         });
     }
 
@@ -252,7 +254,7 @@ final readonly class MergeService implements MergeServiceInterface
     }
 
     /**
-     * Both records, active, with `edit` on each (locked in id order when `$lock`).
+     * Both records, active, with `edit` on each and `delete` on the other one (locked in id order when `$lock`).
      *
      * @return array{CrmRecord, CrmRecord}
      */
@@ -273,6 +275,10 @@ final readonly class MergeService implements MergeServiceInterface
                 throw new NotAvailableException();
             }
             $this->support->access->require($context, CrmPermission::Edit, SubjectRef::of($type, $id, $record->getOwnerId()));
+            // The merged record ends as a tombstone: removing it needs the delete permission on it too (audit UP-L-1).
+            if ($id === $otherId) {
+                $this->support->access->require($context, CrmPermission::Delete, SubjectRef::of($type, $id, $record->getOwnerId()));
+            }
             if (!$record->isActive()) {
                 throw new ConflictException($lock ? ConflictException::MERGE_STALE : ConflictException::TRASHED, $id);
             }

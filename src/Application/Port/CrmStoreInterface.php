@@ -98,30 +98,38 @@ interface CrmStoreInterface
     /**
      * A page of records and the total.
      *
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
+     *
      * @return array{list<CrmRecord>, int}
      */
-    public function list(TenantRef $tenant, ListQuery $query): array;
+    public function list(TenantRef $tenant, ListQuery $query, ?array $visibleOwners = null): array;
 
     /**
      * Records after `$afterId` (keyset by id) matching the query's filters.
      *
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
+     *
      * @return list<CrmRecord>
      */
-    public function batch(TenantRef $tenant, ListQuery $query, ?string $afterId, int $limit): array;
+    public function batch(TenantRef $tenant, ListQuery $query, ?string $afterId, int $limit, ?array $visibleOwners = null): array;
 
     /**
      * Active records sharing a key with `$record` (name, domain, tax id / sort key, e-mail).
      *
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
+     *
      * @return list<CrmRecord>
      */
-    public function duplicates(CrmRecord $record, int $limit = 10): array;
+    public function duplicates(CrmRecord $record, int $limit = 10, ?array $visibleOwners = null): array;
 
     /**
      * Active records whose searchable fields contain the text, and the total.
      *
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
+     *
      * @return array{list<CrmRecord>, int}
      */
-    public function search(SubjectType $type, TenantRef $tenant, string $text, int $limit, ?string $companyId = null): array;
+    public function search(SubjectType $type, TenantRef $tenant, string $text, int $limit, ?string $companyId = null, ?array $visibleOwners = null): array;
 
     /**
      * Affiliations of a contact or of a company.

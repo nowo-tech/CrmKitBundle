@@ -32,7 +32,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   stored role and every affiliation with its purposes and flags.
 - Two-connection race tests (MySQL 8.4, MariaDB 11.4, PostgreSQL 16): concurrent role edits, two "set primary
   contact" calls on one company, an import chunk waiting on a locked parent before it settles any row.
-
 - **Access in the house shape (REQ-UI-002)**: the `security` node (`access_roles`, `access_checker`,
   `allow_unauthenticated`, `manage_roles`, `settings_roles`, `export_roles`, `erase_roles`, `resource_scoping`), the
   area checker `CrmKitAccessCheckerInterface` (and `TenantAwareCrmKitAccessCheckerInterface`) with
@@ -41,7 +40,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `CrmKitGuard` (`requireGranted`, `isGranted`, `grants`), a `kernel.controller` listener that requires `view` on every
   bundle route (nobody signed in ⇒ the firewall's entry point), and a compile-time failure when the pages are on
   without SecurityBundle (unless `allow_unauthenticated`). `CrmPermission` gains `create`, `delete`, `import`,
-  `export` and `erase`.
+  `export` and `erase`. The area checker also has `canViewAmounts()` and `canSendCampaigns()` (`security.amounts_roles`,
+  `security.campaigns_roles`, default `[ROLE_ADMIN]`) for the later phases' `amounts_view` and `campaigns_send`.
+- **Resource scoping in every read** (audit UP-M-1): with `security.resource_scoping`, lists and their totals, search,
+  duplicates, CSV exports, a page's related records (affiliations, a company's timeline), `subjectsLinkedTo()` and the
+  affiliation picker show only ownerless records, the person's own and the owners a
+  `CrmKitEvents::RECORD_VISIBILITY` listener (`RecordVisibilityEvent`: `addOwner()`, `allowAll()`) adds, filtered in
+  SQL (port `CrmRecordVisibilityInterface`, default `ScopedRecordVisibility`); the same set is the default of a
+  decision on one record. Whoever may manage the settings (the area checker's `canManageSettings`, the host's when
+  configured) sees everything.
 
 ### Changed
 
@@ -64,9 +71,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The CSV export has a `roles` column after `owner`.
 - The minimum database versions are MySQL 8.0, MariaDB 10.6 and PostgreSQL 9.5 (`SKIP LOCKED`; PostgreSQL 10 with
   DBAL 4).
-- Every write of a company or contact moves its optimistic version: a write in the same second as the previous one
-  (a role-, tag- or affiliation-only change) moves the edit time one second on, since the ORM compares the stored
-  whole-second value.
+- An empty `access_roles`, `manage_roles`, `amounts_roles` or `campaigns_roles` list means **any authenticated
+  user** for that area (0.1.0's empty lists denied); `settings_roles`, `export_roles` and `erase_roles` must name at
+  least one role.
+- `security.allow_unauthenticated` is refused when `kernel.environment` is `prod`, and turns `resource_scoping` off
+  (one shared actor `anonymous`).
 
 ### Fixed (audit UL, before the release)
 
@@ -83,6 +92,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The GDPR export lists affiliations to trashed companies too, with `company_status`.
 - `ListQuery` refuses a role or purpose that is not a valid key.
 - A contact merge moves the primary-company flag of a company both contacts are linked to when the survivor had none.
+
+### Fixed (audit UP, before the release)
+
+- A merge also needs `delete` on the merged record (it becomes a tombstone); the merge action is shown only with it.
+- Removing the affiliation of a company's primary contact needs `edit` on the company, locks it and records the
+  `primary_contact` timeline entry.
+- The scoping bypass asks the area checker (`canManageSettings`), so a host checker decides it too.
+
+### Security
+
+- An import with the `update` duplicate policy rewrote existing contacts (values, custom values, tags, roles,
+  affiliations) with the tenant-wide import permission only; 0.1.0 is affected (no advisory, owner decision
+  2026-11-19). Each matched contact now needs `edit` on that contact, and a named company `view` on it, before the row
+  writes anything; otherwise the row is `invalid` (`error.forbidden`) and echoes nothing (a skipped duplicate shows
+  the existing id only to someone who may see it).
 
 ## [0.1.0] - 2026-11-19
 

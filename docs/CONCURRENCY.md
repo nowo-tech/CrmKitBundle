@@ -127,9 +127,10 @@ shared lock on the duplicate in two sessions on MySQL and deadlock them on the u
 
 ## Version checks
 
-Every editable row (records, notes, tags, fields, settings) has `version`. **(0.2.0)** Every write of a company or
-contact moves its version, also a change of roles, tags or affiliations only: the ORM compares the stored values and
-`updated_at` keeps whole seconds, so a write in the same second as the previous one moves the edit time one second on. The service compares the version the form
+Every editable row (records, notes, tags, fields, settings) has `version`. The version moves when the stored row
+changes; `updated_at` keeps the exact edit time (whole seconds), so two writes of the same person in the same second
+that change nothing else of the row (a role-, tag- or affiliation-only change) keep the version (owner decision
+2026-11-19). The service compares the version the form
 showed before the change (cheap refusal) and Doctrine's optimistic lock compares it again at flush (the guard against
 a writer between the read and the flush). A mismatch is a **domain** conflict (`crm_record_stale`,
 `crm_settings_stale`, `crm_merge_stale`): retrying the same version cannot succeed, so there is no `Retry-After` and

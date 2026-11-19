@@ -123,7 +123,7 @@ final class ModelTest extends TestCase
         self::assertSame('survivor', $contact->getMergedIntoId());
         self::assertNull($contact->getEmailKey());
         self::assertSame(1, $contact->getVersion());
-        self::assertGreaterThan($this->now, $contact->getUpdatedAt(), 'a write in the same second moves the edit time on, so the version moves');
+        self::assertSame($this->now, $contact->getUpdatedAt());
         $company = new Company(self::ID, 'acme', $this->now);
         $company->mergeInto('x', $this->now, null);
         self::assertSame('x', $company->getMergedIntoId());

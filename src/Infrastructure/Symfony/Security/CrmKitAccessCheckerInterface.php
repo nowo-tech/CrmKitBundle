@@ -39,4 +39,10 @@ interface CrmKitAccessCheckerInterface
 
     /** GDPR erasure of a contact (`security.erase_roles`). */
     public function canErase(?object $user): bool;
+
+    /** Deal amounts, quote and invoice totals, revenue figures, from phase B on (`security.amounts_roles`). */
+    public function canViewAmounts(?object $user): bool;
+
+    /** Sending an informative circular, from phase E2 on (`security.campaigns_roles`). */
+    public function canSendCampaigns(?object $user): bool;
 }

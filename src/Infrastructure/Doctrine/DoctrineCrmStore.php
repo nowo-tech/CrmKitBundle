@@ -219,9 +219,9 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * {@inheritDoc}
      */
-    public function list(TenantRef $tenant, ListQuery $query): array
+    public function list(TenantRef $tenant, ListQuery $query, ?array $visibleOwners = null): array
     {
-        $qb    = $this->filtered($tenant, $query);
+        $qb    = $this->filtered($tenant, $query, $visibleOwners);
         $total = (int) (clone $qb)->select('COUNT(r.id)')->resetDQLPart('orderBy')->getQuery()->getSingleScalarResult();
         $field = match ($query->sort) {
             'created' => 'r.createdAt',
@@ -232,26 +232,26 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             ->setFirstResult(($query->page - 1) * $query->perPage)->setMaxResults($query->perPage)
             ->getQuery()->getResult();
 
-        return [$this->exact($rows, $this->class($query->type), $tenant, $query->ownerId), $total];
+        return [$this->visible($this->exact($rows, $this->class($query->type), $tenant, $query->ownerId), $visibleOwners), $total];
     }
 
     /**
      * {@inheritDoc}
      */
-    public function batch(TenantRef $tenant, ListQuery $query, ?string $afterId, int $limit): array
+    public function batch(TenantRef $tenant, ListQuery $query, ?string $afterId, int $limit, ?array $visibleOwners = null): array
     {
-        $qb = $this->filtered($tenant, $query)->orderBy('r.id', 'ASC')->setMaxResults($limit);
+        $qb = $this->filtered($tenant, $query, $visibleOwners)->orderBy('r.id', 'ASC')->setMaxResults($limit);
         if ($afterId !== null) {
             $qb->andWhere('r.id > :after')->setParameter('after', $afterId); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
 
-        return $this->exact($qb->getQuery()->getResult(), $this->class($query->type), $tenant, $query->ownerId);
+        return $this->visible($this->exact($qb->getQuery()->getResult(), $this->class($query->type), $tenant, $query->ownerId), $visibleOwners);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function duplicates(CrmRecord $record, int $limit = 10): array
+    public function duplicates(CrmRecord $record, int $limit = 10, ?array $visibleOwners = null): array
     {
         $tenant = new TenantRef($record->getTenantId());
         $qb     = $this->em()->createQueryBuilder()->select('r')->from($record::class, 'r')
@@ -275,8 +275,9 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             $qb->setParameter('sort', $record->getSortKey());
         }
         $qb->andWhere($or);
+        $this->restrict($qb, $visibleOwners);
 
-        return array_values(array_filter($this->exact($qb->getQuery()->getResult(), CrmRecord::class, $tenant), static function (CrmRecord $other) use ($record): bool {
+        return array_values(array_filter($this->visible($this->exact($qb->getQuery()->getResult(), CrmRecord::class, $tenant), $visibleOwners), static function (CrmRecord $other) use ($record): bool {
             return ($record instanceof Company && $other instanceof Company && ($other->getNameKey() === $record->getNameKey() || ($record->getDomainKey() !== null && $other->getDomainKey() === $record->getDomainKey()) || ($record->getTaxIdKey() !== null && $other->getTaxIdKey() === $record->getTaxIdKey())))
                 || ($record instanceof Contact && $other instanceof Contact && $other->getSortKey() === $record->getSortKey());
         }));
@@ -285,9 +286,9 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * {@inheritDoc}
      */
-    public function search(SubjectType $type, TenantRef $tenant, string $text, int $limit, ?string $companyId = null): array
+    public function search(SubjectType $type, TenantRef $tenant, string $text, int $limit, ?string $companyId = null, ?array $visibleOwners = null): array
     {
-        return $this->list($tenant, new ListQuery($type, $text, perPage: $limit, companyId: $companyId));
+        return $this->list($tenant, new ListQuery($type, $text, perPage: $limit, companyId: $companyId), $visibleOwners);
     }
 
     /**
@@ -821,7 +822,10 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * The list query with the query's filters (no order, no page).
      */
-    private function filtered(TenantRef $tenant, ListQuery $query): QueryBuilder
+    /**
+     * @param list<string>|null $visibleOwners
+     */
+    private function filtered(TenantRef $tenant, ListQuery $query, ?array $visibleOwners = null): QueryBuilder
     {
         $qb = $this->em()->createQueryBuilder()->select('r')->from($this->class($query->type), 'r')
             ->where('r.tenantId = :tenant')->andWhere('r.status = :status')
@@ -844,6 +848,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         if ($query->ownerId !== null) {
             $qb->andWhere('r.ownerId = :owner')->setParameter('owner', $query->ownerId);
         }
+        $this->restrict($qb, $visibleOwners);
         if ($query->role !== null) {
             $qb->andWhere('EXISTS (SELECT 1 FROM ' . RoleAssignment::class . ' ro WHERE ro.subjectId = r.id AND ro.subjectType = :roleType AND ro.roleKey = :role AND ro.tenantId = :tenant)')
                 ->setParameter('roleType', $query->type)->setParameter('role', $query->role);
@@ -867,6 +872,40 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         }
 
         return $qb;
+    }
+
+    /**
+     * Resource scoping in SQL: only ownerless records and the visible owners' (nothing added when every record is
+     * visible).
+     *
+     * @param list<string>|null $visibleOwners
+     */
+    private function restrict(QueryBuilder $qb, ?array $visibleOwners): void
+    {
+        if ($visibleOwners === null) {
+            return;
+        }
+        if ($visibleOwners === []) {
+            $qb->andWhere('r.ownerId IS NULL');
+
+            return;
+        }
+        $qb->andWhere('r.ownerId IS NULL OR r.ownerId IN (:visibleOwners)')->setParameter('visibleOwners', $visibleOwners, ArrayParameterType::STRING);
+    }
+
+    /**
+     * The records visible under `$visibleOwners`, re-checked with `===` (REQ-SEC-006 rule 2).
+     *
+     * @template T of CrmRecord
+     *
+     * @param list<T> $records
+     * @param list<string>|null $visibleOwners
+     *
+     * @return list<T>
+     */
+    private function visible(array $records, ?array $visibleOwners): array
+    {
+        return $visibleOwners === null ? $records : array_values(array_filter($records, static fn (CrmRecord $r): bool => $r->getOwnerId() === null || in_array($r->getOwnerId(), $visibleOwners, true)));
     }
 
     /**

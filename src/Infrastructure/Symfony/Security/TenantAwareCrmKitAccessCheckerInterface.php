@@ -34,4 +34,10 @@ interface TenantAwareCrmKitAccessCheckerInterface extends CrmKitAccessCheckerInt
 
     /** {@inheritDoc} */
     public function canErase(?object $user, ?string $tenantKey = null): bool;
+
+    /** {@inheritDoc} */
+    public function canViewAmounts(?object $user, ?string $tenantKey = null): bool;
+
+    /** {@inheritDoc} */
+    public function canSendCampaigns(?object $user, ?string $tenantKey = null): bool;
 }

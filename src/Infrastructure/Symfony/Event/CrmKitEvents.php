@@ -14,4 +14,10 @@ final class CrmKitEvents
      * may grant() or deny() (a deny wins); without an answer the default decision stands.
      */
     public const RECORD_ACCESS_CHECK = 'nowo_crm_kit.record_access_check';
+
+    /**
+     * {@see RecordVisibilityEvent}: with `security.resource_scoping`, which owners' records a person sees in lists,
+     * totals, search, exports and on record pages (team rules). Dispatched once per call.
+     */
+    public const RECORD_VISIBILITY = 'nowo_crm_kit.record_visibility';
 }

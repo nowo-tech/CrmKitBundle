@@ -127,6 +127,21 @@ final class KernelBootTest extends KernelTestCase
         (new CrmKitWebUiSecurityPass())->process($builder);
     }
 
+    public function testAnonymousUseIsRefusedInProdAndTurnsScopingOff(): void
+    {
+        $builder = new ContainerBuilder();
+        foreach (['ui.enabled' => false, 'security.access_checker' => null, 'security.allow_unauthenticated' => true, 'security.resource_scoping' => true] as $key => $value) {
+            $builder->setParameter('nowo_crm_kit.' . $key, $value);
+        }
+        $builder->setParameter('kernel.environment', 'dev');
+        (new CrmKitWebUiSecurityPass())->process($builder);
+        self::assertFalse($builder->getParameter('nowo_crm_kit.security.resource_scoping'), 'one shared actor: no per-owner scoping');
+        $builder->setParameter('kernel.environment', 'prod');
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('refused when kernel.environment is prod');
+        (new CrmKitWebUiSecurityPass())->process($builder);
+    }
+
     public function testLaterPhasesAreRefusedUntilTheirRelease(): void
     {
         $this->expectException(InvalidConfigurationException::class);

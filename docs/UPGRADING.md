@@ -3,9 +3,18 @@
 ## Table of contents
 
 - [Unreleased (0.1.0, first release)](#unreleased-010-first-release)
+- [To 0.1.0](#to-010)
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased (0.1.0, first release)
+
+## To 0.1.0
+
+First release. Install it with:
+
+```bash
+composer require nowo-tech/crm-kit-bundle
+```
 
 0.1.0 is the first release (phase A: companies and contacts). There is nothing to upgrade from; install it as
 described in [INSTALLATION.md](INSTALLATION.md):

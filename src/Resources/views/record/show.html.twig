@@ -146,7 +146,7 @@
                 {% for entry in timeline %}
                     <li data-testid="crm-activity" data-kind="{{ entry.kind.value }}">
                         <time datetime="{{ entry.occurredAt|date('c') }}">{{ entry.occurredAt|date('Y-m-d H:i') }}</time> ·
-                        {% if entry.kind.value == 'host' %}{{ (entry.params._label ?? '')|trans(entry.params|filter((v, k) => k starts with '%')) }}{% set _url = entry.params._url ?? '' %}{% if _url starts with '/' and not (_url starts with '//') and not (_url starts with '/\\') %} <a href="{{ _url }}">{{ 'timeline.open'|trans({}, _d) }}</a>{% endif %}{% else %}{{ ('activity.' ~ entry.kind.value)|trans({'%actor%': entry.actorName ?? '—'}, _d) }}{% endif %}
+                        {% if entry.kind.value == 'host' %}{{ (entry.params._label ?? '')|trans(entry.params|filter((v, k) => k starts with '%')) }}{% set _url = entry.params._url ?? '' %}{% if _url starts with '/' and not (_url starts with '//') and not (_url starts with '/\\') %} <a href="{{ _url }}">{{ 'timeline.open'|trans({}, _d) }}</a>{% endif %}{% else %}{{ ('activity.' ~ entry.kind.value)|trans({'%actor%': entry.actorName ?? '—'}, _d) }}{% endif %}{% if entry.params.via is defined and entry.params.via is not same as('web') and entry.params.token is defined %} {{ 'activity.via_token'|trans({'%token%': entry.params.token}, _d) }}{% endif %}
                         {% if entry.subjectLabel %} · <a href="{{ path('nowo_crm_kit_show', {type: 'contacts', id: entry.subjectId}) }}">{{ entry.subjectLabel }}</a>{% endif %}
                     </li>
                 {% endfor %}

@@ -13,6 +13,7 @@ use Symfony\Component\Config\Definition\Builder\NodeBuilder;
 
 use function array_unique;
 use function count;
+use function is_array;
 use function is_string;
 use function preg_match;
 use function str_starts_with;
@@ -113,6 +114,7 @@ final class ConfigurationTree
             ->scalarNode('layout')->defaultNull()->info('Twig layout of the pages; null = UiKit admin layout.')->end()
         ->end()->end();
         self::pipeline($children);
+        self::api($children);
         foreach (self::LATER_PHASES as $phase => $release) {
             $children->arrayNode($phase)->addDefaultsIfNotSet()->children()
                 ->booleanNode('enabled')->defaultFalse()
@@ -120,6 +122,34 @@ final class ConfigurationTree
                 ->end()
             ->end()->end();
         }
+    }
+
+    /**
+     * The API (0.3.0): operations for in-process callers (an MCP host) and the off-by-default `/crm/v1` JSON API.
+     */
+    private static function api(NodeBuilder $children): void
+    {
+        $api = $children->arrayNode('api')->addDefaultsIfNotSet()->info('0.3.0: the Api\Operation layer (an MCP host needs only this) and the /crm/v1 JSON API.')
+            ->validate()->ifTrue(static fn (array $v): bool => is_array($v['http'] ?? null) && ($v['http']['enabled'] ?? false) === true && ($v['enabled'] ?? false) !== true)->thenInvalid('nowo_crm_kit.api.http.enabled needs nowo_crm_kit.api.enabled.')->end()
+            ->children();
+        $api->booleanNode('enabled')->defaultFalse()->info('The operations, the principal and the idempotency table.')->end();
+        $api->integerNode('page_size')->defaultValue(25)->min(10)->max(100)->info('Default page size of the keyset lists (at most 100).')->end();
+        $api->integerNode('idempotency_ttl_seconds')->defaultValue(86400)->min(3600)->max(604800)->info('How long an Idempotency-Key is kept.')->end();
+        $http = $api->arrayNode('http')->addDefaultsIfNotSet()->children();
+        $http->booleanNode('enabled')->defaultFalse()->info('The /crm/v1 routes (route type nowo_crm_kit_api).')->end();
+        $http->scalarNode('prefix')->defaultValue('/api')
+            ->validate()->ifTrue(static fn (mixed $v): bool => !is_string($v) || preg_match('#\A(?:/[a-z0-9_-]+)+\z#', $v) !== 1)->thenInvalid('api.http.prefix is a path like /api: segments of a-z, 0-9, "_" or "-", no trailing slash.')->end()
+        ->end();
+        $http->scalarNode('authenticator')->defaultNull()->info('Service id of a CrmApiAuthenticatorInterface; null = SecurityUserCrmApiAuthenticator (the firewall user + default_grant).')->end();
+        $http->scalarNode('tenant_resolver')->defaultNull()->info('Service id of a CrmApiTenantResolverInterface; null = the configured tenant resolver.')->end();
+        $grant = $http->arrayNode('default_grant')->addDefaultsIfNotSet()->info('What SecurityUserCrmApiAuthenticator grants a firewall user.')->children();
+        $grant->enumNode('level')->values(['view', 'edit', 'manage'])->defaultValue('view')->end();
+        $grant->booleanNode('amounts')->defaultFalse()->end();
+        $grant->booleanNode('consents')->defaultFalse()->end();
+        $grant->booleanNode('destructive')->defaultFalse()->end();
+        $grant->end()->end();
+        $http->end()->end();
+        $api->end()->end();
     }
 
     /**

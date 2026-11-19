@@ -4,6 +4,20 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection;
 
+use Nowo\CrmKitBundle\Api\Operation\CrmApiCursorCodec;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiDealOperations;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiGuard;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiIdempotency;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiNextActionOperations;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiOperations;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiPipeline;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiReadOperations;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiRecordOperations;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiRecords;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiRelationOperations;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiWriter;
+use Nowo\CrmKitBundle\Api\Port\CrmApiCallerFactoryInterface;
+use Nowo\CrmKitBundle\Api\Port\CrmApiIdempotencyStoreInterface;
 use Nowo\CrmKitBundle\Application\ActorPersonalData;
 use Nowo\CrmKitBundle\Application\ConsentService;
 use Nowo\CrmKitBundle\Application\CrmAccess;
@@ -72,12 +86,22 @@ use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\Api\DoctrineCrmApiIdempotencyStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\CrmMetadataListener;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmActorDataStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmBatchLookupStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrinePipelineStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\ConfiguredCrmApiTenantResolver;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\Controller\CrmApiController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\CrmApiAuthenticatorInterface;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\CrmApiExceptionListener;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\CrmApiRouteLoader;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\CrmApiTenantResolverInterface;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\PrincipalCallerFactory;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\SecurityUserCrmApiAuthenticator;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\ApiPurgeIdempotencyCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\CountersRebuildCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\ImportResumeCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\PurgeCommand;
@@ -286,11 +310,13 @@ final class ServiceDefinitions
         $s->alias(CrmBatchLookupInterface::class, CrmBatchLookup::class)->public();
 
         // Console.
-        $s->set(PurgeCommand::class)->args([service(RecordPurger::class)])->tag('console.command');
+        $api = is_array($config['api'] ?? null) && ($config['api']['enabled'] ?? false) === true;
+        $s->set(PurgeCommand::class)->args([service(RecordPurger::class), $api ? service(CrmApiIdempotencyStoreInterface::class) : null, $clock])->tag('console.command');
         $s->set(ImportResumeCommand::class)->args([service(ImportService::class)])->tag('console.command');
         $s->set(CountersRebuildCommand::class)->args([service(CrmStoreInterface::class), service(PlanCounter::class), service(TransactionRunnerInterface::class), $housekeeping])->tag('console.command');
 
         // HTTP.
+        $s->set(CrmApiRouteLoader::class)->args([param($p . 'api.http.enabled'), param($p . 'api_path'), param($p . 'pipeline.enabled')])->tag('routing.loader');
         $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path'), param($p . 'pipeline.enabled')])->tag('routing.loader');
         $s->set(DomainExceptionListener::class)->tag('kernel.event_listener', ['event' => 'kernel.exception', 'method' => 'onKernelException', 'priority' => 32]);
         if (interface_exists(ConflictResponseFormatterInterface::class)) {
@@ -299,6 +325,9 @@ final class ServiceDefinitions
         $ui = is_array($config['ui'] ?? null) && ($config['ui']['enabled'] ?? false) === true;
         if ($pipeline) {
             self::pipeline($container);
+        }
+        if ($api) {
+            self::api($container, $pipeline);
         }
         if ($ui) {
             self::ui($container);
@@ -353,6 +382,46 @@ final class ServiceDefinitions
         $s->set(FunnelStatistics::class)->args([service(PipelineSupport::class), service(DealReader::class)])->public();
         $s->set(PartyStageService::class)->args([service(PipelineSupport::class)])->public();
         $s->set(NextActionService::class)->args([service(PipelineSupport::class), service(CrmTaskPort::class), service(CrmActorDirectoryInterface::class), service(NextActionViews::class)])->public();
+    }
+
+    /**
+     * The API (0.3.0, only with `api.enabled`): the operations, the principal caller, the idempotency store and, with
+     * `api.http.enabled`, the `/crm/v1` routes' controller and error listener.
+     */
+    private static function api(ContainerConfigurator $container, bool $pipeline): void
+    {
+        $s = $container->services();
+        $p = self::P;
+        $s->set(DoctrineCrmApiIdempotencyStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->alias(CrmApiIdempotencyStoreInterface::class, DoctrineCrmApiIdempotencyStore::class)->public();
+        $s->set(PrincipalCallerFactory::class)->args([service(CrmKitAccessCheckerInterface::class), service(CrmResourceAccessChecker::class), service(ScopedRecordVisibility::class), service(CrmActorDirectoryInterface::class), service(CrmActorResolverInterface::class)]);
+        $s->alias(CrmApiCallerFactoryInterface::class, PrincipalCallerFactory::class)->public();
+        $s->set(CrmApiOperations::class)->args([$pipeline])->public();
+        $s->set(CrmApiGuard::class)->args([service(CrmAccess::class), service(CrmApiCallerFactoryInterface::class), service(CrmApiOperations::class)]);
+        $s->set(CrmApiIdempotency::class)->args([service(CrmApiIdempotencyStoreInterface::class), service($p . 'clock'), param($p . 'api.idempotency_ttl_seconds')]);
+        $s->set(CrmApiWriter::class)->args([service(CrmApiGuard::class), service(CrmApiIdempotency::class)]);
+        $s->set(CrmApiCursorCodec::class)->args([param('kernel.secret')]);
+        $s->set(CrmApiRecords::class)->args([service(WriteSupport::class)]);
+        $pipe = null;
+        if ($pipeline) {
+            $s->set(CrmApiPipeline::class)->args([service(FunnelReader::class), service(DealReader::class), service(DealService::class), service(FunnelStatistics::class), service(NextActionService::class), service(PartyStageService::class)]);
+            $pipe = service(CrmApiPipeline::class);
+        }
+        $s->set(CrmApiReadOperations::class)->args([service(CrmApiGuard::class), service(CrmApiRecords::class), service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class), service(CrmApiCursorCodec::class), service(CrmApiOperations::class), param($p . 'gdpr.purposes'), $pipe])->public();
+        $s->set(CrmApiRelationOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiRecords::class), service(RecordService::class), service(NoteService::class), service(TagService::class), service(RecordViews::class), service(WriteSupport::class)])->public();
+        $s->set(CrmApiRecordOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiRecords::class), service(CrmApiReadOperations::class), service(RecordService::class), service(CrmReader::class), service(WriteSupport::class), service(CrmApiRelationOperations::class)])->public();
+        $s->set(CrmApiDealOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiCursorCodec::class), $pipe])->public();
+        $s->set(CrmApiNextActionOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiRecords::class), $pipe])->public();
+        $s->set(ApiPurgeIdempotencyCommand::class)->args([service(CrmApiIdempotencyStoreInterface::class), service($p . 'clock')])->tag('console.command');
+
+        // HTTP (api.http.enabled): the routes come from the loader; the controller and the error listener are cheap.
+        $s->set(SecurityUserCrmApiAuthenticator::class)->args([service('security.token_storage')->nullOnInvalid(), ['level' => param($p . 'api.http.default_grant.level'), 'amounts' => param($p . 'api.http.default_grant.amounts'), 'consents' => param($p . 'api.http.default_grant.consents'), 'destructive' => param($p . 'api.http.default_grant.destructive')], service(CrmActorResolverInterface::class)]);
+        $s->set(ConfiguredCrmApiTenantResolver::class)->args([service(CrmTenantResolverInterface::class)]);
+        $s->alias(CrmApiAuthenticatorInterface::class, $p . 'api.authenticator');
+        $s->alias(CrmApiTenantResolverInterface::class, $p . 'api.tenant_resolver');
+        $s->set(CrmApiController::class)->args([service(CrmApiAuthenticatorInterface::class), service(CrmApiTenantResolverInterface::class), service(CrmApiReadOperations::class), service(CrmApiRecordOperations::class), service(CrmApiRelationOperations::class), service(CrmApiDealOperations::class), service(CrmApiNextActionOperations::class), param($p . 'api.page_size')])->public()->tag('controller.service_arguments');
+        $s->set(CrmApiExceptionListener::class)->args([service('nowo_transaction_doctrine.conflict_response_policy'), service('logger')->nullOnInvalid()])
+            ->tag('kernel.event_listener', ['event' => 'kernel.exception', 'method' => 'onKernelException', 'priority' => 128]);
     }
 
     /**

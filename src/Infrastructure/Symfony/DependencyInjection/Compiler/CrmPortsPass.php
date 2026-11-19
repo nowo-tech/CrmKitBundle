@@ -13,6 +13,8 @@ use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\ConfiguredCrmApiTenantResolver;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\SecurityUserCrmApiAuthenticator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiReadOperations;
@@ -53,6 +55,13 @@ final class CrmPortsPass implements CompilerPassInterface
             if (is_string($id) && $id !== '') {
                 $container->setAlias($interface, $id);
             }
+        }
+        // 0.3.0: the JSON API's authenticator and tenant resolver (the host's services, else the defaults).
+        if ($container->hasParameter($p . 'api.http.authenticator')) {
+            $authenticator = $container->getParameter($p . 'api.http.authenticator');
+            $tenants       = $container->getParameter($p . 'api.http.tenant_resolver');
+            $container->setAlias($p . 'api.authenticator', is_string($authenticator) && $authenticator !== '' ? $authenticator : SecurityUserCrmApiAuthenticator::class);
+            $container->setAlias($p . 'api.tenant_resolver', is_string($tenants) && $tenants !== '' ? $tenants : ConfiguredCrmApiTenantResolver::class);
         }
         $clock = $container->getParameter($p . 'clock');
         // FrameworkBundle (required) always defines `clock`.

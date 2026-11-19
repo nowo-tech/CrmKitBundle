@@ -251,6 +251,7 @@ timeline:
     empty: Aún no ha ocurrido nada.
     open: Abrir
 activity:
+    via_token: "vía agente ‹%token%›"
     lifecycle_stage: 'Etapa del ciclo de vida cambiada por %actor%'
     next_action_closed: 'Próxima acción cerrada por %actor%'
     next_action_added: 'Próxima acción añadida por %actor%'

@@ -718,11 +718,19 @@ run(id, maxChunks): loop (0.1.0: the token is read from the claimed import):
                  last chunk: status='done', finished_at; after commit: ImportCompleted, audit
 resume command:  UPDATE crm_import SET claim_token=?, claimed_at=now, version=version+1
                  WHERE id=? AND tenant_id=? AND status='running' AND claimed_at < now - stale
+                       AND claim_token IS NOT NULL
+                 (0.2.1) stops before a row that needs a person: in the same unit
+                 UPDATE crm_import SET claim_token=NULL, claimed_at=now, version=version+1
+                 WHERE id=? AND status='running' AND claim_token=?   (waits for a person)
+continue:        (0.2.1) on a paused import: UPDATE crm_import SET claim_token=?, claimed_at=now, version=version+1
+                 WHERE id=? AND tenant_id=? AND status='running' AND claim_token IS NULL (one winner)
 ```
 
 A double confirm stores nothing twice (one claim wins; rows settle once). A killed worker leaves `running` with
 progress; the resume command takes over a stale claim **(0.1.0)**; the page's "Continue" button (anyone with `edit`)
-runs further chunks under the current claim, and "Cancel" ends a preview or a stale running import. Each chunk is
+runs further chunks under the current claim, and "Cancel" ends a preview or a stale running import. **(0.2.1)** An
+import the resume command paused (no claim: it waits for a person) is skipped by later resume runs, claimed at once by
+"Continue" and cancellable at once; no schema change (the empty `claim_token` of a running import is the flag). Each chunk is
 small so locks are short; no file I/O inside a unit (the file is parsed at upload, before the unit that stores the rows).
 
 ## 16. GDPR

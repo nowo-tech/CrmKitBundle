@@ -25,6 +25,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `HOST_LINK_REMOVED`, `RECORD_PURGED`, … : their class names), and the host's view of link, merge, erasure and purge
   changes in USAGE "Events".
 
+### Fixed
+
+- **Paused unattended import resume** (follow-up of audit UP2-1): when the resume command stops before a row that
+  needs a person's decision, it now releases its claim in the same transaction. The import waits for a person
+  (`ImportView::$awaitingPerson`); later resume runs skip it instead of taking it again after `stale_claim_seconds`
+  and pausing again (with a fresh claim in between); a person's "Continue" claims it with its own token (one winner),
+  and "Cancel" ends it at once instead of waiting for the claim to go stale. No schema change.
+
 ## [0.2.0] - 2026-11-19
 
 ### Added
@@ -69,6 +77,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   SQL (port `CrmRecordVisibilityInterface`, default `ScopedRecordVisibility`); the same set is the default of a
   decision on one record. Whoever may manage the settings (the area checker's `canManageSettings`, the host's when
   configured) sees everything.
+
 ### Changed
 
 - **Breaking (configuration):** `access.roles` is replaced by `security.*_roles` (defaults `[ROLE_ADMIN]`); the root

@@ -224,9 +224,19 @@ final class SecurityTest extends CrmTestCase
         $rows = $imports->preview($id)->rows;
         self::assertSame(['created', 'pending', 'pending'], [$rows[0]->outcome->value, $rows[1]->outcome->value, $rows[2]->outcome->value], 'the update and the company row wait for a person');
         self::assertSame('Ada', $this->text('SELECT last_name FROM nowo_crm_contact WHERE id = ?', [$ada]));
+        // The pause released the claim: the import waits for a person, and later resume runs leave it alone.
+        self::assertTrue($imports->preview($id)->awaitingPerson);
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_import WHERE id = ? AND claim_token IS NULL', [$id]));
+        $before = $this->connection()->fetchAssociative('SELECT version, claimed_at, rows_done FROM nowo_crm_import WHERE id = ?', [$id]);
+        $this->clock()->sleep(3600);
+        $this->signOut();
+        self::assertSame(0, $this->service(ImportService::class)->resumeStale());
+        self::assertSame($before, $this->connection()->fetchAssociative('SELECT version, claimed_at, rows_done FROM nowo_crm_import WHERE id = ?', [$id]), 'a second resume run does not touch it');
+        $this->signIn('root');
 
-        // The next person's "Continue" settles them under their own access.
+        // The next person's "Continue" settles them at once (no stale claim to wait for), under their own access.
         self::assertTrue($imports->run($id));
+        self::assertFalse($imports->preview($id)->awaitingPerson);
         $rows = $imports->preview($id)->rows;
         self::assertSame(['created', 'updated', 'created'], [$rows[0]->outcome->value, $rows[1]->outcome->value, $rows[2]->outcome->value]);
         self::assertSame('Changed', $this->text('SELECT last_name FROM nowo_crm_contact WHERE id = ?', [$ada]));
@@ -240,6 +250,23 @@ final class SecurityTest extends CrmTestCase
         self::assertSame(0, $this->service(ImportService::class)->resumeStale());
         $this->signIn('root');
         self::assertSame('pending', $imports->preview($named)->rows[0]->outcome->value);
+        self::assertTrue($imports->preview($named)->awaitingPerson);
+        // Continue right away, one chunk at a time: the first call claims it, the claim is held while it runs.
+        $this->clock()->sleep(1);
+        self::assertTrue($imports->run($named, 1));
+        self::assertSame('created', $imports->preview($named)->rows[0]->outcome->value);
+
+        // A paused import can be cancelled at once too (no stale claim to wait for).
+        $other = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'o.csv', 'email,last_name,company
+dot@x.test,Dot,Acme
+');
+        $imports->confirm($other, ['email' => 'email', 'last_name' => 'last_name', 'company' => 'company'], DuplicatePolicy::Skip, 1);
+        $this->clock()->sleep(3600);
+        $this->signOut();
+        self::assertSame(0, $this->service(ImportService::class)->resumeStale());
+        $this->signIn('root');
+        $imports->cancel($other);
+        self::assertSame('cancelled', $imports->preview($other)->status->value);
     }
 
     private function signOut(): void

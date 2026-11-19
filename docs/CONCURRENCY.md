@@ -186,8 +186,13 @@ chunk holds the import row lock, a runner whose token was replaced stops, and ea
 the same person store one contact (the e-mail key); the second row becomes `duplicate` (or `updated`). No Messenger
 handler ships in 0.1.0. **(0.2.0)** The resume command runs
 with nobody signed in: it settles only rows that need no decision on one record and stops before the first one that
-updates an existing contact or names a company, leaving it (and the rows after it) pending under the claim for the
-next person's "Continue" (audit UP2-1).
+updates an existing contact or names a company, leaving it (and the rows after it) pending for the next person's
+"Continue" (audit UP2-1). **(0.2.1)** In the same transaction it releases its claim (`claim_token` emptied with a
+conditional `UPDATE … WHERE claim_token = ?`): a running import without a claim **waits for a person**
+(`ImportView::$awaitingPerson`). Later resume runs skip it (`claim_token IS NOT NULL` in their query and in the
+takeover); a person's "Continue" claims it at once with `UPDATE … SET claim_token = ? WHERE status = 'running' AND
+claim_token IS NULL` (one winner; a second "Continue" joins the winner's claim and the import row lock serialises
+their chunks), and "Cancel" ends it at once.
 
 ## Isolation and locks
 

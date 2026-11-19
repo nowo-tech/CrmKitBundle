@@ -16,6 +16,13 @@ already trusts (USAGE "Batch lookups for host jobs"). `CrmKitEvents` gains const
 names; listeners registered by class name keep working. The retention purge now also dispatches `RecordsPurged` per
 committed batch (no listener: nothing changes); `CrmBatchLookupInterface::existing()` is new. No schema change.
 
+**Imports paused by the resume command.** An import that `nowo:crm-kit:import:resume` stopped before a row needing a
+person now releases its claim and waits for a person (`ImportView::$awaitingPerson`, a new trailing constructor
+argument with a default); the resume command skips it and the page's "Continue" takes it at once. No migration: the
+flag is a running import with an empty `claim_token`. An import paused by 0.2.0 still holds the resume command's
+claim; after the upgrade it is taken once more when that claim goes stale, paused again and released, or a person's
+"Continue" runs it at any time, as before.
+
 ## To 0.2.0
 
 From **0.1.0**:

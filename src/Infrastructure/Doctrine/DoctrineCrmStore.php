@@ -1088,7 +1088,12 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
      */
     private function class(SubjectType $type): string
     {
-        return $type === SubjectType::Company ? Company::class : Contact::class;
+        return match ($type) {
+            SubjectType::Company => Company::class,
+            SubjectType::Contact => Contact::class,
+            // Deals (0.3.0) are not records: the funnel store reads them.
+            SubjectType::Deal => throw new LogicException('A deal is not a company or a contact.'),
+        };
     }
 
     private function em(): EntityManagerInterface

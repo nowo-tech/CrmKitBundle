@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Pipeline\StageChange" table="crm_stage_change">
+        <indexes>
+            <index name="crm_stage_change_funnel" columns="tenant_id,funnel_id,occurred_at"/>
+            <index name="crm_stage_change_item" columns="tenant_id,item_type,item_id,occurred_at"/>
+        </indexes>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="itemType" column="item_type" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\SubjectType"/>
+        <field name="itemId" column="item_id" type="string" length="36"/>
+        <field name="funnelId" column="funnel_id" type="string" length="36"/>
+        <field name="fromStageId" column="from_stage_id" type="string" length="36" nullable="true"/>
+        <field name="toStageId" column="to_stage_id" type="string" length="36"/>
+        <field name="actorId" column="actor_id" type="string" length="128" nullable="true"/>
+        <field name="via" column="via" type="string" length="16" nullable="true"/>
+        <field name="occurredAt" column="occurred_at" type="nowo_crm_utc_datetime_micro"/>
+        <field name="secondsInFrom" column="seconds_in_from" type="bigint" nullable="true"/>
+    </entity>
+</doctrine-mapping>

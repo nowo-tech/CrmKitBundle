@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
@@ -42,7 +43,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
     /**
      * Wires the collaborators.
      */
-    public function __construct(private WriteSupport $support, private PlanCounter $counter)
+    public function __construct(private WriteSupport $support, private PlanCounter $counter, private ?PipelineHousekeeping $pipeline = null)
     {
     }
 
@@ -70,6 +71,10 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
                 'links'    => array_map(static fn (HostLink $l): array => ['type' => $l->getHostType(), 'id' => $l->getHostId()], $store->links($context->tenant, SubjectType::Contact, $contactId)),
                 'merges'   => array_map(static fn (MergeRecord $m): array => ['into' => $m->getSurvivorId(), 'snapshot' => $m->getSnapshot(), 'merged_at' => $m->getMergedAt()->format(DATE_ATOM)], $store->mergesOf($context->tenant, $contactId)),
             ];
+            if ($this->pipeline instanceof PipelineHousekeeping) {
+                // 0.3.0: its deals, lifecycle stages, stage history and next actions.
+                $data += $this->pipeline->exportContact($context->tenant, $contactId);
+            }
             $this->support->activity($context, SubjectType::Contact, $contactId, ActivityKind::Exported);
             $this->support->audit($effects, $context, 'crm.contact.exported', SubjectType::Contact, $contactId);
 
@@ -130,6 +135,8 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
             foreach ($store->consents($context->tenant, $contactId) as $row) {
                 $row->anonymise();
             }
+            // 0.3.0: its deals are unlinked; its stage history, lifecycle stages and next actions are deleted.
+            $this->pipeline?->forgetRecord($context->tenant, SubjectType::Contact, $contactId);
             // The merge tombstones of this contact, and theirs in turn: locked, blanked, their merge traces deleted.
             $seen  = [$contactId => true];
             $level = [$contactId];

@@ -18,7 +18,6 @@ use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Import\ImportFileException;
-use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\AuditEntry;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;

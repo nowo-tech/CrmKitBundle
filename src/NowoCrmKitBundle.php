@@ -46,6 +46,9 @@ final class NowoCrmKitBundle extends AbstractBundle
     /** Doctrine mapping name of phase A. */
     public const MAPPING_NAME = 'NowoCrmKitBundle';
 
+    /** Doctrine mapping name of the funnels (0.3.0; only with `pipeline.enabled`). */
+    public const PIPELINE_MAPPING_NAME = 'NowoCrmKitBundlePipeline';
+
     protected string $extensionAlias = self::ALIAS;
 
     /**
@@ -99,11 +102,15 @@ final class NowoCrmKitBundle extends AbstractBundle
         if (!$builder->hasExtension('doctrine')) {
             return;
         }
-        $manager = self::ALIAS;
+        $manager  = self::ALIAS;
+        $pipeline = false;
         foreach ($builder->getExtensionConfig(self::ALIAS) as $config) {
             $doctrine = is_array($config) && is_array($config['doctrine'] ?? null) ? $config['doctrine'] : [];
             if (array_key_exists('entity_manager', $doctrine)) {
                 $manager = is_string($doctrine['entity_manager']) && $doctrine['entity_manager'] !== '' ? $doctrine['entity_manager'] : 'default';
+            }
+            if (is_array($config) && is_array($config['pipeline'] ?? null) && array_key_exists('enabled', $config['pipeline'])) {
+                $pipeline = $config['pipeline']['enabled'] === true;
             }
         }
         $builder->prependExtensionConfig('doctrine', ['dbal' => ['types' => [UtcDateTimeImmutableType::NAME => UtcDateTimeImmutableType::class, UtcMicroDateTimeImmutableType::NAME => UtcMicroDateTimeImmutableType::class]]]);
@@ -112,8 +119,12 @@ final class NowoCrmKitBundle extends AbstractBundle
             // fails the build with the fix instead of creating one silently.
             return;
         }
-        $mapping = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model', 'is_bundle' => false];
-        $builder->prependExtensionConfig('doctrine', ['orm' => ['entity_managers' => [$manager => ['mappings' => [self::MAPPING_NAME => $mapping]]]]]);
+        $mappings = [self::MAPPING_NAME => ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model', 'is_bundle' => false]];
+        if ($pipeline) {
+            // 0.3.0: the funnel tables are mapped only while `pipeline.enabled` (no table otherwise).
+            $mappings[self::PIPELINE_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-pipeline', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Pipeline', 'is_bundle' => false];
+        }
+        $builder->prependExtensionConfig('doctrine', ['orm' => ['entity_managers' => [$manager => ['mappings' => $mappings]]]]);
     }
 
     /**

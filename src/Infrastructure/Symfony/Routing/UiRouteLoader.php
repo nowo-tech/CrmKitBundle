@@ -8,6 +8,8 @@ use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\AdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ImportController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineAdminController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordPartsController;
 use Symfony\Component\Config\Loader\Loader;
@@ -17,7 +19,8 @@ use Symfony\Component\Routing\RouteCollection;
 use function rtrim;
 
 /**
- * Route loader `nowo_crm_kit_ui` (contract section 11.1), only when `ui.enabled` (REQ-UI-001: routes are opt-in). The
+ * Route loader `nowo_crm_kit_ui` (contract section 11.1), only when `ui.enabled` (REQ-UI-001: routes are opt-in); the
+ * funnel pages (0.3.0) only with `pipeline.enabled` too. The
  * host imports it with its prefix: `{resource: ., type: nowo_crm_kit_ui}`. Route names `nowo_crm_kit_*`.
  */
 final class UiRouteLoader extends Loader
@@ -31,7 +34,7 @@ final class UiRouteLoader extends Loader
     /**
      * Wires the settings.
      */
-    public function __construct(private readonly bool $enabled = false, private readonly string $path = '/crm')
+    public function __construct(private readonly bool $enabled = false, private readonly string $path = '/crm', private readonly bool $pipeline = false)
     {
         parent::__construct();
     }
@@ -83,8 +86,40 @@ final class UiRouteLoader extends Loader
         $this->add($routes, 'fields', $base . '/admin/fields', $a . 'fields', ['GET', 'POST']);
         $this->add($routes, 'field_edit', $base . '/admin/fields/{id}', $a . 'field', ['GET', 'POST'], $id);
         $this->add($routes, 'settings', $base . '/admin/settings', $a . 'settings', ['GET', 'POST']);
+        if ($this->pipeline) {
+            $this->pipeline($routes, $base, $id);
+        }
 
         return $routes;
+    }
+
+    /**
+     * The funnel pages (0.3.0, `pipeline.enabled`).
+     *
+     * @param array<string, string> $id
+     */
+    private function pipeline(RouteCollection $routes, string $base, array $id): void
+    {
+        $d = PipelineController::class . '::';
+        $f = PipelineAdminController::class . '::';
+        $this->add($routes, 'deals', $base . '/deals', $d . 'list', ['GET']);
+        $this->add($routes, 'deal_new', $base . '/deals/new', $d . 'create', ['GET', 'POST']);
+        $this->add($routes, 'deal_show', $base . '/deals/{id}', $d . 'show', ['GET'], $id);
+        $this->add($routes, 'deal_edit', $base . '/deals/{id}/edit', $d . 'edit', ['GET', 'POST'], $id);
+        $this->add($routes, 'deal_move', $base . '/deals/{id}/stage', $d . 'move', ['POST'], $id);
+        $this->add($routes, 'deal_trash', $base . '/deals/{id}/trash', $d . 'trash', ['POST'], $id);
+        $this->add($routes, 'deal_restore', $base . '/deals/{id}/restore', $d . 'restore', ['POST'], $id);
+        $this->add($routes, 'deal_purge', $base . '/deals/{id}/purge', $d . 'purge', ['POST'], $id);
+        $this->add($routes, 'deal_board', $base . '/funnels/{id}/board', $d . 'board', ['GET'], $id);
+        $this->add($routes, 'next_action_add', $base . '/{type}/{id}/next-actions', $d . 'addNextAction', ['POST'], ['type' => 'companies|contacts|deals'] + $id);
+        $this->add($routes, 'next_action_close', $base . '/next-actions/{id}/{action}', $d . 'closeNextAction', ['POST'], $id + ['action' => 'done|cancel']);
+        $this->add($routes, 'lifecycle', $base . '/{type}/{id}/lifecycle', $d . 'lifecycle', ['POST'], ['type' => SubjectType::SEGMENT_REQUIREMENT] + $id);
+        $this->add($routes, 'funnel_stats', $base . '/funnels/{id}/stats', $f . 'stats', ['GET'], $id);
+        $this->add($routes, 'funnel_stats_csv', $base . '/funnels/{id}/stats.csv', $f . 'statsCsv', ['GET'], $id);
+        $this->add($routes, 'funnels', $base . '/admin/funnels', $f . 'funnels', ['GET', 'POST']);
+        $this->add($routes, 'funnel_edit', $base . '/admin/funnels/{id}', $f . 'funnel', ['GET', 'POST'], $id);
+        $this->add($routes, 'stage_edit', $base . '/admin/stages/{id}', $f . 'stage', ['POST'], $id);
+        $this->add($routes, 'stage_move', $base . '/admin/stages/{id}/move/{direction}', $f . 'moveStage', ['POST'], $id + ['direction' => 'up|down']);
     }
 
     /**

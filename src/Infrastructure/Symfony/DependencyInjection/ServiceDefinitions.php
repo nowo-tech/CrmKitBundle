@@ -17,6 +17,18 @@ use Nowo\CrmKitBundle\Application\ImportService;
 use Nowo\CrmKitBundle\Application\MergeService;
 use Nowo\CrmKitBundle\Application\NoteService;
 use Nowo\CrmKitBundle\Application\PartyCatalogue;
+use Nowo\CrmKitBundle\Application\Pipeline\BuiltInCrmTaskPort;
+use Nowo\CrmKitBundle\Application\Pipeline\DealReader;
+use Nowo\CrmKitBundle\Application\Pipeline\DealService;
+use Nowo\CrmKitBundle\Application\Pipeline\FunnelReader;
+use Nowo\CrmKitBundle\Application\Pipeline\FunnelService;
+use Nowo\CrmKitBundle\Application\Pipeline\FunnelStatistics;
+use Nowo\CrmKitBundle\Application\Pipeline\NextActionService;
+use Nowo\CrmKitBundle\Application\Pipeline\NextActionViews;
+use Nowo\CrmKitBundle\Application\Pipeline\PartyStageService;
+use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
+use Nowo\CrmKitBundle\Application\Pipeline\PipelineSupport;
+use Nowo\CrmKitBundle\Application\Pipeline\Port\PipelineStoreInterface;
 use Nowo\CrmKitBundle\Application\PlanCounter;
 use Nowo\CrmKitBundle\Application\Port\CrmActorDataStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmBatchLookupStoreInterface;
@@ -38,6 +50,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
@@ -60,12 +73,17 @@ use Nowo\CrmKitBundle\Infrastructure\Doctrine\CrmMetadataListener;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmActorDataStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmBatchLookupStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrinePipelineStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\CountersRebuildCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\ImportResumeCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\PurgeCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\AdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ImportController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineAdminController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineForms;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineRecordBlock;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordForms;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordPage;
@@ -74,16 +92,24 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\UiSupport;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ActionType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\AffiliationType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ConsentType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\DealFilterType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\DealType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FieldDefinitionType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FilterType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FunnelType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\HostLinkType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ImportConfirmType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ImportUploadType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\LifecycleType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\MergePickType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\MergeType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\NextActionType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\NoteType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\RecordType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\SettingsType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\StageMoveType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\StageType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\StatsFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\TagsAssignType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\TagType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\CrmConflictFormatter;
@@ -166,7 +192,7 @@ final class ServiceDefinitions
         $s->set(CrmKitAccessListener::class)->args([service(CrmKitGuard::class), service(CrmAccessCheckerInterface::class), service('security.firewall.map')->nullOnInvalid()])
             ->tag('kernel.event_listener', ['event' => 'kernel.controller', 'method' => 'onKernelController', 'priority' => 16]);
         $s->set($p . 'default.feature_gate', ConfiguredFeatureGate::class)->args([param($p . 'feature.default_enabled')]);
-        $s->set($p . 'default.plan_limits', ConfiguredPlanLimits::class)->args([['companies' => param($p . 'limits.companies'), 'contacts' => param($p . 'limits.contacts')]]);
+        $s->set($p . 'default.plan_limits', ConfiguredPlanLimits::class)->args([['companies' => param($p . 'limits.companies'), 'contacts' => param($p . 'limits.contacts'), 'deals' => param($p . 'limits.deals')]]);
         $s->set($p . 'default.actor_directory', SecurityActorDirectory::class)->args([service('security.token_storage')->nullOnInvalid(), service(CrmActorResolverInterface::class)]);
         $s->set($p . 'default.audit_sink', PsrLogAuditSink::class)->args([$logger]);
         $s->set(IdGeneratorInterface::class, SymfonyUuidGenerator::class);
@@ -203,7 +229,9 @@ final class ServiceDefinitions
         $s->alias(CrmCatalogueInterface::class, PartyCatalogue::class)->public();
         $s->set(Roles::class)->args([service(WriteSupport::class), service(PartyCatalogue::class)]);
         $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class), service(PartyCatalogue::class), service(CrmActorResolverInterface::class)]);
-        $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events])->public();
+        $pipeline     = is_array($config['pipeline'] ?? null) && ($config['pipeline']['enabled'] ?? false) === true;
+        $housekeeping = $pipeline ? service(PipelineHousekeeping::class) : null;
+        $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $housekeeping])->public();
         $s->set(RecordService::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(Taggings::class), service(CrmActorDirectoryInterface::class), service(RecordPurger::class), service(Roles::class), service(PartyCatalogue::class)]);
         $s->alias(RecordServiceInterface::class, RecordService::class)->public();
         $s->set(CrmReader::class)->args([service(WriteSupport::class), service(RecordViews::class), service(CrmActorDirectoryInterface::class), tagged_iterator(CrmPanelProviderInterface::PANEL_TAG), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), $logger])->public();
@@ -230,7 +258,7 @@ final class ServiceDefinitions
             param($p . 'import.stale_claim_seconds'),
         ])->public();
         $s->alias(ImportServiceInterface::class, ImportService::class)->public();
-        $s->set(MergeService::class)->args([service(WriteSupport::class), service(RecordViews::class), service(PlanCounter::class)]);
+        $s->set(MergeService::class)->args([service(WriteSupport::class), service(RecordViews::class), service(PlanCounter::class), $housekeeping]);
         $s->alias(MergeServiceInterface::class, MergeService::class)->public();
         $s->set(CrmExporter::class)->args([service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class)]);
         $s->alias(CrmExporterInterface::class, CrmExporter::class)->public();
@@ -239,7 +267,7 @@ final class ServiceDefinitions
         $s->alias(CrmActorDataStoreInterface::class, DoctrineCrmActorDataStore::class);
         $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events]);
         $s->alias(CrmActorPersonalDataInterface::class, ActorPersonalData::class)->public();
-        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class)]);
+        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
@@ -250,17 +278,63 @@ final class ServiceDefinitions
         // Console.
         $s->set(PurgeCommand::class)->args([service(RecordPurger::class)])->tag('console.command');
         $s->set(ImportResumeCommand::class)->args([service(ImportService::class)])->tag('console.command');
-        $s->set(CountersRebuildCommand::class)->args([service(CrmStoreInterface::class), service(PlanCounter::class), service(TransactionRunnerInterface::class)])->tag('console.command');
+        $s->set(CountersRebuildCommand::class)->args([service(CrmStoreInterface::class), service(PlanCounter::class), service(TransactionRunnerInterface::class), $housekeeping])->tag('console.command');
 
         // HTTP.
-        $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path')])->tag('routing.loader');
+        $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path'), param($p . 'pipeline.enabled')])->tag('routing.loader');
         $s->set(DomainExceptionListener::class)->tag('kernel.event_listener', ['event' => 'kernel.exception', 'method' => 'onKernelException', 'priority' => 32]);
         if (interface_exists(ConflictResponseFormatterInterface::class)) {
             $s->set(CrmConflictFormatter::class)->tag('nowo_transaction_doctrine.conflict_response_formatter', ['priority' => 10]);
         }
         $ui = is_array($config['ui'] ?? null) && ($config['ui']['enabled'] ?? false) === true;
+        if ($pipeline) {
+            self::pipeline($container);
+        }
         if ($ui) {
             self::ui($container);
+        }
+        if ($ui && $pipeline) {
+            self::pipelineUi($container);
+        }
+    }
+
+    /**
+     * The funnels (0.3.0, only with `pipeline.enabled`).
+     */
+    private static function pipeline(ContainerConfigurator $container): void
+    {
+        $s = $container->services();
+        $p = self::P;
+        $s->set(DoctrinePipelineStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->alias(PipelineStoreInterface::class, DoctrinePipelineStore::class);
+        $s->set(PipelineSupport::class)->args([service(WriteSupport::class), service(PipelineStoreInterface::class), param($p . 'pipeline.lost_reasons')]);
+        $s->set(PipelineHousekeeping::class)->args([service(PipelineStoreInterface::class), service(CrmStoreInterface::class), service(PlanCounter::class)]);
+        // The task port: pipeline.task_port, else the TaskBoard bridge (CrmPortsPass), else the built-in list.
+        $s->set($p . 'default.task_port', BuiltInCrmTaskPort::class);
+        $s->alias(CrmTaskPort::class, $p . 'default.task_port')->public();
+        $s->set(NextActionViews::class)->args([service(CrmTaskPort::class)]);
+        $s->set(FunnelReader::class)->args([service(PipelineSupport::class)])->public();
+        $s->set(FunnelService::class)->args([service(PipelineSupport::class)])->public();
+        $s->set(DealService::class)->args([service(PipelineSupport::class), service(PlanCounter::class), service(CrmActorDirectoryInterface::class), service(PipelineHousekeeping::class)])->public();
+        $s->set(DealReader::class)->args([service(PipelineSupport::class), service(RecordViews::class), service(NextActionViews::class)])->public();
+        $s->set(FunnelStatistics::class)->args([service(PipelineSupport::class), service(DealReader::class)])->public();
+        $s->set(PartyStageService::class)->args([service(PipelineSupport::class)])->public();
+        $s->set(NextActionService::class)->args([service(PipelineSupport::class), service(CrmTaskPort::class), service(CrmActorDirectoryInterface::class), service(NextActionViews::class)])->public();
+    }
+
+    /**
+     * The funnel pages (0.3.0, with `ui.enabled` and `pipeline.enabled`).
+     */
+    private static function pipelineUi(ContainerConfigurator $container): void
+    {
+        $s = $container->services();
+        $p = self::P;
+        $s->set(PipelineForms::class)->args([service(RecordForms::class), service(CrmReaderInterface::class), param($p . 'pipeline.lost_reasons')]);
+        $s->set(PipelineController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(DealService::class), service(NextActionService::class), service(PartyStageService::class), service(PipelineForms::class), service(CrmAccess::class)])->public()->tag('controller.service_arguments');
+        $s->set(PipelineAdminController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(FunnelService::class), service(FunnelStatistics::class), service(PipelineForms::class), service(CrmAccess::class)])->public()->tag('controller.service_arguments');
+        $s->set(PipelineRecordBlock::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(PartyStageService::class), service(NextActionService::class), service(PipelineForms::class)]);
+        foreach ([DealFilterType::class, DealType::class, FunnelType::class, StageType::class, StageMoveType::class, NextActionType::class, StatsFilterType::class, LifecycleType::class] as $type) {
+            $s->set($type)->tag('form.type');
         }
     }
 
@@ -271,9 +345,9 @@ final class ServiceDefinitions
     {
         $s = $container->services();
         $p = self::P;
-        $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size')]);
+        $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size'), param($p . 'pipeline.enabled')]);
         $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
-        $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class)]);
+        $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid()]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class)])->public()->tag('controller.service_arguments');
         $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class)])->public()->tag('controller.service_arguments');
         $s->set(ImportController::class)->args([service(UiSupport::class), service(ImportServiceInterface::class), service(RecordForms::class), param($p . 'import.sync_chunks'), param($p . 'import.max_bytes')])->public()->tag('controller.service_arguments');

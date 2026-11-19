@@ -11,4 +11,5 @@ enum CrmResource: string
 {
     case Companies = 'companies';
     case Contacts  = 'contacts';
+    case Deals     = 'deals';
 }

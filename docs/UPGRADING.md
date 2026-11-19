@@ -10,6 +10,33 @@
 
 ## Unreleased
 
+**Funnels (0.3.0, `pipeline.enabled`).** Nothing changes while the funnels stay off: no table is mapped and no route
+is added. To turn them on, set `nowo_crm_kit.pipeline.enabled: true` and create the tables (`doctrine:migrations:diff
+--em=nowo_crm_kit` produces the same DDL as below; `<p>` is `doctrine.table_prefix`, `nowo_` by default).
+
+- `SubjectType` gains `Deal` (`deal`; `segment()` `deals`, `isRecord()` false) and `CrmResource` gains `Deals`.
+  `nowo_crm_kit.record_access_check` listeners that assumed `company | contact` must expect `deal`
+  (`getSubjectType()`); a `match` over `SubjectType` in host code needs the new case.
+- `nowo:crm-kit:purge` returns and prints a `deals` count; `RecordPurger::purge()` gains the `deals` key.
+- The 360° page renders a funnels block while they are on; the area navigation gains Deals and Funnels.
+
+MySQL 8.4 / MariaDB 11.4 (identifier columns use `utf8mb4_0900_bin` on MySQL, `utf8mb4_nopad_bin` on MariaDB):
+
+```sql
+CREATE TABLE nowo_crm_funnel (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, kind VARCHAR(16) NOT NULL, subject_type VARCHAR(16) DEFAULT NULL, name VARCHAR(120) NOT NULL, position INT NOT NULL, archived TINYINT(1) NOT NULL, version INT DEFAULT 1 NOT NULL, created_at DATETIME NOT NULL, updated_at DATETIME(6) NOT NULL, INDEX nowo_crm_funnel_list (tenant_id, kind, archived, position), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_stage (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, funnel_id VARCHAR(36) NOT NULL, name VARCHAR(80) NOT NULL, position INT NOT NULL, kind VARCHAR(8) NOT NULL, probability SMALLINT NOT NULL, rot_days INT DEFAULT NULL, archived TINYINT(1) NOT NULL, version INT DEFAULT 1 NOT NULL, INDEX nowo_crm_stage_funnel (tenant_id, funnel_id, position), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_deal (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, funnel_id VARCHAR(36) NOT NULL, stage_id VARCHAR(36) NOT NULL, title VARCHAR(200) NOT NULL, company_id VARCHAR(36) DEFAULT NULL, contact_id VARCHAR(36) DEFAULT NULL, owner_id VARCHAR(128) DEFAULT NULL, amount NUMERIC(18, 4) DEFAULT NULL, currency VARCHAR(3) DEFAULT NULL, probability SMALLINT DEFAULT NULL, expected_close DATE DEFAULT NULL, status VARCHAR(16) NOT NULL, trashed_from VARCHAR(16) DEFAULT NULL, lost_reason VARCHAR(32) DEFAULT NULL, lost_note VARCHAR(500) DEFAULT NULL, stage_entered_at DATETIME(6) NOT NULL, closed_at DATETIME DEFAULT NULL, next_action_at DATETIME DEFAULT NULL, trashed_at DATETIME DEFAULT NULL, version INT DEFAULT 1 NOT NULL, created_at DATETIME NOT NULL, created_by_id VARCHAR(128) DEFAULT NULL, updated_at DATETIME(6) NOT NULL, updated_by_id VARCHAR(128) DEFAULT NULL, INDEX nowo_crm_deal_stage (tenant_id, funnel_id, stage_id, status), INDEX nowo_crm_deal_keyset_updated (tenant_id, status, updated_at, id), INDEX nowo_crm_deal_company (tenant_id, company_id), INDEX nowo_crm_deal_contact (tenant_id, contact_id), INDEX nowo_crm_deal_owner (tenant_id, owner_id), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_stage_change (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, item_type VARCHAR(16) NOT NULL, item_id VARCHAR(36) NOT NULL, funnel_id VARCHAR(36) NOT NULL, from_stage_id VARCHAR(36) DEFAULT NULL, to_stage_id VARCHAR(36) NOT NULL, actor_id VARCHAR(128) DEFAULT NULL, via VARCHAR(16) DEFAULT NULL, occurred_at DATETIME(6) NOT NULL, seconds_in_from BIGINT DEFAULT NULL, INDEX nowo_crm_stage_change_funnel (tenant_id, funnel_id, occurred_at), INDEX nowo_crm_stage_change_item (tenant_id, item_type, item_id, occurred_at), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_party_stage (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, funnel_id VARCHAR(36) NOT NULL, subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36) NOT NULL, stage_id VARCHAR(36) NOT NULL, entered_at DATETIME(6) NOT NULL, version INT DEFAULT 1 NOT NULL, INDEX nowo_crm_party_stage_stage (tenant_id, funnel_id, stage_id), UNIQUE INDEX nowo_crm_party_stage_unique (funnel_id, subject_id), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_next_action (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36) NOT NULL, title VARCHAR(200) NOT NULL, due_at DATETIME NOT NULL, assignee_id VARCHAR(128) DEFAULT NULL, status VARCHAR(16) NOT NULL, task_type VARCHAR(32) DEFAULT NULL, task_id VARCHAR(128) DEFAULT NULL, dedupe_key VARCHAR(64) NOT NULL, created_by_id VARCHAR(128) DEFAULT NULL, created_at DATETIME NOT NULL, done_at DATETIME DEFAULT NULL, version INT DEFAULT 1 NOT NULL, INDEX nowo_crm_next_action_subject (tenant_id, subject_type, subject_id, status, due_at), UNIQUE INDEX nowo_crm_next_action_dedupe (tenant_id, dedupe_key), PRIMARY KEY (id));
+```
+
+PostgreSQL 16: the same tables with `BOOLEAN` for `archived`, `TIMESTAMP(0) WITHOUT TIME ZONE` for the plain
+instants, `TIMESTAMP(6) WITHOUT TIME ZONE` for `updated_at`, `stage_entered_at`, `occurred_at`, `entered_at`, and
+`CREATE INDEX` / `CREATE UNIQUE INDEX` statements for the keys. SQLite: `TEXT` / `INTEGER` / `NUMERIC` columns with the
+same keys. No column of an earlier table changes and no backfill is needed; the `deals` row of `crm_counter` is created
+on the first deal.
+
 **0.2.1 (additive, nothing to change).** `CrmBatchLookupInterface` is a new public service for backend jobs: it
 checks no permission and no record visibility, so call it only from trusted server-side code with a tenant your job
 already trusts (USAGE "Batch lookups for host jobs"). `CrmKitEvents` gains constants equal to the domain event class

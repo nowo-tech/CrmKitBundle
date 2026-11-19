@@ -19,7 +19,7 @@ use function sprintf;
 /**
  * `nowo:crm-kit:purge` (contract section 16.4): the retention purge, daily.
  */
-#[AsCommand(name: 'nowo:crm-kit:purge', description: 'Deletes trashed records, merge tombstones, old timeline entries, import rows and merge traces past their retention.')]
+#[AsCommand(name: 'nowo:crm-kit:purge', description: 'Deletes trashed records and deals, merge tombstones, old timeline entries, import rows and merge traces past their retention.')]
 final class PurgeCommand extends Command
 {
     /**
@@ -33,7 +33,7 @@ final class PurgeCommand extends Command
     protected function configure(): void
     {
         $this->addOption('tenant', null, InputOption::VALUE_REQUIRED, 'Only this tenant');
-        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Count what would be deleted (trashed records only)');
+        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Count what would be deleted (trashed records and deals only)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -52,7 +52,7 @@ final class PurgeCommand extends Command
 
             return Command::SUCCESS;
         }
-        $output->writeln(sprintf('records: %d, merge tombstones: %d, timeline entries: %d, import rows: %d, merge traces: %d', $counts['records'], $counts['tombstones'], $counts['activities'], $counts['import_rows'], $counts['merges']));
+        $output->writeln(sprintf('records: %d, merge tombstones: %d, timeline entries: %d, import rows: %d, merge traces: %d, deals: %d', $counts['records'], $counts['tombstones'], $counts['activities'], $counts['import_rows'], $counts['merges'], $counts['deals']));
 
         return Command::SUCCESS;
     }

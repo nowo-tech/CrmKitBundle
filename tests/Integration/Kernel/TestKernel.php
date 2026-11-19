@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Kernel;
 
 use Closure;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
+use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestServices;
 use Nowo\FormKitBundle\NowoFormKitBundle;
@@ -16,7 +17,6 @@ use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
-use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;

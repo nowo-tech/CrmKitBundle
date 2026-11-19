@@ -1,0 +1,24 @@
+{#
+  The next actions of a subject (0.3.0). Variables: actions (list of NextActionView), buttons (action id => list of
+  View\Action), form (FormView or null), action (URL of the add form), back (query of the close buttons).
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{%- set _b = 'NowoCrmKitBundle' -%}
+<section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-next-actions">
+    <div class="{{ nowo_ui_class('card_body', _b) }}">
+        <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'next_action.title'|trans({}, _d) }}</h2>
+        {% if actions is empty %}<p>{{ 'next_action.empty'|trans({}, _d) }}</p>{% else %}
+            <ul>
+            {% for a in actions %}
+                <li data-testid="crm-next-action" data-status="{{ a.status.value }}">{{ a.title }} · {{ a.dueAt|date('Y-m-d H:i') }} · {{ ('next_action.status.' ~ a.status.value)|trans({}, _d) }}
+                    {% if a.taskUrl and a.taskUrl starts with '/' and not (a.taskUrl starts with '//') and not (a.taskUrl starts with '/\\') %} · <a href="{{ a.taskUrl }}">{{ 'next_action.task'|trans({}, _d) }}</a>{% elseif a.taskHidden %} · {{ 'next_action.task_hidden'|trans({}, _d) }}{% endif %}
+                    {% if a.status.value == 'open' %}{% for button in buttons[a.id] ?? [] %}{{ include(nowo_ui_partial('action', _b), {action: button, context: 'row', bundle: _b}) }}{% endfor %}{% endif %}
+                </li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+</section>
+{% if form %}
+    {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'next_action.add', submit: 'next_action.save', action: action, testid: 'crm-next-action-form', variant: 'btn_secondary'}) }}
+{% endif %}

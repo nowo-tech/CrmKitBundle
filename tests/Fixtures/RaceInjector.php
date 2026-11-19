@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Fixtures;
 
+use Doctrine\DBAL\Driver\AbstractException;
+use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\Event\LifecycleEventArgs;
 use Nowo\CrmKitBundle\Domain\Model\Affiliation;
@@ -12,6 +14,8 @@ use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\CrmSettings;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
+use Nowo\CrmKitBundle\Domain\Model\Pipeline\NextAction;
+use Nowo\CrmKitBundle\Domain\Model\Pipeline\PartyStage;
 use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tag;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
@@ -42,6 +46,11 @@ final class RaceInjector
     {
         $object = $args->getObject();
         $short  = (new ReflectionClass($object))->getShortName();
+        if ($object instanceof NextAction && ($this->context->races['NextActionLock'] ?? 0) > 0) {
+            --$this->context->races['NextActionLock'];
+
+            throw new LockWaitTimeoutException(new class('Lock wait timeout exceeded.') extends AbstractException {}, null);
+        }
         if (($this->context->races[$short] ?? 0) > 0) {
             --$this->context->races[$short];
             $this->insertTwin($args->getObjectManager(), $object);
@@ -112,6 +121,8 @@ final class RaceInjector
             $object instanceof CrmSettings     => ['tenant_id' => $object->getTenantId(), 'trash_days' => 30, 'timeline_years' => 5, 'import_keep_days' => 30, 'merge_keep_days' => 90, 'version' => 1, 'updated_at' => $at],
             $object instanceof Tag             => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'name' => $object->getName(), 'name_key' => $object->getNameKey(), 'colour' => 'red', 'version' => 1, 'created_at' => $at],
             $object instanceof RoleAssignment  => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'role_key' => $object->getRoleKey(), 'created_at' => $at],
+            $object instanceof NextAction      => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'title' => 'Racer', 'due_at' => $at, 'status' => 'open', 'dedupe_key' => $object->getDedupeKey(), 'created_at' => $at, 'version' => 1],
+            $object instanceof PartyStage      => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'funnel_id' => $object->getFunnelId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'stage_id' => $object->getStageId(), 'entered_at' => $at . '.000000', 'version' => 1],
             $object instanceof Tagging         => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'tag_id' => $object->getTagId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'created_at' => $at],
             default                            => null,
         };

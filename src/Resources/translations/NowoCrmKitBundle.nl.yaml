@@ -1,5 +1,7 @@
 # CRM-kit, fase A (bedrijven en contacten). Domein NowoCrmKitBundle. Parameters staan tussen %.
 nav:
+    funnels: 'Trechters'
+    deals: 'Deals'
     label: CRM
     companies: Bedrijven
     contacts: Contacten
@@ -8,6 +10,7 @@ nav:
     fields: Aangepaste velden
     settings: Instellingen
 type:
+    deal: 'Deal'
     company: Bedrijf
     contact: Contact
 status:
@@ -20,6 +23,7 @@ form:
     save: Opslaan
     cancel: Annuleren
 list:
+    next: 'Volgende pagina'
     title:
         company: Bedrijven
         contact: Contacten
@@ -31,6 +35,7 @@ list:
     col:
         updated: Bijgewerkt
     filter:
+        apply: 'Toepassen'
         role: 'Rol'
         purpose: 'Contact voor'
         primary_contact: 'Hoofdcontact'
@@ -246,6 +251,10 @@ timeline:
     empty: Er is nog niets gebeurd.
     open: Openen
 activity:
+    lifecycle_stage: 'Levenscyclusfase gewijzigd door %actor%'
+    next_action_closed: 'Volgende actie afgesloten door %actor%'
+    next_action_added: 'Volgende actie toegevoegd door %actor%'
+    stage_moved: 'Fase gewijzigd door %actor%'
     roles_changed: 'Rollen gewijzigd door %actor%'
     primary_contact: 'Hoofdcontact gewijzigd door %actor%'
     created: 'Aangemaakt door %actor%'
@@ -361,6 +370,7 @@ search:
     see_all: 'Alle %count% tonen'
 flash:
     conflict:
+        crm_stage_invalid: 'Deze fase kan niet worden gebruikt: ze hoort bij een andere trechter, of de fase of de trechter is gearchiveerd of gesloten.'
         crm_record_stale: 'Iemand heeft dit record op hetzelfde moment gewijzigd. Het formulier toont de huidige waarden: controleer ze en sla opnieuw op.'
         crm_record_merged: Dit record is met een ander record samengevoegd.
         crm_record_trashed: Dit record staat in de prullenbak.
@@ -370,6 +380,16 @@ flash:
         crm_settings_stale: Iemand heeft de instellingen op hetzelfde moment gewijzigd. Controleer ze en sla opnieuw op.
         crm_write_conflict: 'Een andere wijziging van dezelfde gegevens kwam op hetzelfde moment binnen. Probeer het opnieuw.'
 error:
+    stage_invalid: 'De fase kon niet worden opgeslagen: controleer het formulier.'
+    next_action_invalid: 'De volgende actie kon niet worden opgeslagen: controleer het formulier.'
+    amount_invalid: 'Vul een bedrag in (hoogstens 4 decimalen) en een valuta van 3 letters.'
+    lost_reason_unknown: 'Onbekende reden van verlies.'
+    lost_reason_required: 'Geef aan waarom de deal verloren is.'
+    stage_limit: 'De trechter heeft het maximale aantal fasen.'
+    funnel_limit: 'De tenant heeft het maximale aantal trechters.'
+    funnel_kind: 'Deze trechter kan hier niet worden gebruikt.'
+    deal_party_required: 'Een deal heeft een bedrijf of een contact nodig.'
+    deal_related_unknown: 'Kies een bedrijf of contact dat je kunt zien.'
     forbidden: 'U mag dit niet wijzigen.'
     role_unknown: 'Onbekende rol.'
     purpose_unknown: 'Onbekend doel.'
@@ -409,3 +429,165 @@ purpose:
     orders: 'Bestellingen'
     technical: 'Technisch'
     general: 'Algemeen'
+deals:
+    title: 'Deals'
+    empty: 'Nog geen deals.'
+deal:
+    new: 'Nieuwe deal'
+    edit: 'Bewerken'
+    edit_title: '%name% bewerken'
+    created: 'Deal aangemaakt.'
+    saved: 'Deal opgeslagen.'
+    moved: 'Fase gewijzigd.'
+    not_moved: 'De deal staat al in die fase.'
+    trashed: 'Deal naar de prullenbak verplaatst.'
+    restored: 'Deal teruggezet.'
+    purged: 'Deal definitief verwijderd.'
+    trash: 'Naar prullenbak'
+    trash_confirm: 'Deze deal naar de prullenbak verplaatsen?'
+    restore: 'Terugzetten'
+    purge: 'Definitief verwijderen'
+    purge_confirm: 'Deze deal en zijn geschiedenis definitief verwijderen?'
+    funnel: 'Trechter'
+    status_label: 'Status'
+    status:
+        any: 'Open, gewonnen of verloren'
+        open: 'Open'
+        won: 'Gewonnen'
+        lost: 'Verloren'
+        trashed: 'In de prullenbak'
+    stale: 'Stilstaand'
+    stale_only: 'Alleen stilstaande'
+    sort_label: 'Volgorde'
+    sort:
+        updated: 'Laatst gewijzigd'
+        expected_close: 'Verwachte afsluiting'
+        amount: 'Bedrag'
+    hidden: 'Niet zichtbaar voor jou'
+    probability: 'Kans'
+    weighted: 'Gewogen waarde'
+    history_title: 'Fasegeschiedenis'
+    history:
+        created: 'Aangemaakt'
+        days: '%days% dagen in de vorige fase'
+        via: 'via %via%'
+    form:
+        title: 'Titel'
+        stage: 'Fase'
+        company: 'Bedrijf'
+        contact: 'Contact'
+        owner: 'Eigenaar'
+        amount: 'Bedrag'
+        currency: 'Valuta (ISO 4217)'
+        probability: 'Eigen kans (%)'
+        expected_close: 'Verwachte afsluiting'
+        none: '— Geen —'
+    move:
+        title: 'Naar een fase verplaatsen'
+        save: 'Verplaatsen'
+        stage: 'Fase'
+        lost_reason: 'Reden van verlies'
+        lost_note: 'Notitie bij verlies'
+board:
+    title: 'Bord'
+    intro: 'De deals van deze trechter per fase.'
+    empty: 'Geen deals.'
+    more: 'Het bord toont de eerste 100 deals.'
+    list: 'Alles in de lijst bekijken'
+next_action:
+    title: 'Volgende acties'
+    empty: 'Geen volgende acties.'
+    add: 'Een volgende actie toevoegen'
+    save: 'Toevoegen'
+    done: 'Gedaan'
+    cancel: 'Annuleren'
+    added: 'Volgende actie toegevoegd.'
+    closed: 'Volgende actie afgesloten.'
+    refused: 'De takendienst weigerde de volgende actie. Er is niets opgeslagen.'
+    task: 'Taak openen'
+    task_hidden: 'Taak niet zichtbaar voor jou'
+    status:
+        open: 'Open'
+        done: 'Gedaan'
+        cancelled: 'Geannuleerd'
+    form:
+        title: 'Titel'
+        due_at: 'Uiterlijk'
+        assignee: 'Toegewezen aan'
+        me: '— Ik —'
+lifecycle:
+    title: 'Levenscyclus'
+    none: 'Niet in deze trechter'
+    save: 'Fase instellen'
+    saved: 'Levenscyclusfase opgeslagen.'
+    form:
+        stage: 'Levenscyclusfase'
+funnels:
+    title: 'Trechters'
+    intro: 'Dealtrechters en levenscyclustrechters van bedrijven en contacten.'
+    empty: 'Nog geen trechters.'
+funnel:
+    add: 'Nieuwe trechter'
+    save: 'Aanmaken'
+    edit: 'Bewerken'
+    created: 'Trechter aangemaakt.'
+    saved: 'Trechter opgeslagen.'
+    stages: 'Fasen'
+    form:
+        name: 'Naam'
+        kind: 'Soort'
+        archived: 'Gearchiveerd'
+    kind:
+        deal: 'Deals'
+        party_company: 'Levenscyclus van bedrijven'
+        party_contact: 'Levenscyclus van contacten'
+stage:
+    add: 'Nieuwe fase'
+    save: 'Opslaan'
+    edit: 'Bewerken'
+    created: 'Fase toegevoegd.'
+    saved: 'Fase opgeslagen.'
+    move_up: 'Omhoog'
+    move_down: 'Omlaag'
+    form:
+        name: 'Naam'
+        kind: 'Soort'
+        probability: 'Standaardkans (%)'
+        rot_days: 'Stilstaand na (dagen)'
+        archived: 'Gearchiveerd'
+    kind:
+        open: 'Open'
+        won: 'Gewonnen'
+        lost: 'Verloren'
+    default:
+        open: 'Gekwalificeerd'
+        won: 'Gewonnen'
+        lost: 'Verloren'
+        first: 'Nieuw'
+stats:
+    title: 'Statistieken'
+    title_of: 'Statistieken van %name%'
+    filter:
+        at: 'Op een eerder moment'
+        from: 'Afgesloten vanaf'
+        to: 'Afgesloten tot'
+    at: 'Op %at%'
+    now: 'Nu (%at%)'
+    conversion: 'Naar de volgende fase'
+    average_days: 'Gemiddeld aantal dagen in de fase'
+    win_rate: 'Gewonnen vanaf de eerste fase: %rate% %'
+    closed: 'Afgesloten in de periode: %won% gewonnen, %lost% verloren'
+    csv:
+        stage: 'Fase'
+        kind: 'Soort'
+        count: 'Deals'
+        stale: 'Stilstaand'
+        currency: 'Valuta'
+        value: 'Waarde'
+        weighted: 'Gewogen waarde'
+lost_reason:
+    price: 'Prijs'
+    timing: 'Timing'
+    competitor: 'Concurrent'
+    no_decision: 'Geen beslissing'
+    other: 'Overig'

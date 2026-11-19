@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Doctrine;
 
+use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
 use LogicException;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType;
 use Throwable;
 
 use function in_array;
@@ -16,8 +19,9 @@ use function str_starts_with;
 /**
  * Doctrine `loadClassMetadata` listener of the bundle's entities (and only them: on a shared entity manager the host's
  * classes are untouched): prefixes table, index and unique-constraint names with `doctrine.table_prefix`
- * (REQ-ORM-002) and maps the identifier, reference, key and hash columns with a binary NO PAD collation on MySQL /
- * MariaDB ({@see BinaryCollation}), so `schema:update` and `migrations:diff` keep it.
+ * (REQ-ORM-002), maps the identifier, reference, key and hash columns with a binary NO PAD collation on MySQL /
+ * MariaDB ({@see BinaryCollation}), and the microsecond edit times as `DATETIME(6)` / `TIMESTAMP(6)`, so
+ * `schema:update` and `migrations:diff` keep them.
  *
  * @internal
  */
@@ -59,13 +63,20 @@ final readonly class CrmMetadataListener
         } catch (Throwable $exception) {
             throw new LogicException('nowo_crm_kit needs the database platform to map its reference columns with a binary collation. Set doctrine.dbal.server_version (or make the database reachable) before warming up the cache.', 0, $exception);
         }
+        // Edit times to the microsecond: DATETIME(6) / TIMESTAMP(6) through the column definition (the type keeps the
+        // plain declaration, so the schema comparator sees no change on every diff); SQLite keeps the text.
+        $micro = match (true) {
+            $platform instanceof AbstractMySQLPlatform => 'DATETIME(6)',
+            $platform instanceof PostgreSQLPlatform    => 'TIMESTAMP(6) WITHOUT TIME ZONE',
+            default                                    => null,
+        };
         $collation = BinaryCollation::for($platform);
-        if ($collation === null) {
-            return;
-        }
         foreach ($metadata->fieldMappings as $field => $mapping) {
             $column = $mapping->columnName;
-            if ($mapping->type === 'string' && ($column === 'id' || str_ends_with($column, '_id') || in_array($column, self::EXACT_COLUMNS, true))) {
+            if ($micro !== null && $mapping->type === UtcMicroDateTimeImmutableType::NAME) {
+                $metadata->fieldMappings[$field]->columnDefinition = $micro . ($mapping->nullable === true ? ' DEFAULT NULL' : ' NOT NULL');
+            }
+            if ($collation !== null && $mapping->type === 'string' && ($column === 'id' || str_ends_with($column, '_id') || in_array($column, self::EXACT_COLUMNS, true))) {
                 $metadata->fieldMappings[$field]->options = ['charset' => 'utf8mb4', 'collation' => $collation] + ($mapping->options ?? []);
             }
         }

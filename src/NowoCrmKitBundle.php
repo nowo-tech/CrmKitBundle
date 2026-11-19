@@ -7,6 +7,7 @@ namespace Nowo\CrmKitBundle;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\CrmKitWebUiSecurityPass;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\CrmPortsPass;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\PrivateEntityManagerPass;
@@ -105,7 +106,7 @@ final class NowoCrmKitBundle extends AbstractBundle
                 $manager = is_string($doctrine['entity_manager']) && $doctrine['entity_manager'] !== '' ? $doctrine['entity_manager'] : 'default';
             }
         }
-        $builder->prependExtensionConfig('doctrine', ['dbal' => ['types' => [UtcDateTimeImmutableType::NAME => UtcDateTimeImmutableType::class]]]);
+        $builder->prependExtensionConfig('doctrine', ['dbal' => ['types' => [UtcDateTimeImmutableType::NAME => UtcDateTimeImmutableType::class, UtcMicroDateTimeImmutableType::NAME => UtcMicroDateTimeImmutableType::class]]]);
         if ($manager !== 'default' && !$this->declares($builder, $manager)) {
             // The private entity manager is the host's to declare (the Flex recipe does): PrivateEntityManagerPass
             // fails the build with the fix instead of creating one silently.

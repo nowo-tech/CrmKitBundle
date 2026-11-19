@@ -198,7 +198,7 @@ CREATE TABLE nowo_crm_settings (
     merge_keep_days INT NOT NULL,
     version INT NOT NULL,
     updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
-    updated_at DATETIME NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
     PRIMARY KEY (tenant_id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB;
 
@@ -220,7 +220,7 @@ CREATE TABLE nowo_crm_company (
     version INT NOT NULL,
     created_at DATETIME NOT NULL,
     created_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
-    updated_at DATETIME NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
     updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
     name VARCHAR(200) NOT NULL,
     name_key VARCHAR(200) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
@@ -256,7 +256,7 @@ CREATE TABLE nowo_crm_contact (
     version INT NOT NULL,
     created_at DATETIME NOT NULL,
     created_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
-    updated_at DATETIME NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
     updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
     first_name VARCHAR(120) DEFAULT NULL,
     last_name VARCHAR(120) DEFAULT NULL,
@@ -351,7 +351,7 @@ CREATE TABLE nowo_crm_note (
     author_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
     version INT NOT NULL,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
     INDEX nowo_crm_note_subject (tenant_id, subject_type, subject_id, created_at),
     PRIMARY KEY (id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB;
@@ -477,7 +477,7 @@ CREATE TABLE nowo_crm_settings (
     merge_keep_days INT NOT NULL,
     version INT NOT NULL,
     updated_by_id VARCHAR(128) DEFAULT NULL,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
     PRIMARY KEY (tenant_id)
 );
 
@@ -499,7 +499,7 @@ CREATE TABLE nowo_crm_company (
     version INT NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
     created_by_id VARCHAR(128) DEFAULT NULL,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
     updated_by_id VARCHAR(128) DEFAULT NULL,
     name VARCHAR(200) NOT NULL,
     name_key VARCHAR(200) NOT NULL,
@@ -535,7 +535,7 @@ CREATE TABLE nowo_crm_contact (
     version INT NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
     created_by_id VARCHAR(128) DEFAULT NULL,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
     updated_by_id VARCHAR(128) DEFAULT NULL,
     first_name VARCHAR(120) DEFAULT NULL,
     last_name VARCHAR(120) DEFAULT NULL,
@@ -630,7 +630,7 @@ CREATE TABLE nowo_crm_note (
     author_id VARCHAR(128) DEFAULT NULL,
     version INT NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
     PRIMARY KEY (id)
 );
 CREATE INDEX nowo_crm_note_subject ON nowo_crm_note (tenant_id, subject_type, subject_id, created_at);

@@ -181,7 +181,8 @@ Invalid; Limit }` (**0.1.0**: no `Skipped`; a skipped duplicate is `Duplicate`),
   `sort_key`, `field_key`, `purpose`, `host_type`, `claim_token`, `resource` (so `crm_company.tax_id` gets it too); it
   needs the platform at metadata load (`doctrine.dbal.server_version`). Every read, export, erasure or
   bulk write keyed by such a value re-checks `===` in PHP (REQ-SEC-006 rule 2).
-- Instants: `datetime_immutable` UTC (second precision). Optimistic `version` (int, ORM `version="true"`) on every
+- Instants: `datetime_immutable` UTC (second precision); **(0.2.0)** the `updated_at` of companies, contacts, notes and
+  settings to the microsecond (`DATETIME(6)` / `TIMESTAMP(6)`), so every write moves the optimistic version. Optimistic `version` (int, ORM `version="true"`) on every
   editable row.
 - No foreign keys to host tables. Internal relations are plain id columns (no ORM associations), so the bundle never
   loads a graph and children move by primary key.
@@ -967,7 +968,8 @@ differs is applied in the next commit and noted here with the date._
   unticked "primary contact" keeps the company's primary contact (clearing is the company page's own action, and a
   linked company has a pre-filled form); `purpose_keys` is 1100 characters; an import row that changes a company's
   primary contact needs `edit` on that company (else `invalid`, `error.forbidden`); every write of a record moves its
-  version when the stored row changes (owner decision 2026-11-19: `updated_at` stays exact, no forced bump); imports announce and audit role changes;
+  version on every write (owner decision 2026-11-19: `updated_at` of companies, contacts, notes and settings kept to
+  the microsecond, `DATETIME(6)` / `TIMESTAMP(6)`); imports announce and audit role changes;
   the GDPR export lists affiliations to trashed companies with their status; `ListQuery` refuses invalid role and
   purpose keys; a contact merge moves the primary-company flag of a shared company.
 

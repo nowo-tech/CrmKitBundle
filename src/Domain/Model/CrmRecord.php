@@ -323,7 +323,10 @@ abstract class CrmRecord
      */
     public function touch(DateTimeImmutable $now, ?string $actor): void
     {
-        $this->updatedAt   = $now;
+        // The edit time to the microsecond (owner decision 2026-11-19): every write changes the stored value, so the
+        // optimistic version always moves. Two writes at the very same instant (a frozen clock) keep a strictly later
+        // time by one microsecond; otherwise the time is exact.
+        $this->updatedAt   = $now > $this->updatedAt ? $now : $this->updatedAt->modify('+1 microsecond');
         $this->updatedById = $actor;
     }
 

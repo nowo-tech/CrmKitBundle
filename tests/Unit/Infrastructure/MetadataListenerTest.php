@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Tests\Unit\Infrastructure;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\MariaDBPlatform;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
@@ -14,6 +15,7 @@ use LogicException;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\BinaryCollation;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\CrmMetadataListener;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use stdClass;
@@ -33,6 +35,12 @@ final class MetadataListenerTest extends TestCase
         self::assertSame(BinaryCollation::MARIADB, $metadata->fieldMappings['emailKey']->options['collation'] ?? null);
         self::assertSame(BinaryCollation::MARIADB, $metadata->fieldMappings['tenantId']->options['collation'] ?? null);
         self::assertArrayNotHasKey('collation', $metadata->fieldMappings['displayName']->options ?? []);
+        self::assertSame('DATETIME(6) NOT NULL', $metadata->fieldMappings['updatedAt']->columnDefinition);
+        self::assertSame('DATETIME(6) DEFAULT NULL', $metadata->fieldMappings['erasedAt']->columnDefinition);
+        $pg = $this->contactMetadata();
+        (new CrmMetadataListener())->loadClassMetadata(new LoadClassMetadataEventArgs($pg, $this->manager(new PostgreSQLPlatform())));
+        self::assertSame('TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL', $pg->fieldMappings['updatedAt']->columnDefinition);
+        self::assertArrayNotHasKey('collation', $pg->fieldMappings['emailKey']->options ?? []);
     }
 
     public function testOtherPlatformsAndClasses(): void
@@ -41,6 +49,7 @@ final class MetadataListenerTest extends TestCase
         (new CrmMetadataListener())->loadClassMetadata(new LoadClassMetadataEventArgs($metadata, $this->manager(new SQLitePlatform())));
         self::assertSame('nowo_crm_contact', $metadata->getTableName());
         self::assertArrayNotHasKey('collation', $metadata->fieldMappings['emailKey']->options ?? []);
+        self::assertNull($metadata->fieldMappings['updatedAt']->columnDefinition, 'SQLite keeps the text');
         $host = new ClassMetadata(stdClass::class);
         $host->setPrimaryTable(['name' => 'host']);
         (new CrmMetadataListener())->loadClassMetadata(new LoadClassMetadataEventArgs($host, $this->manager(new SQLitePlatform())));
@@ -69,6 +78,8 @@ final class MetadataListenerTest extends TestCase
             $metadata->mapField(['fieldName' => $field, 'columnName' => $column, 'type' => 'string', 'length' => 128]);
         }
         $metadata->mapField(['fieldName' => 'version', 'columnName' => 'version', 'type' => 'integer']);
+        $metadata->mapField(['fieldName' => 'updatedAt', 'columnName' => 'updated_at', 'type' => UtcMicroDateTimeImmutableType::NAME]);
+        $metadata->mapField(['fieldName' => 'erasedAt', 'columnName' => 'erased_at', 'type' => UtcMicroDateTimeImmutableType::NAME, 'nullable' => true]);
 
         return $metadata;
     }

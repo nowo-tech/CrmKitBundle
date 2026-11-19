@@ -16,6 +16,55 @@ already trusts (USAGE "Batch lookups for host jobs"). `CrmKitEvents` gains const
 names; listeners registered by class name keep working. The retention purge now also dispatches `RecordsPurged` per
 committed batch (no listener: nothing changes); `CrmBatchLookupInterface::existing()` is new. No schema change.
 
+**Actor ids (`security.actor_resolver`).** Nothing changes until you configure a resolver: the default keeps
+`getUserIdentifier()`. `CrmPersonalDataInterface` gains `exportActor()` and `anonymiseActor()` (a class of your own
+that implements the interface must add them); `RecordViews`, `SecurityCrmAccessChecker` and `SecurityActorDirectory`
+take the resolver as a new trailing argument with a default.
+
+Switching an existing installation from identifiers (e-mails) to stable ids rewrites every stored actor id. Stop the
+writers (maintenance mode, the import resume cron and the retention purge off), take a backup, fill a mapping table
+from your users (old identifier ⇒ new id), run the statements below in one transaction, then deploy the resolver.
+Default prefix `nowo_`; the map uses the same binary collation as the CRM columns so the comparison is exact.
+
+```sql
+-- MySQL 8.4
+CREATE TABLE crm_actor_map (old_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL PRIMARY KEY,
+                            new_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL);
+-- MariaDB 11.4
+CREATE TABLE crm_actor_map (old_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin NOT NULL PRIMARY KEY,
+                            new_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin NOT NULL);
+-- PostgreSQL 16 (byte-exact by default)
+CREATE TABLE crm_actor_map (old_id VARCHAR(128) NOT NULL PRIMARY KEY, new_id VARCHAR(128) NOT NULL);
+
+INSERT INTO crm_actor_map (old_id, new_id) SELECT email, uuid FROM app_user;   -- your users
+
+-- Every id column (portable SQL). Repeat for each pair below; add ", version = version + 1" on the versioned tables
+-- (company, contact, note, import, settings) so open forms fail as stale.
+UPDATE nowo_crm_company SET owner_id = (SELECT m.new_id FROM crm_actor_map m WHERE m.old_id = nowo_crm_company.owner_id),
+       version = version + 1
+ WHERE owner_id IN (SELECT old_id FROM crm_actor_map);
+--   nowo_crm_company: owner_id, created_by_id, updated_by_id      nowo_crm_contact: owner_id, created_by_id, updated_by_id
+--   nowo_crm_note: author_id          nowo_crm_activity: actor_id          nowo_crm_consent: recorded_by_id
+--   nowo_crm_host_link: created_by_id nowo_crm_role_assignment: created_by_id nowo_crm_import: created_by_id
+--   nowo_crm_merge: actor_id          nowo_crm_settings: updated_by_id
+
+-- The owner inside JSON documents. MySQL / MariaDB:
+UPDATE nowo_crm_activity a JOIN crm_actor_map m ON m.old_id = JSON_UNQUOTE(JSON_EXTRACT(a.params, '$.owner'))
+   SET a.params = JSON_SET(a.params, '$.owner', m.new_id) WHERE a.kind = 'owner_changed';
+UPDATE nowo_crm_merge r JOIN crm_actor_map m ON m.old_id = JSON_UNQUOTE(JSON_EXTRACT(r.snapshot, '$.owner'))
+   SET r.snapshot = JSON_SET(r.snapshot, '$.owner', m.new_id);
+-- PostgreSQL:
+UPDATE nowo_crm_activity a SET params = jsonb_set(a.params::jsonb, '{owner}', to_jsonb(m.new_id))::json
+  FROM crm_actor_map m WHERE a.kind = 'owner_changed' AND m.old_id = a.params->>'owner';
+UPDATE nowo_crm_merge r SET snapshot = jsonb_set(r.snapshot::jsonb, '{owner}', to_jsonb(m.new_id))::json
+  FROM crm_actor_map m WHERE m.old_id = r.snapshot->>'owner';
+
+DROP TABLE crm_actor_map;
+```
+
+Ids your resolver keeps (people without a new id) need no row in the map. The audit entries your sink already stored
+keep the old identifiers: map them in the sink's own storage if you need to.
+
 **Imports paused by the resume command.** An import that `nowo:crm-kit:import:resume` stopped before a row needing a
 person now releases its claim and waits for a person (`ImportView::$awaitingPerson`, a new trailing constructor
 argument with a default); the resume command skips it and the page's "Continue" takes it at once. No migration: the

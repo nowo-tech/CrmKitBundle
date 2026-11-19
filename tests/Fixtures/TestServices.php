@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Fixtures;
 
+use Nowo\CrmKitBundle\Domain\Event\ActorAnonymised;
 use Nowo\CrmKitBundle\Domain\Event\ConsentRecorded;
 use Nowo\CrmKitBundle\Domain\Event\ContactErased;
 use Nowo\CrmKitBundle\Domain\Event\HostLinkAdded;
@@ -33,7 +34,7 @@ final class TestServices
 {
     public const USERS = ['ana' => ['password' => 'x', 'roles' => ['ROLE_USER']], 'root' => ['password' => 'x', 'roles' => ['ROLE_ADMIN']], 'leo' => ['password' => 'x', 'roles' => ['ROLE_USER']]];
 
-    public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, RecordsPurged::class, TagsChanged::class, RolesChanged::class, HostLinkAdded::class, HostLinkRemoved::class];
+    public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, RecordsPurged::class, ActorAnonymised::class, TagsChanged::class, RolesChanged::class, HostLinkAdded::class, HostLinkRemoved::class];
 
     /** The bundle configuration that points every port at the test services. */
     public const PORTS = [
@@ -55,6 +56,7 @@ final class TestServices
         foreach (self::EVENTS as $event) {
             $recorder->tag('kernel.event_listener', ['event' => $event, 'method' => 'onEvent']);
         }
+        $s->set('test.actor_resolver', TestActorResolver::class)->public();
         $s->set('test.queries', QueryLog::class)->public();
         $s->set('test.query_counter', QueryCounter::class)->args([service('test.queries')])->tag('doctrine.middleware');
         $s->set('test.clock', MockClock::class)->args(['2026-11-18 10:00:00', 'UTC'])->public();

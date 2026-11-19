@@ -9,9 +9,11 @@ use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Model\Activity;
+use Nowo\CrmKitBundle\Domain\Model\Consent;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
+use Nowo\CrmKitBundle\Domain\Model\Note;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
@@ -110,13 +112,10 @@ final readonly class CrmReader implements CrmReaderInterface
             }
             $before  = $before !== null && RecordId::isValid($before) ? $before : null;
             $entries = $this->support->store->activities($context->tenant, $subjects, max(1, min(200, $limit)), $before);
-            $names   = [];
+            $names   = $this->views->actorNames($context->tenant, array_map(static fn (Activity $a): ?string => $a->getActorId(), $entries));
 
-            return array_map(function (Activity $a) use ($context, $record, $labels, &$names): ActivityView { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            return array_map(static function (Activity $a) use ($record, $labels, $names): ActivityView { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 $actor = $a->getActorId();
-                if ($actor !== null && !isset($names[$actor])) {
-                    $names[$actor] = $this->views->actorName($context->tenant, $actor);
-                }
 
                 return new ActivityView(
                     $a->getId(),
@@ -124,7 +123,7 @@ final readonly class CrmReader implements CrmReaderInterface
                     $a->getSubjectId(),
                     $a->getSubjectId() === $record->getId() ? null : ($labels[$a->getSubjectId()] ?? null),
                     $a->getKind(),
-                    $actor === null ? null : $names[$actor],
+                    $actor === null ? null : ($names[$actor] ?? null),
                     $a->getParams(),
                     $a->getOccurredAt(),
                 );
@@ -151,14 +150,12 @@ final readonly class CrmReader implements CrmReaderInterface
     {
         return $this->support->read(function () use ($type, $id): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$context] = $this->load($type, $id);
-            $names     = [];
+            $rows      = $this->support->store->notes($context->tenant, $type, $id);
+            $names     = $this->views->actorNames($context->tenant, array_map(static fn (Note $n): ?string => $n->getAuthorId(), $rows));
             $notes     = [];
-            foreach ($this->support->store->notes($context->tenant, $type, $id) as $note) {
-                $author = $note->getAuthorId();
-                if ($author !== null && !isset($names[$author])) {
-                    $names[$author] = $this->views->actorName($context->tenant, $author);
-                }
-                $notes[] = new NoteView($note->getId(), $note->getBody(), $note->isPinned(), $author, $author === null ? null : $names[$author], $note->getVersion(), $note->getCreatedAt(), $note->getUpdatedAt());
+            foreach ($rows as $note) {
+                $author  = $note->getAuthorId();
+                $notes[] = new NoteView($note->getId(), $note->getBody(), $note->isPinned(), $author, $author === null ? null : ($names[$author] ?? null), $note->getVersion(), $note->getCreatedAt(), $note->getUpdatedAt());
             }
 
             return $notes;
@@ -220,14 +217,12 @@ final readonly class CrmReader implements CrmReaderInterface
     {
         return $this->support->read(function () use ($contactId): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$context] = $this->load(SubjectType::Contact, $contactId);
-            $names     = [];
+            $rows      = $this->support->store->consents($context->tenant, $contactId);
+            $names     = $this->views->actorNames($context->tenant, array_map(static fn (Consent $c): ?string => $c->getRecordedById(), $rows));
             $views     = [];
-            foreach ($this->support->store->consents($context->tenant, $contactId) as $consent) {
-                $by = $consent->getRecordedById();
-                if ($by !== null && !isset($names[$by])) {
-                    $names[$by] = $this->views->actorName($context->tenant, $by);
-                }
-                $views[] = new ConsentView($consent->getId(), $consent->getPurpose(), $consent->isGranted(), $consent->getSource(), $consent->getEvidence(), $by === null ? null : $names[$by], $consent->getRecordedAt());
+            foreach ($rows as $consent) {
+                $by      = $consent->getRecordedById();
+                $views[] = new ConsentView($consent->getId(), $consent->getPurpose(), $consent->isGranted(), $consent->getSource(), $consent->getEvidence(), $by === null ? null : ($names[$by] ?? null), $consent->getRecordedAt());
             }
 
             return $views;

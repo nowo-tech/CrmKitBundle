@@ -10,11 +10,13 @@
   - [Feature gate](#feature-gate)
   - [Plan limits](#plan-limits)
   - [Actor directory](#actor-directory)
+  - [Actor resolver (0.2.1)](#actor-resolver-021)
   - [Audit sink](#audit-sink)
   - [Panel providers](#panel-providers)
   - [Host object resolvers](#host-object-resolvers)
 - [Services a host calls](#services-a-host-calls)
 - [Events](#events)
+- [A person's references (export and anonymisation)](#a-persons-references-export-and-anonymisation)
 - [Batch lookups for host jobs](#batch-lookups-for-host-jobs)
 - [Errors](#errors)
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
@@ -246,6 +248,47 @@ final readonly class MemberDirectory implements CrmActorDirectoryInterface
 
 `owners()` fills the owner pickers, and every owner a write stores is checked against it (an unknown owner is the form
 error `error.owner_unknown`). `actor()` names note authors, owners and timeline actors.
+
+### Actor resolver (0.2.1)
+
+The actor id the CRM stores (owner, note author, created_by / updated_by, timeline, consent, import, merge and audit
+actor) comes from `CrmActorResolverInterface::idOf()`. The default keeps `getUserIdentifier()`. When that identifier
+can change (an e-mail), register a resolver that returns a stable id, and name people for the pages in one call:
+
+```php
+use Nowo\CrmKitBundle\Domain\Value\{ActorProfile, ActorRef};
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmActorResolverInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
+
+final readonly class UuidActorResolver implements CrmActorResolverInterface
+{
+    public function __construct(private Users $users) {}
+
+    public function idOf(UserInterface $user): string
+    {
+        return $user instanceof AppUser ? $user->uuid() : $user->getUserIdentifier();
+    }
+
+    public function resolve(array $ids): array   // one query per page
+    {
+        $profiles = [];
+        foreach ($this->users->byUuids($ids) as $u) {
+            $profiles[$u->uuid()] = new ActorProfile(new ActorRef($u->uuid()), $u->displayName(), $u->email());
+        }
+
+        return $profiles;
+    }
+}
+```
+
+```yaml
+nowo_crm_kit:
+    security:
+        actor_resolver: App\Crm\UuidActorResolver
+```
+
+Each profile's ref must be exactly its key; ids the resolver leaves out are named by the actor directory. Switching an
+existing installation to new ids needs a data migration: see [UPGRADING.md](UPGRADING.md#unreleased).
 
 ### Audit sink
 
@@ -482,6 +525,18 @@ What a host that keeps its own copy of links, e-mails or affiliations listens to
 There is no `CompanyErased`: companies hold no personal data and are not erased; a company leaves through the trash
 (`RecordTrashed`, then `RecordPurged` or `RecordsPurged`). As a safety net for missed events, a nightly sweep can
 pass the ids it holds to `CrmBatchLookupInterface::existing()` and drop those that are gone.
+
+## A person's references (export and anonymisation)
+
+`CrmPersonalDataInterface::exportActor($actorId)` lists every CRM reference to a host person **in every tenant**
+(tenant ⇒ kind such as `company.owner`, `note.author`, `activity.actor` ⇒ row keys); `anonymiseActor($actorId)`
+replaces each with `anonymised` in batches of 200 rows, one transaction each, and returns how many it replaced (0
+when run again). Records, notes and everyone else's data stay. After the commits it dispatches `ActorAnonymised`
+(`CrmKitEvents::ACTOR_ANONYMISED`: tenant and count, never the id) and audits `crm.actor.anonymised` per tenant.
+
+> **System API.** No tenant, no actor and no permission check: call it only from trusted server-side code (an
+> account-deletion job), never from a page, an API endpoint or an agent tool (MCP) a person can reach. Audit entries
+> your sink already stored are yours to anonymise.
 
 ## Batch lookups for host jobs
 

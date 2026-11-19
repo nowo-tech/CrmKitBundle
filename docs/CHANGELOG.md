@@ -21,6 +21,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   (trashed records and merge tombstones, at most 200 of one type) after its commit, with the tenant and the records'
   type + id only (`CrmKitEvents::RECORDS_PURGED`); a rolled-back batch announces nothing. A manual `purge()` keeps
   dispatching `RecordPurged` per record.
+- **Stable actor ids**: `CrmActorResolverInterface` (`security.actor_resolver`; default `IdentifierActorResolver`,
+  `getUserIdentifier()` as before) gives the actor id the access checker and the default directory use, so a host can
+  store user UUIDs instead of e-mails; `resolve()` (Domain port `CrmActorProfilesInterface`) names the actors of a page
+  (owners in lists, note authors, timeline and consent actors) in one call, the directory naming the rest.
+- **A person's references across tenants** (system API, no permission check): `CrmPersonalDataInterface::exportActor()`
+  and `anonymiseActor()` over owner, note author, created_by / updated_by, timeline, consent, link, role, import and
+  merge actors and the owner inside timeline entries and merge snapshots; batches of 200 rows, one write unit each,
+  versions moved, idempotent; event `ActorAnonymised` (`CrmKitEvents::ACTOR_ANONYMISED`, tenant and count) and audit
+  `crm.actor.anonymised` per tenant after the commits.
 - `CrmKitEvents` constants for the domain events dispatched after the commit (`CONTACT_ERASED`, `RECORDS_MERGED`,
   `HOST_LINK_REMOVED`, `RECORD_PURGED`, … : their class names), and the host's view of link, merge, erasure and purge
   changes in USAGE "Events".

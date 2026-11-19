@@ -152,6 +152,12 @@ The tenant is the controller; the bundle is the tool.
 - A host link URL returned by a resolver is rendered as given (escaped): return local paths or http(s) URLs only.
 - A provider exception is contained (the panel is skipped); a transient storage failure is rethrown so the write unit
   can replay.
+- **`CrmPersonalDataInterface::exportActor()` / `anonymiseActor()` are system APIs (0.2.1)** without any tenant
+  scope: they read or rewrite a host person's references in every tenant and check no permission. Call them only from
+  trusted server-side code; never expose them to end users or agent tools (MCP).
+- **Actor ids.** The actor id stored everywhere comes from `CrmActorResolverInterface::idOf()` (default the
+  identifier). A host whose identifiers can change or be reused (e-mails) should return a stable id, or a former
+  address's new holder inherits the old owner's records under `resource_scoping`.
 - **`CrmBatchLookupInterface` is a system API (0.2.1).** It is scoped to the `TenantRef` it is given (every query names
   the tenant, every row is re-checked with `===`), but it resolves no tenant, actor or feature gate and checks no
   permission and no record visibility (`security.resource_scoping` does not apply). Only trusted server-side code

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Event;
 
+use Nowo\CrmKitBundle\Domain\Event\ActorAnonymised;
 use Nowo\CrmKitBundle\Domain\Event\ConsentRecorded;
 use Nowo\CrmKitBundle\Domain\Event\ContactErased;
 use Nowo\CrmKitBundle\Domain\Event\HostLinkAdded;
@@ -80,6 +81,9 @@ final class CrmKitEvents
 
     /** {@see RolesChanged}: a record's party roles changed (added and removed keys). */
     public const ROLES_CHANGED = RolesChanged::class;
+
+    /** {@see ActorAnonymised}: a host person's references in one tenant were anonymised (the count, never the id). */
+    public const ACTOR_ANONYMISED = ActorAnonymised::class;
 
     /** {@see HostLinkAdded}: a record was linked to a host object. */
     public const HOST_LINK_ADDED = HostLinkAdded::class;

@@ -372,6 +372,15 @@ interface CrmActorDirectoryInterface                 // [SecurityActorDirectory:
 }
 ```
 
+**(0.2.1) The actor id.** `Infrastructure\Symfony\Security\CrmActorResolverInterface` (`security.actor_resolver`;
+default `IdentifierActorResolver` = `getUserIdentifier()`, so no stored id changes) gives the actor id of a signed-in
+person: `idOf(UserInterface): string` is what the access checker's `currentActor()` and the default directory use,
+so it is what every owner, note author, created_by / updated_by, timeline actor, consent recorder, import uploader,
+merge actor and audit actor stores. `resolve(list<string> $ids): array<id, ActorProfile>` (the Domain port
+`CrmActorProfilesInterface`) names the people of one page in one call; ids it does not name fall back to
+`CrmActorDirectoryInterface::actor()`. A host whose identifier can change (an e-mail) returns a stable id (a user
+UUID); UPGRADING has the migration of existing ids.
+
 ### 8.2 Extension points
 
 | Port | Default | Purpose |
@@ -772,6 +781,21 @@ rollback; `--dry-run` **(0.1.0)** counts trashed records only (up to one batch
 per type). Import rows are deleted only for finished imports; the `crm_import` rows themselves stay. Inactive-contact review (contacts without activity for N years) is a report in
 phase G (Q-O8).
 
+### 16.5 A host person's references (0.2.1, system API)
+
+`CrmPersonalDataInterface::exportActor(string $actorId): array` and `anonymiseActor(string $actorId): int` cover every
+CRM reference to a host person's actor id **in every tenant**: owner, note author, created_by / updated_by, timeline
+actor, consent recorder, host-link and role creator, import uploader, merge actor, and the owner inside owner-changed
+timeline entries and merge snapshots (kinds in `Application\Port\CrmActorDataStoreInterface::KINDS`). The export
+lists tenant ⇒ kind ⇒ row keys. Anonymisation replaces the id with the placeholder `anonymised`, keeps the records
+and everyone else's data, moves the version of versioned rows (a form opened before fails as stale instead of writing
+the old id back), and runs in batches of 200 rows, one write unit each (rows locked first; a lock conflict replays the
+batch or answers 409 + `CONFLICT_001` / `CONFLICT_002`, REQ-RUNTIME-003 rule 6); after the last commit it dispatches
+`ActorAnonymised` (tenant, count; never the id) and audits `crm.actor.anonymised` (count) per tenant. Running it again
+changes nothing and returns 0. Like `CrmBatchLookupInterface` it is a **system API**: no tenant, actor or permission
+check; never exposed to end users or agent tools (MCP). There is no assignee in 0.2.x (tasks come in 0.4.0, which will
+add theirs to the kinds). Audit entries already written live in the host's audit sink: the host anonymises them.
+
 ## 17. Migrations
 
 - **No Doctrine migration classes are shipped** (house style; tables carry the host's prefix and live on the host's
@@ -1009,7 +1033,7 @@ REQ-RUNTIME-002 / 003 with two-connection race tests, REQ-SEC-006, deny by defau
 | Release | Phase | Content |
 |---|---|---|
 | **0.2.0** (this release) | A2 | Party roles; the company's primary contact and affiliation purposes; role and purpose filters, import and export columns; the UD-2 follow-ups (§6.8, §15) |
-| **0.2.1** | A2 patch | Additive, for host backend jobs: `CrmBatchLookupInterface` batch lookups including `existing()` for reconciliation (§7; system API without access checks, one query per call), the `RecordsPurged` event per committed retention-purge batch (§14, §16.4) and the `CrmKitEvents` constants of the domain events. No schema change |
+| **0.2.1** | A2 patch | Stable actor ids (`CrmActorResolverInterface`, §8.1), a host person's export and anonymisation across tenants (§16.5), the unattended import resume that waits for a person (§15.4). Additive, for host backend jobs: `CrmBatchLookupInterface` batch lookups including `existing()` for reconciliation (§7; system API without access checks, one query per call), the `RecordsPurged` event per committed retention-purge batch (§14, §16.4) and the `CrmKitEvents` constants of the domain events. No schema change |
 | **0.3.0** | B, funnels | Funnels with per-stage statistics and next actions (below) |
 | **0.4.0** | B2, tasks and agenda | Tasks, automations, meetings and calls, "my agenda" (below) |
 | **0.5.0** | C, quotes | Below |

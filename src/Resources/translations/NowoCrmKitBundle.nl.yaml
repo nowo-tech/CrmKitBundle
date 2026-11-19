@@ -31,6 +31,10 @@ list:
     col:
         updated: Bijgewerkt
     filter:
+        role: 'Rol'
+        purpose: 'Contact voor'
+        primary_contact: 'Hoofdcontact'
+        primary_contact_only: 'Alleen hoofdcontacten'
         q: Zoeken
         tag: Tag
         owner: Verantwoordelijke
@@ -40,6 +44,7 @@ list:
         active: Actief
         trashed: Prullenbak
 field:
+    roles: 'Rollen'
     name: Naam
     contact_name: Naam
     legal_name: Juridische naam
@@ -135,6 +140,13 @@ record:
     purged: Het record is verwijderd.
     erased: "De persoonsgegevens van het contact zijn gewist."
 affiliation:
+    edit: 'Bewerken'
+    update: 'Opslaan'
+    clear_primary_contact: 'Als hoofdcontact verwijderen'
+    primary_contact_cleared: 'Het bedrijf heeft nu geen hoofdcontact.'
+    primary_contact: 'Hoofdcontact'
+    make_primary_contact: 'Hoofdcontact maken'
+    primary_contact_set: 'Het hoofdcontact is gewijzigd.'
     add: Een bedrijf toevoegen
     save: Toevoegen
     added: Het bedrijf is toegevoegd.
@@ -142,6 +154,8 @@ affiliation:
     remove: Verwijderen
     primary: Primair
     form:
+        purposes: 'Contact voor'
+        primary_contact: 'Hoofdcontact van het bedrijf'
         company: Bedrijf
         role: Rol
         primary: Primair bedrijf
@@ -232,6 +246,8 @@ timeline:
     empty: Er is nog niets gebeurd.
     open: Openen
 activity:
+    roles_changed: 'Rollen gewijzigd door %actor%'
+    primary_contact: 'Hoofdcontact gewijzigd door %actor%'
     created: 'Aangemaakt door %actor%'
     updated: 'Bijgewerkt door %actor%'
     owner_changed: 'Verantwoordelijke gewijzigd door %actor%'
@@ -308,6 +324,9 @@ import:
         skip: Rijen overslaan waarvan het e-mailadres al bestaat
         update: Het bestaande contact bijwerken
     target:
+        roles: 'Rollen (sleutels, gescheiden door komma’s)'
+        purposes: 'Contact voor (sleutels, gescheiden door komma’s)'
+        primary_contact: 'Hoofdcontact van het bedrijf (ja / nee)'
         skip: '(deze kolom overslaan)'
         company: Bedrijf (bestaand, op naam)
         tags: Tags (bestaand, gescheiden door komma's)
@@ -351,6 +370,10 @@ flash:
         crm_settings_stale: Iemand heeft de instellingen op hetzelfde moment gewijzigd. Controleer ze en sla opnieuw op.
         crm_write_conflict: 'Een andere wijziging van dezelfde gegevens kwam op hetzelfde moment binnen. Probeer het opnieuw.'
 error:
+    forbidden: 'U mag dit niet wijzigen.'
+    role_unknown: 'Onbekende rol.'
+    purpose_unknown: 'Onbekend doel.'
+    not_affiliated: 'Dit contact is niet aan het bedrijf gekoppeld.'
     required: Dit veld is verplicht.
     invalid: Deze waarde is ongeldig.
     host_object_unknown: 'Dit object bestaat niet of u kunt het niet zien.'
@@ -376,3 +399,13 @@ error:
     merge_same: Een record kan niet met zichzelf worden samengevoegd.
     out_of_range: Deze waarde valt buiten het bereik.
     csrf: Het formulier is verlopen. Laad de pagina opnieuw en probeer het nog eens.
+role:
+    customer: 'Klant'
+    supplier: 'Leverancier'
+    partner: 'Partner'
+    distributor: 'Distributeur'
+purpose:
+    billing: 'Facturatie'
+    orders: 'Bestellingen'
+    technical: 'Technisch'
+    general: 'Algemeen'

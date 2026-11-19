@@ -1,7 +1,7 @@
 {#
   The 360° page of a company or contact (contract section 9). Variables: page (ShowPage), record (RecordView),
-  segment, can_edit, can_manage, forms (note, notes[id], tags, link, affiliation, consent), buttons (notes, links,
-  affiliations: View\Action per id), back (return params), notes, timeline, links, panels, duplicates, consents.
+  segment, can_edit, can_manage, can_merge, forms (note, notes[id], tags, link, affiliation, affiliations[id], consent), buttons (notes, links,
+  affiliations, primary_contact: View\Action per affiliation id), back (return params), notes, timeline, links, panels, duplicates, consents.
 #}
 {% extends '@NowoUiKit/page/show.html.twig' %}
 
@@ -10,6 +10,9 @@
     {%- set _b = page.bundle -%}
     <div class="crm-kit-toolbar" data-testid="crm-focus">{{ include(nowo_ui_partial('focus_mode_toggle', _b), {area: 'crm', bundle: _b}) }}</div>
 
+    {% if record.roles is not empty %}
+        <p data-testid="crm-roles"><span class="crm-kit-label">{{ 'field.roles'|trans({}, _d) }}:</span> {% for role in record.roles %}<span class="{{ nowo_ui_class('badge', _b) }} crm-kit-role" data-role="{{ role }}">{{ ('role.' ~ role)|trans({}, _d) }}</span> {% endfor %}</p>
+    {% endif %}
     {% if record.tags is not empty %}
         <p data-testid="crm-tags">{% for tag in record.tags %}<span class="{{ nowo_ui_class('badge', _b) }} crm-kit-tag crm-kit-tag--{{ tag.colour }}">{{ tag.name }}</span> {% endfor %}</p>
     {% endif %}
@@ -28,7 +31,15 @@
                     <li data-testid="crm-affiliation">
                         {% if record.type.value == 'company' %}<a href="{{ path('nowo_crm_kit_show', {type: 'contacts', id: a.contactId}) }}">{{ a.contactName }}</a>{% else %}<a href="{{ path('nowo_crm_kit_show', {type: 'companies', id: a.companyId}) }}">{{ a.companyName }}</a>{% endif %}
                         {% if a.role %} · {{ a.role }}{% endif %}{% if a.primary %} · <strong>{{ 'affiliation.primary'|trans({}, _d) }}</strong>{% endif %}
+                        {% if a.primaryContact %} · <strong data-testid="crm-primary-contact">{{ 'affiliation.primary_contact'|trans({}, _d) }}</strong>{% endif %}
+                        {% if a.purposes is not empty %} · <span data-testid="crm-purposes">{% for p in a.purposes %}{{ ('purpose.' ~ p)|trans({}, _d) }}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+                        {% if buttons.primary_contact[a.id] is defined %}{{ include(nowo_ui_partial('action', _b), {action: buttons.primary_contact[a.id], context: 'row', bundle: _b}) }}{% endif %}
                         {% if buttons.affiliations[a.id] is defined %}{{ include(nowo_ui_partial('action', _b), {action: buttons.affiliations[a.id], context: 'row', bundle: _b}) }}{% endif %}
+                        {% if forms.affiliations[a.id] is defined %}
+                            <details><summary>{{ 'affiliation.edit'|trans({}, _d) }}</summary>
+                                {{ include('@NowoCrmKit/_form.html.twig', {form: forms.affiliations[a.id], title: null, submit: 'affiliation.update', action: path('nowo_crm_kit_affiliate', {id: record.id}), testid: 'crm-affiliation-edit', variant: 'btn_secondary'}) }}
+                            </details>
+                        {% endif %}
                     </li>
                 {% endfor %}
                 </ul>
@@ -117,7 +128,7 @@
         <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-duplicates">
             <div class="{{ nowo_ui_class('card_body', _b) }}">
                 <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'record.duplicates'|trans({}, _d) }}</h2>
-                <ul>{% for d in duplicates %}<li><a href="{{ path('nowo_crm_kit_show', {type: segment, id: d.id}) }}">{{ d.label }}</a>{% if can_edit %} · <a href="{{ path('nowo_crm_kit_merge', {type: segment, id: record.id, other: d.id}) }}" data-testid="crm-merge-link">{{ 'record.merge_with'|trans({}, _d) }}</a>{% endif %}</li>{% endfor %}</ul>
+                <ul>{% for d in duplicates %}<li><a href="{{ path('nowo_crm_kit_show', {type: segment, id: d.id}) }}">{{ d.label }}</a>{% if can_merge %} · <a href="{{ path('nowo_crm_kit_merge', {type: segment, id: record.id, other: d.id}) }}" data-testid="crm-merge-link">{{ 'record.merge_with'|trans({}, _d) }}</a>{% endif %}</li>{% endfor %}</ul>
             </div>
         </section>
     {% endif %}

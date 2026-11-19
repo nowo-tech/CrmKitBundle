@@ -8,8 +8,9 @@
 
 ## Version plan
 
-One 0.x minor per phase (contract Q-O1 / Q-O13): **0.1.0** (phase A, companies and contacts), **0.2.0** (B,
-pipeline) … **0.7.0** (G, reports), each after its REQ-SEC-004 audit (permissions, GDPR erasure and merge are
+One 0.x minor per phase (contract Q-O1 / Q-O13): **0.1.0** (phase A, companies and contacts), **0.2.0**
+(roles and purposes), **0.3.0** (funnels) … **0.10.0** (circulars), phase G later (owner's plan of 2026-11-19,
+contract section 25), each after its REQ-SEC-004 audit (permissions, GDPR erasure and merge are
 data-loss paths, audited before the tag), then **1.0.0** after phase G and the full audit. The first tag is **0.1.0**,
 after the owner registers the package on Packagist. See [ROADMAP.md](ROADMAP.md).
 

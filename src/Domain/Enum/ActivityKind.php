@@ -24,6 +24,8 @@ enum ActivityKind: string
     case Unlinked         = 'unlinked';
     case Affiliated       = 'affiliated';
     case Unaffiliated     = 'unaffiliated';
+    case RolesChanged     = 'roles_changed';
+    case PrimaryContact   = 'primary_contact';
     case ConsentGiven     = 'consent_given';
     case ConsentWithdrawn = 'consent_withdrawn';
     case Imported         = 'imported';

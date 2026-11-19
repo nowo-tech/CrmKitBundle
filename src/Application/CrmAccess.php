@@ -10,11 +10,14 @@ use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Psr\Clock\ClockInterface;
+
+use function in_array;
 
 /**
  * The gate of every call (contract section 13): tenant (none ⇒ 404), feature gate (off ⇒ 404), actor (none ⇒ 404),
@@ -30,7 +33,28 @@ final readonly class CrmAccess
         private CrmFeatureGateInterface $gate,
         private CrmAccessCheckerInterface $checker,
         private ClockInterface $clock,
+        private ?CrmRecordVisibilityInterface $visibility = null,
     ) {
+    }
+
+    /**
+     * The owners whose records the actor may see in lists and related blocks (null: every record of the tenant).
+     *
+     * @return list<string>|null
+     */
+    public function visibleOwners(CrmContext $context): ?array
+    {
+        return $this->visibility?->visibleOwners($context->tenant, $context->actor);
+    }
+
+    /**
+     * Whether a record of this owner is visible under {@see self::visibleOwners()}.
+     *
+     * @param list<string>|null $owners
+     */
+    public static function visible(?array $owners, ?string $owner): bool
+    {
+        return $owners === null || $owner === null || in_array($owner, $owners, true);
     }
 
     /**

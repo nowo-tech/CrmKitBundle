@@ -32,18 +32,19 @@ final readonly class RecordViews
     /**
      * Wires the collaborators.
      */
-    public function __construct(private CrmStoreInterface $store, private CrmActorDirectoryInterface $directory)
+    public function __construct(private CrmStoreInterface $store, private CrmActorDirectoryInterface $directory, private PartyCatalogue $catalogue = new PartyCatalogue())
     {
     }
 
     /**
-     * Views of records of one type, with tags (and affiliations when `$withAffiliations`).
+     * Views of records of one type, with tags and configured roles (and affiliations when `$withAffiliations`).
      *
      * @param list<CrmRecord> $records
+     * @param list<string>|null $visibleOwners resource scoping of the counterparts ({@see CrmAccess::visibleOwners()})
      *
      * @return list<RecordView>
      */
-    public function many(TenantRef $tenant, SubjectType $type, array $records, bool $withAffiliations = false): array
+    public function many(TenantRef $tenant, SubjectType $type, array $records, bool $withAffiliations = false, ?array $visibleOwners = null): array
     {
         if ($records === []) {
             return [];
@@ -64,6 +65,10 @@ final readonly class RecordViews
                     $byRecord[$recordId][] = self::tag($tag);
                 }
             }
+        }
+        $roles = [];
+        foreach ($this->store->roleAssignments($tenant, $type, $ids) as $assignment) {
+            $roles[$assignment->getSubjectId()][] = $assignment->getRoleKey();
         }
         $owners = [];
         $views  = [];
@@ -87,7 +92,8 @@ final readonly class RecordViews
                 $record->getCreatedAt(),
                 $record->getUpdatedAt(),
                 $record->getTrashedAt(),
-                $withAffiliations ? $this->affiliations($tenant, $type, $record->getId()) : [],
+                $withAffiliations ? $this->affiliations($tenant, $type, $record->getId(), $visibleOwners) : [],
+                $this->catalogue->knownRoles($roles[$record->getId()] ?? []),
             );
         }
 
@@ -95,19 +101,23 @@ final readonly class RecordViews
     }
 
     /**
-     * One view, with affiliations.
+     * One view, with affiliations (counterparts limited to the visible owners).
+     *
+     * @param list<string>|null $visibleOwners
      */
-    public function one(TenantRef $tenant, CrmRecord $record): RecordView
+    public function one(TenantRef $tenant, CrmRecord $record, ?array $visibleOwners = null): RecordView
     {
-        return $this->many($tenant, $record::type(), [$record], true)[0];
+        return $this->many($tenant, $record::type(), [$record], true, $visibleOwners)[0];
     }
 
     /**
-     * The affiliations of a record with both labels (only active counterparts).
+     * The affiliations of a record with both labels (only active counterparts the actor may see).
+     *
+     * @param list<string>|null $visibleOwners
      *
      * @return list<AffiliationView>
      */
-    public function affiliations(TenantRef $tenant, SubjectType $type, string $id): array
+    public function affiliations(TenantRef $tenant, SubjectType $type, string $id, ?array $visibleOwners = null): array
     {
         $links = $this->store->affiliations($tenant, $type, $id);
         if ($links === []) {
@@ -121,7 +131,7 @@ final readonly class RecordViews
         $views     = [];
         foreach ($links as $link) {
             $counterpart = $records[$type === SubjectType::Contact ? $link->getCompanyId() : $link->getContactId()] ?? null;
-            if (!$counterpart instanceof CrmRecord || !$counterpart->isActive()) {
+            if (!$counterpart instanceof CrmRecord || !$counterpart->isActive() || !CrmAccess::visible($visibleOwners, $counterpart->getOwnerId())) {
                 continue;
             }
             $views[] = new AffiliationView(
@@ -132,6 +142,8 @@ final readonly class RecordViews
                 $type === SubjectType::Company ? $selfLabel : $counterpart->label(),
                 $link->getRole(),
                 $link->isPrimary(),
+                $link->isPrimaryContact(),
+                $this->catalogue->knownPurposes($link->getPurposes()),
             );
         }
 

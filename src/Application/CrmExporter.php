@@ -21,7 +21,8 @@ use function str_contains;
 use function str_replace;
 
 /**
- * Exports (contract section 9): CSV of every record matching a list's filters (keyset batches of 500, flat memory;
+ * Exports (contract section 9): CSV of every record matching a list's filters (with the configured role keys, the
+ * format the import reads back) (keyset batches of 500, flat memory;
  * cells starting with `=`, `+`, `-`, `@`, tab or CR prefixed with `'`), and a vCard 4.0 of one contact. Stateless.
  */
 final readonly class CrmExporter implements CrmExporterInterface
@@ -41,16 +42,17 @@ final readonly class CrmExporter implements CrmExporterInterface
      */
     public function csv(ListQuery $query): iterable
     {
-        $context = $this->support->access->context(CrmPermission::Manage);
+        $context = $this->support->access->context(CrmPermission::Export);
         $fields  = $this->support->read(fn (): array => $this->support->store->fields($context->tenant, $query->type, false));
+        $owners  = $this->support->access->visibleOwners($context);
         $keys    = array_map(static fn (FieldDefinition $f): string => $f->getFieldKey(), $fields);
-        $header  = ['id', ...RecordFields::names($query->type), ...array_map(static fn (string $k): string => 'custom.' . $k, $keys), 'owner', 'tags', 'created_at', 'updated_at'];
+        $header  = ['id', ...RecordFields::names($query->type), ...array_map(static fn (string $k): string => 'custom.' . $k, $keys), 'owner', 'roles', 'tags', 'created_at', 'updated_at'];
 
         yield self::line($header);
         $after = null;
         do {
-            $views = $this->support->read(function () use ($context, $query, &$after): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
-                $records = $this->support->store->batch($context->tenant, $query, $after, self::BATCH);
+            $views = $this->support->read(function () use ($context, $query, $owners, &$after): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                $records = $this->support->store->batch($context->tenant, $query, $after, self::BATCH, $owners);
                 $after   = $records === [] ? $after : $records[count($records) - 1]->getId();
 
                 return $this->views->many($context->tenant, $query->type, $records);
@@ -111,6 +113,7 @@ final readonly class CrmExporter implements CrmExporterInterface
             $cells[] = $view->custom[$key] ?? '';
         }
         $cells[] = $view->ownerName ?? $view->ownerId ?? '';
+        $cells[] = implode(', ', $view->roles);
         $cells[] = implode(', ', array_map(static fn (TagView $t): string => $t->name, $view->tags));
         $cells[] = $view->createdAt->format('Y-m-d H:i:s');
         $cells[] = $view->updatedAt->format('Y-m-d H:i:s');

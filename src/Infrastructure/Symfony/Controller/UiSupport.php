@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
-use Nowo\CrmKitBundle\Application\CrmAccess;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
@@ -13,6 +12,7 @@ use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\UiKitBundle\View\AreaNav;
 use Nowo\UiKitBundle\View\AreaNavItem;
@@ -53,7 +53,7 @@ final readonly class UiSupport
         private Environment $twig,
         private UrlGeneratorInterface $router,
         private FormFactoryInterface $forms,
-        private CrmAccess $access,
+        private CrmKitGuard $guard,
         private TranslatorInterface $translator,
         private CsrfTokenManagerInterface $csrf,
         private ?string $layout = null,
@@ -227,7 +227,7 @@ final readonly class UiSupport
      */
     public function require(CrmPermission $permission): void
     {
-        $this->access->context($permission);
+        $this->guard->requireGranted($permission);
     }
 
     /**
@@ -235,7 +235,7 @@ final readonly class UiSupport
      */
     public function requireOn(CrmPermission $permission, RecordView $view): void
     {
-        $this->access->require($this->access->base(), $permission, SubjectRef::of($view->type, $view->id, $view->ownerId));
+        $this->guard->requireGranted($permission, SubjectRef::of($view->type, $view->id, $view->ownerId));
     }
 
     /**
@@ -243,7 +243,7 @@ final readonly class UiSupport
      */
     public function can(CrmPermission $permission): bool
     {
-        return $this->access->can($permission);
+        return $this->guard->isGranted($permission);
     }
 
     /**
@@ -255,7 +255,7 @@ final readonly class UiSupport
             new AreaNavItem(self::label('nav.companies'), $this->url('nowo_crm_kit_list', ['type' => 'companies']), $current === 'companies'),
             new AreaNavItem(self::label('nav.contacts'), $this->url('nowo_crm_kit_list', ['type' => 'contacts']), $current === 'contacts'),
         ];
-        if ($this->can(CrmPermission::Edit)) {
+        if ($this->can(CrmPermission::Import)) {
             $items[] = new AreaNavItem(self::label('nav.import'), $this->url('nowo_crm_kit_import'), $current === 'import');
         }
         if ($this->can(CrmPermission::Manage)) {

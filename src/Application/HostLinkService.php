@@ -112,9 +112,10 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
 
         return $this->support->read(function () use ($context, $host): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $subjects = [];
+            $owners   = $this->support->access->visibleOwners($context);
             foreach ($this->support->store->linksTo($context->tenant, $host) as $link) {
                 $record = $this->support->store->record($link->getSubjectType(), $context->tenant, $link->getSubjectId());
-                if ($record instanceof CrmRecord && $record->isActive()) {
+                if ($record instanceof CrmRecord && $record->isActive() && CrmAccess::visible($owners, $record->getOwnerId())) {
                     $subjects[] = SubjectRef::of($link->getSubjectType(), $record->getId(), $record->getOwnerId());
                 }
             }

@@ -19,7 +19,7 @@ composer require nowo-tech/crm-kit-bundle
 
 With Symfony Flex the recipe registers `Nowo\CrmKitBundle\NowoCrmKitBundle` and the required
 `Nowo\TransactionDoctrine\Symfony\NowoTransactionDoctrineBundle`, writes
-`config/packages/nowo_crm_kit.yaml` (access roles empty, UI off) and declares the **private entity manager**
+`config/packages/nowo_crm_kit.yaml` (`security.*_roles` at `ROLE_ADMIN`, UI off) and declares the **private entity manager**
 `nowo_crm_kit` in `config/packages/nowo_crm_kit_doctrine.yaml`. Without Flex, register the bundle in
 `config/bundles.php` (both bundles) and write both files yourself.
 
@@ -76,6 +76,12 @@ the same request (`CONFLICT_002`), and its responder answers lock conflicts: 409
 When you turn its `conflict_response` off, a fallback listener on the CRM's routes keeps the same status, codes and
 headers ([CONCURRENCY.md](CONCURRENCY.md)).
 
+**A replay clears your entity manager.** When a CRM write unit is replayed after a deadlock, a lock-wait timeout or a
+serialization failure, transaction-doctrine (1.6) clears **every** open entity manager before the next attempt,
+your default one included (private and shared mode alike). Entities of your own that you loaded before calling a CRM
+write are detached afterwards: re-read them after the call, or call the CRM before you load them. A refused write
+without a replay (stale version, limit, invalid input) leaves your manager as it was.
+
 ## Routes
 
 The pages are opt-in. Turn them on and import the route loader with your prefix:
@@ -94,6 +100,26 @@ nowo_crm_kit:
     resource: .
     type: nowo_crm_kit_ui
     prefix: /admin
+```
+
+The pages need SecurityBundle (the build fails without it unless `security.allow_unauthenticated: true`, demos only).
+Set who may use them (REQ-UI-002, [CONFIGURATION.md](CONFIGURATION.md#security-req-ui-002)) and lock the path in your
+firewall too:
+
+```yaml
+# config/packages/nowo_crm_kit.yaml
+nowo_crm_kit:
+    security:
+        access_roles: [ROLE_USER]      # default [ROLE_ADMIN]
+        manage_roles: [ROLE_USER]
+        settings_roles: [ROLE_ADMIN]
+        export_roles: [ROLE_ADMIN]
+        erase_roles: [ROLE_ADMIN]
+
+# config/packages/security.yaml
+security:
+    access_control:
+        - { path: ^/admin/crm, roles: IS_AUTHENTICATED_FULLY }
 ```
 
 The routes are then `/admin/crm`, `/admin/crm/companies`, `/admin/crm/contacts/{id}`, … (names `nowo_crm_kit_*`,
@@ -117,15 +143,18 @@ php bin/console doctrine:migrations:migrate --em=nowo_crm_kit
 
 The metadata listener prefixes the table, index and unique-constraint names (`doctrine.table_prefix`, default
 `nowo_`) and maps every `id` / `*_id` column and the key columns (`email_key`, `name_key`, `tax_id_key`, `domain_key`,
-`sort_key`, `field_key`, `purpose`, `host_type`, `claim_token`, `resource`) with a **binary NO PAD collation** on MySQL
+`sort_key`, `field_key`, `purpose`, `purpose_keys`, `role_key`, `host_type`, `claim_token`, `resource`) with a **binary NO PAD collation** on MySQL
 and MariaDB, so `diff` and `schema:update` keep it:
 
 | Platform | Collation of those columns | Effect |
 | --- | --- | --- |
 | MySQL 8.0+ | `utf8mb4_0900_bin` | Byte comparison, NO PAD: `usera` ≠ `UserA`, `u1 ` ≠ `u1` |
-| MariaDB 10.2+ | `utf8mb4_nopad_bin` | The same |
-| MySQL 5.7 | `utf8mb4_bin` (PAD SPACE) | Case-exact; trailing spaces still pad, the PHP `===` re-check catches them |
+| MariaDB 10.6+ | `utf8mb4_nopad_bin` | The same |
 | PostgreSQL, SQLite | the default (exact already) | No collation is declared |
+
+Minimum database versions (0.2.0): MySQL 8.0, MariaDB 10.6, PostgreSQL 9.5 (the purge claim is read with
+`FOR UPDATE SKIP LOCKED`; with Doctrine DBAL 4, PostgreSQL 10, its lowest platform); SQLite for development and
+tests.
 
 The collation is chosen from the platform when the metadata loads, so the platform must be known at cache warm-up: set
 `doctrine.dbal.server_version` (for example `8.4`, `11.4.2-MariaDB` or `16`), or keep the database reachable. The
@@ -150,7 +179,9 @@ Every read keyed by such a value is also re-checked with `===` in PHP (REQ-SEC-0
 ## Reference DDL
 
 What `doctrine:migrations:diff --em=nowo_crm_kit` produces for phase A with the default prefix `nowo_` (the
-authoritative source is the XML mapping in `src/Resources/config/doctrine`). Phase A creates 15 tables.
+authoritative source is the XML mapping in `src/Resources/config/doctrine`). Phase A creates 15 tables; 0.2.0 adds
+`crm_role_assignment` and two columns of `crm_affiliation` (shown below; the upgrade DDL is in
+[UPGRADING.md](UPGRADING.md#to-020)).
 
 **MariaDB 11.4** is the MySQL DDL with `utf8mb4_nopad_bin` in place of `utf8mb4_0900_bin` and `LONGTEXT … CHECK
 (json_valid(…))` in place of `JSON` (MariaDB's JSON alias).
@@ -167,7 +198,7 @@ CREATE TABLE nowo_crm_settings (
     merge_keep_days INT NOT NULL,
     version INT NOT NULL,
     updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
-    updated_at DATETIME NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
     PRIMARY KEY (tenant_id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB;
 
@@ -189,7 +220,7 @@ CREATE TABLE nowo_crm_company (
     version INT NOT NULL,
     created_at DATETIME NOT NULL,
     created_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
-    updated_at DATETIME NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
     updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
     name VARCHAR(200) NOT NULL,
     name_key VARCHAR(200) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
@@ -225,7 +256,7 @@ CREATE TABLE nowo_crm_contact (
     version INT NOT NULL,
     created_at DATETIME NOT NULL,
     created_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
-    updated_at DATETIME NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
     updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
     first_name VARCHAR(120) DEFAULT NULL,
     last_name VARCHAR(120) DEFAULT NULL,
@@ -249,8 +280,23 @@ CREATE TABLE nowo_crm_affiliation (
     role VARCHAR(120) DEFAULT NULL,
     is_primary TINYINT(1) NOT NULL,
     created_at DATETIME NOT NULL,
+    is_primary_contact TINYINT(1) DEFAULT 0 NOT NULL,
+    purpose_keys VARCHAR(1100) CHARACTER SET utf8mb4 DEFAULT '' NOT NULL COLLATE `utf8mb4_0900_bin`,
     UNIQUE INDEX nowo_crm_affiliation_pair (contact_id, company_id),
     INDEX nowo_crm_affiliation_company (tenant_id, company_id),
+    PRIMARY KEY (id)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB;
+
+CREATE TABLE nowo_crm_role_assignment (
+    id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
+    tenant_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
+    subject_type VARCHAR(16) NOT NULL,
+    subject_id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
+    role_key VARCHAR(32) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
+    created_at DATETIME NOT NULL,
+    created_by_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
+    UNIQUE INDEX nowo_crm_role_assignment_key (tenant_id, subject_id, role_key),
+    INDEX nowo_crm_role_assignment_role (tenant_id, role_key, subject_type),
     PRIMARY KEY (id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB;
 
@@ -305,7 +351,7 @@ CREATE TABLE nowo_crm_note (
     author_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`,
     version INT NOT NULL,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
     INDEX nowo_crm_note_subject (tenant_id, subject_type, subject_id, created_at),
     PRIMARY KEY (id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB;
@@ -431,7 +477,7 @@ CREATE TABLE nowo_crm_settings (
     merge_keep_days INT NOT NULL,
     version INT NOT NULL,
     updated_by_id VARCHAR(128) DEFAULT NULL,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
     PRIMARY KEY (tenant_id)
 );
 
@@ -453,7 +499,7 @@ CREATE TABLE nowo_crm_company (
     version INT NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
     created_by_id VARCHAR(128) DEFAULT NULL,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
     updated_by_id VARCHAR(128) DEFAULT NULL,
     name VARCHAR(200) NOT NULL,
     name_key VARCHAR(200) NOT NULL,
@@ -489,7 +535,7 @@ CREATE TABLE nowo_crm_contact (
     version INT NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
     created_by_id VARCHAR(128) DEFAULT NULL,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
     updated_by_id VARCHAR(128) DEFAULT NULL,
     first_name VARCHAR(120) DEFAULT NULL,
     last_name VARCHAR(120) DEFAULT NULL,
@@ -513,10 +559,25 @@ CREATE TABLE nowo_crm_affiliation (
     role VARCHAR(120) DEFAULT NULL,
     is_primary BOOLEAN NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    is_primary_contact BOOLEAN DEFAULT false NOT NULL,
+    purpose_keys VARCHAR(1100) DEFAULT '' NOT NULL,
     PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX nowo_crm_affiliation_pair ON nowo_crm_affiliation (contact_id, company_id);
 CREATE INDEX nowo_crm_affiliation_company ON nowo_crm_affiliation (tenant_id, company_id);
+
+CREATE TABLE nowo_crm_role_assignment (
+    id VARCHAR(36) NOT NULL,
+    tenant_id VARCHAR(128) NOT NULL,
+    subject_type VARCHAR(16) NOT NULL,
+    subject_id VARCHAR(36) NOT NULL,
+    role_key VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    created_by_id VARCHAR(128) DEFAULT NULL,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX nowo_crm_role_assignment_key ON nowo_crm_role_assignment (tenant_id, subject_id, role_key);
+CREATE INDEX nowo_crm_role_assignment_role ON nowo_crm_role_assignment (tenant_id, role_key, subject_type);
 
 CREATE TABLE nowo_crm_tag (
     id VARCHAR(36) NOT NULL,
@@ -569,7 +630,7 @@ CREATE TABLE nowo_crm_note (
     author_id VARCHAR(128) DEFAULT NULL,
     version INT NOT NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
     PRIMARY KEY (id)
 );
 CREATE INDEX nowo_crm_note_subject ON nowo_crm_note (tenant_id, subject_type, subject_id, created_at);

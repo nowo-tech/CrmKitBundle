@@ -31,6 +31,10 @@ list:
     col:
         updated: Actualizado
     filter:
+        role: 'Rol'
+        purpose: 'Contacto para'
+        primary_contact: 'Contacto principal'
+        primary_contact_only: 'Solo contactos principales'
         q: Buscar
         tag: Etiqueta
         owner: Responsable
@@ -40,6 +44,7 @@ list:
         active: Activos
         trashed: Papelera
 field:
+    roles: 'Roles'
     name: Nombre
     contact_name: Nombre
     legal_name: Razón social
@@ -135,6 +140,13 @@ record:
     purged: Se ha eliminado el registro.
     erased: "Se han borrado los datos personales del contacto."
 affiliation:
+    edit: 'Editar'
+    update: 'Guardar'
+    clear_primary_contact: 'Quitar como contacto principal'
+    primary_contact_cleared: 'La empresa ya no tiene contacto principal.'
+    primary_contact: 'Contacto principal'
+    make_primary_contact: 'Hacer contacto principal'
+    primary_contact_set: 'Se cambió el contacto principal.'
     add: Añadir una empresa
     save: Añadir
     added: Se ha añadido la empresa.
@@ -142,6 +154,8 @@ affiliation:
     remove: Quitar
     primary: Principal
     form:
+        purposes: 'Contacto para'
+        primary_contact: 'Contacto principal de la empresa'
         company: Empresa
         role: Función
         primary: Empresa principal
@@ -232,6 +246,8 @@ timeline:
     empty: Aún no ha ocurrido nada.
     open: Abrir
 activity:
+    roles_changed: 'Roles cambiados por %actor%'
+    primary_contact: 'Contacto principal cambiado por %actor%'
     created: 'Creado por %actor%'
     updated: 'Actualizado por %actor%'
     owner_changed: 'Responsable cambiado por %actor%'
@@ -308,6 +324,9 @@ import:
         skip: Omitir las filas cuyo correo ya existe
         update: Actualizar el contacto existente
     target:
+        roles: 'Roles (claves separadas por comas)'
+        purposes: 'Contacto para (claves separadas por comas)'
+        primary_contact: 'Contacto principal de la empresa (sí / no)'
         skip: '(omitir esta columna)'
         company: Empresa (existente, por nombre)
         tags: Etiquetas (existentes, separadas por comas)
@@ -351,6 +370,10 @@ flash:
         crm_settings_stale: Alguien ha modificado los ajustes al mismo tiempo. Revísalos y vuelve a guardar.
         crm_write_conflict: 'Otro cambio de los mismos datos llegó al mismo tiempo. Inténtalo de nuevo.'
 error:
+    forbidden: 'No puedes cambiar esto.'
+    role_unknown: 'Rol desconocido.'
+    purpose_unknown: 'Finalidad desconocida.'
+    not_affiliated: 'Este contacto no está vinculado a la empresa.'
     required: Este campo es obligatorio.
     invalid: Este valor no es válido.
     host_object_unknown: 'Este objeto no existe o no puedes verlo.'
@@ -376,3 +399,13 @@ error:
     merge_same: Un registro no se puede fusionar consigo mismo.
     out_of_range: Este valor está fuera de rango.
     csrf: El formulario ha caducado. Recarga la página e inténtalo de nuevo.
+role:
+    customer: 'Cliente'
+    supplier: 'Proveedor'
+    partner: 'Socio'
+    distributor: 'Distribuidor'
+purpose:
+    billing: 'Facturación'
+    orders: 'Pedidos'
+    technical: 'Técnico'
+    general: 'General'

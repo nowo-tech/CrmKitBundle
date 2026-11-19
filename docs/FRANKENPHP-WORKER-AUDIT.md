@@ -29,7 +29,7 @@ run with alternating tenants and actors.
 | --- | --- | --- |
 | Application services (`RecordService`, `CrmReader`, `MergeService`, `ImportService`, `TagService`, `FieldService`, `NoteService`, `HostLinkService`, `ConsentService`, `CrmPersonalData`, `CrmExporter`, `SettingsService`, `PlanCounter`, `RecordPurger`, `WriteSupport`, `Taggings`, `RecordViews`) | none | `final readonly`; collaborators and configuration scalars only |
 | `CrmAccess` | none | asks the tenant resolver, feature gate and access checker on every call; the resulting `CrmContext` (tenant, actor, now) lives only for the call |
-| Port defaults (`SingleTenantResolver`, `RoleMapAccessChecker`, `SecurityActorDirectory`, `ConfiguredFeatureGate`, `ConfiguredPlanLimits`, `PsrLogAuditSink`, `SymfonyUuidGenerator`) | none | read the security token per call; configuration only |
+| Port defaults (`SingleTenantResolver`, `SecurityCrmAccessChecker`, `ConfigurableCrmKitAccessChecker`, `CrmResourceAccessChecker`, `CrmKitGuard`, `SecurityActorDirectory`, `ConfiguredFeatureGate`, `ConfiguredPlanLimits`, `PsrLogAuditSink`, `SymfonyUuidGenerator`) | none | read the security token per call; configuration only |
 | `DoctrineTransactionRunner`, `DoctrineCrmStore` | none | the entity manager is fetched from the registry per call (and reset when closed) |
 | `CrmMetadataListener` | none | the table prefix only; collation chosen from the platform per class load |
 | Controllers, forms, route loader, HTTP listeners | none | `final readonly`; forms are built per request |

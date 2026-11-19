@@ -87,7 +87,7 @@ final readonly class RecordController
             foreach ($this->reader->tags() as $tag) {
                 $tags[$tag->name] = $tag->id;
             }
-            $filters = $this->ui->form(FilterType::class, null, ['tags' => $tags, 'owners' => $this->forms->owners()], '');
+            $filters = $this->ui->form(FilterType::class, null, ['tags' => $tags, 'owners' => $this->forms->owners(), 'roles' => $this->forms->roles(), 'purposes' => $subject === SubjectType::Contact ? $this->forms->affiliationPurposes() : []], '');
             $filters->handleRequest($request);
             $query  = $this->query($request, $subject, $tags);
             $result = $this->reader->list($query);
@@ -96,17 +96,18 @@ final readonly class RecordController
             foreach ($result->rows as $view) {
                 $rows[] = $this->row($view);
             }
-            $canEdit = $this->ui->can(CrmPermission::Edit);
-            $actions = [];
-            if ($canEdit) {
+            $canEdit   = $this->ui->can(CrmPermission::Edit);
+            $canDelete = $this->ui->can(CrmPermission::Delete);
+            $actions   = [];
+            if ($this->ui->can(CrmPermission::Create)) {
                 $actions[] = Action::create($this->ui->url('nowo_crm_kit_new', ['type' => $type]), UiSupport::label('record.new.' . $subject->value));
             }
-            if ($this->ui->can(CrmPermission::Manage)) {
+            if ($this->ui->can(CrmPermission::Export)) {
                 $actions[] = new Action('export', UiSupport::label('list.export'), $this->ui->url('nowo_crm_kit_export', ['type' => $type] + $request->query->all()), icon: 'download');
             }
             $columns = $subject === SubjectType::Company
-                ? [new Column('label', UiSupport::label('field.name'), true, required: true, sortKey: 'name'), new Column('city', UiSupport::label('field.city'), priority: 2), new Column('email', UiSupport::label('field.email'), priority: 3), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')]
-                : [new Column('label', UiSupport::label('field.contact_name'), true, required: true, sortKey: 'name'), new Column('email', UiSupport::label('field.email')), new Column('phone', UiSupport::label('field.phone'), priority: 2), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')];
+                ? [new Column('label', UiSupport::label('field.name'), true, required: true, sortKey: 'name'), new Column('city', UiSupport::label('field.city'), priority: 2), new Column('email', UiSupport::label('field.email'), priority: 3), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('roles', UiSupport::label('field.roles'), priority: 2), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')]
+                : [new Column('label', UiSupport::label('field.contact_name'), true, required: true, sortKey: 'name'), new Column('email', UiSupport::label('field.email')), new Column('phone', UiSupport::label('field.phone'), priority: 2), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('roles', UiSupport::label('field.roles'), priority: 2), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')];
 
             return $this->ui->render('@NowoCrmKit/record/list.html.twig', [
                 'page' => new ListPage(
@@ -114,21 +115,23 @@ final readonly class RecordController
                     $columns,
                     $rows,
                     $filters->createView(),
-                    function (mixed $row) use ($type, $canEdit, $token, $query): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                    function (mixed $row) use ($type, $canEdit, $canDelete, $token, $query): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
                         $id      = is_array($row) && is_string($row['id'] ?? null) ? $row['id'] : '';
                         $actions = [Action::view($this->ui->url('nowo_crm_kit_show', ['type' => $type, 'id' => $id]), UiSupport::label('record.open'))];
                         if ($canEdit && $query->status === RecordStatus::Active) {
                             $actions[] = Action::edit($this->ui->url('nowo_crm_kit_edit', ['type' => $type, 'id' => $id]), UiSupport::label('record.edit'));
+                        }
+                        if ($canDelete && $query->status === RecordStatus::Active) {
                             $actions[] = new Action('delete', UiSupport::label('record.trash'), $this->ui->url('nowo_crm_kit_trash', ['type' => $type, 'id' => $id]), method: 'POST', csrfToken: $token, confirm: new Confirm(UiSupport::label('record.trash_confirm'), null, UiSupport::label('record.trash')), csrfField: 'crm_action[_token]');
                         }
-                        if ($canEdit && $query->status === RecordStatus::Trashed) {
+                        if ($canDelete && $query->status === RecordStatus::Trashed) {
                             $actions[] = new Action('restore', UiSupport::label('record.restore'), $this->ui->url('nowo_crm_kit_restore', ['type' => $type, 'id' => $id]), method: 'POST', csrfToken: $token, csrfField: 'crm_action[_token]');
                         }
 
                         return $actions;
                     },
                     Pagination::fromTotal($result->total, $query->page, $query->perPage, route: 'nowo_crm_kit_list', query: $request->query->all()),
-                    new EmptyState(UiSupport::label('list.empty.' . $subject->value), UiSupport::label('list.empty_hint'), $canEdit ? Action::create($this->ui->url('nowo_crm_kit_new', ['type' => $type]), UiSupport::label('record.new.' . $subject->value)) : null),
+                    new EmptyState(UiSupport::label('list.empty.' . $subject->value), UiSupport::label('list.empty_hint'), $this->ui->can(CrmPermission::Create) ? Action::create($this->ui->url('nowo_crm_kit_new', ['type' => $type]), UiSupport::label('record.new.' . $subject->value)) : null),
                     $this->ui->url('nowo_crm_kit_list', ['type' => $type]),
                     $query->sort === 'name' ? 'label' : $query->sort,
                     $query->direction,
@@ -149,7 +152,7 @@ final readonly class RecordController
     {
         return $this->ui->guard(function () use ($request, $type): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $subject = self::type($type);
-            $this->ui->require(CrmPermission::Edit);
+            $this->ui->require(CrmPermission::Create);
             $form = $this->forms->form($subject, null);
             $form->handleRequest($request);
             if ($form->isSubmitted() && $form->isValid()) {
@@ -474,6 +477,9 @@ final readonly class RecordController
         $owner  = is_string($q['owner'] ?? null) && $q['owner'] !== '' && ExactId::isValid($q['owner']) ? $q['owner'] : null;
         $status = ($q['status'] ?? null) === 'trashed' ? RecordStatus::Trashed : RecordStatus::Active;
         $sort   = is_string($q['sort'] ?? null) ? ($q['sort'] === 'label' ? 'name' : $q['sort']) : 'name';
+        // Only configured keys filter (byte for byte); anything else is ignored like an unknown tag.
+        $role    = is_string($q['role'] ?? null) && in_array($q['role'], $this->forms->roles(), true) ? $q['role'] : null;
+        $purpose = $type === SubjectType::Contact && is_string($q['purpose'] ?? null) && in_array($q['purpose'], $this->forms->affiliationPurposes(), true) ? $q['purpose'] : null;
 
         return new ListQuery(
             $type,
@@ -485,6 +491,9 @@ final readonly class RecordController
             is_string($q['direction'] ?? null) ? $q['direction'] : 'asc',
             is_numeric($q['page'] ?? null) ? (int) $q['page'] : 1,
             $perPage ?? (is_numeric($q['per_page'] ?? null) ? (int) $q['per_page'] : $this->ui->pageSize),
+            role: $role,
+            purpose: $purpose,
+            primaryContactOnly: $type === SubjectType::Contact && ($q['primary_contact'] ?? null) === '1',
         );
     }
 
@@ -503,6 +512,7 @@ final readonly class RecordController
             'email'   => $view->values['email'] ?? null,
             'phone'   => $view->values['phone'] ?? $view->values['mobile'] ?? null,
             'owner'   => $view->ownerName ?? $view->ownerId,
+            'roles'   => implode(', ', array_map(fn (string $r): string => $this->ui->trans('role.' . $r), $view->roles)),
             'tags'    => implode(', ', array_map(static fn (TagView $t): string => $t->name, $view->tags)),
             'updated' => $view->updatedAt->format('Y-m-d'),
         ];

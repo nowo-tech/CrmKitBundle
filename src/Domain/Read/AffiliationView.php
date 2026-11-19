@@ -10,7 +10,9 @@ namespace Nowo\CrmKitBundle\Domain\Read;
 final readonly class AffiliationView
 {
     /**
-     * Wires the view.
+     * @param bool $primary the contact's primary company
+     * @param bool $primaryContact the company's primary contact
+     * @param list<string> $purposes purpose keys, list order (purposes no longer configured are left out)
      */
     public function __construct(
         public string $id,
@@ -20,6 +22,8 @@ final readonly class AffiliationView
         public string $companyName,
         public ?string $role,
         public bool $primary,
+        public bool $primaryContact = false,
+        public array $purposes = [],
     ) {
     }
 }

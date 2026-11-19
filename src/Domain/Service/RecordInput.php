@@ -18,6 +18,8 @@ final readonly class RecordInput
      * @param array<string, mixed> $custom custom field key => raw value; null = keep the current values
      * @param list<string>|null $tagIds the record's tags; null = keep them
      * @param bool $setOwner whether `$owner` applies (false keeps the current owner)
+     * @param list<string>|null $roles the record's party roles (keys of `roles.catalogue`); null = keep them. Stored
+     *                                 roles no longer in the catalogue are kept either way
      */
     public function __construct(
         public SubjectType $type,
@@ -26,6 +28,7 @@ final readonly class RecordInput
         public ?array $custom = null,
         public ?array $tagIds = null,
         public bool $setOwner = true,
+        public ?array $roles = null,
     ) {
     }
 }

@@ -10,6 +10,7 @@ use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Model\RecordFields;
+use Nowo\CrmKitBundle\Domain\Read\AffiliationView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
@@ -30,6 +31,7 @@ use Nowo\UiKitBundle\View\ShowPage;
 use Symfony\Component\HttpFoundation\Response;
 
 use function array_map;
+use function in_array;
 use function substr;
 
 /**
@@ -59,30 +61,36 @@ final readonly class RecordPage
         $active  = $view->status === RecordStatus::Active;
         $edit    = $active && $this->access->can(CrmPermission::Edit, $subject);
         $manage  = $this->access->can(CrmPermission::Manage, $subject);
+        $delete  = $this->access->can(CrmPermission::Delete, $subject);
+        $export  = $this->access->can(CrmPermission::Export, $subject);
+        $erase   = $this->access->can(CrmPermission::Erase, $subject);
         $token   = $this->ui->actionToken();
         $actions = [];
         if ($edit) {
             $actions[] = Action::edit($this->ui->url('nowo_crm_kit_edit', ['type' => $seg, 'id' => $view->id]), UiSupport::label('record.edit'));
+        }
+        if ($edit && $delete) {
+            // A merge turns the other record into a tombstone: it needs delete too.
             $actions[] = new Action('custom', UiSupport::label('record.merge'), $this->ui->url('nowo_crm_kit_merge', ['type' => $seg, 'id' => $view->id]), icon: 'merge');
         }
         if ($type === SubjectType::Contact && $view->status !== RecordStatus::Erased) {
             $actions[] = new Action('download', UiSupport::label('record.vcard'), $this->ui->url('nowo_crm_kit_vcard', ['id' => $view->id]), icon: 'download');
         }
-        if ($type === SubjectType::Contact && $manage) {
+        if ($type === SubjectType::Contact && $export) {
             // A POST with the action token: the export is a logged processing of personal data, never a plain link.
             $actions[] = $this->post($token, 'download', 'record.gdpr_export', 'nowo_crm_kit_gdpr_export', ['id' => $view->id]);
         }
         $back = ['type' => $seg, 'subject' => $view->id];
-        if ($edit) {
+        if ($active && $delete) {
             $actions[] = $this->post($token, 'delete', 'record.trash', 'nowo_crm_kit_trash', ['type' => $seg, 'id' => $view->id], 'record.trash_confirm', 'danger');
         }
-        if ($view->status === RecordStatus::Trashed && $this->access->can(CrmPermission::Edit, $subject)) {
+        if ($view->status === RecordStatus::Trashed && $delete) {
             $actions[] = $this->post($token, 'restore', 'record.restore', 'nowo_crm_kit_restore', ['type' => $seg, 'id' => $view->id]);
         }
         if ($view->status === RecordStatus::Trashed && $manage) {
             $actions[] = $this->post($token, 'delete', 'record.purge', 'nowo_crm_kit_purge', ['type' => $seg, 'id' => $view->id], 'record.purge_confirm', 'danger');
         }
-        if ($type === SubjectType::Contact && $manage && $view->status !== RecordStatus::Erased) {
+        if ($type === SubjectType::Contact && $erase && $view->status !== RecordStatus::Erased) {
             $actions[] = $this->post($token, 'delete', 'record.erase', 'nowo_crm_kit_erase', ['id' => $view->id], 'record.erase_confirm', 'danger');
         }
         $details = [];
@@ -125,12 +133,20 @@ final readonly class RecordPage
                 $forms['link'] = $this->ui->form(HostLinkType::class, null, ['types' => $types], 'crm_link')->createView();
             }
             if ($type === SubjectType::Contact) {
+                // The add form offers the companies the contact is not linked to yet; a linked one has its own form below,
+                // filled with the stored role, flags and purposes.
+                $linked    = array_map(static fn (AffiliationView $a): string => $a->companyId, $view->affiliations);
                 $companies = [];
                 foreach ($this->reader->list(new ListQuery(SubjectType::Company, perPage: 100))->rows as $company) {
-                    $companies[$company->label . ' · ' . substr($company->id, -6)] = $company->id;
+                    if (!in_array($company->id, $linked, true)) {
+                        $companies[$company->label . ' · ' . substr($company->id, -6)] = $company->id;
+                    }
+                }
+                foreach ($view->affiliations as $affiliation) {
+                    $forms['affiliations'][$affiliation->id] = $this->ui->form(AffiliationType::class, ['company' => $affiliation->companyId, 'role' => $affiliation->role, 'primary' => $affiliation->primary, 'purposes' => $affiliation->purposes, 'primary_contact' => $affiliation->primaryContact], ['companies' => [$affiliation->companyName => $affiliation->companyId], 'purposes' => $this->forms->affiliationPurposes()], 'crm_affiliation')->createView();
                 }
                 if ($companies !== []) {
-                    $forms['affiliation'] = $this->ui->form(AffiliationType::class, null, ['companies' => $companies], 'crm_affiliation')->createView();
+                    $forms['affiliation'] = $this->ui->form(AffiliationType::class, null, ['companies' => $companies, 'purposes' => $this->forms->affiliationPurposes()], 'crm_affiliation')->createView();
                 }
                 $purposes = $this->forms->purposes();
                 if ($purposes !== []) {
@@ -141,7 +157,7 @@ final readonly class RecordPage
 
         $notes   = $this->reader->notes($type, $view->id);
         $links   = $this->reader->links($type, $view->id);
-        $buttons = ['notes' => [], 'links' => [], 'affiliations' => []];
+        $buttons = ['notes' => [], 'links' => [], 'affiliations' => [], 'primary_contact' => []];
         if ($edit) {
             foreach ($notes as $note) {
                 $forms['notes'][$note->id]   = $this->ui->form(NoteType::class, ['body' => $note->body, 'pinned' => $note->pinned, 'version' => (string) $note->version], ['versioned' => true], 'crm_note')->createView();
@@ -152,6 +168,11 @@ final readonly class RecordPage
             }
             foreach ($view->affiliations as $affiliation) {
                 $buttons['affiliations'][$affiliation->id] = $this->post($token, 'delete', 'affiliation.remove', 'nowo_crm_kit_unaffiliate', ['id' => $affiliation->id] + $back);
+                if ($type === SubjectType::Company) {
+                    $buttons['primary_contact'][$affiliation->id] = $affiliation->primaryContact
+                        ? $this->post($token, 'custom', 'affiliation.clear_primary_contact', 'nowo_crm_kit_primary_contact_clear', ['id' => $view->id])
+                        : $this->post($token, 'custom', 'affiliation.make_primary_contact', 'nowo_crm_kit_primary_contact', ['id' => $view->id, 'contact' => $affiliation->contactId]);
+                }
             }
         }
 
@@ -167,6 +188,7 @@ final readonly class RecordPage
             'segment'    => $seg,
             'can_edit'   => $edit,
             'can_manage' => $manage,
+            'can_merge'  => $edit && $delete,
             'forms'      => $forms,
             'notes'      => $notes,
             'timeline'   => $this->reader->timeline($type, $view->id, 30),

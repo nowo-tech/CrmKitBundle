@@ -31,6 +31,10 @@ list:
     col:
         updated: Aktualisiert
     filter:
+        role: 'Rolle'
+        purpose: 'Ansprechpartner für'
+        primary_contact: 'Hauptansprechpartner'
+        primary_contact_only: 'Nur Hauptansprechpartner'
         q: Suchen
         tag: Tag
         owner: Verantwortlich
@@ -40,6 +44,7 @@ list:
         active: Aktiv
         trashed: Papierkorb
 field:
+    roles: 'Rollen'
     name: Name
     contact_name: Name
     legal_name: Firmenname
@@ -135,6 +140,13 @@ record:
     purged: Der Datensatz wurde gelöscht.
     erased: "Die personenbezogenen Daten des Kontakts wurden gelöscht."
 affiliation:
+    edit: 'Bearbeiten'
+    update: 'Speichern'
+    clear_primary_contact: 'Als Hauptansprechpartner entfernen'
+    primary_contact_cleared: 'Das Unternehmen hat jetzt keinen Hauptansprechpartner.'
+    primary_contact: 'Hauptansprechpartner'
+    make_primary_contact: 'Zum Hauptansprechpartner machen'
+    primary_contact_set: 'Der Hauptansprechpartner wurde geändert.'
     add: Unternehmen hinzufügen
     save: Hinzufügen
     added: Das Unternehmen wurde hinzugefügt.
@@ -142,6 +154,8 @@ affiliation:
     remove: Entfernen
     primary: Primär
     form:
+        purposes: 'Ansprechpartner für'
+        primary_contact: 'Hauptansprechpartner des Unternehmens'
         company: Unternehmen
         role: Rolle
         primary: Primäres Unternehmen
@@ -232,6 +246,8 @@ timeline:
     empty: Noch ist nichts passiert.
     open: Öffnen
 activity:
+    roles_changed: 'Rollen geändert von %actor%'
+    primary_contact: 'Hauptansprechpartner geändert von %actor%'
     created: 'Angelegt von %actor%'
     updated: 'Aktualisiert von %actor%'
     owner_changed: 'Verantwortliche Person geändert von %actor%'
@@ -308,6 +324,9 @@ import:
         skip: Zeilen überspringen, deren E-Mail bereits existiert
         update: Vorhandenen Kontakt aktualisieren
     target:
+        roles: 'Rollen (Schlüssel, durch Kommas getrennt)'
+        purposes: 'Ansprechpartner für (Schlüssel, durch Kommas getrennt)'
+        primary_contact: 'Hauptansprechpartner des Unternehmens (ja / nein)'
         skip: '(diese Spalte überspringen)'
         company: Unternehmen (vorhanden, nach Name)
         tags: Tags (vorhanden, durch Komma getrennt)
@@ -351,6 +370,10 @@ flash:
         crm_settings_stale: Jemand hat die Einstellungen gleichzeitig geändert. Prüfen Sie sie und speichern Sie erneut.
         crm_write_conflict: 'Eine andere Änderung derselben Daten kam im selben Moment an. Versuchen Sie es erneut.'
 error:
+    forbidden: 'Sie dürfen das nicht ändern.'
+    role_unknown: 'Unbekannte Rolle.'
+    purpose_unknown: 'Unbekannter Zweck.'
+    not_affiliated: 'Dieser Kontakt ist nicht mit dem Unternehmen verknüpft.'
     required: Dieses Feld ist erforderlich.
     invalid: Dieser Wert ist ungültig.
     host_object_unknown: 'Dieses Objekt existiert nicht oder Sie können es nicht sehen.'
@@ -376,3 +399,13 @@ error:
     merge_same: Ein Datensatz kann nicht mit sich selbst zusammengeführt werden.
     out_of_range: Dieser Wert liegt außerhalb des zulässigen Bereichs.
     csrf: Das Formular ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.
+role:
+    customer: 'Kunde'
+    supplier: 'Lieferant'
+    partner: 'Partner'
+    distributor: 'Händler'
+purpose:
+    billing: 'Rechnungen'
+    orders: 'Bestellungen'
+    technical: 'Technik'
+    general: 'Allgemein'

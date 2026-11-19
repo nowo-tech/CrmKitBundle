@@ -20,6 +20,7 @@ use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\ImportRow;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
 use Nowo\CrmKitBundle\Domain\Model\Note;
+use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tag;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
@@ -68,32 +69,67 @@ interface CrmStoreInterface
     public function contactByEmailKey(TenantRef $tenant, string $emailKey): ?Contact;
 
     /**
+     * The ids of the contacts holding these e-mail keys, any status, in id order.
+     *
+     * @param list<string> $emailKeys
+     *
+     * @return list<string>
+     */
+    public function contactIdsByEmailKeys(TenantRef $tenant, array $emailKeys): array;
+
+    /**
+     * The distinct companies these contacts are affiliated to, in id order (plain ids, no entities loaded).
+     *
+     * @param list<string> $contactIds
+     *
+     * @return list<string>
+     */
+    public function affiliatedCompanyIds(TenantRef $tenant, array $contactIds): array;
+
+    /**
+     * The party roles stored for records of one type (every stored key, configured or not), by id.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<RoleAssignment>
+     */
+    public function roleAssignments(TenantRef $tenant, SubjectType $type, array $ids): array;
+
+    /**
      * A page of records and the total.
+     *
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
      *
      * @return array{list<CrmRecord>, int}
      */
-    public function list(TenantRef $tenant, ListQuery $query): array;
+    public function list(TenantRef $tenant, ListQuery $query, ?array $visibleOwners = null): array;
 
     /**
      * Records after `$afterId` (keyset by id) matching the query's filters.
      *
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
+     *
      * @return list<CrmRecord>
      */
-    public function batch(TenantRef $tenant, ListQuery $query, ?string $afterId, int $limit): array;
+    public function batch(TenantRef $tenant, ListQuery $query, ?string $afterId, int $limit, ?array $visibleOwners = null): array;
 
     /**
      * Active records sharing a key with `$record` (name, domain, tax id / sort key, e-mail).
      *
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
+     *
      * @return list<CrmRecord>
      */
-    public function duplicates(CrmRecord $record, int $limit = 10): array;
+    public function duplicates(CrmRecord $record, int $limit = 10, ?array $visibleOwners = null): array;
 
     /**
      * Active records whose searchable fields contain the text, and the total.
      *
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
+     *
      * @return array{list<CrmRecord>, int}
      */
-    public function search(SubjectType $type, TenantRef $tenant, string $text, int $limit, ?string $companyId = null): array;
+    public function search(SubjectType $type, TenantRef $tenant, string $text, int $limit, ?string $companyId = null, ?array $visibleOwners = null): array;
 
     /**
      * Affiliations of a contact or of a company.
@@ -262,8 +298,9 @@ interface CrmStoreInterface
     public function setCounter(TenantRef $tenant, string $resource, int $value): void;
 
     /**
-     * Claims the single run of the retention purge (the claim row locked as {@see self::lockCounter()} does, then a
-     * conditional UPDATE): true when free or the claim is older than `$staleBefore` (unix times).
+     * Claims the single run of the retention purge: the claim row locked without waiting (`FOR UPDATE SKIP LOCKED`;
+     * a row locked by the batch of a running purge answers false at once), created when missing, then a conditional
+     * UPDATE: true when free or the claim is older than `$staleBefore` (unix times).
      */
     public function claimPurge(int $now, int $staleBefore): bool;
 

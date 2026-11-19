@@ -19,6 +19,7 @@ final readonly class RecordView
      * @param array<string, string> $custom custom values
      * @param list<TagView> $tags
      * @param list<AffiliationView> $affiliations companies of a contact, contacts of a company
+     * @param list<string> $roles party role keys, catalogue order (roles no longer configured are left out)
      */
     public function __construct(
         public SubjectType $type,
@@ -36,6 +37,7 @@ final readonly class RecordView
         public DateTimeImmutable $updatedAt,
         public ?DateTimeImmutable $trashedAt,
         public array $affiliations,
+        public array $roles = [],
     ) {
     }
 }

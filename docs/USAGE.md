@@ -16,6 +16,7 @@
 - [Services a host calls](#services-a-host-calls)
 - [Events](#events)
 - [Errors](#errors)
+- [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Pages and routes](#pages-and-routes)
 - [Imports](#imports)
 - [SearchKit](#searchkit)
@@ -26,7 +27,9 @@
 Phase A (0.1.0) gives a tenant **companies** and **contacts** with owners, tags, custom fields, notes, an activity
 timeline, affiliations (contact ↔ company with a role, one primary company), host links and host panels on a 360°
 page, CSV / vCard import, duplicate hints and merging, CSV / vCard export, GDPR consent / export / erasure /
-retention, trash with restore, plan-limit counters and a SearchKit provider. The host owns tenants, people, who may do
+retention, trash with restore, plan-limit counters and a SearchKit provider. 0.2.0 adds **party roles** (customer,
+supplier, partner, … several per record, also on a contact without a company), the company's **primary contact** and
+**affiliation purposes** (billing, orders, technical, general). The host owns tenants, people, who may do
 what, the plan, the brand and its own modules; the bundle asks the host through ports on every call.
 
 ## Set it up
@@ -80,37 +83,104 @@ App\Crm\OrganizationTenantResolver`.
 
 ### Access checker
 
+0.2.0 follows the house shape of the Nowo admin UIs (REQ-UI-002; [CONFIGURATION.md](CONFIGURATION.md#security-req-ui-002)).
+
+**Areas.** The roles of `security.*_roles` decide by default. For other rules, implement
+`Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface` (or its tenant-aware variant, which
+receives the tenant of the call) and set `security.access_checker` to your service:
+
 ```php
-use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
-use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
-use Nowo\CrmKitBundle\Domain\Value\{ActorRef, SubjectRef, TenantRef};
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\TenantAwareCrmKitAccessCheckerInterface;
 
-final readonly class OrganizationCrmAccess implements CrmAccessCheckerInterface
+final readonly class OrganizationCrmAreas implements TenantAwareCrmKitAccessCheckerInterface
 {
-    public function __construct(private Security $security, private Memberships $members) {}
+    public function __construct(private Memberships $members) {}
 
-    public function isGranted(CrmPermission $permission, TenantRef $tenant, ?SubjectRef $subject = null): bool
+    public function canAccess(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.view'); }
+    public function canCreate(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.edit'); }
+    public function canEdit(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.edit'); }
+    public function canDelete(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.edit'); }
+    public function canImport(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.edit'); }
+    public function canExport(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
+    public function canManageSettings(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
+    public function canErase(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
+    public function canViewAmounts(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.amounts.view'); }
+    public function canSendCampaigns(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.campaigns.send'); }
+
+    private function has(?object $user, ?string $tenant, string $permission): bool
     {
-        $actor = $this->currentActor();
-        if ($actor === null) {
-            return false;
-        }
-        // $subject (type, id, owner) is set for a check on one record: e.g. "own companies only".
-        return $this->members->has($tenant->value, $actor->value, 'crm.' . $permission->value);
-    }
-
-    public function currentActor(): ?ActorRef
-    {
-        $id = $this->security->getUser()?->getUserIdentifier();
-
-        return $id === null ? null : new ActorRef($id);
+        return $user !== null && $tenant !== null && $this->members->has($tenant, $user->getUserIdentifier(), $permission);
     }
 }
 ```
 
-Deny by default: return `false` for anything you do not grant. `edit` and `manage` do not imply `view`; the bundle asks
-for exactly the permission of the action ([SECURITY.md](SECURITY.md#permission-matrix)). With `$subject === null` the
-bundle asks for the tenant-wide grant (lists, imports, settings, administration).
+**The actor** is the security user's identifier (1–128 bytes, compared exactly); the actor directory port gives the
+names. Deny by default: return `false` for anything you do not grant.
+
+**The deprecated 0.1.0 port.** A `Domain\Port\CrmAccessCheckerInterface` service set in the root key `access_checker`
+still replaces all of this in 0.2.0; it is asked `create`, `delete` and `import` as `edit`, `export` and `erase` as
+`manage`. Move to the area checker and a record listener; the key is removed in 0.3.0.
+
+<a id="record-access-listeners"></a>
+**Records.** After the area check, a decision on one company or contact dispatches
+`CrmKitEvents::RECORD_ACCESS_CHECK` (`nowo_crm_kit.record_access_check`). The default is "open" (a shared CRM) or,
+with `security.resource_scoping: true`, "owner, ownerless record or `settings_roles` only". A listener grants or
+denies; a deny always wins:
+
+```php
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\{CrmKitEvents, RecordAccessCheckEvent};
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+#[AsEventListener(event: CrmKitEvents::RECORD_ACCESS_CHECK)]
+final readonly class TeamRecordAccess
+{
+    public function __construct(private Teams $teams) {}
+
+    public function __invoke(RecordAccessCheckEvent $event): void
+    {
+        // getAction(): view, edit, create, delete, import, export, manage, erase, ...
+        $owner = $event->getOwnerId();
+        if ($owner !== null && $this->teams->sameTeam($event->getTenantKey(), $event->getActorId(), $owner)) {
+            $event->grant();
+        }
+        if ($event->getAction() === 'erase' && $this->teams->isLegalHold($event->getTenantKey(), $event->getSubjectId())) {
+            $event->deny();
+        }
+    }
+}
+```
+
+**Lists under resource scoping.** With `security.resource_scoping: true`, every read that returns several records
+(lists and totals, search, duplicates, CSV exports, the related records of a page, `subjectsLinkedTo()`) shows only
+ownerless records, the person's own and the owners a `CrmKitEvents::RECORD_VISIBILITY` listener adds, in SQL; the
+same set is the default of the record decision above, so a team rule belongs here:
+
+```php
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\{CrmKitEvents, RecordVisibilityEvent};
+
+#[AsEventListener(event: CrmKitEvents::RECORD_VISIBILITY)]
+final readonly class TeamVisibility
+{
+    public function __construct(private Teams $teams) {}
+
+    public function __invoke(RecordVisibilityEvent $event): void
+    {
+        foreach ($this->teams->teammates($event->getTenantKey(), $event->getActorId()) as $id) {
+            $event->addOwner($id);
+        }
+        // $event->allowAll() opens every record of the tenant (e.g. a supervisor).
+    }
+}
+```
+
+Lists follow only `RECORD_VISIBILITY` (owner-based); `RECORD_ACCESS_CHECK` decides single-record pages and writes. To
+hide a record from lists, give it an owner the person does not see. A visibility above 1 000 owners is refused: use
+`allowAll()` and record checks instead. The GDPR export of a contact lists every company it is affiliated to (also
+companies the person exporting may not see), since it is the person's own data.
+
+**In your own controllers**, `Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard` answers the same
+questions: `requireGranted(CrmPermission, ?SubjectRef)` (404 when the CRM is not available, 403 when refused),
+`isGranted()` and `grants()` (every permission's decision, for menus).
 
 ### Feature gate
 
@@ -302,7 +372,8 @@ resolves the tenant and the actor and checks the permission itself (404 / 403); 
 
 | Service | Methods |
 | --- | --- |
-| `RecordServiceInterface` | `create(RecordInput): string`, `update(string $id, RecordInput, int $expectedVersion): int`, `trash(SubjectType, string $id, int $expectedVersion)`, `restore(SubjectType, string $id)`, `purge(SubjectType, string $id)` (`manage`), `affiliate(string $contactId, string $companyId, ?string $role, bool $primary): string`, `unaffiliate(string $affiliationId)` |
+| `RecordServiceInterface` | `create(RecordInput): string`, `update(string $id, RecordInput, int $expectedVersion): int`, `trash(SubjectType, string $id, int $expectedVersion)`, `restore(SubjectType, string $id)`, `purge(SubjectType, string $id)` (`manage`), `affiliate(string $contactId, string $companyId, ?string $role, bool $primary, ?bool $primaryContact = null, ?list $purposes = null): string`, `unaffiliate(string $affiliationId)`, `setPrimaryContact(string $companyId, ?string $contactId)`, `setRoles(SubjectType, string $id, list<string> $roles)` |
+| `CrmCatalogueInterface` | `roles(): list<string>`, `purposes(): list<string>` (the configured keys) |
 | `CrmReaderInterface` | `record(SubjectType, id): RecordView`, `list(ListQuery): ListResult`, `timeline(SubjectType, id, int $limit = 50, ?string $before)`, `duplicates`, `notes`, `links`, `panels`, `consents(contactId)`, `tags()`, `fields(SubjectType, bool $withArchived)`, `owners()` |
 | `TagServiceInterface` | `create(name, colour): string`, `change(id, name, colour, int $v)`, `delete(id)` (`manage`); `assign(SubjectType, id, list<tagId>)` (`edit`, set semantics) |
 | `FieldServiceInterface` | `define(SubjectType, key, label, FieldType, choices, required, position): string`, `change(id, label, choices, required, position, int $v)`, `archive(id, bool $archived, int $v)` (`manage`) |
@@ -375,6 +446,7 @@ carries ids and VOs only.
 | `ConsentRecorded` | `contactId`, `purpose`, `granted` |
 | `ImportCompleted` | `type`, `importId`, `counts` (per outcome) |
 | `TagsChanged` | `type`, `id`, `added`, `removed` (tag ids) |
+| `RolesChanged` (0.2.0) | `type`, `id`, `added`, `removed` (role keys) |
 | `HostLinkAdded`, `HostLinkRemoved` | `type`, `id`, `hostType`, `hostId` |
 
 ```php
@@ -403,6 +475,41 @@ final readonly class ProjectClientSync
 Forms of the UI handle the expected cases themselves: a stale record form is shown again with the current values,
 a flash and status 409; POST actions (trash, restore, notes, tags, links, consent) flash the conflict and redirect.
 
+## Roles and affiliation purposes
+
+Since 0.2.0 ([CONFIGURATION.md](CONFIGURATION.md#roles-and-affiliation-purposes), contract section 6.8).
+
+- **Roles** say what a party is to the tenant: a company or a contact holds any number of them (`customer`,
+  `supplier`, `partner` built in; `distributor` and keys of your own by configuration). One entity serves customers
+  and suppliers: a supplier that also buys is a company with both roles. A private customer is a contact with the
+  `customer` role and no company. Prospect and former customer are lifecycle stages of the customer role (funnels,
+  0.3.0); a competitor is a tag.
+- **The company's primary contact**: at most one per company, set from the company page ("Make primary contact",
+  "Remove as primary contact"), in the affiliation form of the contact (an unticked box keeps it), through `setPrimaryContact()` / `affiliate(…, primaryContact: true)` or by an
+  import column; the previous one is cleared.
+- **Purposes** say what a contact is the company's contact for (several per affiliation).
+
+```php
+use Nowo\CrmKitBundle\Domain\Service\ListQuery;
+
+$supplierId = $records->create(new RecordInput(SubjectType::Company, ['name' => 'Parts Ltd'], roles: ['supplier']));
+$records->setRoles(SubjectType::Company, $supplierId, ['supplier', 'customer']);   // set semantics
+
+$records->affiliate($contactId, $supplierId, 'Accounts', primary: true, primaryContact: true, purposes: ['billing']);
+$records->setPrimaryContact($supplierId, $otherContactId);                          // clears the previous one
+
+$suppliers = $reader->list(new ListQuery(SubjectType::Company, role: 'supplier'));
+$billing   = $reader->list(new ListQuery(SubjectType::Contact, companyId: $supplierId, purpose: 'billing'));
+$primaries = $reader->list(new ListQuery(SubjectType::Contact, role: 'customer', primaryContactOnly: true));
+```
+
+`RecordView::$roles` holds the configured role keys of a record (catalogue order) and every `AffiliationView` its
+`primaryContact` flag and `purposes`. A key removed from the configuration stays in the database but is hidden; the
+GDPR export lists every stored role. The list pages filter by `role` (and, for contacts, `purpose` and
+`primary_contact=1`); unknown keys in the URL are ignored, while `ListQuery` itself refuses a string that is not a
+valid key (`InvalidInputException`). An affiliation edit replaces only the configured purposes; stored ones no longer
+configured stay.
+
 ## Pages and routes
 
 Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<name>`; `{type}` is `companies` or
@@ -411,7 +518,7 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 | Name | Path | Methods | Permission |
 | --- | --- | --- | --- |
 | `home` | `/` | GET | redirect to companies |
-| `list` | `/{type}` (`q`, `tag`, `owner`, `status=trashed`, `sort=name\|created\|updated`, `direction`, `page`, `per_page`) | GET | view |
+| `list` | `/{type}` (`q`, `tag`, `role`, `owner`, `status=trashed`, `sort=name\|created\|updated`, `direction`, `page`, `per_page`; contacts also `purpose`, `primary_contact=1`) | GET | view |
 | `new` | `/{type}/new` | GET, POST | edit |
 | `show` | `/{type}/{id}` (a merged id redirects to the survivor) | GET | view |
 | `edit` | `/{type}/{id}/edit` | GET, POST | edit |
@@ -424,6 +531,7 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 | `tags_assign` | `/{type}/{id}/tags` | POST | edit |
 | `link_add`, `link_remove` | `/{type}/{id}/links`, `/links/{id}/remove` | POST | edit |
 | `affiliate`, `unaffiliate` | `/contacts/{id}/affiliations`, `/affiliations/{id}/remove` | POST | edit |
+| `primary_contact`, `primary_contact_clear` (0.2.0) | `/companies/{id}/primary-contact/{contact}`, `/companies/{id}/primary-contact/clear` (action token) | POST | edit on the company |
 | `consent` | `/contacts/{id}/consent` | POST | edit |
 | `vcard` | `/contacts/{id}/vcard` | GET | view |
 | `gdpr_export`, `erase` | `/contacts/{id}/gdpr-export` (JSON download), `/contacts/{id}/erase` | POST (both with the action token `crm_action[_token]`) | manage |
@@ -444,13 +552,21 @@ template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the bra
    `e-mail`, `surname`, `zip`, `vat`), errors per row and, for contacts, the existing contact with the same e-mail.
    The mapping is editable: a core field, `custom.<key>`, `tags` (comma-separated names of **existing** tags) or, for
    contacts, `company` (affiliates to an existing active company with exactly that name, case-insensitive), or skip.
+   0.2.0: `roles` (role keys separated by `,` or `;`, both types; added to the stored ones), and for contacts
+   `purposes` (purpose keys of the affiliation to the named company, added to the stored ones) and `primary_contact`
+   (`yes` / `no`, also `1`, `true`, `x` / empty, `0`, `false`: makes the contact the company's primary contact; a row
+   that changes it needs `edit` on that company, else it is `invalid` with `error.forbidden`).
+   Keys must equal configured keys exactly; an unknown key or an unreadable yes / no makes the row `invalid`.
 3. **Confirm** with the duplicate policy: `skip` (a contact whose e-mail exists becomes `duplicate`) or `update` (the
    existing active contact is updated; a trashed one stays `duplicate`). Companies have no duplicate key: every valid
    row creates a company.
 4. **Run**: the confirm request runs `import.sync_rows` rows in chunks of `import.chunk_rows`; a larger import shows
    "Continue" (`do=run`, the same amount again). A worker that stopped leaves the import `running`;
-   `nowo:crm-kit:import:resume` takes over claims older than `import.stale_claim_seconds`. Rows end as `created`,
-   `updated`, `duplicate`, `invalid` (with the first error key) or `limit` (plan limit reached).
+   `nowo:crm-kit:import:resume` takes over claims older than `import.stale_claim_seconds`; with nobody signed in it
+   stops before a row that updates an existing contact or names a company, which waits for a person's "Continue". Rows end as `created`,
+   `updated`, `duplicate`, `invalid` (with the first error key) or `limit` (plan limit reached). Each chunk first
+   locks the existing contacts and the named companies of all its rows (contacts, then companies, each in id order),
+   then settles the rows ([CONCURRENCY.md](CONCURRENCY.md#import)).
 
 No Messenger handler ships in 0.1.0: imports always run in requests and in the resume command.
 

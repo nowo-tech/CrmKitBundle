@@ -13,8 +13,9 @@ FormKit UI.**
 interfaces and value objects with no Symfony, Doctrine or HTTP types, the bundle-owned tables are mapped in XML and
 referenced by id, and the bundle never flushes your EntityManager.
 
-> **Status: 0.1.0 (phase A, not tagged yet): companies and contacts.** Pipeline, quotes, invoices, campaigns, a
-> customer portal and reports follow phase by phase from [docs/CONTRACT.md](docs/CONTRACT.md)
+> **Status: 0.1.0 released (companies and contacts); 0.2.0 in progress (party roles, the company's primary contact
+> and affiliation purposes).** Funnels, tasks and agenda, quotes, invoices, a customer portal, scoring, segments,
+> informative circulars and reports follow phase by phase from [docs/CONTRACT.md](docs/CONTRACT.md)
 > ([docs/ROADMAP.md](docs/ROADMAP.md)). Usage: [docs/USAGE.md](docs/USAGE.md).
 
 > **Compatible with Symfony 7.4, 8.0 and 8.1** · PHP 8.2+ (Symfony 8.x requires PHP 8.4+)
@@ -29,7 +30,12 @@ Phase A (0.1.0), always on when the bundle is enabled:
 
 - **Companies and contacts**: core fields, owners (people of your application), tags, custom fields per tenant
   (text, textarea, number, date, boolean, choice, url, email), trash with restore and purge.
-- **Affiliations**: a contact belongs to any number of companies, each with a role, one of them primary.
+- **Party roles** (0.2.0): one entity for customers, suppliers, partners and so on: a company or a contact holds any
+  number of roles from a configurable catalogue (`customer`, `supplier`, `partner`; `distributor` opt-in), filtered
+  in the lists, imported and exported.
+- **Affiliations**: a contact belongs to any number of companies, each with a role, one of them primary; a company has
+  at most one **primary contact**, and each affiliation says what the contact is for (**purposes**: billing, orders,
+  technical, general; configurable).
 - **Notes and timeline**: plain-text notes (pinned first) and an append-only activity timeline per record; a company's
   timeline includes its contacts' entries; your application adds its own entries.
 - **360° page**: details, contacts / companies, host links (your projects, tickets and so on, referenced by id and
@@ -45,8 +51,9 @@ Phase A (0.1.0), always on when the bundle is enabled:
 - **Private entity manager** `nowo_crm_kit`, declared by the Flex recipe, so the bundle never flushes the host's
   unit of work; every write is a transaction-doctrine write unit (409 with `CONFLICT_001` / `CONFLICT_002`).
 
-Built phase by phase: **A companies and contacts (0.1)** → B pipeline → C quotes → D invoices → E campaigns →
-F customer portal → G reports (1.0).
+Built phase by phase: **companies and contacts (0.1)** → **roles and purposes (0.2)** → funnels (0.3) → tasks and
+agenda (0.4) → quotes (0.5) → invoices (0.6) → customer portal (0.7) → scoring (0.8) → lists and segments (0.9) →
+informative circulars (0.10) → reports (1.0).
 
 ## Installation
 
@@ -63,11 +70,12 @@ See [docs/INSTALLATION.md](docs/INSTALLATION.md).
 nowo_crm_kit:
     doctrine:
         entity_manager: nowo_crm_kit
-    access:
-        roles:
-            view: [ROLE_USER]
-            edit: [ROLE_USER]
-            manage: [ROLE_ADMIN]
+    security:                  # REQ-UI-002: also lock the path with access_control in security.yaml
+        access_roles: [ROLE_USER]
+        manage_roles: [ROLE_USER]
+        settings_roles: [ROLE_ADMIN]
+        export_roles: [ROLE_ADMIN]
+        erase_roles: [ROLE_ADMIN]
     ui:
         enabled: true
 ```

@@ -7,6 +7,123 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Party roles**: a company or a contact holds any number of roles from `roles.catalogue` (built in: `customer`,
+  `supplier`, `partner`; `distributor` translated and opt-in), stored in the new table `crm_role_assignment` (unique
+  per tenant, record and role; binary NO PAD key). Roles are edited in the record form, through
+  `RecordInput::$roles` and `RecordServiceInterface::setRoles()` (set semantics, the record locked first), shown on
+  the 360° page and in the lists, filtered by `ListQuery::$role` and the list pages, imported (`roles` column, keys
+  separated by `,` or `;`) and exported (`roles` CSV column). Event `RolesChanged`; audit `crm.roles.changed` (keys
+  only) after the commit. A role removed from the configuration keeps its rows, hidden everywhere except the GDPR
+  export.
+- **The company's primary contact** (`crm_affiliation.is_primary_contact`, at most one per company, under the
+  company's row lock with the contact → company lock order): `affiliate(…, primaryContact:)`,
+  `RecordServiceInterface::setPrimaryContact()`, a "Make primary contact" action on the company page
+  (`/companies/{id}/primary-contact/{contact}`), an import column `primary_contact` and the filter
+  `ListQuery::$primaryContactOnly`. Audit `crm.affiliation.primary_contact`.
+- **Affiliation purposes** from `affiliations.purposes` (built in: `billing`, `orders`, `technical`, `general`; stored
+  as `crm_affiliation.purpose_keys`): `affiliate(…, purposes:)`, the affiliation form, the import column `purposes`,
+  the filter `ListQuery::$purpose`.
+- `CrmCatalogueInterface` (`roles()`, `purposes()`), value objects `RoleKey` and `AffiliationPurpose`, timeline kinds
+  `roles_changed` and `primary_contact`, translations of every new key in the 7 locales.
+- Merges move the roles (no duplicate), unite the purposes of a shared affiliation and keep one primary company per
+  contact and one primary contact per company; purge and GDPR erasure delete the roles; the GDPR export lists every
+  stored role and every affiliation with its purposes and flags.
+- Two-connection race tests (MySQL 8.4, MariaDB 11.4, PostgreSQL 16): concurrent role edits, two "set primary
+  contact" calls on one company, an import chunk waiting on a locked parent before it settles any row.
+- **Access in the house shape (REQ-UI-002)**: the `security` node (`access_roles`, `access_checker`,
+  `allow_unauthenticated`, `manage_roles`, `settings_roles`, `export_roles`, `erase_roles`, `resource_scoping`), the
+  area checker `CrmKitAccessCheckerInterface` (and `TenantAwareCrmKitAccessCheckerInterface`) with
+  `ConfigurableCrmKitAccessChecker` and `AllowAllCrmKitAccessChecker`, the record checker `CrmResourceAccessChecker`
+  with the event `CrmKitEvents::RECORD_ACCESS_CHECK` (`RecordAccessCheckEvent`: grant / deny, a deny wins),
+  `CrmKitGuard` (`requireGranted`, `isGranted`, `grants`), a `kernel.controller` listener that requires `view` on every
+  bundle route (nobody signed in ⇒ the firewall's entry point), and a compile-time failure when the pages are on
+  without SecurityBundle (unless `allow_unauthenticated`). `CrmPermission` gains `create`, `delete`, `import`,
+  `export` and `erase`. The area checker also has `canViewAmounts()` and `canSendCampaigns()` (`security.amounts_roles`,
+  `security.campaigns_roles`, default `[ROLE_ADMIN]`) for the later phases' `amounts_view` and `campaigns_send`.
+- **Resource scoping in every read** (audit UP-M-1): with `security.resource_scoping`, lists and their totals, search,
+  duplicates, CSV exports, a page's related records (affiliations, a company's timeline), `subjectsLinkedTo()` and the
+  affiliation picker show only ownerless records, the person's own and the owners a
+  `CrmKitEvents::RECORD_VISIBILITY` listener (`RecordVisibilityEvent`: `addOwner()`, `allowAll()`) adds, filtered in
+  SQL (port `CrmRecordVisibilityInterface`, default `ScopedRecordVisibility`); the same set is the default of a
+  decision on one record. Whoever may manage the settings (the area checker's `canManageSettings`, the host's when
+  configured) sees everything.
+
+### Changed
+
+- **Breaking (configuration):** `access.roles` is replaced by `security.*_roles` (defaults `[ROLE_ADMIN]`); the root
+  `access_checker` key is deprecated (a 0.1.0 checker set there is wrapped and asked the new permissions as the old
+  ones) and removed in 0.3.0; `RoleMapAccessChecker` is removed.
+- **UD2-L-1**: an import chunk locks, before it settles any row, the existing contacts of its e-mails in id order and
+  then the companies its rows name in id order (the lock order of every other path), instead of row by row.
+- **UD2-L-3**: a second `nowo:crm-kit:purge` that starts while a batch of the first holds the claim row prints
+  "Another purge is running" at once (the claim row is read `FOR UPDATE SKIP LOCKED`) instead of a lock conflict.
+- **UD2-L-2** (documented): a write unit replayed after a deadlock clears every open entity manager, the host's
+  included (inherited from transaction-doctrine); see CONCURRENCY and INSTALLATION.
+- The phase plan of 2026-11-19: funnels 0.3.0, tasks and agenda 0.4.0, quotes 0.5.0, invoices 0.6.0, customer portal
+  0.7.0, scoring 0.8.0, lists and segments 0.9.0, circulars 0.10.0, reports later; the switches of the later phases
+  name their new release.
+- `RecordView` gains `roles`, `AffiliationView` gains `primaryContact` and `purposes` (new trailing constructor
+  arguments with defaults); `RecordServiceInterface` gains `setRoles()` and `setPrimaryContact()`, and `affiliate()`
+  two optional arguments; `CrmStoreInterface` (internal) gains `contactIdsByEmailKeys()`, `affiliatedCompanyIds()`
+  and `roleAssignments()`.
+- The CSV export has a `roles` column after `owner`.
+- The minimum database versions are MySQL 8.0, MariaDB 10.6 and PostgreSQL 9.5 (`SKIP LOCKED`; PostgreSQL 10 with
+  DBAL 4).
+- `updated_at` of companies, contacts, notes and settings is kept to the microsecond (`DATETIME(6)` /
+  `TIMESTAMP(6)`, type `nowo_crm_utc_datetime_micro`): every write of a company or contact moves its optimistic
+  version, also two role-, tag- or affiliation-only changes in one second, so a stale form is refused (the
+  whole-second column hid them from Doctrine's change detection).
+- An empty `access_roles`, `manage_roles`, `amounts_roles` or `campaigns_roles` list means **any authenticated
+  user** for that area (0.1.0's empty lists denied); `settings_roles`, `export_roles` and `erase_roles` must name at
+  least one role.
+- `security.allow_unauthenticated` is refused when `kernel.environment` is `prod`, and turns `resource_scoping` off
+  (one shared actor `anonymous`).
+
+### Fixed (audit UL, before the release)
+
+- An affiliation edit replaced every purpose: purposes no longer configured are now kept (only the configured ones
+  are replaced).
+- Re-sending an affiliation with "primary contact" unticked cleared the company's primary contact (403 without `edit`
+  on the company): unticked now keeps it; clearing is a "Remove as primary contact" action on the company page
+  (`/companies/{id}/primary-contact/clear`), and each linked company has its own form, filled with the stored role,
+  flags and purposes (the add form lists only companies not linked yet).
+- `crm_affiliation.purpose_keys` is `VARCHAR(1100)` (32 keys of 32 characters fit).
+- An import row that changes a company's primary contact needs `edit` on that company, else it is `invalid`
+  (`error.forbidden`); the ambiguous column alias `primary` is gone (`primary_contact` stays).
+- Imports announce role changes (`RolesChanged`) and audit them (`crm.roles.changed`).
+- The GDPR export lists affiliations to trashed companies too, with `company_status`.
+- `ListQuery` refuses a role or purpose that is not a valid key.
+- A contact merge moves the primary-company flag of a company both contacts are linked to when the survivor had none.
+
+### Fixed (audit UP, before the release)
+
+- A merge also needs `delete` on the merged record (it becomes a tombstone); the merge action is shown only with it.
+- Removing the affiliation of a company's primary contact needs `edit` on the company, locks it and records the
+  `primary_contact` timeline entry.
+- The scoping bypass asks the area checker (`canManageSettings`), so a host checker decides it too.
+
+### Fixed (audit UP-2, before the release)
+
+- `nowo:crm-kit:import:resume` (nobody signed in) settled every row needing a decision on one record as
+  `error.forbidden`: it now stops before such a row (an update of an existing contact, a named company) and leaves it
+  pending for a person's "Continue".
+- A taken e-mail (form error, import preview) names the other contact only to someone who may see it.
+- An import resolves a named company among the companies the importer may see (an invisible one is unknown), once,
+  and links exactly the company it checked.
+- More than 1 000 visible owners is refused with a clear `LogicException` (one SQL parameter each).
+- Docs: `RECORD_VISIBILITY` runs per access check; lists follow it, single records `RECORD_ACCESS_CHECK`; the
+  microsecond `ALTER`s are run by hand on DBAL 4; the GDPR export lists every affiliated company.
+
+### Security
+
+- An import with the `update` duplicate policy rewrote existing contacts (values, custom values, tags, roles,
+  affiliations) with the tenant-wide import permission only; 0.1.0 is affected (no advisory, owner decision
+  2026-11-19). Each matched contact now needs `edit` on that contact, and a named company `view` on it, before the row
+  writes anything; otherwise the row is `invalid` (`error.forbidden`) and echoes nothing (a skipped duplicate shows
+  the existing id only to someone who may see it).
+
 ## [0.1.0] - 2026-11-19
 
 ### Added

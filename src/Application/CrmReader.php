@@ -75,7 +75,7 @@ final readonly class CrmReader implements CrmReaderInterface
         return $this->support->read(function () use ($type, $id): RecordView { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$context, $record] = $this->load($type, $id);
 
-            return $this->views->one($context->tenant, $record);
+            return $this->views->one($context->tenant, $record, $this->support->access->visibleOwners($context));
         });
     }
 
@@ -87,7 +87,7 @@ final readonly class CrmReader implements CrmReaderInterface
         $context = $this->support->access->context(CrmPermission::View);
 
         return $this->support->read(function () use ($context, $query): ListResult { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            [$records, $total] = $this->support->store->list($context->tenant, $query);
+            [$records, $total] = $this->support->store->list($context->tenant, $query, $this->support->access->visibleOwners($context));
 
             return new ListResult($this->views->many($context->tenant, $query->type, $records), $total);
         });
@@ -103,7 +103,7 @@ final readonly class CrmReader implements CrmReaderInterface
             $subjects           = [[$type, $id]];
             $labels             = [];
             if ($type === SubjectType::Company) {
-                foreach (array_slice($this->views->affiliations($context->tenant, $type, $id), 0, self::TIMELINE_CONTACTS) as $affiliation) {
+                foreach (array_slice($this->views->affiliations($context->tenant, $type, $id, $this->support->access->visibleOwners($context)), 0, self::TIMELINE_CONTACTS) as $affiliation) {
                     $subjects[]                      = [SubjectType::Contact, $affiliation->contactId];
                     $labels[$affiliation->contactId] = $affiliation->contactName;
                 }
@@ -140,7 +140,7 @@ final readonly class CrmReader implements CrmReaderInterface
         return $this->support->read(function () use ($type, $id): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$context, $record] = $this->load($type, $id);
 
-            return $this->views->many($context->tenant, $type, $this->support->store->duplicates($record));
+            return $this->views->many($context->tenant, $type, $this->support->store->duplicates($record, 10, $this->support->access->visibleOwners($context)));
         });
     }
 
@@ -299,7 +299,7 @@ final readonly class CrmReader implements CrmReaderInterface
                 }
                 $company = $record->getId();
             }
-            [$records, $total] = $this->support->store->search($type, $context->tenant, $text, $limit, $company);
+            [$records, $total] = $this->support->store->search($type, $context->tenant, $text, $limit, $company, $this->support->access->visibleOwners($context));
 
             return [$this->views->many($context->tenant, $type, $records), $total];
         });

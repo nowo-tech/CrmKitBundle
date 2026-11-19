@@ -16,6 +16,7 @@ use Nowo\CrmKitBundle\Domain\Event\RecordRestored;
 use Nowo\CrmKitBundle\Domain\Event\RecordsMerged;
 use Nowo\CrmKitBundle\Domain\Event\RecordTrashed;
 use Nowo\CrmKitBundle\Domain\Event\RecordUpdated;
+use Nowo\CrmKitBundle\Domain\Event\RolesChanged;
 use Nowo\CrmKitBundle\Domain\Event\TagsChanged;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
@@ -29,9 +30,9 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
  */
 final class TestServices
 {
-    public const USERS = ['ana' => ['password' => 'x', 'roles' => ['ROLE_USER']]];
+    public const USERS = ['ana' => ['password' => 'x', 'roles' => ['ROLE_USER']], 'root' => ['password' => 'x', 'roles' => ['ROLE_ADMIN']], 'leo' => ['password' => 'x', 'roles' => ['ROLE_USER']]];
 
-    public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, TagsChanged::class, HostLinkAdded::class, HostLinkRemoved::class];
+    public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, TagsChanged::class, RolesChanged::class, HostLinkAdded::class, HostLinkRemoved::class];
 
     /** The bundle configuration that points every port at the test services. */
     public const PORTS = [

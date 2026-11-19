@@ -17,6 +17,7 @@ use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
 use Nowo\CrmKitBundle\Domain\Enum\RowOutcome;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Event\ImportCompleted;
+use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
@@ -30,6 +31,7 @@ use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\ImportRow;
+use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use Nowo\CrmKitBundle\Domain\Read\ImportRowView;
 use Nowo\CrmKitBundle\Domain\Read\ImportView;
@@ -38,12 +40,12 @@ use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\ExactId;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
+use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Psr\Clock\ClockInterface;
 
 use function array_filter;
 use function array_map;
-use function array_slice;
 use function array_sum;
 use function array_unique;
 use function array_values;
@@ -72,6 +74,7 @@ final readonly class ImportService implements ImportServiceInterface
         private WriteSupport $support,
         private PlanCounter $counter,
         private ClockInterface $clock,
+        private PartyCatalogue $catalogue = new PartyCatalogue(),
         private int $maxRows = 5000,
         private int $maxBytes = 5242880,
         private int $chunkRows = 100,
@@ -84,7 +87,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function upload(SubjectType $type, ImportFormat $format, string $fileName, string $bytes): string
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
         $name    = trim($fileName) === '' || mb_strlen($fileName) > 255 || !ExactId::isValid(trim($fileName), 1020) ? 'import' : trim($fileName);
         if ($format === ImportFormat::Vcard && $type !== SubjectType::Contact) {
             throw new ImportFileException('import.error.vcard_contacts');
@@ -112,23 +115,25 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function preview(string $id, int $rows = 20): ImportView
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
 
         return $this->support->read(function () use ($context, $id, $rows): ImportView { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $import = $this->import($context->tenant, $id);
             $fields = $this->activeFields($context->tenant, $import->getSubjectType());
             $views  = [];
             foreach ($this->support->store->importRows($id, max(1, min(100, $rows)), false) as $row) {
-                $errors     = [];
-                $duplicates = [];
-                [$input]    = ImportMapping::input($import->getSubjectType(), $row->getData(), $import->getMapping());
+                $errors                           = [];
+                $duplicates                       = [];
+                [$input, , , $purposes, $primary] = ImportMapping::input($import->getSubjectType(), $row->getData(), $import->getMapping());
                 try {
+                    $this->extras($input->roles, $purposes, $primary);
                     $values = RecordValidator::values($import->getSubjectType(), $input->values, $import->getSubjectType() === SubjectType::Company);
                     if ($import->getSubjectType() === SubjectType::Contact) {
                         RecordValidator::contactName($values);
                         $email    = $values['email'] ?? null;
                         $existing = $email === null ? null : $this->support->store->contactByEmailKey($context->tenant, mb_strtolower($email, 'UTF-8'));
-                        if ($existing instanceof CrmRecord) {
+                        // Named only to someone who may see that contact.
+                        if ($existing instanceof CrmRecord && $this->support->access->can(CrmPermission::View, SubjectRef::of(SubjectType::Contact, $existing->getId(), $existing->getOwnerId()))) {
                             $duplicates[] = $existing->label();
                         }
                     }
@@ -165,7 +170,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function confirm(string $id, array $mapping, DuplicatePolicy $policy, int $expectedVersion): void
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
         $won     = $this->support->write(function (Effects $effects) use ($context, $id, $mapping, $policy, $expectedVersion): bool { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $import = $this->import($context->tenant, $id);
             if (!ImportMapping::valid($mapping, $import->getColumns(), ImportMapping::targets($import->getSubjectType(), $this->activeFields($context->tenant, $import->getSubjectType())))) {
@@ -185,7 +190,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function run(string $id, ?int $maxChunks = null): bool
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
         $import  = $this->support->read(fn (): Import => $this->import($context->tenant, $id));
         if ($import->getStatus() !== ImportStatus::Running) {
             return $import->getStatus() === ImportStatus::Done;
@@ -200,7 +205,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function cancel(string $id): void
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
         $this->support->write(function (Effects $effects) use ($context, $id): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $import = $this->import($context->tenant, $id);
             $stale  = $this->staleBefore($context->now);
@@ -214,7 +219,9 @@ final readonly class ImportService implements ImportServiceInterface
 
     /**
      * Takes over the imports whose claim is stale and runs them (resume command, no signed-in person); how many
-     * finished.
+     * finished. Nobody is signed in, so a row that needs a decision on one record (an update of an existing contact,
+     * a named company) is never settled here: the run stops before it and leaves it pending under the claim, for the
+     * next person's "Continue" to process with their own access (audit UP2-1).
      */
     public function resumeStale(int $limit = 20): int
     {
@@ -224,7 +231,7 @@ final readonly class ImportService implements ImportServiceInterface
             $tenant = new TenantRef($stale['tenant']);
             $token  = $this->support->id();
             $won    = $this->support->write(fn (): bool => $this->support->store->takeOverImport($tenant, $stale['id'], $token, $now, $this->staleBefore($now)));
-            if ($won && $this->runClaimed($tenant, $stale['id'], $token, null)) {
+            if ($won && $this->runClaimed($tenant, $stale['id'], $token, null, null, false)) {
                 ++$finished;
             }
         }
@@ -235,10 +242,10 @@ final readonly class ImportService implements ImportServiceInterface
     /**
      * Runs chunks while this claim holds the import.
      */
-    private function runClaimed(TenantRef $tenant, string $id, string $token, ?int $maxChunks, ?string $actor = null): bool
+    private function runClaimed(TenantRef $tenant, string $id, string $token, ?int $maxChunks, ?string $actor = null, bool $attended = true): bool
     {
         for ($chunk = 0; $maxChunks === null || $chunk < $maxChunks; ++$chunk) {
-            $state = $this->chunkOnceMore($tenant, $id, $token, $actor);
+            $state = $this->chunkOnceMore($tenant, $id, $token, $actor, $attended);
             if ($state !== 'more') {
                 return $state === 'done';
             }
@@ -251,13 +258,13 @@ final readonly class ImportService implements ImportServiceInterface
      * One chunk; a unique key refused by a racing writer (an e-mail stored meanwhile) runs the chunk once more, where
      * that row becomes a duplicate.
      */
-    private function chunkOnceMore(TenantRef $tenant, string $id, string $token, ?string $actor): string
+    private function chunkOnceMore(TenantRef $tenant, string $id, string $token, ?string $actor, bool $attended): string
     {
         try {
-            return $this->support->write(fn (Effects $effects): string => $this->chunk($effects, $tenant, $id, $token, $actor));
+            return $this->support->write(fn (Effects $effects): string => $this->chunk($effects, $tenant, $id, $token, $actor, $attended));
         } catch (DuplicateRowException) {
             try {
-                return $this->support->write(fn (Effects $effects): string => $this->chunk($effects, $tenant, $id, $token, $actor));
+                return $this->support->write(fn (Effects $effects): string => $this->chunk($effects, $tenant, $id, $token, $actor, $attended));
             } catch (DuplicateRowException $e) {
                 throw new ConflictException(ConflictException::WRITE_CONFLICT, null, $e);
             }
@@ -265,10 +272,11 @@ final readonly class ImportService implements ImportServiceInterface
     }
 
     /**
-     * Settles up to `chunk_rows` pending rows under the import row's lock: `more`, `done` or `lost` (claim gone). The
-     * rows are attributed to `$actor` (the person running it), else to the uploader, else to the system actor.
+     * Settles up to `chunk_rows` pending rows under the import row's lock: `more`, `done`, `lost` (claim gone) or
+     * `paused` (unattended run stopped before a row that needs a record decision). The rows are attributed to `$actor`
+     * (the person running it), else to the uploader, else to the system actor.
      */
-    private function chunk(Effects $effects, TenantRef $tenant, string $id, string $token, ?string $actor): string
+    private function chunk(Effects $effects, TenantRef $tenant, string $id, string $token, ?string $actor, bool $attended = true): string
     {
         $store = $this->support->store;
         if (!$store->holdsImport($id, $token)) {
@@ -286,13 +294,24 @@ final readonly class ImportService implements ImportServiceInterface
         }
         $counts = [];
         $rows   = $store->importRows($id, $this->chunkRows, true);
+        $this->lockParents($context, $import, $rows);
+        $paused = false;
         foreach ($rows as $row) {
-            [$outcome, $recordId, $message] = $this->row($context, $import, $row, $fields, $tags);
+            [$outcome, $recordId, $message] = $this->row($effects, $context, $import, $row, $fields, $tags, $attended);
+            if (!$outcome instanceof RowOutcome) {
+                // Nobody signed in may decide on this row: it stays pending, and so do the rows after it.
+                $paused = true;
+
+                break;
+            }
             if ($store->settleRow($row->getId(), $outcome, $recordId, $message)) {
                 $counts[$outcome->value] = ($counts[$outcome->value] ?? 0) + 1;
             }
         }
         $store->advanceImport($id, array_sum($counts), $counts, $now);
+        if ($paused) {
+            return 'paused';
+        }
         if (count($rows) === $this->chunkRows && $store->importRows($id, 1, true) !== []) {
             return 'more';
         }
@@ -305,21 +324,23 @@ final readonly class ImportService implements ImportServiceInterface
     }
 
     /**
-     * Settles one row: the outcome, the record and the error key.
+     * Settles one row: the outcome, the record and the error key; a null outcome when the run is unattended and the row
+     * needs a decision on one record (it stays pending).
      *
      * @param list<FieldDefinition> $fields
      * @param array<string, string> $tags tag name key => id
      *
-     * @return array{RowOutcome, string|null, string|null}
+     * @return array{RowOutcome|null, string|null, string|null}
      */
-    private function row(CrmContext $context, Import $import, ImportRow $row, array $fields, array $tags): array
+    private function row(Effects $effects, CrmContext $context, Import $import, ImportRow $row, array $fields, array $tags, bool $attended = true): array
     {
-        $store                        = $this->support->store;
-        $type                         = $import->getSubjectType();
-        [$input, $tagNames, $company] = ImportMapping::input($type, $row->getData(), $import->getMapping());
+        $store                                             = $this->support->store;
+        $type                                              = $import->getSubjectType();
+        [$input, $tagNames, $company, $purposes, $primary] = ImportMapping::input($type, $row->getData(), $import->getMapping());
         try {
-            $values = RecordValidator::values($type, $input->values, $type === SubjectType::Company);
-            $tagIds = [];
+            [$roles, $purposes, $primaryContact] = $this->extras($input->roles, $purposes, $primary);
+            $values                              = RecordValidator::values($type, $input->values, $type === SubjectType::Company);
+            $tagIds                              = [];
             foreach ($tagNames as $name) {
                 $tagId = $tags[mb_strtolower($name, 'UTF-8')] ?? null;
                 if ($tagId === null) {
@@ -336,13 +357,22 @@ final readonly class ImportService implements ImportServiceInterface
             }
             if ($existing instanceof Contact) {
                 if ($import->getDuplicatePolicy() === DuplicatePolicy::Skip || !$existing->isActive()) {
-                    return [RowOutcome::Duplicate, $existing->getId(), null];
+                    // The id only for a contact the person may see.
+                    return [RowOutcome::Duplicate, $this->may($context, CrmPermission::View, SubjectType::Contact, $existing->getId(), $existing->getOwnerId()) ? $existing->getId() : null, null];
+                }
+                // Updating an existing contact is an edit of that contact (audit UP-M-2), checked before any write.
+                if (!$attended) {
+                    return [null, null, null];
+                }
+                $named = $company === null ? null : $this->companyNamed($context, $company);
+                if (!$this->may($context, CrmPermission::Edit, SubjectType::Contact, $existing->getId(), $existing->getOwnerId()) || !$this->mayAttach($context, $existing, $named, $primaryContact)) {
+                    return [RowOutcome::Invalid, null, 'error.forbidden'];
                 }
                 $existing->apply($values);
                 RecordValidator::contactName($existing->values());
                 $existing->changeCustom(RecordValidator::custom(($input->custom ?? []) + $existing->getCustom(), $fields, $existing->getCustom()));
                 $existing->touch($context->now, $context->actor->value);
-                $this->attach($context, $existing, $tagIds, $company);
+                $this->attach($effects, $context, $existing, $tagIds, $roles, $named, $purposes, $primaryContact);
                 $this->support->activity($context, $type, $existing->getId(), ActivityKind::Imported, ['import' => $import->getId()]);
                 $store->flush();
 
@@ -359,24 +389,35 @@ final readonly class ImportService implements ImportServiceInterface
         } catch (InvalidInputException $e) {
             return [RowOutcome::Invalid, null, array_values($e->errors)[0] ?? 'error.invalid'];
         }
+        if ($company !== null && !$attended) {
+            return [null, null, null];
+        }
+        $named = $company === null ? null : $this->companyNamed($context, $company);
+        if (!$this->mayAttach($context, null, $named, $primaryContact)) {
+            return [RowOutcome::Invalid, null, 'error.forbidden'];
+        }
         if (!$this->counter->tryTake($context->tenant, $type)) {
             return [RowOutcome::Limit, null, null];
         }
         $store->add($record); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         $store->flush();
         $this->support->activity($context, $type, $record->getId(), ActivityKind::Imported, ['import' => $import->getId()]);
-        $this->attach($context, $record, $tagIds, $company);
+        $this->attach($effects, $context, $record, $tagIds, $roles, $named, $purposes, $primaryContact);
         $store->flush();
 
         return [RowOutcome::Created, $record->getId(), null];
     }
 
     /**
-     * Adds the row's tags and, for a contact, the affiliation to the named company (existing active ones only).
+     * Adds the row's tags and roles (an import only adds them) and, for a contact, the affiliation to the named company
+     * (`$named`: the id {@see self::mayAttach()} checked; existing active ones only) with the row's purposes (added to
+     * the stored ones) and primary-contact flag.
      *
      * @param list<string> $tagIds
+     * @param list<string> $roles
+     * @param list<string> $purposes
      */
-    private function attach(CrmContext $context, CrmRecord $record, array $tagIds, ?string $company): void
+    private function attach(Effects $effects, CrmContext $context, CrmRecord $record, array $tagIds, array $roles, ?string $named, array $purposes, ?bool $primaryContact): void
     {
         $store = $this->support->store;
         $type  = $record::type();
@@ -384,24 +425,144 @@ final readonly class ImportService implements ImportServiceInterface
             $have = array_map(static fn (Tagging $t): string => $t->getTagId(), $store->taggings($context->tenant, $type, [$record->getId()]));
             (new Taggings($this->support))->set($context, $type, $record->getId(), array_values(array_unique([...$have, ...$tagIds])));
         }
-        if ($company === null || !$record instanceof Contact) {
+        if ($roles !== []) {
+            $have = array_map(static fn (RoleAssignment $r): string => $r->getRoleKey(), $store->roleAssignments($context->tenant, $type, [$record->getId()]));
+            (new Roles($this->support, $this->catalogue))->set($context, $type, $record->getId(), array_values(array_unique([...$this->catalogue->knownRoles($have), ...$roles])), $effects);
+        }
+        // Contact first (locked by lockParents(), or new), then the company: the order of affiliate(); its status
+        // re-read under the lock, so a company merged or trashed meanwhile gets no affiliation.
+        $locked = $named === null || !$record instanceof Contact ? [] : $store->lockRecords(SubjectType::Company, $context->tenant, [$named]);
+        $match  = array_values(array_filter($locked, static fn (CrmRecord $m): bool => $m->isActive()))[0] ?? null;
+        if (!$match instanceof CrmRecord || !$record instanceof Contact) {
             return;
         }
-        [$matches] = $store->list($context->tenant, new ListQuery(SubjectType::Company, $company, perPage: 5));
-        $named     = array_values(array_map(static fn (CrmRecord $m): string => $m->getId(), array_filter($matches, static fn (CrmRecord $m): bool => mb_strtolower($m->label(), 'UTF-8') === mb_strtolower($company, 'UTF-8'))));
-        // Contact first (locked by row(), or new), then the company: the order of affiliate(); its status re-read
-        // under the lock, so a company merged or trashed meanwhile gets no affiliation.
-        $active = array_values(array_filter($store->lockRecords(SubjectType::Company, $context->tenant, array_slice($named, 0, 1)), static fn (CrmRecord $m): bool => $m->isActive()));
-        $match  = $active[0] ?? null;
-        if (!$match instanceof CrmRecord) {
-            return;
-        }
-        foreach ($store->affiliations($context->tenant, SubjectType::Contact, $record->getId()) as $affiliation) {
-            if ($affiliation->getCompanyId() === $match->getId()) {
-                return;
+        $affiliation = null;
+        $others      = $store->affiliations($context->tenant, SubjectType::Contact, $record->getId());
+        foreach ($others as $row) {
+            if ($row->getCompanyId() === $match->getId()) {
+                $affiliation = $row;
             }
         }
-        $store->add(new Affiliation($this->support->id(), $context->tenant->value, $record->getId(), $match->getId(), null, $store->affiliations($context->tenant, SubjectType::Contact, $record->getId()) === [], $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        if (!$affiliation instanceof Affiliation) {
+            $affiliation = new Affiliation($this->support->id(), $context->tenant->value, $record->getId(), $match->getId(), null, $others === [], $context->now);
+            $store->add($affiliation); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        }
+        if ($purposes !== []) {
+            $affiliation->setPurposes([...$affiliation->getPurposes(), ...$purposes]);
+        }
+        if ($primaryContact !== null && $primaryContact !== $affiliation->isPrimaryContact()) {
+            // The company is locked: at most one primary contact per company.
+            if ($primaryContact) {
+                RecordService::markPrimaryContact($store->affiliations($context->tenant, SubjectType::Company, $match->getId()), $record->getId());
+            }
+            $affiliation->setPrimaryContact($primaryContact);
+            $this->support->activity($context, SubjectType::Company, $match->getId(), ActivityKind::PrimaryContact, ['contact' => $primaryContact ? $record->getId() : null]);
+        }
+    }
+
+    /**
+     * Whether the row may link the named company: `view` on it, and, when the row's primary-contact flag would change
+     * for it (a new contact has none), `edit` on it, as in the UI. Checked before the row writes anything.
+     */
+    private function mayAttach(CrmContext $context, ?Contact $contact, ?string $named, ?bool $primaryContact): bool
+    {
+        if ($named === null) {
+            return true;
+        }
+        $owner = $this->support->store->record(SubjectType::Company, $context->tenant, $named)?->getOwnerId();
+        // The named company must be one the person may see (else nothing is linked and nothing is told about it).
+        if (!$this->may($context, CrmPermission::View, SubjectType::Company, $named, $owner)) {
+            return false;
+        }
+        if ($primaryContact === null) {
+            return true;
+        }
+        $current = false;
+        foreach ($contact instanceof Contact ? $this->support->store->affiliations($context->tenant, SubjectType::Contact, $contact->getId()) : [] as $affiliation) {
+            $current = $current || ($affiliation->getCompanyId() === $named && $affiliation->isPrimaryContact());
+        }
+
+        return $current === $primaryContact || $this->may($context, CrmPermission::Edit, SubjectType::Company, $named, $owner);
+    }
+
+    /**
+     * Whether the person running the import holds the permission on one record.
+     */
+    private function may(CrmContext $context, CrmPermission $permission, SubjectType $type, string $id, ?string $owner): bool
+    {
+        try {
+            $this->support->access->require($context, $permission, SubjectRef::of($type, $id, $owner));
+        } catch (AccessDeniedException) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * The roles, purposes and primary-contact flag of a row, checked against the catalogues.
+     *
+     * @param list<string>|null $roles
+     * @param list<string> $purposes
+     *
+     * @throws InvalidInputException
+     *
+     * @return array{list<string>, list<string>, bool|null}
+     */
+    private function extras(?array $roles, array $purposes, ?string $primary): array
+    {
+        $flag = $primary === null ? null : ImportMapping::yes($primary);
+        if ($primary !== null && $flag === null) {
+            throw InvalidInputException::field('primary_contact', 'error.invalid');
+        }
+
+        return [$this->catalogue->checkRoles($roles ?? []), $this->catalogue->checkPurposes($purposes), $flag];
+    }
+
+    /**
+     * The company a row names: the first active company of the tenant the person may see (resource scoping) whose name
+     * matches exactly, case-insensitively; an invisible company is unknown (audit UP2-3).
+     */
+    private function companyNamed(CrmContext $context, string $name): ?string
+    {
+        [$matches] = $this->support->store->list($context->tenant, new ListQuery(SubjectType::Company, $name, perPage: 5), $this->support->access->visibleOwners($context));
+        foreach ($matches as $match) {
+            if (mb_strtolower($match->label(), 'UTF-8') === mb_strtolower($name, 'UTF-8')) {
+                return $match->getId();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Locks, before any row is settled, the records the chunk's rows may change (UD2-L-1): the existing contacts of
+     * their e-mails in id order, then the companies they name in id order. Every lock of the chunk is so taken in the
+     * order of every other path (contacts before companies, each kind by id), never row by row.
+     *
+     * @param list<ImportRow> $rows
+     */
+    private function lockParents(CrmContext $context, Import $import, array $rows): void
+    {
+        if ($import->getSubjectType() !== SubjectType::Contact) {
+            return;
+        }
+        $store     = $this->support->store;
+        $emails    = [];
+        $companies = [];
+        foreach ($rows as $row) {
+            [$input, , $company] = ImportMapping::input(SubjectType::Contact, $row->getData(), $import->getMapping());
+            $email               = mb_strtolower(trim($input->values['email'] ?? ''), 'UTF-8');
+            if ($email !== '') {
+                $emails[$email] = $email;
+            }
+            $named = $company === null ? null : $this->companyNamed($context, $company);
+            if ($named !== null) {
+                $companies[$named] = $named;
+            }
+        }
+        $store->lockRecords(SubjectType::Contact, $context->tenant, $store->contactIdsByEmailKeys($context->tenant, array_values($emails)));
+        $store->lockRecords(SubjectType::Company, $context->tenant, array_values($companies));
     }
 
     private function import(TenantRef $tenant, string $id): Import

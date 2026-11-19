@@ -14,11 +14,13 @@ use Nowo\CrmKitBundle\Application\HostLinkService;
 use Nowo\CrmKitBundle\Application\ImportService;
 use Nowo\CrmKitBundle\Application\MergeService;
 use Nowo\CrmKitBundle\Application\NoteService;
+use Nowo\CrmKitBundle\Application\PartyCatalogue;
 use Nowo\CrmKitBundle\Application\PlanCounter;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Application\RecordPurger;
 use Nowo\CrmKitBundle\Application\RecordService;
 use Nowo\CrmKitBundle\Application\RecordViews;
+use Nowo\CrmKitBundle\Application\Roles;
 use Nowo\CrmKitBundle\Application\SettingsService;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\CrmKitBundle\Application\Taggings;
@@ -31,9 +33,11 @@ use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmCatalogueInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
@@ -80,11 +84,18 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\EntityManagerHygieneListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredFeatureGate;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredPlanLimits;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\PsrLogAuditSink;
-use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\RoleMapAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SecurityActorDirectory;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SingleTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SymfonyUuidGenerator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Routing\UiRouteLoader;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\AllowAllCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ConfigurableCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessListener;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmResourceAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseFormatterInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -125,8 +136,20 @@ final class ServiceDefinitions
 
         // Port defaults.
         $s->set($p . 'default.tenant_resolver', SingleTenantResolver::class);
-        $s->set($p . 'default.access_checker', RoleMapAccessChecker::class)
-            ->args([param($p . 'access.roles'), service('security.authorization_checker')->nullOnInvalid(), service('security.token_storage')->nullOnInvalid()]);
+        // REQ-UI-002: the area checker (security.*_roles, or the host's security.access_checker), the record checker
+        // with its event, and the port adapter the application asks.
+        $auth = service('security.authorization_checker')->nullOnInvalid();
+        $s->set(ConfigurableCrmKitAccessChecker::class)->args([$auth, param($p . 'security.access_roles'), param($p . 'security.manage_roles'), param($p . 'security.settings_roles'), param($p . 'security.export_roles'), param($p . 'security.erase_roles'), param($p . 'security.amounts_roles'), param($p . 'security.campaigns_roles')]);
+        $s->set(AllowAllCrmKitAccessChecker::class);
+        $s->alias(CrmKitAccessCheckerInterface::class, ConfigurableCrmKitAccessChecker::class)->public();
+        $s->set(ScopedRecordVisibility::class)->args([service(CrmKitAccessCheckerInterface::class), service('security.token_storage')->nullOnInvalid(), $events, param($p . 'security.resource_scoping')]);
+        $s->alias(CrmRecordVisibilityInterface::class, ScopedRecordVisibility::class);
+        $s->set(CrmResourceAccessChecker::class)->args([$events, service(CrmRecordVisibilityInterface::class)]);
+        $s->set($p . 'default.access_checker', SecurityCrmAccessChecker::class)
+            ->args([service(CrmKitAccessCheckerInterface::class), service(CrmResourceAccessChecker::class), service('security.token_storage')->nullOnInvalid(), param($p . 'security.allow_unauthenticated')]);
+        $s->set(CrmKitGuard::class)->args([service(CrmAccess::class)])->public();
+        $s->set(CrmKitAccessListener::class)->args([service(CrmKitGuard::class), service(CrmAccessCheckerInterface::class), service('security.firewall.map')->nullOnInvalid()])
+            ->tag('kernel.event_listener', ['event' => 'kernel.controller', 'method' => 'onKernelController', 'priority' => 16]);
         $s->set($p . 'default.feature_gate', ConfiguredFeatureGate::class)->args([param($p . 'feature.default_enabled')]);
         $s->set($p . 'default.plan_limits', ConfiguredPlanLimits::class)->args([['companies' => param($p . 'limits.companies'), 'contacts' => param($p . 'limits.contacts')]]);
         $s->set($p . 'default.actor_directory', SecurityActorDirectory::class)->args([service('security.token_storage')->nullOnInvalid()]);
@@ -155,13 +178,16 @@ final class ServiceDefinitions
             ->tag('kernel.event_listener', ['event' => 'console.terminate', 'method' => 'clear', 'priority' => -2048]);
 
         // Application.
-        $s->set(CrmAccess::class)->args([service(CrmTenantResolverInterface::class), service(CrmFeatureGateInterface::class), service(CrmAccessCheckerInterface::class), $clock])->public();
+        $s->set(CrmAccess::class)->args([service(CrmTenantResolverInterface::class), service(CrmFeatureGateInterface::class), service(CrmAccessCheckerInterface::class), $clock, service(CrmRecordVisibilityInterface::class)])->public();
         $s->set(WriteSupport::class)->args([service(CrmAccess::class), service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(IdGeneratorInterface::class), service(CrmAuditSinkInterface::class), $events]);
         $s->set(PlanCounter::class)->args([service(CrmStoreInterface::class), service(CrmPlanLimitsInterface::class)])->public();
         $s->set(Taggings::class)->args([service(WriteSupport::class)]);
-        $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class)]);
+        $s->set(PartyCatalogue::class)->args([param($p . 'roles.catalogue'), param($p . 'affiliations.purposes')]);
+        $s->alias(CrmCatalogueInterface::class, PartyCatalogue::class)->public();
+        $s->set(Roles::class)->args([service(WriteSupport::class), service(PartyCatalogue::class)]);
+        $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class), service(PartyCatalogue::class)]);
         $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock])->public();
-        $s->set(RecordService::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(Taggings::class), service(CrmActorDirectoryInterface::class), service(RecordPurger::class)]);
+        $s->set(RecordService::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(Taggings::class), service(CrmActorDirectoryInterface::class), service(RecordPurger::class), service(Roles::class), service(PartyCatalogue::class)]);
         $s->alias(RecordServiceInterface::class, RecordService::class)->public();
         $s->set(CrmReader::class)->args([service(WriteSupport::class), service(RecordViews::class), service(CrmActorDirectoryInterface::class), tagged_iterator(CrmPanelProviderInterface::PANEL_TAG), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), $logger])->public();
         $s->alias(CrmReaderInterface::class, CrmReader::class)->public();
@@ -180,6 +206,7 @@ final class ServiceDefinitions
             service(WriteSupport::class),
             service(PlanCounter::class),
             $clock,
+            service(PartyCatalogue::class),
             param($p . 'import.max_rows'),
             param($p . 'import.max_bytes'),
             param($p . 'import.chunk_rows'),
@@ -190,7 +217,7 @@ final class ServiceDefinitions
         $s->alias(MergeServiceInterface::class, MergeService::class)->public();
         $s->set(CrmExporter::class)->args([service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class)]);
         $s->alias(CrmExporterInterface::class, CrmExporter::class)->public();
-        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(CrmReader::class), service(PlanCounter::class)]);
+        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class)]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
@@ -219,8 +246,8 @@ final class ServiceDefinitions
     {
         $s = $container->services();
         $p = self::P;
-        $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmAccess::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size')]);
-        $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes')]);
+        $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size')]);
+        $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class)]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class)])->public()->tag('controller.service_arguments');
         $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class)])->public()->tag('controller.service_arguments');

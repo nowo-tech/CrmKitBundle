@@ -31,6 +31,10 @@ list:
     col:
         updated: Aggiornato
     filter:
+        role: 'Ruolo'
+        purpose: 'Contatto per'
+        primary_contact: 'Contatto principale'
+        primary_contact_only: 'Solo contatti principali'
         q: Cerca
         tag: Tag
         owner: Responsabile
@@ -40,6 +44,7 @@ list:
         active: Attivi
         trashed: Cestino
 field:
+    roles: 'Ruoli'
     name: Nome
     contact_name: Nome
     legal_name: Ragione sociale
@@ -135,6 +140,13 @@ record:
     purged: Il record è stato eliminato.
     erased: "I dati personali del contatto sono stati cancellati."
 affiliation:
+    edit: 'Modifica'
+    update: 'Salva'
+    clear_primary_contact: 'Rimuovi come contatto principale'
+    primary_contact_cleared: 'L''azienda non ha più un contatto principale.'
+    primary_contact: 'Contatto principale'
+    make_primary_contact: 'Rendi contatto principale'
+    primary_contact_set: 'Il contatto principale è stato cambiato.'
     add: Aggiungi un'azienda
     save: Aggiungi
     added: L'azienda è stata aggiunta.
@@ -142,6 +154,8 @@ affiliation:
     remove: Rimuovi
     primary: Principale
     form:
+        purposes: 'Contatto per'
+        primary_contact: 'Contatto principale dell''azienda'
         company: Azienda
         role: Ruolo
         primary: Azienda principale
@@ -232,6 +246,8 @@ timeline:
     empty: Non è ancora successo nulla.
     open: Apri
 activity:
+    roles_changed: 'Ruoli cambiati da %actor%'
+    primary_contact: 'Contatto principale cambiato da %actor%'
     created: 'Creato da %actor%'
     updated: 'Aggiornato da %actor%'
     owner_changed: 'Responsabile cambiato da %actor%'
@@ -308,6 +324,9 @@ import:
         skip: Salta le righe la cui e-mail esiste già
         update: Aggiorna il contatto esistente
     target:
+        roles: 'Ruoli (chiavi separate da virgole)'
+        purposes: 'Contatto per (chiavi separate da virgole)'
+        primary_contact: 'Contatto principale dell''azienda (sì / no)'
         skip: '(salta questa colonna)'
         company: Azienda (esistente, per nome)
         tags: Tag (esistenti, separati da virgole)
@@ -351,6 +370,10 @@ flash:
         crm_settings_stale: Qualcuno ha modificato le impostazioni nello stesso momento. Controllale e salva di nuovo.
         crm_write_conflict: 'Un''altra modifica degli stessi dati è arrivata nello stesso momento. Riprova.'
 error:
+    forbidden: 'Non puoi modificarlo.'
+    role_unknown: 'Ruolo sconosciuto.'
+    purpose_unknown: 'Finalità sconosciuta.'
+    not_affiliated: 'Questo contatto non è collegato all''azienda.'
     required: Questo campo è obbligatorio.
     invalid: Questo valore non è valido.
     host_object_unknown: 'Questo oggetto non esiste o non puoi vederlo.'
@@ -376,3 +399,13 @@ error:
     merge_same: Un record non può essere unito a sé stesso.
     out_of_range: Questo valore è fuori intervallo.
     csrf: Il modulo è scaduto. Ricarica la pagina e riprova.
+role:
+    customer: 'Cliente'
+    supplier: 'Fornitore'
+    partner: 'Partner'
+    distributor: 'Distributore'
+purpose:
+    billing: 'Fatturazione'
+    orders: 'Ordini'
+    technical: 'Tecnico'
+    general: 'Generale'

@@ -1,14 +1,21 @@
 # Demo configuration: the CRM on a private entity manager, UI routes on under /crm, the demo's people as owners, a
-# host panel and a host object resolver ("projects") to show the 360° page extension points.
+# host panel and a host object resolver ("projects") to show the 360° page extension points. Party roles: the built-in
+# catalogue plus the opt-in "distributor"; the affiliation purposes are the built-in ones.
 nowo_crm_kit:
     doctrine:
         entity_manager: nowo_crm_kit
     actor_directory: App\Crm\DemoActors
-    access:
-        roles:
-            view: [ROLE_USER]
-            edit: [ROLE_SALES]
-            manage: [ROLE_ADMIN]
+    # REQ-UI-002: every signed-in person opens the CRM, sales people create and edit, admins administer.
+    security:
+        access_roles: [ROLE_USER]
+        manage_roles: [ROLE_SALES]
+        settings_roles: [ROLE_ADMIN]
+        export_roles: [ROLE_ADMIN]
+        erase_roles: [ROLE_ADMIN]
     ui:
         enabled: true
         path: /crm
+    roles:
+        catalogue: [customer, supplier, partner, distributor]
+    affiliations:
+        purposes: [billing, orders, technical, general]

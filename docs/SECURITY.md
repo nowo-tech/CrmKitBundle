@@ -16,13 +16,14 @@
 
 ## Status and scope
 
-0.1.0 ships phase A (companies and contacts). The security model is contract sections 5 (value objects), 6.1
+0.1.0 ships phase A (companies and contacts); 0.2.0 adds party roles, the company's primary contact and affiliation
+purposes (contract section 6.8) with the same model: no new permission, deny by default. The security model is contract sections 5 (value objects), 6.1
 (exact identifiers), 11.3 (errors), 13 (permission matrix), 15 (concurrency, [CONCURRENCY.md](CONCURRENCY.md)) and 16
 (GDPR).
 
 | Input | Handling |
 | --- | --- |
-| Configuration | Strict tree (unknown keys refused); `access.roles` empty by default (deny everything); later phases refuse `enabled: true` |
+| Configuration | Strict tree (unknown keys refused); `security.*_roles` default to `ROLE_ADMIN` (REQ-UI-002); `allow_unauthenticated` false; later phases refuse `enabled: true` |
 | Every service call | Tenant, feature gate, actor and permission checked in the application services, not only the controllers |
 | Identifiers | Ids are canonical lowercase UUIDs; host references are 1–128 bytes, never trimmed or folded, compared with `===`; binary NO PAD collations |
 | Form input | Trimmed, length- and kind-checked (e-mail, http(s) URL, phone, ISO country), control and format characters refused |
@@ -31,7 +32,17 @@
 
 ## Security model
 
-- **Deny by default.** The default access checker grants nothing until `access.roles` maps roles; without
+- **Admin UI exposure (REQ-UI-002).** The pages are opt-in (`ui.enabled`). Two layers: the host's firewall
+  (`access_control` on the CRM's path, [CONFIGURATION.md](CONFIGURATION.md#security-req-ui-002)) and the bundle's
+  checks: a `kernel.controller` listener requires `view` on every bundle route (nobody signed in ⇒ the firewall's
+  entry point), each action asks its own permission through `CrmKitGuard` and the services ask again.
+  **`security.allow_unauthenticated: true` is a footgun**: it opens the pages to anonymous visitors (actor
+  `anonymous`, shared by everybody: a real user with that identifier would be the same actor, and resource scoping is
+  turned off), and without SecurityBundle every area; demos only: it is refused when `kernel.environment` is `prod`.
+  Without SecurityBundle and without it, the container build fails.
+- **Deny by default.** The default area checker grants an area only to the roles of its `security.*_roles` list
+  (`ROLE_ADMIN` by default); with `resource_scoping` a record is open by default only to its owner (or when it has
+  none) and to `settings_roles`, and a `nowo_crm_kit.record_access_check` listener's deny always wins; without
   SecurityBundle it grants nothing at all. A host checker must return `false` for anything it does not grant.
 - **Order of the checks, per call:** tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404) →
   record lookup in the tenant (absent or another tenant's ⇒ 404) → permission (refused ⇒ 403). A user of another
@@ -43,27 +54,45 @@
 
 ## Permission matrix
 
-| Action | view | edit | manage |
-| --- | --- | --- | --- |
-| Lists, 360° pages, timeline, notes, links, panels, consents, duplicates, vCard of one contact, header search | ✓ | | |
-| Create / edit / trash / restore records, notes, tag assignment, host links, affiliations, consent records, import, merge (on both records), host timeline entries | | ✓ | |
-| Edit or delete another person's note | | ✓ + ✓ | ✓ |
-| Tag and field administration, settings, purge from the trash, CSV export of lists, GDPR export and erasure | | | ✓ |
+| Action | Permission | Area (default `security.*_roles`) |
+| --- | --- | --- |
+| Lists, 360° pages, timeline, notes, links, panels, consents, duplicates, vCard of one contact, header search | `view` | `canAccess` (`access_roles`) |
+| Create companies and contacts | `create` | `canCreate` (`manage_roles`) |
+| Edit records, notes, tag assignment, roles, host links, affiliations with their purposes, consent records, merge (on both records), host timeline entries | `edit` | `canEdit` (`manage_roles`) |
+| The company's primary contact: `edit` on the company (the contact needs `view`; an import row that changes it also needs `edit` on the company, else `invalid`) | `edit` | `canEdit` |
+| Trash / restore | `delete` | `canDelete` (`manage_roles`) |
+| Import | `import` | `canImport` (`manage_roles`) |
+| CSV export of lists, GDPR export | `export` | `canExport` (`export_roles`) |
+| Tag and field administration, settings, purge from the trash, another person's note | `manage` | `canManageSettings` (`settings_roles`) |
+| GDPR erasure | `erase` | `canErase` (`erase_roles`) |
+| (later phases) Amounts and totals / sending circulars | `amounts_view` / `campaigns_send` | `canViewAmounts` (`amounts_roles`) / `canSendCampaigns` (`campaigns_roles`) |
 
-`amounts_view` and `campaigns_send` exist for phases B–E and are not asked in 0.1.0. Notes: the author edits and
-deletes their own notes with `edit` on the record; another person's note needs `edit` on the record and `manage`.
+Every area also needs `canAccess`. A check on one record then goes through `CrmResourceAccessChecker` and the
+`nowo_crm_kit.record_access_check` event (a listener's deny wins). With `security.resource_scoping`, every read that
+returns several records (lists and totals, search, duplicates, CSV exports, related records, `subjectsLinkedTo()`)
+is filtered in SQL to the same visible owners as the record decision (`nowo_crm_kit.record_visibility`). Lists follow
+only `RECORD_VISIBILITY` (owner-based); `RECORD_ACCESS_CHECK` decides single-record pages and writes, so a record is
+hidden from lists through its owner. The GDPR export lists every company the contact is affiliated to. A taken e-mail
+names the other contact only to someone who may see it. Imports
+need `edit` on each existing contact they update and `view` on each company they name; a merge needs `delete` on the
+merged record. An empty role list means any authenticated user for that area. Notes: the author edits and deletes their own notes with `edit` on the
+record; another person's note needs `edit` on the record and `manage`.
 
 ## Tenant isolation and exact identifiers
 
 - Every table has `tenant_id`; every query filters by it and every row returned is re-checked in PHP with `===`
   (tenant, and owner when a list filters by owner) before it is used (REQ-SEC-006 rule 2).
 - Every `id` / `*_id` column and the key columns (`email_key`, `name_key`, `tax_id_key`, `domain_key`, `sort_key`,
-  `field_key`, `purpose`, `host_type`, `claim_token`, `resource`) use `utf8mb4_0900_bin` (MySQL 8) or
+  `field_key`, `purpose`, `purpose_keys`, `role_key`, `host_type`, `claim_token`, `resource`) use `utf8mb4_0900_bin` (MySQL 8) or
   `utf8mb4_nopad_bin` (MariaDB): `bob` ≠ `Bob`, `bob ` ≠ `bob`, and NBSP or ZWSP look-alikes never match.
 - `TenantRef`, `ActorRef` and host ids refuse invalid UTF-8, control and format characters (ZWSP, BOM, bidi marks),
   line / paragraph separators and edge whitespace or NBSP; they are never trimmed, truncated or case folded.
 - Record, note, tag, field, link, affiliation and import ids must be canonical lowercase UUIDs, otherwise the call is
   404 before any query.
+- Role and affiliation-purpose keys (0.2.0) match `^[a-z][a-z0-9_]{0,31}$` with `/D` (no trailing newline) in the
+  configuration, and every input key must equal a configured key byte for byte (never trimmed in the service, never
+  case folded); import cells are only trimmed of the separator's spaces. A key in a list URL that is not configured is
+  ignored. The purpose filter is an exact `LIKE` on `,<key>,` with `%`, `_` and `!` escaped.
 - Host object resolvers must return exactly the requested ids; a view whose id differs byte for byte is dropped.
 - The actor directory must return exactly the requested actor; a profile for another ref is ignored.
 
@@ -95,18 +124,22 @@ The tenant is the controller; the bundle is the tool.
 
 - **Consent** per contact and purpose (`gdpr.purposes`), append-only, with source, evidence, actor and time; the
   current state is the latest row per purpose.
-- **Export** (`manage`): one JSON document with the contact's fields and custom values, companies, tags, notes, consent
+- **Export** (`manage`): one JSON document with the contact's fields and custom values, every stored party role
+  (also roles no longer configured), companies with the affiliation purposes and flags, tags, notes, consent
   history, timeline entries, host links (type + id) and merges where it was the merged record. The export itself is
   audited (`crm.contact.exported`) and leaves an `exported` timeline entry.
 - **Erasure** (`manage`, idempotent): under the contact's row lock, the name becomes "Erased contact", every other
   personal column, the custom values and the owner are emptied, the e-mail key is released, the status becomes
-  `erased`; notes, taggings, host links, affiliations, timeline entries and merge snapshots of the contact are
-  deleted; consent rows are kept **without their evidence** as proof that consent was given or withdrawn; the plan
+  `erased`; notes, taggings, role assignments, host links, affiliations, timeline entries and merge snapshots of the
+  contact are deleted; consent rows are kept **without their evidence** as proof that consent was given or withdrawn; the plan
   counter is released when the contact was active. An erased contact cannot be edited, restored or merged.
 - **Retention** (`nowo:crm-kit:purge`): trashed records after `trash_days` with every child row, timeline entries
   after `timeline_years`, import rows after `import_keep_days`, merge snapshots after `merge_keep_days`; one audit
   entry per tenant with counts only.
-- **Audit and logs** carry ids, counts and codes only, never names, e-mails or note text. A failing panel provider is
+- **Audit and logs** carry ids, counts and codes only, never names, e-mails or note text: role edits are audited as
+  `crm.roles.changed` with the added and removed keys, the company's primary contact as
+  `crm.affiliation.primary_contact` with the contact id, affiliation saves with the flags and purpose keys, after the
+  commit. A failing panel provider is
   logged with class names only.
 
 ## Host extension points

@@ -45,6 +45,13 @@ final class TestContext
      */
     public array $races = [];
 
+    /**
+     * Refusals that win over every grant: `<permission>:<record id>` (a person with `edit` but not on that record).
+     *
+     * @var list<string>
+     */
+    public array $denied = [];
+
     /** A panel provider throws. */
     public bool $panelFails = false;
 
@@ -69,6 +76,9 @@ final class TestContext
     public function holds(string $tenant, string $actor, CrmPermission $permission, ?SubjectRef $subject): bool
     {
         $mine = $this->grants[$tenant][$actor] ?? [];
+        if ($subject instanceof SubjectRef && in_array($permission->value . ':' . $subject->id->value, $this->denied, true)) {
+            return false;
+        }
 
         return in_array($permission->value, $mine, true) || ($subject instanceof SubjectRef && in_array($permission->value . ':' . $subject->id->value, $mine, true));
     }

@@ -16,6 +16,7 @@ use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
@@ -30,7 +31,9 @@ use Nowo\CrmKitBundle\Tests\Fixtures\TestServices;
 use Nowo\CrmKitBundle\Tests\Integration\Kernel\Host;
 use Nowo\CrmKitBundle\Tests\Integration\Kernel\TestKernel;
 use Nowo\TransactionDoctrine\WriteUnit\ConcurrencyConflict;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Throwable;
 
@@ -301,18 +304,110 @@ final class RaceTest extends CrmTestCase
         if (!$this->twoConnections()) {
             return;
         }
-        $other      = $this->second();
+        $other = $this->second();
+        self::assertNotNull($this->service(RecordPurger::class)->purge(), 'a first run creates the claim row and frees it');
         $now        = $this->clock()->now()->getTimestamp();
         $connection = $this->runner()->manager()->getConnection();
         $connection->beginTransaction();
         try {
+            // A batch of the first run holds the claim row: the second run does not wait for it (UD2-L-3), it answers
+            // "another purge is running" at once.
             self::assertTrue($this->service(CrmStoreInterface::class)->claimPurge($now, $now - RecordPurger::STALE_CLAIM_SECONDS));
-            $this->expectLockConflict(static fn () => self::svc($other, RecordPurger::class)->purge());
+            self::assertNull(self::svc($other, RecordPurger::class)->purge(), 'the claim row is locked by a batch');
+            $tester = new CommandTester((new Application($other))->find('nowo:crm-kit:purge'));
+            self::assertSame(0, $tester->execute([]));
+            self::assertStringContainsString('Another purge is running', $tester->getDisplay());
         } finally {
             $connection->commit();
         }
         self::assertNull(self::svc($other, RecordPurger::class)->purge(), 'the claim is held');
         self::assertSame($now, $this->int("SELECT value FROM nowo_crm_counter WHERE tenant_id = '__crm__'"));
+    }
+
+    public function testConcurrentRoleEditsOnTwoConnections(): void
+    {
+        if (!$this->twoConnections()) {
+            return;
+        }
+        $id    = $this->company('Acme');
+        $other = $this->second();
+        // A role edit holds the record: the other connection's edit waits, gives up with a lock conflict, stores nothing.
+        $this->holdRecords(SubjectType::Company, [$id], function () use ($other, $id): void {
+            $this->expectLockConflict(static fn () => self::svc($other, RecordServiceInterface::class)->setRoles(SubjectType::Company, $id, ['supplier']));
+        });
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_role_assignment'));
+        // One after the other: an add and a remove of the same role, then two adds of it: one row, never a duplicate.
+        $this->records()->setRoles(SubjectType::Company, $id, ['customer', 'supplier']);
+        self::svc($other, RecordServiceInterface::class)->setRoles(SubjectType::Company, $id, ['customer']);
+        $this->records()->setRoles(SubjectType::Company, $id, ['customer']);
+        self::svc($other, RecordServiceInterface::class)->setRoles(SubjectType::Company, $id, ['customer', 'partner']);
+        self::assertSame(['customer', 'partner'], $this->service(CrmReaderInterface::class)->record(SubjectType::Company, $id)->roles);
+        self::assertSame(1, $this->int("SELECT COUNT(*) FROM nowo_crm_role_assignment WHERE role_key = 'customer'"));
+        // A form edit that does not lock the record stores the same role at the same moment (injected): one more run.
+        $this->ctx()->races['RoleAssignment'] = 1;
+        $this->records()->setRoles(SubjectType::Company, $id, ['customer', 'partner', 'supplier']);
+        self::assertSame(1, $this->int("SELECT COUNT(*) FROM nowo_crm_role_assignment WHERE role_key = 'supplier'"));
+    }
+
+    public function testTwoSetPrimaryContactCallsOnOneCompany(): void
+    {
+        if (!$this->twoConnections()) {
+            return;
+        }
+        $acme = $this->company('Acme');
+        $ada  = $this->contact('Ada', 'A');
+        $bob  = $this->contact('Bob', 'B');
+        $this->records()->affiliate($ada, $acme, null, true);
+        $this->records()->affiliate($bob, $acme, null, true);
+        $other = $this->second();
+        // The first call holds the contact and the company (its lock order): the second waits on the company, gives up.
+        $runner     = $this->runner();
+        $connection = $runner->manager()->getConnection();
+        $connection->beginTransaction();
+        try {
+            $store = $this->service(CrmStoreInterface::class);
+            $store->lockRecords(SubjectType::Contact, new TenantRef('acme'), [$ada]);
+            $store->lockRecords(SubjectType::Company, new TenantRef('acme'), [$acme]);
+            $this->expectLockConflict(static fn () => self::svc($other, RecordServiceInterface::class)->setPrimaryContact($acme, $bob));
+            $this->expectLockConflict(static fn () => self::svc($other, RecordServiceInterface::class)->affiliate($bob, $acme, null, true, true));
+        } finally {
+            $connection->rollBack();
+            $runner->manager()->clear();
+        }
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE is_primary_contact = ?', [true]));
+        // Then both run, one after the other: the later one wins, never two primary contacts.
+        $this->records()->setPrimaryContact($acme, $ada);
+        self::svc($other, RecordServiceInterface::class)->setPrimaryContact($acme, $bob);
+        self::assertSame($bob, $this->text('SELECT contact_id FROM nowo_crm_affiliation WHERE is_primary_contact = ?', [true]));
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE is_primary_contact = ?', [true]));
+        $this->records()->affiliate($ada, $acme, null, true, true);
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE is_primary_contact = ?', [true]));
+        self::assertSame($ada, $this->text('SELECT contact_id FROM nowo_crm_affiliation WHERE is_primary_contact = ?', [true]));
+    }
+
+    public function testAnImportChunkLocksItsParentsFirst(): void
+    {
+        if (!$this->twoConnections()) {
+            return;
+        }
+        $acme    = $this->company('Acme');
+        $ada     = $this->contact('Ada', 'A', 'ada@x.test');
+        $imports = $this->service(ImportServiceInterface::class);
+        $id      = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'a.csv', 'email,last_name,company
+new@x.test,N,
+ada@x.test,A,Acme
+');
+        $imports->confirm($id, ['email' => 'email', 'last_name' => 'last_name', 'company' => 'company'], DuplicatePolicy::Update, 1);
+        $other = $this->second();
+        // The company of row 2 is held: the chunk waits before it settles row 1 (its parents are locked first, contacts
+        // then companies, each in id order), gives up, and nothing of the chunk is stored.
+        $this->holdRecords(SubjectType::Company, [$acme], function () use ($other, $id): void {
+            $this->expectLockConflict(static fn () => self::svc($other, ImportServiceInterface::class)->run($id));
+        });
+        self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE email_key = 'new@x.test'"));
+        self::assertTrue(self::svc($other, ImportServiceInterface::class)->run($id));
+        self::assertSame(1, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE email_key = 'new@x.test'"));
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation WHERE contact_id = ? AND company_id = ?', [$ada, $acme]));
     }
 
     public function testALockConflictAfterACommitInTheSameRequestIsConflict002(): void

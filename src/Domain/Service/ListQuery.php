@@ -6,6 +6,9 @@ namespace Nowo\CrmKitBundle\Domain\Service;
 
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
+use Nowo\CrmKitBundle\Domain\Value\AffiliationPurpose;
+use Nowo\CrmKitBundle\Domain\Value\RoleKey;
 
 use function in_array;
 use function max;
@@ -33,6 +36,12 @@ final readonly class ListQuery
     /**
      * @param string|null $text free text (name, e-mail, tax id, domain)
      * @param RecordStatus $status Active or Trashed
+     * @param string|null $role only records holding this party role (a key of `roles.catalogue`; a string that is
+     *                          not a valid key is refused with `InvalidInputException`, as `$purpose`)
+     * @param string|null $purpose contacts only: only contacts with an affiliation of this purpose (a key of
+     *                             `affiliations.purposes`)
+     * @param bool $primaryContactOnly contacts only: only contacts that are the primary contact of a company (of
+     *                                 `$companyId` when set)
      */
     public function __construct(
         public SubjectType $type,
@@ -45,7 +54,16 @@ final readonly class ListQuery
         int $page = 1,
         int $perPage = 25,
         public ?string $companyId = null,
+        public ?string $role = null,
+        public ?string $purpose = null,
+        public bool $primaryContactOnly = false,
     ) {
+        if ($role !== null && !RoleKey::isValid($role)) {
+            throw InvalidInputException::field('role', 'error.role_unknown');
+        }
+        if ($purpose !== null && !AffiliationPurpose::isValid($purpose)) {
+            throw InvalidInputException::field('purpose', 'error.purpose_unknown');
+        }
         $this->sort      = in_array($sort, self::SORTS, true) ? $sort : 'name';
         $this->direction = $direction === 'desc' ? 'desc' : 'asc';
         $this->page      = min(self::MAX_PAGE, max(1, $page));

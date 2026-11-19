@@ -2,10 +2,12 @@
 nowo_crm_kit:
     doctrine:
         entity_manager: nowo_crm_kit   # declared in nowo_crm_kit_doctrine.yaml; null = the default entity manager
-    access:
-        roles:                         # the default access checker: every list empty = denied
-            view: []
-            edit: []
-            manage: []
+    security:                          # REQ-UI-002; also add access_control for the CRM's path in security.yaml
+        access_roles: [ROLE_ADMIN]     # open the CRM
+        manage_roles: [ROLE_ADMIN]     # create, edit, trash / restore, import
+        settings_roles: [ROLE_ADMIN]   # tags, fields, settings, purge
+        export_roles: [ROLE_ADMIN]     # CSV and GDPR export
+        erase_roles: [ROLE_ADMIN]      # GDPR erasure
+        allow_unauthenticated: false   # DEV/DEMO only
     ui:
         enabled: false                 # then import the routes: {resource: ., type: nowo_crm_kit_ui, prefix: /admin}

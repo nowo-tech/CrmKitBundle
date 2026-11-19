@@ -288,7 +288,7 @@ nowo_crm_kit:
 ```
 
 Each profile's ref must be exactly its key; ids the resolver leaves out are named by the actor directory. Switching an
-existing installation to new ids needs a data migration: see [UPGRADING.md](UPGRADING.md#unreleased).
+existing installation to new ids needs a data migration: see [UPGRADING.md](UPGRADING.md#to-021).
 
 - The resolver feeds the default access checker (`SecurityCrmAccessChecker`) and the default directory. A host
   `access_checker` of its own (or a 0.1.0 checker under `LegacyCrmAccessChecker`) must return `idOf($user)` from

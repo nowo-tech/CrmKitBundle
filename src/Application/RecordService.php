@@ -78,13 +78,27 @@ final readonly class RecordService implements RecordServiceInterface
      */
     public function create(RecordInput $input): string
     {
+        return $this->createChecked($input);
+    }
+
+    /**
+     * Creates a company or contact; `$check` runs inside the write unit, after the plan counter row is locked and
+     * before the insert, with the new (not yet stored) record: it may throw to refuse (0.3.0: the API's duplicate
+     * check, which then answers with the existing record).
+     *
+     * @param (callable(CrmRecord): void)|null $check
+     *
+     * @internal
+     */
+    public function createChecked(RecordInput $input, ?callable $check = null): string
+    {
         $context = $this->support->access->context(CrmPermission::Create);
         $values  = RecordValidator::values($input->type, $input->values, true);
         $owner   = $this->owner($context, $input);
         $roles   = $input->roles === null ? [] : $this->catalogue->checkRoles($input->roles);
 
-        return $this->guardEmail($context, $input, null, function () use ($context, $input, $values, $owner, $roles): string {
-            return $this->support->write(function (Effects $effects) use ($context, $input, $values, $owner, $roles): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
+        return $this->guardEmail($context, $input, null, function () use ($context, $input, $values, $owner, $roles, $check): string {
+            return $this->support->write(function (Effects $effects) use ($context, $input, $values, $owner, $roles, $check): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 $store  = $this->support->store;
                 $id     = $this->support->id();
                 $record = $input->type === SubjectType::Company
@@ -97,6 +111,9 @@ final readonly class RecordService implements RecordServiceInterface
                 $record->changeOwner($owner);
                 $record->changeCustom(RecordValidator::custom($input->custom ?? [], $store->fields($context->tenant, $input->type, true), []));
                 $this->counter->take($context->tenant, $input->type);
+                if ($check !== null) {
+                    $check($record);
+                }
                 $store->add($record); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
                 $store->flush();
                 $this->support->activity($context, $input->type, $id, ActivityKind::Created);

@@ -15,6 +15,8 @@ use function str_pad;
 use function strlen;
 use function substr;
 
+use const PHP_INT_MAX;
+use const PHP_INT_MIN;
 use const STR_PAD_LEFT;
 
 /**
@@ -37,6 +39,34 @@ final class Decimal
         }
 
         return self::trim($value);
+    }
+
+    /**
+     * `$a + $b` for amounts of at most 4 fraction digits, exact while the sum stays within ±9.2e14 (0.3.0: open values
+     * of a record).
+     */
+    public static function add(string $a, string $b): string
+    {
+        $x = self::units($a);
+        $y = self::units($b);
+        if (($y > 0 && $x > PHP_INT_MAX - $y) || ($y < 0 && $x < PHP_INT_MIN - $y)) {
+            return number_format(($x + $y) / 10000, 4, '.', '');
+        }
+
+        return self::shift((string) ($x + $y), 4);
+    }
+
+    /**
+     * A decimal string in ten-thousandths.
+     */
+    private static function units(string $value): int
+    {
+        $negative         = $value !== '' && $value[0] === '-';
+        $digits           = $negative ? substr($value, 1) : $value;
+        [$int, $fraction] = preg_match('/\A([0-9]+)(?:\.([0-9]*))?\z/', $digits, $m) === 1 ? [$m[1], $m[2] ?? ''] : ['0', ''];
+        $units            = (int) ($int . substr(str_pad($fraction, 4, '0'), 0, 4));
+
+        return $negative ? -$units : $units;
     }
 
     /**

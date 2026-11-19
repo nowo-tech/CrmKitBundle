@@ -19,6 +19,8 @@ use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\TagName;
 
+use function array_diff;
+use function array_values;
 use function in_array;
 use function trim;
 
@@ -108,6 +110,39 @@ final readonly class TagService implements TagServiceInterface
             $this->support->store->remove($tag); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->audit($effects, $context, 'crm.tag.deleted', null, $id, ['taggings' => $count]);
         });
+    }
+
+    /**
+     * Adds (`$add` true) or removes one tag of a record under the record's lock, keeping the others (0.3.0: the API's
+     * `crm_tag_add` / `crm_tag_remove`); whether the tags changed.
+     *
+     * @internal
+     */
+    public function toggle(SubjectType $type, string $id, string $tagId, bool $add): bool
+    {
+        $context = $this->support->access->base();
+        $work    = function (Effects $effects) use ($context, $type, $id, $tagId, $add): bool { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $record  = $this->support->load($context, $type, $id, CrmPermission::Edit, lock: true);
+            $current = [];
+            foreach ($this->support->store->taggings($context->tenant, $type, [$id]) as $tagging) {
+                $current[] = $tagging->getTagId();
+            }
+            $wanted            = $add ? [...array_values(array_diff($current, [$tagId])), $tagId] : array_values(array_diff($current, [$tagId]));
+            [$added, $removed] = $this->taggings->set($context, $type, $id, $wanted, $effects); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+            if ($added === [] && $removed === []) {
+                return false;
+            }
+            $record->touch($context->now, $context->actor->value);
+            $effects->event(new TagsChanged($context->tenant, $context->actor, $context->now, $type, $id, $added, $removed));
+
+            return true;
+        };
+
+        try {
+            return $this->support->write($work);
+        } catch (DuplicateRowException) {
+            return RecordService::onceMore(fn (): bool => $this->support->write($work));
+        }
     }
 
     /**

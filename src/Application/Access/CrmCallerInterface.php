@@ -48,4 +48,10 @@ interface CrmCallerInterface
      * @return list<ActorProfile>|null
      */
     public function selfOwners(TenantRef $tenant): ?array;
+
+    /** Runs first inside every write unit of the call (0.3.0: the API's idempotency claim); may throw to refuse. */
+    public function beginUnit(): void;
+
+    /** Runs last inside every write unit of the call, with the unit's result (the API stores the outcome). */
+    public function endUnit(mixed $result): void;
 }

@@ -46,6 +46,9 @@ final class NowoCrmKitBundle extends AbstractBundle
     /** Doctrine mapping name of phase A. */
     public const MAPPING_NAME = 'NowoCrmKitBundle';
 
+    /** Doctrine mapping name of the API's idempotency table (0.3.0; only with `api.enabled`). */
+    public const API_MAPPING_NAME = 'NowoCrmKitBundleApi';
+
     /** Doctrine mapping name of the funnels (0.3.0; only with `pipeline.enabled`). */
     public const PIPELINE_MAPPING_NAME = 'NowoCrmKitBundlePipeline';
 
@@ -104,10 +107,14 @@ final class NowoCrmKitBundle extends AbstractBundle
         }
         $manager  = self::ALIAS;
         $pipeline = false;
+        $api      = false;
         foreach ($builder->getExtensionConfig(self::ALIAS) as $config) {
             $doctrine = is_array($config) && is_array($config['doctrine'] ?? null) ? $config['doctrine'] : [];
             if (array_key_exists('entity_manager', $doctrine)) {
                 $manager = is_string($doctrine['entity_manager']) && $doctrine['entity_manager'] !== '' ? $doctrine['entity_manager'] : 'default';
+            }
+            if (is_array($config) && is_array($config['api'] ?? null) && array_key_exists('enabled', $config['api'])) {
+                $api = $config['api']['enabled'] === true;
             }
             if (is_array($config) && is_array($config['pipeline'] ?? null) && array_key_exists('enabled', $config['pipeline'])) {
                 $pipeline = $config['pipeline']['enabled'] === true;
@@ -123,6 +130,10 @@ final class NowoCrmKitBundle extends AbstractBundle
         if ($pipeline) {
             // 0.3.0: the funnel tables are mapped only while `pipeline.enabled` (no table otherwise).
             $mappings[self::PIPELINE_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-pipeline', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Pipeline', 'is_bundle' => false];
+        }
+        if ($api) {
+            // 0.3.0: the idempotency table is mapped only while `api.enabled`.
+            $mappings[self::API_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-api', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Api', 'is_bundle' => false];
         }
         $builder->prependExtensionConfig('doctrine', ['orm' => ['entity_managers' => [$manager => ['mappings' => $mappings]]]]);
     }
@@ -154,9 +165,11 @@ final class NowoCrmKitBundle extends AbstractBundle
         foreach (ParameterFlattener::flatten(self::ALIAS, $config) as $name => $value) {
             $parameters->set($name, $value);
         }
-        /** @var array{doctrine: array{entity_manager: ?string}, import: array{sync_rows: int, chunk_rows: int}} $typed */
+        /** @var array{doctrine: array{entity_manager: ?string}, import: array{sync_rows: int, chunk_rows: int}, api: array{http: array{prefix: string}}} $typed */
         $typed = $config;
         $parameters->set(self::ALIAS . '.import.sync_chunks', ServiceDefinitions::syncChunks($typed['import']['sync_rows'], $typed['import']['chunk_rows']));
+        $parameters->set(self::ALIAS . '.api_prefix', $typed['api']['http']['prefix']);
+        $parameters->set(self::ALIAS . '.api_path', $typed['api']['http']['prefix'] . '/crm/v1');
         $manager = $typed['doctrine']['entity_manager'];
         $builder->setAlias(
             self::ALIAS . '.entity_manager',

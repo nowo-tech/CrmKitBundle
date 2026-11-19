@@ -9,6 +9,8 @@
         <indexes>
             <index name="crm_contact_sort" columns="tenant_id,status,sort_key"/>
             <index name="crm_contact_owner" columns="tenant_id,owner_id"/>
+            <index name="crm_contact_keyset_name" columns="tenant_id,status,sort_key,id"/>
+            <index name="crm_contact_keyset_updated" columns="tenant_id,status,updated_at,id"/>
         </indexes>
         <field name="firstName" column="first_name" type="string" length="120" nullable="true"/>
         <field name="lastName" column="last_name" type="string" length="120" nullable="true"/>

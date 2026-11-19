@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Command;
 
 use InvalidArgumentException;
+use Nowo\CrmKitBundle\Api\Port\CrmApiIdempotencyStoreInterface;
 use Nowo\CrmKitBundle\Application\RecordPurger;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
+use Psr\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,7 +27,7 @@ final class PurgeCommand extends Command
     /**
      * Wires the purger.
      */
-    public function __construct(private readonly RecordPurger $purger)
+    public function __construct(private readonly RecordPurger $purger, private readonly ?CrmApiIdempotencyStoreInterface $idempotency = null, private readonly ?ClockInterface $clock = null)
     {
         parent::__construct();
     }
@@ -51,6 +53,10 @@ final class PurgeCommand extends Command
             $output->writeln('Another purge is running; nothing (more) done.');
 
             return Command::SUCCESS;
+        }
+        if ($this->idempotency !== null && $this->clock !== null && $input->getOption('dry-run') !== true) {
+            // 0.3.0: the API's expired idempotency keys, outside any write unit.
+            $output->writeln(sprintf('expired idempotency keys: %d', ApiPurgeIdempotencyCommand::purge($this->idempotency, $this->clock)));
         }
         $output->writeln(sprintf('records: %d, merge tombstones: %d, timeline entries: %d, import rows: %d, merge traces: %d, deals: %d', $counts['records'], $counts['tombstones'], $counts['activities'], $counts['import_rows'], $counts['merges'], $counts['deals']));
 

@@ -31,7 +31,7 @@ final readonly class CrmMetadataListener
     public const ENTITY_NAMESPACE = 'Nowo\CrmKitBundle\Domain\\';
 
     /** Columns compared exactly besides every `id` / `*_id` (keys, tokens, purposes). */
-    public const EXACT_COLUMNS = ['email_key', 'name_key', 'tax_id_key', 'domain_key', 'sort_key', 'field_key', 'purpose', 'purpose_keys', 'role_key', 'host_type', 'claim_token', 'resource', 'dedupe_key', 'task_type', 'lost_reason', 'currency'];
+    public const EXACT_COLUMNS = ['email_key', 'name_key', 'tax_id_key', 'domain_key', 'sort_key', 'field_key', 'purpose', 'purpose_keys', 'role_key', 'host_type', 'claim_token', 'resource', 'dedupe_key', 'task_type', 'lost_reason', 'currency', 'scope_hash', 'key_hash', 'fingerprint', 'operation'];
 
     /**
      * Wires the collaborators.

@@ -87,4 +87,18 @@ final readonly class SessionCaller implements CrmCallerInterface
     {
         return null;
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function beginUnit(): void
+    {
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function endUnit(mixed $result): void
+    {
+    }
 }

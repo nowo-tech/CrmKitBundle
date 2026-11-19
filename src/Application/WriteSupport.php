@@ -69,11 +69,15 @@ final readonly class WriteSupport
     public function write(callable $work, string $staleCode = ConflictException::STALE): mixed
     {
         $effects = new Effects();
+        $caller  = $this->access->caller();
         try {
-            $result = $this->runner->write(static function () use ($work, $effects): mixed { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $result = $this->runner->write(static function () use ($work, $effects, $caller): mixed { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 $effects->clear();
+                $caller->beginUnit();
+                $result = $work($effects);
+                $caller->endUnit($result);
 
-                return $work($effects);
+                return $result;
             });
         } catch (StaleRowException $e) {
             throw new ConflictException($staleCode, null, $e);

@@ -114,6 +114,43 @@ interface CrmStoreInterface
     public function batch(TenantRef $tenant, ListQuery $query, ?string $afterId, int $limit, ?array $visibleOwners = null): array;
 
     /**
+     * A keyset page of records (0.3.0, the API): the list's filters, ordered by the name key (ascending) or by the
+     * last change (newest first), then the id; only rows after `$after` (`{v, id}` of the last row of the previous
+     * page). With `$stage` (`{funnel, stage}`), only records currently in that lifecycle stage (pipeline on).
+     *
+     * @param array{v: string, id: string}|null $after
+     * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'
+     * @param array{funnel: string, stage: string}|null $stage
+     *
+     * @return list<CrmRecord>
+     */
+    public function keyset(TenantRef $tenant, ListQuery $query, bool $byUpdated, ?array $after, int $limit, ?array $visibleOwners = null, ?array $stage = null): array;
+
+    /**
+     * The keyset value of a record for {@see self::keyset()}.
+     */
+    public function keyOf(CrmRecord $record, bool $byUpdated): string;
+
+    /**
+     * A keyset page of notes (0.3.0): pinned first, then newest first (id descending), after `{pinned, id}`.
+     *
+     * @param array{pinned: bool, id: string}|null $after
+     *
+     * @return list<Note>
+     */
+    public function notesAfter(TenantRef $tenant, SubjectType $type, string $id, ?array $after, int $limit): array;
+
+    /**
+     * Active and trashed records of the tenant whose exact key matches (0.3.0, the API's duplicate check), oldest
+     * first, locked `FOR UPDATE` when `$lock`.
+     *
+     * @param string $field `emailKey`, `taxIdKey`, `domainKey` or `nameKey`
+     *
+     * @return list<CrmRecord>
+     */
+    public function matching(SubjectType $type, TenantRef $tenant, string $field, string $key, bool $lock): array;
+
+    /**
      * Active records sharing a key with `$record` (name, domain, tax id / sort key, e-mail).
      *
      * @param list<string>|null $visibleOwners null: every record; else only ownerless records and these owners'

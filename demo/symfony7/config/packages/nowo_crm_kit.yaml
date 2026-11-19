@@ -5,11 +5,13 @@ nowo_crm_kit:
     doctrine:
         entity_manager: nowo_crm_kit
     actor_directory: App\Crm\DemoActors
-    access:
-        roles:
-            view: [ROLE_USER]
-            edit: [ROLE_SALES]
-            manage: [ROLE_ADMIN]
+    # REQ-UI-002: every signed-in person opens the CRM, sales people create and edit, admins administer.
+    security:
+        access_roles: [ROLE_USER]
+        manage_roles: [ROLE_SALES]
+        settings_roles: [ROLE_ADMIN]
+        export_roles: [ROLE_ADMIN]
+        erase_roles: [ROLE_ADMIN]
     ui:
         enabled: true
         path: /crm

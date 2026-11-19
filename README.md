@@ -70,11 +70,12 @@ See [docs/INSTALLATION.md](docs/INSTALLATION.md).
 nowo_crm_kit:
     doctrine:
         entity_manager: nowo_crm_kit
-    access:
-        roles:
-            view: [ROLE_USER]
-            edit: [ROLE_USER]
-            manage: [ROLE_ADMIN]
+    security:                  # REQ-UI-002: also lock the path with access_control in security.yaml
+        access_roles: [ROLE_USER]
+        manage_roles: [ROLE_USER]
+        settings_roles: [ROLE_ADMIN]
+        export_roles: [ROLE_ADMIN]
+        erase_roles: [ROLE_ADMIN]
     ui:
         enabled: true
 ```

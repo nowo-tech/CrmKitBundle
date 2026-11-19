@@ -83,11 +83,17 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\EntityManagerHygieneListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredFeatureGate;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredPlanLimits;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\PsrLogAuditSink;
-use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\RoleMapAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SecurityActorDirectory;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SingleTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SymfonyUuidGenerator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Routing\UiRouteLoader;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\AllowAllCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ConfigurableCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessListener;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmResourceAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseFormatterInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -128,8 +134,18 @@ final class ServiceDefinitions
 
         // Port defaults.
         $s->set($p . 'default.tenant_resolver', SingleTenantResolver::class);
-        $s->set($p . 'default.access_checker', RoleMapAccessChecker::class)
-            ->args([param($p . 'access.roles'), service('security.authorization_checker')->nullOnInvalid(), service('security.token_storage')->nullOnInvalid()]);
+        // REQ-UI-002: the area checker (security.*_roles, or the host's security.access_checker), the record checker
+        // with its event, and the port adapter the application asks.
+        $auth = service('security.authorization_checker')->nullOnInvalid();
+        $s->set(ConfigurableCrmKitAccessChecker::class)->args([$auth, param($p . 'security.access_roles'), param($p . 'security.manage_roles'), param($p . 'security.settings_roles'), param($p . 'security.export_roles'), param($p . 'security.erase_roles')]);
+        $s->set(AllowAllCrmKitAccessChecker::class);
+        $s->alias(CrmKitAccessCheckerInterface::class, ConfigurableCrmKitAccessChecker::class)->public();
+        $s->set(CrmResourceAccessChecker::class)->args([$events, $auth, param($p . 'security.settings_roles'), param($p . 'security.resource_scoping')]);
+        $s->set($p . 'default.access_checker', SecurityCrmAccessChecker::class)
+            ->args([service(CrmKitAccessCheckerInterface::class), service(CrmResourceAccessChecker::class), service('security.token_storage')->nullOnInvalid(), param($p . 'security.allow_unauthenticated')]);
+        $s->set(CrmKitGuard::class)->args([service(CrmAccess::class)])->public();
+        $s->set(CrmKitAccessListener::class)->args([service(CrmKitGuard::class), service(CrmAccessCheckerInterface::class), service('security.firewall.map')->nullOnInvalid()])
+            ->tag('kernel.event_listener', ['event' => 'kernel.controller', 'method' => 'onKernelController', 'priority' => 16]);
         $s->set($p . 'default.feature_gate', ConfiguredFeatureGate::class)->args([param($p . 'feature.default_enabled')]);
         $s->set($p . 'default.plan_limits', ConfiguredPlanLimits::class)->args([['companies' => param($p . 'limits.companies'), 'contacts' => param($p . 'limits.contacts')]]);
         $s->set($p . 'default.actor_directory', SecurityActorDirectory::class)->args([service('security.token_storage')->nullOnInvalid()]);
@@ -226,7 +242,7 @@ final class ServiceDefinitions
     {
         $s = $container->services();
         $p = self::P;
-        $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmAccess::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size')]);
+        $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size')]);
         $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class)]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class)])->public()->tag('controller.service_arguments');

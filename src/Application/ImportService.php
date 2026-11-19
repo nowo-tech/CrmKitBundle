@@ -87,7 +87,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function upload(SubjectType $type, ImportFormat $format, string $fileName, string $bytes): string
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
         $name    = trim($fileName) === '' || mb_strlen($fileName) > 255 || !ExactId::isValid(trim($fileName), 1020) ? 'import' : trim($fileName);
         if ($format === ImportFormat::Vcard && $type !== SubjectType::Contact) {
             throw new ImportFileException('import.error.vcard_contacts');
@@ -115,7 +115,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function preview(string $id, int $rows = 20): ImportView
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
 
         return $this->support->read(function () use ($context, $id, $rows): ImportView { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $import = $this->import($context->tenant, $id);
@@ -169,7 +169,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function confirm(string $id, array $mapping, DuplicatePolicy $policy, int $expectedVersion): void
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
         $won     = $this->support->write(function (Effects $effects) use ($context, $id, $mapping, $policy, $expectedVersion): bool { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $import = $this->import($context->tenant, $id);
             if (!ImportMapping::valid($mapping, $import->getColumns(), ImportMapping::targets($import->getSubjectType(), $this->activeFields($context->tenant, $import->getSubjectType())))) {
@@ -189,7 +189,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function run(string $id, ?int $maxChunks = null): bool
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
         $import  = $this->support->read(fn (): Import => $this->import($context->tenant, $id));
         if ($import->getStatus() !== ImportStatus::Running) {
             return $import->getStatus() === ImportStatus::Done;
@@ -204,7 +204,7 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function cancel(string $id): void
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Import);
         $this->support->write(function (Effects $effects) use ($context, $id): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $import = $this->import($context->tenant, $id);
             $stale  = $this->staleBefore($context->now);

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection;
 
-use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Value\AffiliationPurpose;
 use Nowo\CrmKitBundle\Domain\Value\ConsentPurpose;
 use Nowo\CrmKitBundle\Domain\Value\RoleKey;
@@ -40,14 +39,22 @@ final class ConfigurationTree
     public static function define(ArrayNodeDefinition $root): void
     {
         $children = $root->addDefaultsIfNotSet()->children();
-        foreach (['tenant_resolver', 'access_checker', 'feature_gate', 'plan_limits', 'actor_directory', 'audit_sink', 'clock'] as $port) {
+        foreach (['tenant_resolver', 'feature_gate', 'plan_limits', 'actor_directory', 'audit_sink', 'clock'] as $port) {
             $children->scalarNode($port)->defaultNull()->info('Service id of the host implementation; null = the bundle default.')->end();
         }
-        $roles = $children->arrayNode('access')->addDefaultsIfNotSet()->children()->arrayNode('roles')->addDefaultsIfNotSet()->info('RoleMapAccessChecker only: permission => roles; every list empty = denied.')->children();
-        foreach (CrmPermission::cases() as $permission) {
-            $roles->arrayNode($permission->value)->scalarPrototype()->cannotBeEmpty()->end()->defaultValue([])->end();
-        }
-        $roles->end()->end()->end()->end();
+        $children->scalarNode('access_checker')->defaultNull()
+            ->info('DEPRECATED since 0.2.0 (removed in 0.3.0): service id of a 0.1.0 CrmAccessCheckerInterface (create / delete / import are asked as edit, export / erase as manage). Use security.access_checker and nowo_crm_kit.record_access_check listeners.')
+        ->end();
+        $security = $children->arrayNode('security')->addDefaultsIfNotSet()->info('REQ-UI-002: who may use the CRM. Each *_roles list grants its area to any of its roles; an empty list means no bundle-level role check for that area.')->children();
+        $security->arrayNode('access_roles')->info('Opening the CRM (lists, 360° pages, search).')->scalarPrototype()->cannotBeEmpty()->end()->defaultValue(['ROLE_ADMIN'])->end();
+        $security->scalarNode('access_checker')->defaultNull()->info('Service id of a host CrmKitAccessCheckerInterface; null = ConfigurableCrmKitAccessChecker (these role lists).')->end();
+        $security->booleanNode('allow_unauthenticated')->defaultFalse()->info('DEV/DEMO only: the pages without SecurityBundle or without signing in (actor "anonymous"). Never in production.')->end();
+        $security->arrayNode('manage_roles')->info('Create, edit, trash / restore, import.')->scalarPrototype()->cannotBeEmpty()->end()->defaultValue(['ROLE_ADMIN'])->end();
+        $security->arrayNode('settings_roles')->info('Tags, custom fields, per-tenant settings, purge from the trash; with resource_scoping, every record.')->scalarPrototype()->cannotBeEmpty()->end()->defaultValue(['ROLE_ADMIN'])->end();
+        $security->arrayNode('export_roles')->info('CSV export of lists, GDPR export of a contact.')->scalarPrototype()->cannotBeEmpty()->end()->defaultValue(['ROLE_ADMIN'])->end();
+        $security->arrayNode('erase_roles')->info('GDPR erasure of a contact.')->scalarPrototype()->cannotBeEmpty()->end()->defaultValue(['ROLE_ADMIN'])->end();
+        $security->booleanNode('resource_scoping')->defaultFalse()->info('true: a record is open by default only to its owner (or when it has none) and to settings_roles; nowo_crm_kit.record_access_check listeners decide the rest.')->end();
+        $security->end()->end();
         $children->arrayNode('feature')->addDefaultsIfNotSet()->children()
             ->booleanNode('default_enabled')->defaultTrue()->info('ConfiguredFeatureGate: the CRM is on for every tenant.')->end()
         ->end()->end();

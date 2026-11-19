@@ -19,7 +19,7 @@ composer require nowo-tech/crm-kit-bundle
 
 With Symfony Flex the recipe registers `Nowo\CrmKitBundle\NowoCrmKitBundle` and the required
 `Nowo\TransactionDoctrine\Symfony\NowoTransactionDoctrineBundle`, writes
-`config/packages/nowo_crm_kit.yaml` (access roles empty, UI off) and declares the **private entity manager**
+`config/packages/nowo_crm_kit.yaml` (`security.*_roles` at `ROLE_ADMIN`, UI off) and declares the **private entity manager**
 `nowo_crm_kit` in `config/packages/nowo_crm_kit_doctrine.yaml`. Without Flex, register the bundle in
 `config/bundles.php` (both bundles) and write both files yourself.
 
@@ -100,6 +100,26 @@ nowo_crm_kit:
     resource: .
     type: nowo_crm_kit_ui
     prefix: /admin
+```
+
+The pages need SecurityBundle (the build fails without it unless `security.allow_unauthenticated: true`, demos only).
+Set who may use them (REQ-UI-002, [CONFIGURATION.md](CONFIGURATION.md#security-req-ui-002)) and lock the path in your
+firewall too:
+
+```yaml
+# config/packages/nowo_crm_kit.yaml
+nowo_crm_kit:
+    security:
+        access_roles: [ROLE_USER]      # default [ROLE_ADMIN]
+        manage_roles: [ROLE_USER]
+        settings_roles: [ROLE_ADMIN]
+        export_roles: [ROLE_ADMIN]
+        erase_roles: [ROLE_ADMIN]
+
+# config/packages/security.yaml
+security:
+    access_control:
+        - { path: ^/admin/crm, roles: IS_AUTHENTICATED_FULLY }
 ```
 
 The routes are then `/admin/crm`, `/admin/crm/companies`, `/admin/crm/contacts/{id}`, … (names `nowo_crm_kit_*`,

@@ -83,37 +83,74 @@ App\Crm\OrganizationTenantResolver`.
 
 ### Access checker
 
+0.2.0 follows the house shape of the Nowo admin UIs (REQ-UI-002; [CONFIGURATION.md](CONFIGURATION.md#security-req-ui-002)).
+
+**Areas.** The roles of `security.*_roles` decide by default. For other rules, implement
+`Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface` (or its tenant-aware variant, which
+receives the tenant of the call) and set `security.access_checker` to your service:
+
 ```php
-use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
-use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
-use Nowo\CrmKitBundle\Domain\Value\{ActorRef, SubjectRef, TenantRef};
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\TenantAwareCrmKitAccessCheckerInterface;
 
-final readonly class OrganizationCrmAccess implements CrmAccessCheckerInterface
+final readonly class OrganizationCrmAreas implements TenantAwareCrmKitAccessCheckerInterface
 {
-    public function __construct(private Security $security, private Memberships $members) {}
+    public function __construct(private Memberships $members) {}
 
-    public function isGranted(CrmPermission $permission, TenantRef $tenant, ?SubjectRef $subject = null): bool
+    public function canAccess(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.view'); }
+    public function canCreate(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.edit'); }
+    public function canEdit(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.edit'); }
+    public function canDelete(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.edit'); }
+    public function canImport(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.edit'); }
+    public function canExport(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
+    public function canManageSettings(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
+    public function canErase(?object $user, ?string $tenantKey = null): bool { return $this->has($user, $tenantKey, 'crm.manage'); }
+
+    private function has(?object $user, ?string $tenant, string $permission): bool
     {
-        $actor = $this->currentActor();
-        if ($actor === null) {
-            return false;
-        }
-        // $subject (type, id, owner) is set for a check on one record: e.g. "own companies only".
-        return $this->members->has($tenant->value, $actor->value, 'crm.' . $permission->value);
-    }
-
-    public function currentActor(): ?ActorRef
-    {
-        $id = $this->security->getUser()?->getUserIdentifier();
-
-        return $id === null ? null : new ActorRef($id);
+        return $user !== null && $tenant !== null && $this->members->has($tenant, $user->getUserIdentifier(), $permission);
     }
 }
 ```
 
-Deny by default: return `false` for anything you do not grant. `edit` and `manage` do not imply `view`; the bundle asks
-for exactly the permission of the action ([SECURITY.md](SECURITY.md#permission-matrix)). With `$subject === null` the
-bundle asks for the tenant-wide grant (lists, imports, settings, administration).
+**The actor** is the security user's identifier (1–128 bytes, compared exactly); the actor directory port gives the
+names. Deny by default: return `false` for anything you do not grant.
+
+**The deprecated 0.1.0 port.** A `Domain\Port\CrmAccessCheckerInterface` service set in the root key `access_checker`
+still replaces all of this in 0.2.0; it is asked `create`, `delete` and `import` as `edit`, `export` and `erase` as
+`manage`. Move to the area checker and a record listener; the key is removed in 0.3.0.
+
+<a id="record-access-listeners"></a>
+**Records.** After the area check, a decision on one company or contact dispatches
+`CrmKitEvents::RECORD_ACCESS_CHECK` (`nowo_crm_kit.record_access_check`). The default is "open" (a shared CRM) or,
+with `security.resource_scoping: true`, "owner, ownerless record or `settings_roles` only". A listener grants or
+denies; a deny always wins:
+
+```php
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\{CrmKitEvents, RecordAccessCheckEvent};
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+#[AsEventListener(event: CrmKitEvents::RECORD_ACCESS_CHECK)]
+final readonly class TeamRecordAccess
+{
+    public function __construct(private Teams $teams) {}
+
+    public function __invoke(RecordAccessCheckEvent $event): void
+    {
+        // getAction(): view, edit, create, delete, import, export, manage, erase, ...
+        $owner = $event->getOwnerId();
+        if ($owner !== null && $this->teams->sameTeam($event->getTenantKey(), $event->getActorId(), $owner)) {
+            $event->grant();
+        }
+        if ($event->getAction() === 'erase' && $this->teams->isLegalHold($event->getTenantKey(), $event->getSubjectId())) {
+            $event->deny();
+        }
+    }
+}
+```
+
+**In your own controllers**, `Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard` answers the same
+questions: `requireGranted(CrmPermission, ?SubjectRef)` (404 when the CRM is not available, 403 when refused),
+`isGranted()` and `grants()` (every permission's decision, for menus).
 
 ### Feature gate
 

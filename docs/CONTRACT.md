@@ -337,7 +337,7 @@ interface CrmTenantResolverInterface                 // [SingleTenantResolver: T
     public function current(): ?TenantRef;
 }
 
-interface CrmAccessCheckerInterface                  // [RoleMapAccessChecker: config access.roles, every list empty = DENY]
+interface CrmAccessCheckerInterface                  // [SecurityCrmAccessChecker (0.2.0): area checker + record checker + event]
 {
     /**
      * Deny by default. $subject (type, id, owner) narrows the grant to one record (e.g. "only own companies");
@@ -418,19 +418,21 @@ interface CrmActorDirectoryInterface                 // [SecurityActorDirectory:
 ```yaml
 nowo_crm_kit:
     tenant_resolver: null          # service id of CrmTenantResolverInterface; null = single tenant "default"
-    access_checker: null           # service id; null = RoleMapAccessChecker (deny by default)
+    access_checker: null           # DEPRECATED (0.2.0, removed in 0.3.0): a 0.1.0 CrmAccessCheckerInterface service id
     feature_gate: null             # service id; null = ConfiguredFeatureGate (feature.default_enabled)
     plan_limits: null              # service id; null = ConfiguredPlanLimits (limits.*)
     actor_directory: null          # service id; null = the signed-in security user only
     audit_sink: null               # service id; null = PSR log
     clock: null                    # service id of Psr\Clock\ClockInterface
-    access:
-        roles:                     # RoleMapAccessChecker only; every list empty = denied
-            view: []
-            edit: []
-            manage: []
-            amounts_view: []
-            campaigns_send: []
+    security:                      # REQ-UI-002 (0.2.0)
+        access_roles: [ROLE_ADMIN]     # open the CRM (lists, 360° pages, search)
+        access_checker: null           # service id of CrmKitAccessCheckerInterface; null = ConfigurableCrmKitAccessChecker
+        allow_unauthenticated: false   # DEV/DEMO only
+        manage_roles: [ROLE_ADMIN]     # create, edit, trash / restore, import
+        settings_roles: [ROLE_ADMIN]   # tags, fields, settings, purge; every record with resource_scoping
+        export_roles: [ROLE_ADMIN]     # CSV export of lists, GDPR export
+        erase_roles: [ROLE_ADMIN]      # GDPR erasure
+        resource_scoping: false        # true: records open to their owner (or ownerless) and settings_roles by default
     feature:
         default_enabled: true
     limits:
@@ -548,20 +550,37 @@ scope (or a scope on the company provider) answers `null`.
 
 ## 13. Permission matrix (deny by default)
 
-Every call: tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404) → `isGranted()` (false ⇒ 403); a
-record of another tenant is 404. Beacon maps `crm.view`, `crm.edit`, `crm.manage`, `crm.amounts.view`,
-`crm.campaigns.send`.
+Every call: tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404; **0.2.0** on the pages behind a
+firewall: the firewall's entry point, login redirect or 401) → `isGranted()` (false ⇒ 403); a record of another tenant
+is 404.
 
-| Action | view | edit | manage | amounts_view | campaigns_send |
-|---|---|---|---|---|---|
-| Lists, 360° pages, timeline, panels, vCard of one contact, search | ✓ | | | | |
-| Create / edit / trash / restore records, notes, tags on records, links, affiliations, consent records, import, merge | | ✓ | | | |
-| Tags and fields administration, settings, purge from the trash, CSV export of lists, GDPR export and erasure | | | ✓ | | |
-| (B–D) Deal amounts, quote and invoice totals, revenue reports | | | | ✓ | |
-| (E) Send a campaign | | | | | ✓ |
+**(0.2.0) The house access shape (REQ-UI-002).** The application keeps its port `CrmAccessCheckerInterface`; its
+default adapter `SecurityCrmAccessChecker` asks, for each permission, the **area checker**
+`CrmKitAccessCheckerInterface` (`canAccess`, `canCreate`, `canEdit`, `canDelete`, `canImport`, `canExport`,
+`canManageSettings`, `canErase`; tenant-aware variant `TenantAwareCrmKitAccessCheckerInterface`; default
+`ConfigurableCrmKitAccessChecker` on `security.*_roles`, `AllowAllCrmKitAccessChecker` for demos and tests, a host
+service through `security.access_checker`), and, for one record, `CrmResourceAccessChecker`: deny by default when
+`security.resource_scoping` is on (owner, ownerless record or `settings_roles`), then the event
+`CrmKitEvents::RECORD_ACCESS_CHECK` (`RecordAccessCheckEvent`: user, actor, tenant, type, id, owner, action, default;
+`grant()` / `deny()`, a deny wins). `CrmKitGuard` (`requireGranted`, `isGranted`, `grants`) is the pages' gate and a
+`kernel.controller` listener requires `view` on every bundle route. The 0.1.0 root key `access_checker` still points
+the port at a host service (deprecated, removed in 0.3.0), with the new permissions asked as the ones it knew.
 
-`edit` and `manage` do not imply `view` in the checker: the host grants what it wants; the bundle asks for exactly the
-permission of the action. Notes: the author edits / deletes own notes with `edit`; others' notes need `manage`.
+| Action | Permission | Area (default roles) |
+|---|---|---|
+| Lists, 360° pages, timeline, panels, vCard of one contact, search | `view` | `canAccess` (`access_roles`) |
+| Create companies and contacts | `create` | `canCreate` (`manage_roles`) |
+| Edit records, notes, tags on records, roles, links, affiliations, consent records, merge | `edit` | `canEdit` (`manage_roles`) |
+| Trash / restore | `delete` | `canDelete` (`manage_roles`) |
+| Import | `import` | `canImport` (`manage_roles`) |
+| CSV export of lists, GDPR export | `export` | `canExport` (`export_roles`) |
+| Tags and fields administration, settings, purge from the trash, others' notes | `manage` | `canManageSettings` (`settings_roles`) |
+| GDPR erasure | `erase` | `canErase` (`erase_roles`) |
+| (B–D) Deal amounts, quote and invoice totals, revenue reports | `amounts_view` | `canManageSettings` until its phase |
+| (E2) Send a circular | `campaigns_send` | `canManageSettings` until its phase |
+
+Every area also needs `canAccess`. Notes: the author edits / deletes own notes with `edit`; others' notes need
+`manage`. Beacon maps its `crm.*` permissions in a host area checker (or keeps its 0.1.0 port for 0.2.0).
 
 ## 14. Events (dispatched after commit, ids and VOs only; REQ-ARCH-001 rules 4 / 7)
 
@@ -922,6 +941,11 @@ differs is applied in the next commit and noted here with the date._
 - Owner decisions (2026-11-19, after audit UL): MySQL 8.0 / MariaDB 10.6 minimums and the CSV `roles` column
   accepted; roles and purposes removed from the configuration are hidden but kept (Q-O17); the JSON API ships in
   0.3.0 (Q-O16); roles apply to any contact (Q-O18).
+- Owner instruction (2026-11-19): "crmkit debería usar el mismo tipo de guard y access que el resto de bundles". 0.2.0
+  adopts the house access shape (REQ-UI-002, §13): the `security` node, the area checker
+  `CrmKitAccessCheckerInterface` (+ tenant-aware variant, configurable and allow-all defaults), the record checker with
+  the `nowo_crm_kit.record_access_check` event, `CrmKitGuard`, a route listener, and the compile-time SecurityBundle
+  check; the 0.1.0 `access.roles` is removed and the root `access_checker` deprecated (removed in 0.3.0).
 - Audit UL fixes (2026-11-19): an affiliation edit keeps the stored purposes that are no longer configured; an
   unticked "primary contact" keeps the company's primary contact (clearing is the company page's own action, and a
   linked company has a pre-filled form); `purpose_keys` is 1100 characters; an import row that changes a company's

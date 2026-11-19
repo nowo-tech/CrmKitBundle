@@ -66,7 +66,7 @@ final readonly class RecordService implements RecordServiceInterface
      */
     public function create(RecordInput $input): string
     {
-        $context = $this->support->access->context(CrmPermission::Edit);
+        $context = $this->support->access->context(CrmPermission::Create);
         $values  = RecordValidator::values($input->type, $input->values, true);
         $owner   = $this->owner($context, $input);
         $roles   = $input->roles === null ? [] : $this->catalogue->checkRoles($input->roles);
@@ -159,7 +159,7 @@ final readonly class RecordService implements RecordServiceInterface
     {
         $context = $this->support->access->base();
         $this->support->write(function (Effects $effects) use ($context, $type, $id, $expectedVersion): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $record = $this->support->load($context, $type, $id, CrmPermission::Edit, lock: true);
+            $record = $this->support->load($context, $type, $id, CrmPermission::Delete, lock: true);
             if ($record->getVersion() !== $expectedVersion) {
                 throw new ConflictException(ConflictException::STALE, $id);
             }
@@ -178,7 +178,7 @@ final readonly class RecordService implements RecordServiceInterface
     {
         $context = $this->support->access->base();
         $this->support->write(function (Effects $effects) use ($context, $type, $id): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $record = $this->support->load($context, $type, $id, CrmPermission::Edit, anyStatus: true, lock: true);
+            $record = $this->support->load($context, $type, $id, CrmPermission::Delete, anyStatus: true, lock: true);
             if ($record->getStatus() !== RecordStatus::Trashed) {
                 throw new ConflictException(ConflictException::STALE, $id);
             }

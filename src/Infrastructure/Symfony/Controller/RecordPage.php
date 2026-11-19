@@ -61,6 +61,9 @@ final readonly class RecordPage
         $active  = $view->status === RecordStatus::Active;
         $edit    = $active && $this->access->can(CrmPermission::Edit, $subject);
         $manage  = $this->access->can(CrmPermission::Manage, $subject);
+        $delete  = $this->access->can(CrmPermission::Delete, $subject);
+        $export  = $this->access->can(CrmPermission::Export, $subject);
+        $erase   = $this->access->can(CrmPermission::Erase, $subject);
         $token   = $this->ui->actionToken();
         $actions = [];
         if ($edit) {
@@ -70,21 +73,21 @@ final readonly class RecordPage
         if ($type === SubjectType::Contact && $view->status !== RecordStatus::Erased) {
             $actions[] = new Action('download', UiSupport::label('record.vcard'), $this->ui->url('nowo_crm_kit_vcard', ['id' => $view->id]), icon: 'download');
         }
-        if ($type === SubjectType::Contact && $manage) {
+        if ($type === SubjectType::Contact && $export) {
             // A POST with the action token: the export is a logged processing of personal data, never a plain link.
             $actions[] = $this->post($token, 'download', 'record.gdpr_export', 'nowo_crm_kit_gdpr_export', ['id' => $view->id]);
         }
         $back = ['type' => $seg, 'subject' => $view->id];
-        if ($edit) {
+        if ($active && $delete) {
             $actions[] = $this->post($token, 'delete', 'record.trash', 'nowo_crm_kit_trash', ['type' => $seg, 'id' => $view->id], 'record.trash_confirm', 'danger');
         }
-        if ($view->status === RecordStatus::Trashed && $this->access->can(CrmPermission::Edit, $subject)) {
+        if ($view->status === RecordStatus::Trashed && $delete) {
             $actions[] = $this->post($token, 'restore', 'record.restore', 'nowo_crm_kit_restore', ['type' => $seg, 'id' => $view->id]);
         }
         if ($view->status === RecordStatus::Trashed && $manage) {
             $actions[] = $this->post($token, 'delete', 'record.purge', 'nowo_crm_kit_purge', ['type' => $seg, 'id' => $view->id], 'record.purge_confirm', 'danger');
         }
-        if ($type === SubjectType::Contact && $manage && $view->status !== RecordStatus::Erased) {
+        if ($type === SubjectType::Contact && $erase && $view->status !== RecordStatus::Erased) {
             $actions[] = $this->post($token, 'delete', 'record.erase', 'nowo_crm_kit_erase', ['id' => $view->id], 'record.erase_confirm', 'danger');
         }
         $details = [];

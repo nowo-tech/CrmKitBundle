@@ -294,8 +294,8 @@ final class UiTest extends CrmTestCase
         self::assertSame(404, $this->httpStatus('GET', '/crm/companies'));
         $this->ctx()->enabled = [];
         $this->ctx()->actor   = null;
-        self::assertSame(404, $this->httpStatus('GET', '/crm/contacts'));
-        self::assertSame(404, $this->httpStatus('GET', '/crm/contacts/' . $id . '/vcard'));
+        self::assertSame(401, $this->httpStatus('GET', '/crm/contacts'), 'nobody signed in: the firewall entry point');
+        self::assertSame(401, $this->httpStatus('GET', '/crm/contacts/' . $id . '/vcard'));
         $this->actAs('ana');
         $this->client->xmlHttpRequest('POST', '/crm/contacts/' . $id . '/gdpr-export', ['crm_action' => ['_token' => $token]]);
         self::assertSame(404, $this->client->getResponse()->getStatusCode());

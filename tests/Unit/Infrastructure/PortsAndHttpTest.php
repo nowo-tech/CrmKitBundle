@@ -12,29 +12,39 @@ use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\CrmResource;
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Import\ImportFileException;
+use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\AuditEntry;
+use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\BinaryCollation;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ParameterFlattener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\CrmKitEvents;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\RecordAccessCheckEvent;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\CrmConflictFormatter;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\DomainExceptionListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredFeatureGate;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredPlanLimits;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\PsrLogAuditSink;
-use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\RoleMapAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SecurityActorDirectory;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SingleTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SymfonyUuidGenerator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Routing\UiRouteLoader;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\AllowAllCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ConfigurableCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmResourceAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\LegacyCrmAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\TransactionDoctrine\ConflictCode;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseContext;
 use Nowo\TransactionDoctrine\TransientFailureKind;
@@ -46,6 +56,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use RuntimeException;
 use Stringable;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -85,7 +96,7 @@ final class PortsAndHttpTest extends TestCase
         self::assertSame(['CRM audit: crm.x', ['tenant' => 'acme', 'actor' => 'ana', 'subject_type' => 'company', 'subject_id' => 'id', 'n' => 1]], $logger->lines[0]);
     }
 
-    public function testRoleMapAndSecurityDirectory(): void
+    public function testAccessCheckersAndSecurityDirectory(): void
     {
         $tenant = new TenantRef('acme');
         $tokens = new TokenStorage();
@@ -101,24 +112,133 @@ final class PortsAndHttpTest extends TestCase
                 return $attribute === 'ROLE_CRM';
             }
         };
-        $checker = new RoleMapAccessChecker(['view' => ['ROLE_OTHER', 'ROLE_CRM'], 'edit' => []], $auth, $tokens);
+        // The default area checker: any role of the area's list; an empty list means no role check; fail closed.
+        $areas = new ConfigurableCrmKitAccessChecker($auth, ['ROLE_OTHER', 'ROLE_CRM'], ['ROLE_ADMIN'], [], ['ROLE_CRM'], ['ROLE_ADMIN']);
+        $user  = new InMemoryUser('ana', null, ['ROLE_CRM']);
+        self::assertSame([true, false, false, false, false, true, true, false], [$areas->canAccess($user), $areas->canCreate($user), $areas->canEdit($user), $areas->canDelete($user), $areas->canImport($user), $areas->canExport($user), $areas->canManageSettings($user), $areas->canErase($user)]);
+        self::assertFalse($areas->canAccess(null), 'nobody signed in');
+        self::assertFalse((new ConfigurableCrmKitAccessChecker())->canAccess($user), 'no SecurityBundle: closed');
+        self::assertTrue((new ConfigurableCrmKitAccessChecker(null, []))->canAccess(null), 'an empty list asks no role');
+        $all = new AllowAllCrmKitAccessChecker();
+        self::assertSame([true, true, true, true, true, true, true, true], [$all->canAccess(null), $all->canCreate(null), $all->canEdit(null), $all->canDelete(null), $all->canImport(null), $all->canExport(null), $all->canManageSettings(null), $all->canErase(null)]);
+
+        // The port adapter: no token ⇒ no actor; a user ⇒ the area of each permission, then the record decision.
+        $events   = new EventDispatcher();
+        $resource = new CrmResourceAccessChecker($events, $auth, ['ROLE_ADMIN'], true);
+        $checker  = new SecurityCrmAccessChecker($areas, $resource, $tokens);
         self::assertNull($checker->currentActor());
         self::assertFalse($checker->isGranted(CrmPermission::View, $tenant));
-        $tokens->setToken(new UsernamePasswordToken(new InMemoryUser('ana', null, ['ROLE_CRM']), 'main', ['ROLE_CRM']));
-        $checker = new RoleMapAccessChecker(['view' => ['ROLE_OTHER', 'ROLE_CRM'], 'edit' => []], $auth, $tokens);
-        self::assertSame('ana', $checker->currentActor()?->value);
-        self::assertTrue($checker->isGranted(CrmPermission::View, $tenant));
-        self::assertFalse($checker->isGranted(CrmPermission::Edit, $tenant));
-        self::assertFalse($checker->isGranted(CrmPermission::Manage, $tenant));
+        self::assertSame('anonymous', (new SecurityCrmAccessChecker($all, $resource, $tokens, true))->currentActor()?->value);
+        self::assertTrue((new SecurityCrmAccessChecker($all, $resource, null, true))->isGranted(CrmPermission::Erase, $tenant));
+        $tokens->setToken(new UsernamePasswordToken($user, 'main', ['ROLE_CRM']));
+        self::assertSame('ana', (new SecurityCrmAccessChecker($areas, $resource, $tokens))->currentActor()?->value);
+        $map = static fn (SecurityCrmAccessChecker $c): array => array_map(static fn (CrmPermission $p): bool => $c->isGranted($p, $tenant), CrmPermission::cases());
+        // view edit manage amounts campaigns create delete import export erase
+        self::assertSame([true, false, true, true, true, false, false, false, true, false], $map($checker));
+        self::assertSame([true, false, true, true, true, false, false, false, true, false], $map(new SecurityCrmAccessChecker(new class implements CrmKitAccessCheckerInterface {
+            public function canAccess(?object $user): bool
+            {
+                return true;
+            }
+
+            public function canCreate(?object $user): bool
+            {
+                return false;
+            }
+
+            public function canEdit(?object $user): bool
+            {
+                return false;
+            }
+
+            public function canDelete(?object $user): bool
+            {
+                return false;
+            }
+
+            public function canImport(?object $user): bool
+            {
+                return false;
+            }
+
+            public function canExport(?object $user): bool
+            {
+                return true;
+            }
+
+            public function canManageSettings(?object $user): bool
+            {
+                return true;
+            }
+
+            public function canErase(?object $user): bool
+            {
+                return false;
+            }
+        }, $resource, $tokens)), 'a checker that is not tenant aware');
+
+        // Records: with scoping, the owner's (or an ownerless) record is open, another person's is not, unless a
+        // listener grants it; a deny wins over a grant.
+        $mine   = SubjectRef::of(SubjectType::Company, '01900000-0000-7000-8000-000000000001', 'ana');
+        $theirs = SubjectRef::of(SubjectType::Company, '01900000-0000-7000-8000-000000000002', 'leo');
+        $free   = SubjectRef::of(SubjectType::Contact, '01900000-0000-7000-8000-000000000003');
+        self::assertSame([true, false, true], [$checker->isGranted(CrmPermission::View, $tenant, $mine), $checker->isGranted(CrmPermission::View, $tenant, $theirs), $checker->isGranted(CrmPermission::View, $tenant, $free)]);
+        $seen = [];
+        $events->addListener(CrmKitEvents::RECORD_ACCESS_CHECK, static function (RecordAccessCheckEvent $e) use (&$seen): void {
+            $seen[] = [$e->getUser() instanceof InMemoryUser, $e->getActorId(), $e->getTenantKey(), $e->getSubjectType(), $e->getOwnerId(), $e->getAction(), $e->isDefaultGranted(), substr($e->getSubjectId(), -1)];
+            if ($e->getOwnerId() === 'leo') {
+                $e->grant();
+            }
+            if ($e->getSubjectType() === 'contact') {
+                $e->deny();
+                $e->grant();
+            }
+        });
+        self::assertTrue($checker->isGranted(CrmPermission::View, $tenant, $theirs), 'a listener grants');
+        self::assertFalse($checker->isGranted(CrmPermission::View, $tenant, $free), 'a deny wins');
+        self::assertSame([[true, 'ana', 'acme', 'company', 'leo', 'view', false, '2'], [true, 'ana', 'acme', 'contact', null, 'view', true, '3']], $seen);
+        $denied = new RecordAccessCheckEvent(null, null, 'acme', 'company', 'x', null, 'edit', true);
+        $denied->deny();
+        self::assertSame([true, false], [$denied->isDenied(), $denied->isGranted()]);
+        self::assertTrue((new CrmResourceAccessChecker(null, $auth, ['ROLE_CRM'], true))->isGranted($user, new ActorRef('ana'), $tenant, CrmPermission::Edit, $theirs), 'settings_roles see every record');
+        self::assertFalse((new CrmResourceAccessChecker(null, null, ['ROLE_CRM'], true))->isGranted($user, new ActorRef('ana'), $tenant, CrmPermission::Edit, $theirs));
+        self::assertFalse((new CrmResourceAccessChecker(null, $auth, ['ROLE_CRM'], true))->isGranted(null, null, $tenant, CrmPermission::Edit, $theirs));
+        self::assertTrue((new CrmResourceAccessChecker())->isGranted(null, null, $tenant, CrmPermission::Edit, $theirs), 'no scoping: the tenant\'s records are shared');
         $auth->fail = true;
         self::assertFalse($checker->isGranted(CrmPermission::View, $tenant));
-        self::assertFalse((new RoleMapAccessChecker(['view' => ['ROLE_CRM']]))->isGranted(CrmPermission::View, $tenant));
+        self::assertFalse((new CrmResourceAccessChecker(null, $auth, ['ROLE_CRM'], true))->isGranted($user, new ActorRef('ana'), $tenant, CrmPermission::Edit, $theirs));
+        $auth->fail = false;
+
+        // The deprecated 0.1.0 port: the new permissions reach it as the ones it knew.
+        $inner = new class implements CrmAccessCheckerInterface {
+            /** @var list<string> */
+            public array $asked = [];
+
+            public function isGranted(CrmPermission $permission, TenantRef $tenant, ?SubjectRef $subject = null): bool
+            {
+                $this->asked[] = $permission->value;
+
+                return true;
+            }
+
+            public function currentActor(): ?ActorRef
+            {
+                return $this->asked === [] ? null : new ActorRef('ana');
+            }
+        };
+        $legacy = new LegacyCrmAccessChecker($inner);
+        self::assertNull($legacy->currentActor());
+        foreach (CrmPermission::cases() as $permission) {
+            $legacy->isGranted($permission, $tenant);
+        }
+        self::assertSame(['view', 'edit', 'manage', 'amounts_view', 'campaigns_send', 'edit', 'edit', 'edit', 'manage', 'manage'], $inner->asked);
+        self::assertSame('ana', (new LegacyCrmAccessChecker($inner))->currentActor()?->value);
         $directory = new SecurityActorDirectory($tokens);
         self::assertSame('ana', $directory->actor($tenant, new ActorRef('ana'))?->name);
         self::assertNull($directory->actor($tenant, new ActorRef('Ana')));
         self::assertCount(1, $directory->owners($tenant));
         $tokens->setToken(new UsernamePasswordToken(new InMemoryUser('bad ', null), 'main'));
-        self::assertNull((new RoleMapAccessChecker([], $auth, $tokens))->currentActor());
+        self::assertNull($checker->currentActor());
         self::assertSame([], $directory->owners($tenant));
         self::assertSame([], (new SecurityActorDirectory())->owners($tenant));
     }

@@ -96,12 +96,13 @@ final readonly class RecordController
             foreach ($result->rows as $view) {
                 $rows[] = $this->row($view);
             }
-            $canEdit = $this->ui->can(CrmPermission::Edit);
-            $actions = [];
-            if ($canEdit) {
+            $canEdit   = $this->ui->can(CrmPermission::Edit);
+            $canDelete = $this->ui->can(CrmPermission::Delete);
+            $actions   = [];
+            if ($this->ui->can(CrmPermission::Create)) {
                 $actions[] = Action::create($this->ui->url('nowo_crm_kit_new', ['type' => $type]), UiSupport::label('record.new.' . $subject->value));
             }
-            if ($this->ui->can(CrmPermission::Manage)) {
+            if ($this->ui->can(CrmPermission::Export)) {
                 $actions[] = new Action('export', UiSupport::label('list.export'), $this->ui->url('nowo_crm_kit_export', ['type' => $type] + $request->query->all()), icon: 'download');
             }
             $columns = $subject === SubjectType::Company
@@ -114,21 +115,23 @@ final readonly class RecordController
                     $columns,
                     $rows,
                     $filters->createView(),
-                    function (mixed $row) use ($type, $canEdit, $token, $query): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                    function (mixed $row) use ($type, $canEdit, $canDelete, $token, $query): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
                         $id      = is_array($row) && is_string($row['id'] ?? null) ? $row['id'] : '';
                         $actions = [Action::view($this->ui->url('nowo_crm_kit_show', ['type' => $type, 'id' => $id]), UiSupport::label('record.open'))];
                         if ($canEdit && $query->status === RecordStatus::Active) {
                             $actions[] = Action::edit($this->ui->url('nowo_crm_kit_edit', ['type' => $type, 'id' => $id]), UiSupport::label('record.edit'));
+                        }
+                        if ($canDelete && $query->status === RecordStatus::Active) {
                             $actions[] = new Action('delete', UiSupport::label('record.trash'), $this->ui->url('nowo_crm_kit_trash', ['type' => $type, 'id' => $id]), method: 'POST', csrfToken: $token, confirm: new Confirm(UiSupport::label('record.trash_confirm'), null, UiSupport::label('record.trash')), csrfField: 'crm_action[_token]');
                         }
-                        if ($canEdit && $query->status === RecordStatus::Trashed) {
+                        if ($canDelete && $query->status === RecordStatus::Trashed) {
                             $actions[] = new Action('restore', UiSupport::label('record.restore'), $this->ui->url('nowo_crm_kit_restore', ['type' => $type, 'id' => $id]), method: 'POST', csrfToken: $token, csrfField: 'crm_action[_token]');
                         }
 
                         return $actions;
                     },
                     Pagination::fromTotal($result->total, $query->page, $query->perPage, route: 'nowo_crm_kit_list', query: $request->query->all()),
-                    new EmptyState(UiSupport::label('list.empty.' . $subject->value), UiSupport::label('list.empty_hint'), $canEdit ? Action::create($this->ui->url('nowo_crm_kit_new', ['type' => $type]), UiSupport::label('record.new.' . $subject->value)) : null),
+                    new EmptyState(UiSupport::label('list.empty.' . $subject->value), UiSupport::label('list.empty_hint'), $this->ui->can(CrmPermission::Create) ? Action::create($this->ui->url('nowo_crm_kit_new', ['type' => $type]), UiSupport::label('record.new.' . $subject->value)) : null),
                     $this->ui->url('nowo_crm_kit_list', ['type' => $type]),
                     $query->sort === 'name' ? 'label' : $query->sort,
                     $query->direction,
@@ -149,7 +152,7 @@ final readonly class RecordController
     {
         return $this->ui->guard(function () use ($request, $type): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $subject = self::type($type);
-            $this->ui->require(CrmPermission::Edit);
+            $this->ui->require(CrmPermission::Create);
             $form = $this->forms->form($subject, null);
             $form->handleRequest($request);
             if ($form->isSubmitted() && $form->isValid()) {

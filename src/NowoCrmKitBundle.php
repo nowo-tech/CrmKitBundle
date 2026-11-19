@@ -7,6 +7,7 @@ namespace Nowo\CrmKitBundle;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\CrmKitWebUiSecurityPass;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\CrmPortsPass;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\PrivateEntityManagerPass;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ConfigurationTree;
@@ -64,6 +65,7 @@ final class NowoCrmKitBundle extends AbstractBundle
         $container->registerForAutoconfiguration(CrmHostObjectResolverInterface::class)->addTag(CrmHostObjectResolverInterface::HOST_OBJECT_TAG);
         $container->addCompilerPass(new PrivateEntityManagerPass());
         $container->addCompilerPass(new CrmPortsPass());
+        $container->addCompilerPass(new CrmKitWebUiSecurityPass());
     }
 
     /**
@@ -140,9 +142,8 @@ final class NowoCrmKitBundle extends AbstractBundle
         foreach (ParameterFlattener::flatten(self::ALIAS, $config) as $name => $value) {
             $parameters->set($name, $value);
         }
-        /** @var array{access: array{roles: array<string, list<string>>}, doctrine: array{entity_manager: ?string}, import: array{sync_rows: int, chunk_rows: int}} $typed */
+        /** @var array{doctrine: array{entity_manager: ?string}, import: array{sync_rows: int, chunk_rows: int}} $typed */
         $typed = $config;
-        $parameters->set(self::ALIAS . '.access.roles', $typed['access']['roles']);
         $parameters->set(self::ALIAS . '.import.sync_chunks', ServiceDefinitions::syncChunks($typed['import']['sync_rows'], $typed['import']['chunk_rows']));
         $manager = $typed['doctrine']['entity_manager'];
         $builder->setAlias(

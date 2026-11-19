@@ -7,8 +7,12 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Kernel;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\CrmKitWebUiSecurityPass;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\PrivateEntityManagerPass;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\AllowAllCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ConfigurableCrmKitAccessChecker;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestServices;
 use Nowo\TransactionDoctrine\WriteUnit\WriteUnit;
@@ -45,7 +49,12 @@ final class KernelBootTest extends KernelTestCase
         $container = $this->bootKernel($host->bundleConfig(), $host->configure())->getContainer();
 
         self::assertFalse($container->getParameter('nowo_crm_kit.ui.enabled'));
-        self::assertSame(['view' => [], 'edit' => [], 'manage' => [], 'amounts_view' => [], 'campaigns_send' => []], $container->getParameter('nowo_crm_kit.access.roles'));
+        foreach (['access', 'manage', 'settings', 'export', 'erase'] as $area) {
+            self::assertSame(['ROLE_ADMIN'], $container->getParameter('nowo_crm_kit.security.' . $area . '_roles'), $area);
+        }
+        self::assertFalse($container->getParameter('nowo_crm_kit.security.allow_unauthenticated'));
+        self::assertFalse($container->getParameter('nowo_crm_kit.security.resource_scoping'));
+        self::assertNull($container->getParameter('nowo_crm_kit.security.access_checker'));
         self::assertSame(['marketing_email', 'newsletter', 'tracking'], $container->getParameter('nowo_crm_kit.gdpr.purposes'));
         self::assertSame(5, $container->getParameter('nowo_crm_kit.import.sync_chunks'));
         self::assertSame($host->kind === Host::DDD ? 'ddd_' : 'nowo_', $container->getParameter('nowo_crm_kit.doctrine.table_prefix'));
@@ -97,6 +106,25 @@ final class KernelBootTest extends KernelTestCase
         self::assertInstanceOf(ContainerInterface::class, $services);
         self::assertInstanceOf(WriteUnit::class, $services->get('nowo_crm_kit.write_unit'));
         self::assertInstanceOf(ConflictFallbackListener::class, $services->get(ConflictFallbackListener::class));
+    }
+
+    public function testTheAreaCheckerCanBeTheHostsAndThePagesNeedSecurity(): void
+    {
+        $container = $this->bootKernel(TestServices::PORTS + ['security' => ['access_checker' => AllowAllCrmKitAccessChecker::class]])->getContainer();
+        self::assertInstanceOf(AllowAllCrmKitAccessChecker::class, $container->get(CrmKitAccessCheckerInterface::class));
+        $container = $this->bootKernel(TestServices::PORTS)->getContainer();
+        self::assertInstanceOf(ConfigurableCrmKitAccessChecker::class, $container->get(CrmKitAccessCheckerInterface::class));
+        // Without SecurityBundle, a demo that allows anonymous use gets every area open; otherwise the pages fail.
+        $builder = new ContainerBuilder();
+        foreach (['ui.enabled' => true, 'security.access_checker' => null, 'security.allow_unauthenticated' => true] as $key => $value) {
+            $builder->setParameter('nowo_crm_kit.' . $key, $value);
+        }
+        (new CrmKitWebUiSecurityPass())->process($builder);
+        self::assertSame(AllowAllCrmKitAccessChecker::class, (string) $builder->getAlias(CrmKitAccessCheckerInterface::class));
+        $builder->setParameter('nowo_crm_kit.security.allow_unauthenticated', false);
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('nowo_crm_kit.ui.enabled requires symfony/security-bundle');
+        (new CrmKitWebUiSecurityPass())->process($builder);
     }
 
     public function testLaterPhasesAreRefusedUntilTheirRelease(): void

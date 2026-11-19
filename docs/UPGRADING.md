@@ -82,6 +82,34 @@ is "for version 10.0 and above"; MySQL from 5.7.9, MariaDB from 10.4.3), so with
   (map them in your audit sink if it keeps a list).
 - The CSV export has a new `roles` column after `owner`: a consumer that reads columns by position must move.
 
+**Access (REQ-UI-002), breaking for the configuration.**
+
+- `access.roles` is **removed**: map its lists onto the new `security` node.
+
+  ```yaml
+  # 0.1.0                              # 0.2.0
+  access:                              security:
+      roles:                               access_roles: [ROLE_USER]        # was view
+          view: [ROLE_USER]                manage_roles: [ROLE_SALES]       # was edit (create, edit, trash, import)
+          edit: [ROLE_SALES]               settings_roles: [ROLE_ADMIN]     # was manage (tags, fields, settings, purge)
+          manage: [ROLE_ADMIN]             export_roles: [ROLE_ADMIN]       # was manage (CSV and GDPR export)
+                                           erase_roles: [ROLE_ADMIN]        # was manage (GDPR erasure)
+  ```
+
+  The new lists default to `[ROLE_ADMIN]` (0.1.0 granted nothing by default). Every area also needs `access_roles`.
+- With `ui.enabled: true` the build now **fails without SecurityBundle** unless `security.allow_unauthenticated: true`
+  (demos only).
+- The root key `access_checker` (a `CrmAccessCheckerInterface` of yours) still works in 0.2.0 and is **deprecated**
+  (removed in 0.3.0): the bundle wraps it and asks the new permissions `create`, `delete`, `import` as `edit` and
+  `export`, `erase` as `manage`, so a 0.1.0 implementation keeps working unchanged. Move to
+  `security.access_checker` (`CrmKitAccessCheckerInterface`) plus `nowo_crm_kit.record_access_check` listeners for
+  rules on one record ([USAGE.md](USAGE.md#access-checker)).
+- `CrmPermission` has five new cases (`create`, `delete`, `import`, `export`, `erase`): a `match` on it in your code
+  needs them; `CrmPermission::legacy()` gives the 0.1.0 equivalent.
+- On the pages, nobody signed in now meets the firewall's entry point (login redirect or 401) instead of a 404; no
+  tenant or the CRM off for the tenant are still 404, a refused permission 403.
+- `RoleMapAccessChecker` is gone (replaced by `SecurityCrmAccessChecker` + `ConfigurableCrmKitAccessChecker`).
+
 **Behaviour.**
 
 - `affiliate()` updates an existing pair in place (the affiliation keeps its id) instead of deleting and re-inserting it;

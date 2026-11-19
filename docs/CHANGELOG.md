@@ -33,8 +33,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Two-connection race tests (MySQL 8.4, MariaDB 11.4, PostgreSQL 16): concurrent role edits, two "set primary
   contact" calls on one company, an import chunk waiting on a locked parent before it settles any row.
 
+- **Access in the house shape (REQ-UI-002)**: the `security` node (`access_roles`, `access_checker`,
+  `allow_unauthenticated`, `manage_roles`, `settings_roles`, `export_roles`, `erase_roles`, `resource_scoping`), the
+  area checker `CrmKitAccessCheckerInterface` (and `TenantAwareCrmKitAccessCheckerInterface`) with
+  `ConfigurableCrmKitAccessChecker` and `AllowAllCrmKitAccessChecker`, the record checker `CrmResourceAccessChecker`
+  with the event `CrmKitEvents::RECORD_ACCESS_CHECK` (`RecordAccessCheckEvent`: grant / deny, a deny wins),
+  `CrmKitGuard` (`requireGranted`, `isGranted`, `grants`), a `kernel.controller` listener that requires `view` on every
+  bundle route (nobody signed in ⇒ the firewall's entry point), and a compile-time failure when the pages are on
+  without SecurityBundle (unless `allow_unauthenticated`). `CrmPermission` gains `create`, `delete`, `import`,
+  `export` and `erase`.
+
 ### Changed
 
+- **Breaking (configuration):** `access.roles` is replaced by `security.*_roles` (defaults `[ROLE_ADMIN]`); the root
+  `access_checker` key is deprecated (a 0.1.0 checker set there is wrapped and asked the new permissions as the old
+  ones) and removed in 0.3.0; `RoleMapAccessChecker` is removed.
 - **UD2-L-1**: an import chunk locks, before it settles any row, the existing contacts of its e-mails in id order and
   then the companies its rows name in id order (the lock order of every other path), instead of row by row.
 - **UD2-L-3**: a second `nowo:crm-kit:purge` that starts while a batch of the first holds the claim row prints

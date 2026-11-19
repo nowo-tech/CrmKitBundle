@@ -19,8 +19,8 @@ use Nowo\CrmKitBundle\Tests\Fixtures\TestContext;
 use function in_array;
 
 /**
- * Every page × every profile (contract section 13, deny by default): no tenant, CRM off for the tenant, nobody signed
- * in ⇒ 404; a record of another tenant ⇒ 404; inside the tenant the exact permission decides (403 without it). The
+ * Every page × every profile (contract section 13, deny by default): no tenant, CRM off for the tenant ⇒ 404; nobody
+ * signed in ⇒ the firewall's entry point (401 with HTTP Basic, REQ-UI-002); a record of another tenant ⇒ 404; inside the tenant the exact permission decides (403 without it). The
  * POST actions are checked the same way with a valid CSRF token.
  */
 final class PermissionMatrixTest extends CrmTestCase
@@ -76,7 +76,8 @@ final class PermissionMatrixTest extends CrmTestCase
         foreach (['tenant' => static function (TestContext $ctx): void { $ctx->tenant = null; }, 'feature' => static function (TestContext $ctx): void { $ctx->enabled['acme'] = false; }, 'actor' => static function (TestContext $ctx): void { $ctx->actor = null; }] as $what => $break) {
             $break($this->ctx());
             foreach ($pages as $page => $needs) {
-                self::assertSame(404, $this->httpStatus('GET', $page), 'no ' . $what . ' ' . $page);
+                // Nobody signed in behind a firewall: its entry point (HTTP Basic here, 401), REQ-UI-002.
+                self::assertSame($what === 'actor' ? 401 : 404, $this->httpStatus('GET', $page), 'no ' . $what . ' ' . $page);
             }
             $this->ctx()->tenant  = 'acme';
             $this->ctx()->enabled = [];
@@ -136,7 +137,7 @@ final class PermissionMatrixTest extends CrmTestCase
         foreach (['tenant' => static function (TestContext $ctx): void { $ctx->tenant = null; }, 'feature' => static function (TestContext $ctx): void { $ctx->enabled['acme'] = false; }, 'actor' => static function (TestContext $ctx): void { $ctx->actor = null; }] as $what => $break) {
             $break($this->ctx());
             foreach ($actions as $action => $needs) {
-                self::assertSame(404, $post($action), 'no ' . $what . ' ' . $action);
+                self::assertSame($what === 'actor' ? 401 : 404, $post($action), 'no ' . $what . ' ' . $action);
             }
             $this->ctx()->tenant  = 'acme';
             $this->ctx()->enabled = [];

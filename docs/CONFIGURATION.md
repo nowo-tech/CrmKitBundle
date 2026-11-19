@@ -4,7 +4,7 @@
 
 - [Full reference](#full-reference)
 - [Ports](#ports)
-- [Access (default checker)](#access-default-checker)
+- [Security (REQ-UI-002)](#security-req-ui-002)
 - [Feature gate and plan limits](#feature-gate-and-plan-limits)
 - [Doctrine](#doctrine)
 - [Fields, import and GDPR](#fields-import-and-gdpr)
@@ -25,19 +25,21 @@ Defaults shown:
 ```yaml
 nowo_crm_kit:
     tenant_resolver: null          # service id of CrmTenantResolverInterface; null = single tenant "default"
-    access_checker: null           # service id of CrmAccessCheckerInterface; null = RoleMapAccessChecker
+    access_checker: null           # DEPRECATED (0.2.0, removed in 0.3.0): a 0.1.0 CrmAccessCheckerInterface service id
     feature_gate: null             # service id of CrmFeatureGateInterface; null = ConfiguredFeatureGate
     plan_limits: null              # service id of CrmPlanLimitsInterface; null = ConfiguredPlanLimits
     actor_directory: null          # service id of CrmActorDirectoryInterface; null = the signed-in user only
     audit_sink: null               # service id of CrmAuditSinkInterface; null = one PSR log line per entry
     clock: null                    # service id of Psr\Clock\ClockInterface; null = FrameworkBundle's `clock`
-    access:
-        roles:                     # RoleMapAccessChecker only: permission => security roles; every list empty = denied
-            view: []
-            edit: []
-            manage: []
-            amounts_view: []       # used from phase B
-            campaigns_send: []     # used from phase E
+    security:                      # REQ-UI-002 (0.2.0)
+        access_roles: [ROLE_ADMIN]     # open the CRM (lists, 360° pages, search)
+        access_checker: null           # service id of CrmKitAccessCheckerInterface; null = ConfigurableCrmKitAccessChecker
+        allow_unauthenticated: false   # DEV/DEMO only
+        manage_roles: [ROLE_ADMIN]     # create, edit, trash / restore, import
+        settings_roles: [ROLE_ADMIN]   # tags, fields, settings, purge; every record with resource_scoping
+        export_roles: [ROLE_ADMIN]     # CSV export of lists, GDPR export
+        erase_roles: [ROLE_ADMIN]      # GDPR erasure
+        resource_scoping: false        # true: records open to their owner (or ownerless) and settings_roles by default
     feature:
         default_enabled: true      # ConfiguredFeatureGate: the CRM is on for every tenant
     limits:                        # ConfiguredPlanLimits: maximum active records per tenant (>= 0); null = unlimited
@@ -83,7 +85,7 @@ service ever needs to be overridden. What each port does and how to implement it
 | Key | Interface | Default |
 | --- | --- | --- |
 | `tenant_resolver` | `Domain\Port\CrmTenantResolverInterface` | `SingleTenantResolver`: tenant `default` |
-| `access_checker` | `Domain\Port\CrmAccessCheckerInterface` | `RoleMapAccessChecker`: `access.roles`, deny by default |
+| `access_checker` (deprecated) | `Domain\Port\CrmAccessCheckerInterface` | `SecurityCrmAccessChecker` (the `security` node below); a 0.1.0 host checker set here is still used, with `create` / `delete` / `import` asked as `edit` and `export` / `erase` as `manage` |
 | `feature_gate` | `Domain\Port\CrmFeatureGateInterface` | `ConfiguredFeatureGate`: `feature.default_enabled` |
 | `plan_limits` | `Domain\Port\CrmPlanLimitsInterface` | `ConfiguredPlanLimits`: `limits.*` |
 | `actor_directory` | `Domain\Port\CrmActorDirectoryInterface` | `SecurityActorDirectory`: the signed-in user only |
@@ -94,23 +96,49 @@ Panel providers (`CrmPanelProviderInterface`) and host object resolvers (`CrmHos
 configured: any service implementing them is autoconfigured with its tag (`nowo_crm_kit.panel`,
 `nowo_crm_kit.host_object`).
 
-## Access (default checker)
+## Security (REQ-UI-002)
 
-`access.roles` maps each `CrmPermission` to Symfony security roles. A role grants the permission tenant-wide. With
-every list empty nothing is granted, and without SecurityBundle nothing is granted either. The actor is the security
-user's identifier (an identifier that is not a usable exact id acts as nobody, so the CRM answers 404).
+The house access shape of the Nowo admin UIs. Two layers: the host's firewall (`access_control` on the CRM's path) and
+the bundle's checkers.
+
+| Key | Default | What |
+| --- | --- | --- |
+| `security.access_roles` | `[ROLE_ADMIN]` | Opening the CRM: lists, 360° pages, search (`canAccess`); every other area also needs it |
+| `security.manage_roles` | `[ROLE_ADMIN]` | Create, edit, trash / restore, import (`canCreate`, `canEdit`, `canDelete`, `canImport`) |
+| `security.settings_roles` | `[ROLE_ADMIN]` | Tags, custom fields, settings, purge from the trash, others' notes (`canManageSettings`); with `resource_scoping`, every record |
+| `security.export_roles` | `[ROLE_ADMIN]` | CSV export of lists, GDPR export (`canExport`) |
+| `security.erase_roles` | `[ROLE_ADMIN]` | GDPR erasure (`canErase`) |
+| `security.access_checker` | `null` | Service id of your `CrmKitAccessCheckerInterface` (or `TenantAwareCrmKitAccessCheckerInterface`); null = `ConfigurableCrmKitAccessChecker` on the lists above |
+| `security.allow_unauthenticated` | `false` | **DEV/DEMO only**: the pages without SecurityBundle or without signing in; the actor is then `anonymous` and, without SecurityBundle, every area is open |
+| `security.resource_scoping` | `false` | `true`: a record is open by default only to its owner (or when it has none) and to `settings_roles`; `nowo_crm_kit.record_access_check` listeners decide the rest |
+
+A role list grants its area to **any** of its roles; an empty list means no bundle-level role check for that area.
+With `ui.enabled: true`, the container build fails without SecurityBundle unless `allow_unauthenticated: true`.
+Decisions on one record go through the event `nowo_crm_kit.record_access_check`
+([USAGE.md](USAGE.md#record-access-listeners)).
 
 ```yaml
 nowo_crm_kit:
-    access:
-        roles:
-            view: [ROLE_USER]
-            edit: [ROLE_USER]
-            manage: [ROLE_ADMIN]
+    security:
+        access_roles: [ROLE_USER]
+        manage_roles: [ROLE_SALES]
+        settings_roles: [ROLE_ADMIN]
+        export_roles: [ROLE_ADMIN]
+        erase_roles: [ROLE_ADMIN]
+        # access_checker: App\Crm\CrmAreaAccessChecker
 ```
 
-`edit` and `manage` do not imply `view`: grant what each role needs. The permission matrix is in
-[SECURITY.md](SECURITY.md#permission-matrix).
+Lock the path in the host's firewall too (the routes live under the import prefix and `ui.path`):
+
+```yaml
+# config/packages/security.yaml
+security:
+    access_control:
+        - { path: ^/admin/crm, roles: IS_AUTHENTICATED_FULLY }
+```
+
+The 0.1.0 key `access.roles` is gone (see [UPGRADING.md](UPGRADING.md#to-020)); the root key `access_checker` still
+works in 0.2.0 and is removed in 0.3.0.
 
 ## Feature gate and plan limits
 
@@ -210,6 +238,6 @@ No phase-A value changes at runtime like an `.env` secret, so no runtime setting
 ## Container parameters
 
 Every value is published as `nowo_crm_kit.<path>` (for example `nowo_crm_kit.ui.enabled`,
-`nowo_crm_kit.import.chunk_rows`, `nowo_crm_kit.access.roles`, `nowo_crm_kit.roles.catalogue`,
+`nowo_crm_kit.import.chunk_rows`, `nowo_crm_kit.security.access_roles`, `nowo_crm_kit.roles.catalogue`,
 `nowo_crm_kit.affiliations.purposes`), plus `nowo_crm_kit.import.sync_chunks` (chunks run in
 the confirm request). The alias `nowo_crm_kit.entity_manager` (public) points at the bundle's entity manager.

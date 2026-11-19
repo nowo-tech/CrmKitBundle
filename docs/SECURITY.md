@@ -23,7 +23,7 @@ purposes (contract section 6.8) with the same model: no new permission, deny by 
 
 | Input | Handling |
 | --- | --- |
-| Configuration | Strict tree (unknown keys refused); `access.roles` empty by default (deny everything); later phases refuse `enabled: true` |
+| Configuration | Strict tree (unknown keys refused); `security.*_roles` default to `ROLE_ADMIN` (REQ-UI-002); `allow_unauthenticated` false; later phases refuse `enabled: true` |
 | Every service call | Tenant, feature gate, actor and permission checked in the application services, not only the controllers |
 | Identifiers | Ids are canonical lowercase UUIDs; host references are 1–128 bytes, never trimmed or folded, compared with `===`; binary NO PAD collations |
 | Form input | Trimmed, length- and kind-checked (e-mail, http(s) URL, phone, ISO country), control and format characters refused |
@@ -32,7 +32,16 @@ purposes (contract section 6.8) with the same model: no new permission, deny by 
 
 ## Security model
 
-- **Deny by default.** The default access checker grants nothing until `access.roles` maps roles; without
+- **Admin UI exposure (REQ-UI-002).** The pages are opt-in (`ui.enabled`). Two layers: the host's firewall
+  (`access_control` on the CRM's path, [CONFIGURATION.md](CONFIGURATION.md#security-req-ui-002)) and the bundle's
+  checks: a `kernel.controller` listener requires `view` on every bundle route (nobody signed in ⇒ the firewall's
+  entry point), each action asks its own permission through `CrmKitGuard` and the services ask again.
+  **`security.allow_unauthenticated: true` is a footgun**: it opens the pages to anonymous visitors (actor
+  `anonymous`), and without SecurityBundle every area; demos only, never in production. Without SecurityBundle and
+  without it, the container build fails.
+- **Deny by default.** The default area checker grants an area only to the roles of its `security.*_roles` list
+  (`ROLE_ADMIN` by default); with `resource_scoping` a record is open by default only to its owner (or when it has
+  none) and to `settings_roles`, and a `nowo_crm_kit.record_access_check` listener's deny always wins; without
   SecurityBundle it grants nothing at all. A host checker must return `false` for anything it does not grant.
 - **Order of the checks, per call:** tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404) →
   record lookup in the tenant (absent or another tenant's ⇒ 404) → permission (refused ⇒ 403). A user of another
@@ -44,16 +53,22 @@ purposes (contract section 6.8) with the same model: no new permission, deny by 
 
 ## Permission matrix
 
-| Action | view | edit | manage |
-| --- | --- | --- | --- |
-| Lists, 360° pages, timeline, notes, links, panels, consents, duplicates, vCard of one contact, header search | ✓ | | |
-| Create / edit / trash / restore records, notes, tag assignment, **roles** (0.2.0), host links, affiliations with their purposes, consent records, import, merge (on both records), host timeline entries | | ✓ | |
-| The company's primary contact (0.2.0): `edit` on the company (the contact needs `view`; through the affiliation form also `edit` on the contact; an import row that changes it also needs `edit` on the company, else `invalid`) | | ✓ | |
-| Edit or delete another person's note | | ✓ + ✓ | ✓ |
-| Tag and field administration, settings, purge from the trash, CSV export of lists, GDPR export and erasure | | | ✓ |
+| Action | Permission | Area (default `security.*_roles`) |
+| --- | --- | --- |
+| Lists, 360° pages, timeline, notes, links, panels, consents, duplicates, vCard of one contact, header search | `view` | `canAccess` (`access_roles`) |
+| Create companies and contacts | `create` | `canCreate` (`manage_roles`) |
+| Edit records, notes, tag assignment, roles, host links, affiliations with their purposes, consent records, merge (on both records), host timeline entries | `edit` | `canEdit` (`manage_roles`) |
+| The company's primary contact: `edit` on the company (the contact needs `view`; an import row that changes it also needs `edit` on the company, else `invalid`) | `edit` | `canEdit` |
+| Trash / restore | `delete` | `canDelete` (`manage_roles`) |
+| Import | `import` | `canImport` (`manage_roles`) |
+| CSV export of lists, GDPR export | `export` | `canExport` (`export_roles`) |
+| Tag and field administration, settings, purge from the trash, another person's note | `manage` | `canManageSettings` (`settings_roles`) |
+| GDPR erasure | `erase` | `canErase` (`erase_roles`) |
 
-`amounts_view` and `campaigns_send` exist for phases B–E and are not asked in 0.1.0. Notes: the author edits and
-deletes their own notes with `edit` on the record; another person's note needs `edit` on the record and `manage`.
+Every area also needs `canAccess`. A check on one record then goes through `CrmResourceAccessChecker` and the
+`nowo_crm_kit.record_access_check` event (a listener's deny wins). `amounts_view` and `campaigns_send` exist for later
+phases and use the settings area until then. Notes: the author edits and deletes their own notes with `edit` on the
+record; another person's note needs `edit` on the record and `manage`.
 
 ## Tenant isolation and exact identifiers
 

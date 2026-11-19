@@ -53,7 +53,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
     {
         $context = $this->support->access->base();
         $data    = $this->support->write(function (Effects $effects) use ($context, $contactId): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $record = $this->support->load($context, SubjectType::Contact, $contactId, CrmPermission::Manage, anyStatus: true);
+            $record = $this->support->load($context, SubjectType::Contact, $contactId, CrmPermission::Export, anyStatus: true);
             $store  = $this->support->store;
             $tags   = [];
             foreach ($store->tags($context->tenant) as $tag) {
@@ -101,7 +101,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
     {
         $context = $this->support->access->base();
         $this->support->write(function (Effects $effects) use ($context, $contactId): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $record = $this->support->load($context, SubjectType::Contact, $contactId, CrmPermission::Manage, anyStatus: true, lock: true);
+            $record = $this->support->load($context, SubjectType::Contact, $contactId, CrmPermission::Erase, anyStatus: true, lock: true);
             if (!$record instanceof Contact || $record->getStatus() === RecordStatus::Erased) {
                 return;
             }

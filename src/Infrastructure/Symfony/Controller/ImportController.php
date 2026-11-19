@@ -53,7 +53,7 @@ final readonly class ImportController
     public function index(Request $request): Response
     {
         return $this->ui->guard(function () use ($request): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $this->ui->require(CrmPermission::Edit);
+            $this->ui->require(CrmPermission::Import);
             $form = $this->ui->form(ImportUploadType::class, null, ['max_bytes' => $this->maxBytes], 'crm_import');
             $form->handleRequest($request);
             if ($form->isSubmitted() && $form->isValid()) {

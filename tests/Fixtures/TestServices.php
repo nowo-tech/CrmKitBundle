@@ -54,6 +54,8 @@ final class TestServices
         foreach (self::EVENTS as $event) {
             $recorder->tag('kernel.event_listener', ['event' => $event, 'method' => 'onEvent']);
         }
+        $s->set('test.queries', QueryLog::class)->public();
+        $s->set('test.query_counter', QueryCounter::class)->args([service('test.queries')])->tag('doctrine.middleware');
         $s->set('test.clock', MockClock::class)->args(['2026-11-18 10:00:00', 'UTC'])->public();
         $s->set('test.panel', TestPanel::class)->args([service('test.context')])->tag(CrmPanelProviderInterface::PANEL_TAG);
         $s->set('test.projects', TestProjects::class)->tag(CrmHostObjectResolverInterface::HOST_OBJECT_TAG);

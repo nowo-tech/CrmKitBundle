@@ -146,6 +146,12 @@ The tenant is the controller; the bundle is the tool.
 - A host link URL returned by a resolver is rendered as given (escaped): return local paths or http(s) URLs only.
 - A provider exception is contained (the panel is skipped); a transient storage failure is rethrown so the write unit
   can replay.
+- **`CrmBatchLookupInterface` is a system API (0.2.1).** It is scoped to the `TenantRef` it is given (every query names
+  the tenant, every row is re-checked with `===`), but it resolves no tenant, actor or feature gate and checks no
+  permission and no record visibility (`security.resource_scoping` does not apply). Only trusted server-side code
+  (queue consumers, scheduled jobs) may call it, with a tenant taken from its own trusted data. A host must not expose
+  it, or show its results, to end users without its own permission checks; per-user reads go through
+  `CrmReaderInterface` and `HostLinkServiceInterface`, which check everything.
 
 ## Shared entity manager
 

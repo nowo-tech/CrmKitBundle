@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use function mb_strtolower;
 use function preg_match;
 use function strlen;
+use function trim;
 
 /**
  * An e-mail address as typed (contract section 5): at most 254 bytes, one `@` with a local part and a domain with a
@@ -32,5 +33,19 @@ final readonly class EmailAddress
     public function key(): string
     {
         return mb_strtolower($this->value, 'UTF-8');
+    }
+
+    /**
+     * The key of an address given to a lookup: trimmed, then lowercase like {@see self::key()} (the stored contact
+     * e-mail key), or null when it cannot be a stored address (empty, invalid UTF-8, longer than 254 bytes).
+     */
+    public static function lookupKey(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '' || strlen($value) > 254 || preg_match('//u', $value) !== 1) {
+            return null;
+        }
+
+        return mb_strtolower($value, 'UTF-8');
     }
 }

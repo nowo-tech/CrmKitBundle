@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection;
 
 use Nowo\CrmKitBundle\Application\ConsentService;
 use Nowo\CrmKitBundle\Application\CrmAccess;
+use Nowo\CrmKitBundle\Application\CrmBatchLookup;
 use Nowo\CrmKitBundle\Application\CrmExporter;
 use Nowo\CrmKitBundle\Application\CrmPersonalData;
 use Nowo\CrmKitBundle\Application\CrmReader;
@@ -16,6 +17,7 @@ use Nowo\CrmKitBundle\Application\MergeService;
 use Nowo\CrmKitBundle\Application\NoteService;
 use Nowo\CrmKitBundle\Application\PartyCatalogue;
 use Nowo\CrmKitBundle\Application\PlanCounter;
+use Nowo\CrmKitBundle\Application\Port\CrmBatchLookupStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Application\RecordPurger;
 use Nowo\CrmKitBundle\Application\RecordService;
@@ -37,6 +39,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmBatchLookupInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmCatalogueInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
@@ -51,6 +54,7 @@ use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\CrmMetadataListener;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmBatchLookupStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\CountersRebuildCommand;
@@ -171,6 +175,8 @@ final class ServiceDefinitions
         $s->alias(TransactionRunnerInterface::class, DoctrineTransactionRunner::class);
         $s->set(DoctrineCrmStore::class)->args([service(DoctrineTransactionRunner::class)]);
         $s->alias(CrmStoreInterface::class, DoctrineCrmStore::class);
+        $s->set(DoctrineCrmBatchLookupStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->alias(CrmBatchLookupStoreInterface::class, DoctrineCrmBatchLookupStore::class);
         $s->set(CrmMetadataListener::class)->args([param($p . 'doctrine.table_prefix')])->tag('doctrine.event_listener', ['event' => 'loadClassMetadata']);
         $s->set(EntityManagerHygieneListener::class)->args([service(DoctrineTransactionRunner::class)])
             ->tag('kernel.event_listener', ['event' => 'kernel.finish_request', 'method' => 'clear', 'priority' => -2048])
@@ -221,6 +227,9 @@ final class ServiceDefinitions
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
+        // System API for the host's backend jobs: tenant-scoped, no access checks (USAGE "Batch lookups for host jobs").
+        $s->set(CrmBatchLookup::class)->args([service(CrmBatchLookupStoreInterface::class), service(PartyCatalogue::class)]);
+        $s->alias(CrmBatchLookupInterface::class, CrmBatchLookup::class)->public();
 
         // Console.
         $s->set(PurgeCommand::class)->args([service(RecordPurger::class)])->tag('console.command');

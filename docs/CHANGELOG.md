@@ -49,6 +49,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   SQL (port `CrmRecordVisibilityInterface`, default `ScopedRecordVisibility`); the same set is the default of a
   decision on one record. Whoever may manage the settings (the area checker's `canManageSettings`, the host's when
   configured) sees everything.
+- **Batch lookups for host jobs (0.2.1)**: `CrmBatchLookupInterface` (public alias), a system API for the host's
+  backend jobs, tenant-scoped and without access checks: `contactsByEmails()`, `companiesByDomains()`,
+  `subjectsLinkedToMany()` (`<type>:<id>` keys), `affiliationsOf()` (primary first) and `rolesAndTagsOf()` (read model
+  `RolesAndTags`). One read query per call (per chunk of 500 inputs), every usable input answered, active records only.
+  Key helpers `EmailAddress::lookupKey()`, `CompanyDomain::key()` / `fromWebsite()` (the stored domain key now comes
+  from it), `HostObjectRef::key()`, `SubjectRef::key()`; persistence port `CrmBatchLookupStoreInterface` with
+  `DoctrineCrmBatchLookupStore` (plain SQL, no entity hydrated).
+- `CrmKitEvents` constants for the domain events dispatched after the commit (`CONTACT_ERASED`, `RECORDS_MERGED`,
+  `HOST_LINK_REMOVED`, `RECORD_PURGED`, … : their class names), and the host's view of link, merge, erasure and purge
+  changes in USAGE "Events".
 
 ### Changed
 

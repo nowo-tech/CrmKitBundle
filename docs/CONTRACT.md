@@ -322,6 +322,7 @@ invalid one is 404), not as `RecordId` objects; one `RecordServiceInterface` ser
 | `CrmExporterInterface` | `csv(ListQuery): iterable<string>` (one method for both types: the query's type; streamed lines, CSV-injection safe), `vcard(string $contactId): string` (vCard 4.0) |
 | `CrmPersonalDataInterface` | `export(string $contactId): array` (JSON-ready), `erase(string $contactId): void` (no reason code) |
 | `CrmSettingsInterface` | `get(): array{trash_days, timeline_years, import_keep_days, merge_keep_days, version}`, `update(int $trashDays, int $timelineYears, int $importKeepDays, int $mergeKeepDays, int $expectedVersion)` |
+| `CrmBatchLookupInterface` **(0.2.1)** | **System API** (the exception to "every call checks the permission": no tenant resolution, no actor, no permission or visibility check; trusted backend jobs only, §13). Tenant-scoped, one read query per call (per chunk of 500): `contactsByEmails(TenantRef, list<string>): array<emailKey, list<contactId>>`, `companiesByDomains(TenantRef, list<string>): array<domainKey, list<companyId>>`, `subjectsLinkedToMany(TenantRef, list<HostObjectRef>): array<"type:id", list<SubjectRef>>`, `affiliationsOf(TenantRef, list<contactId>): array<contactId, list<companyId>>` (primary first, then affiliation date, then id), `rolesAndTagsOf(TenantRef, list<SubjectRef>): array<"type:id", RolesAndTags>`. Active records only (trashed, merged and erased excluded); every usable input answered |
 
 ## 8. Ports and SPIs (host-implemented; each has a safe default)
 
@@ -552,7 +553,8 @@ scope (or a scope on the company provider) answers `null`.
 
 ## 13. Permission matrix (deny by default)
 
-Every call: tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404; **0.2.0** on the pages behind a
+Every call (except the **0.2.1** system API `CrmBatchLookupInterface`, §7: tenant-scoped, no actor, no permission or
+visibility check, for trusted backend jobs only): tenant (none ⇒ 404) → feature gate (off ⇒ 404) → actor (none ⇒ 404; **0.2.0** on the pages behind a
 firewall: the firewall's entry point, login redirect or 401) → `isGranted()` (false ⇒ 403); a record of another tenant
 is 404.
 
@@ -594,7 +596,11 @@ Every area also needs `canAccess`. Notes: the author edits / deletes own notes w
 rollback or a write-unit replay drops what the failed attempt collected. Audit entries (`crm.company.created`,
 `crm.contact.erased`, `crm.records.merged`, `crm.import.completed`, `crm.settings.changed`, …) are written through the
 audit sink after commit with counts and ids only. **(0.2.0)** `RolesChanged` (type, id, added and removed keys) and the audit keys `crm.roles.changed`,
-`crm.affiliation.primary_contact`. **(0.1.0)** Audited: record create / update / trash / restore / purge,
+`crm.affiliation.primary_contact`. **(0.2.1)** `Infrastructure\Symfony\Event\CrmKitEvents` names every domain event
+(constants equal to the class names). There is no `CompanyErased` (companies are not erased; they leave through the
+trash and `RecordPurged` or the retention purge, which dispatches no event). Erasure, purge and merge delete or move a
+record's links without a `HostLinkRemoved` per link: `ContactErased`, `RecordPurged` and `RecordsMerged` (type,
+survivor, merged) cover them. **(0.1.0)** Audited: record create / update / trash / restore / purge,
 merge, contact export and erasure, consent, note delete, tag and field administration, import upload / completion /
 cancel, settings, retention purge. Not audited (timeline and events only): note add / edit, tag assignment, host link
 add / remove, affiliations, host timeline entries.
@@ -986,6 +992,7 @@ REQ-RUNTIME-002 / 003 with two-connection race tests, REQ-SEC-006, deny by defau
 | Release | Phase | Content |
 |---|---|---|
 | **0.2.0** (this release) | A2 | Party roles; the company's primary contact and affiliation purposes; role and purpose filters, import and export columns; the UD-2 follow-ups (§6.8, §15) |
+| **0.2.1** | A2 patch | Additive, for host backend jobs: `CrmBatchLookupInterface` batch lookups (§7; system API without access checks, one query per call) and the `CrmKitEvents` constants of the domain events (§14). No schema change |
 | **0.3.0** | B, funnels | Funnels with per-stage statistics and next actions (below) |
 | **0.4.0** | B2, tasks and agenda | Tasks, automations, meetings and calls, "my agenda" (below) |
 | **0.5.0** | C, quotes | Below |

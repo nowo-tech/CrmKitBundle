@@ -27,4 +27,12 @@ final readonly class SubjectRef
     {
         return new self($type, new RecordId($id), $owner === null ? null : new ActorRef($owner));
     }
+
+    /**
+     * The key of the record in batch results: `<type>:<id>`, e.g. `contact:0190…` (the owner is not part of it).
+     */
+    public function key(): string
+    {
+        return $this->type->value . ':' . $this->id->value;
+    }
 }

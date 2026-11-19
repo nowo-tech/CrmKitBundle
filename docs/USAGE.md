@@ -15,6 +15,7 @@
   - [Host object resolvers](#host-object-resolvers)
 - [Services a host calls](#services-a-host-calls)
 - [Events](#events)
+- [Batch lookups for host jobs](#batch-lookups-for-host-jobs)
 - [Errors](#errors)
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Pages and routes](#pages-and-routes)
@@ -381,6 +382,7 @@ resolves the tenant and the actor and checks the permission itself (404 / 403); 
 | `CrmExporterInterface` | `csv(ListQuery): iterable<string>` (`manage`), `vcard(contactId): string` (`view`) |
 | `CrmPersonalDataInterface` | `export(contactId): array`, `erase(contactId)` (`manage`, idempotent) |
 | `CrmSettingsInterface` | `get(): array{trash_days, timeline_years, import_keep_days, merge_keep_days, version}`, `update(int ×4, int $expectedVersion)` (`manage`) |
+| `CrmBatchLookupInterface` (0.2.1) | a **system API without access checks** for the host's backend jobs: see [Batch lookups for host jobs](#batch-lookups-for-host-jobs) |
 
 ### Creating and editing a record
 
@@ -451,6 +453,75 @@ final readonly class ProjectClientSync
     public function __invoke(RecordsMerged $event): void
     {
         // Point your own references at $event->survivorId.
+    }
+}
+```
+
+The event names are the class names; `Infrastructure\Symfony\Event\CrmKitEvents` has a constant for each (0.2.1):
+`RECORD_CREATED`, `RECORD_UPDATED`, `RECORD_TRASHED`, `RECORD_RESTORED`, `RECORD_PURGED`, `RECORDS_MERGED`,
+`CONTACT_ERASED`, `NOTE_ADDED`, `CONSENT_RECORDED`, `IMPORT_COMPLETED`, `TAGS_CHANGED`, `ROLES_CHANGED`,
+`HOST_LINK_ADDED`, `HOST_LINK_REMOVED` (e.g. `#[AsEventListener(event: CrmKitEvents::CONTACT_ERASED)]`).
+
+What a host that keeps its own copy of links, e-mails or affiliations listens to:
+
+| Change | Event | Notes |
+| --- | --- | --- |
+| A link removed by `unlink()` | `HostLinkRemoved` | record `type` + `id`, `hostType` + `hostId` |
+| A record merged into another | `RecordsMerged` | `type`, `survivorId` (to), `mergedId` (from); the merged record's links, roles, tags and affiliations moved to the survivor (no `HostLinkRemoved` / `HostLinkAdded` for them) |
+| A contact erased (GDPR) | `ContactErased` | `contactId`; its links, tags, roles and affiliations are deleted with it (no `HostLinkRemoved` for them) |
+| A record trashed | `RecordTrashed` | it leaves every batch lookup at once (except `rolesAndTagsOf()`); `RecordRestored` brings it back |
+| A trashed record purged with `purge()` | `RecordPurged` | its links, tags, roles and affiliations are deleted with it; the scheduled retention purge (`nowo:crm-kit:purge`) deletes trashed records without an event (they already left with `RecordTrashed`) |
+
+There is no `CompanyErased`: companies hold no personal data and are not erased; a company leaves through the trash
+(`RecordTrashed`, then `RecordPurged` or the retention purge).
+
+## Batch lookups for host jobs
+
+`CrmBatchLookupInterface` (0.2.1, public alias) answers a host's backend jobs ("which customers does this e-mail
+thread, domain or issue concern?") with **one read query per call** (per chunk of `CrmBatchLookupInterface::CHUNK` =
+500 inputs; a longer list runs one query per chunk, never one per input).
+
+> **System API.** Every method takes the `TenantRef` explicitly and is scoped to it, but it does **not** resolve the
+> tenant, the feature gate or the actor, and checks **no permission** and **no record visibility**
+> (`security.resource_scoping`). It is meant for trusted server-side code (queue consumers, cron jobs). Never pass it a
+> tenant or input taken from a request, and never show its results to a person, without your own checks
+> ([SECURITY.md](SECURITY.md#host-extension-points)). For per-user reads use `CrmReaderInterface` /
+> `HostLinkServiceInterface`.
+
+| Method | Result |
+| --- | --- |
+| `contactsByEmails(TenantRef, list<string> $emails)` | `array<emailKey, list<contactId>>`. Keys are the inputs trimmed and lowercased (`EmailAddress::lookupKey()`, the stored contact e-mail key). The key is unique per tenant, so a list holds at most one id today; it stays a list. |
+| `companiesByDomains(TenantRef, list<string> $domains)` | `array<domainKey, list<companyId>>` (ascending). Keys are `CompanyDomain::key()`: the lowercase host without `www.`, as stored from the website; a URL is accepted. Several companies may share a domain. No free-mail filter: that is the caller's concern. |
+| `subjectsLinkedToMany(TenantRef, list<HostObjectRef>)` | `array<hostKey, list<SubjectRef>>`, the batch form of `subjectsLinkedTo()`. `hostKey` is `HostObjectRef::key()`: `<type>:<id>` (the type never holds `:`, so the first `:` splits it). Link creation order; each `SubjectRef` carries the owner. |
+| `affiliationsOf(TenantRef, list<string> $contactIds)` | `array<contactId, list<companyId>>`: the primary affiliation first, then by affiliation date, then company id. |
+| `rolesAndTagsOf(TenantRef, list<SubjectRef>)` | `array<subjectKey, RolesAndTags>`; `subjectKey` is `SubjectRef::key()` (`company:<id>` / `contact:<id>`); `RolesAndTags::$roles` holds the configured role keys in catalogue order, `$tags` the tag name keys (lowercase) in byte order. |
+
+Shapes: every usable input is a key of the result, with an empty list (or empty `RolesAndTags`) when nothing matched;
+duplicates collapse; unusable inputs (an empty or invalid address, a host-less domain, an id that is not a lowercase
+UUID) are left out. Only **active** records are returned: trashed records, merge tombstones and erased contacts never
+are (an affiliation counts when both the contact and the company are active). `rolesAndTagsOf()` reads the rows of
+the given records whatever their status. Read-only: no write unit, no event, no lock; stateless (worker mode).
+
+```php
+use Nowo\CrmKitBundle\Domain\Service\CrmBatchLookupInterface;
+use Nowo\CrmKitBundle\Domain\Value\{HostObjectRef, TenantRef};
+
+final readonly class AffectedCustomersJob
+{
+    public function __construct(private CrmBatchLookupInterface $crm)
+    {
+    }
+
+    public function __invoke(string $organisationId, array $senderEmails, array $issueIds): void
+    {
+        $tenant   = new TenantRef($organisationId);                    // from the job's own trusted payload
+        $contacts = $this->crm->contactsByEmails($tenant, $senderEmails);
+        $linked   = $this->crm->subjectsLinkedToMany($tenant, array_map(
+            static fn (string $id): HostObjectRef => new HostObjectRef('issue', $id),
+            $issueIds,
+        ));
+        $companies = $this->crm->affiliationsOf($tenant, array_merge(...array_values($contacts)));
+        // …
     }
 }
 ```

@@ -6,17 +6,12 @@ namespace Nowo\CrmKitBundle\Domain\Model;
 
 use LogicException;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Value\CompanyDomain;
 
-use function is_string;
 use function mb_strtolower;
-use function parse_url;
 use function preg_replace;
 use function sprintf;
-use function str_starts_with;
 use function strtoupper;
-use function substr;
-
-use const PHP_URL_HOST;
 
 /**
  * A company (contract section 6.2).
@@ -110,8 +105,6 @@ class Company extends CrmRecord
     {
         $this->nameKey   = mb_strtolower($this->name, 'UTF-8');
         $this->taxIdKey  = $this->taxId === null ? null : strtoupper((string) preg_replace('/[\s.\-\/]+/u', '', $this->taxId));
-        $host            = $this->website === null ? null : parse_url($this->website, PHP_URL_HOST);
-        $host            = is_string($host) ? mb_strtolower($host, 'UTF-8') : null;
-        $this->domainKey = $host !== null && str_starts_with($host, 'www.') ? substr($host, 4) : $host;
+        $this->domainKey = CompanyDomain::fromWebsite($this->website);
     }
 }

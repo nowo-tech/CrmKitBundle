@@ -9,6 +9,11 @@
 
 ## Unreleased
 
+**0.2.1 (additive, nothing to change).** `CrmBatchLookupInterface` is a new public service for backend jobs: it
+checks no permission and no record visibility, so call it only from trusted server-side code with a tenant your job
+already trusts (USAGE "Batch lookups for host jobs"). `CrmKitEvents` gains constants equal to the domain event class
+names; listeners registered by class name keep working. No schema change.
+
 ## To 0.2.0
 
 Party roles, the company's primary contact and affiliation purposes; the UD-2 concurrency follow-ups.

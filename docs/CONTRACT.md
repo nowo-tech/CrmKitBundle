@@ -1,14 +1,16 @@
 # CRM kit bundle (CrmKitBundle). Contract v0.1 for symfony-beacon spec 245
 
-Status 2026-11-18: **v0.1, written for the build of phase A (0.1.0).** Every Q-O (§22) and Q-B (§23) question has a
+Status 2026-11-19: **v0.2, phase A2 (0.2.0: party roles, affiliation purposes and the company's primary contact) on
+top of phase A (0.1.0), with the owner's phase plan of 2026-11-19 (§25).** Status 2026-11-18: **v0.1, written for the
+build of phase A (0.1.0).** Every Q-O (§22) and Q-B (§23) question has a
 recommended answer; the build follows those answers until the owner and Beacon reply (§24). The owner approved the
 bundle and the repository `nowo-tech/CrmKitBundle` was created (public, empty) on 2026-11-18; phase A is built in
 `.uic-work/crmkit-1118/repo`: `main` gets the scaffold, phase A goes to `feat/phase-a-companies-contacts` and a PR. No
 tag before the owner registers Packagist and the audit passes.
 
-> **This copy follows the phase A code (0.1.0).** It is the contract v0.1 with every place where the build differs
-> from the plan adjusted to what the code does; those places are marked **(0.1.0)**. The plan for the later phases is
-> unchanged.
+> **This copy follows the code of 0.2.0.** It is the contract with every place where the build differs from the plan
+> adjusted to what the code does; those places are marked **(0.1.0)** or **(0.2.0)**. The later phases follow the plan
+> of §25; each gets its own contract revision before it is built.
 
 - **Approval.** Owner decision **D-20261118-05** (Beacon `docs/DECISIONS.md`): organizations get a complete CRM in
   phases A–G, built as a new reusable, configurable bundle `nowo-tech/crm-kit-bundle`, also for other projects (a
@@ -65,14 +67,21 @@ or routes and renders nothing):
 | Phase | Version | Contents | Enabled by |
 |---|---|---|---|
 | **A** companies and contacts | **0.1.0** | Companies; contacts (several per company, through affiliations with a role and one primary company); owners; tags; custom fields; notes; activity timeline; host links and host panels on a 360° page; CSV and vCard import with preview; duplicate hints and merging; CSV / vCard export; GDPR (consent per purpose, export, erasure, retention); trash with restore; plan-limit counters; SearchKit provider; audit events | always on when the bundle is enabled (`companies` is the root of every other phase) |
-| **B** pipeline | 0.2.0 | Pipelines with stages (configurable per tenant), deals (amount, currency, probability, expected close, owner, company, contacts), board by stage, won / lost with reason, next action with reminders (NotifyKit), activities (call, meeting, e-mail, task) on deals and contacts, calendar link (ICS) | `pipeline.enabled` |
-| **C** quotes | 0.3.0 | Product / service catalogue, quotes with lines, taxes, discounts, versions, PDF with the tenant's brand (brand-contracts), public accept link (signed token) and e-sign hook, accepted quote ⇒ deal won ⇒ host hook (project / board from a template) | `quotes.enabled` (needs B) |
-| **D** invoices | 0.4.0 | Invoices from quotes or host billable lines (hours), numbering per series, VeriFactu records (VerifactuBundle), SEPA mandates and direct-debit batches (SepaPaymentBundle), payment status, payment reminders | `invoices.enabled` (needs C) |
-| **E** campaigns | 0.5.0 | Segments (tags, fields, activity), e-mail campaigns through MailKit with consent, suppression, unsubscribe, optional open / click tracking under tracking consent, templates | `campaigns.enabled` |
-| **F** customer portal | 0.6.0 | A contact signs in by magic link and sees their quotes, invoices and host panels the host allows (tickets, wiki pages, project status), permission-limited | `portal.enabled` |
-| **G** reports | 0.7.0 → 1.0.0 | Pipeline value, forecast, win rate, revenue by client / host project, activity per person, CSV exports; host report hook | `reports.enabled` |
+| **A2** roles and purposes | **0.2.0** | Party roles (many per company or contact; configurable catalogue), the company's primary contact and affiliation purposes, role / purpose filters, import and export columns; the UD-2 concurrency follow-ups (§6.8, §25) | always on (part of phase A) |
+| **B** funnels | 0.3.0 | Deal funnels and party lifecycle funnels with ordered stages, won / lost terminal stages, stage history and per-stage statistics; next actions through `CrmTaskPort` (§25) | `pipeline.enabled` |
+| **B2** tasks and agenda | 0.4.0 | Tasks from any record, opt-in automations, meetings and calls with attendees, "my agenda", reminders and ICS invites (§25) | its own switch (decided in its contract revision) |
+| **C** quotes | 0.5.0 | Product / service catalogue, quotes from a deal or directly on a company or contact, versions, PDF, signed and expiring accept / reject link, e-sign hook; outcomes feed the funnels (§25) | `quotes.enabled` |
+| **D** invoices | 0.6.0 | Invoices from accepted quotes, host billable lines or by hand; atomic numbering per series; corrective invoices; VeriFactu (VerifactuBundle) and SEPA (SepaPaymentBundle) after commit; payment status and reminders (§25) | `invoices.enabled` |
+| **F** customer portal | 0.7.0 | A contact signs in (invitation, magic link / passwordless) and sees their party's invoices, quotes, pending amount, consents and subscriptions (§25) | `portal.enabled` |
+| **S** scoring | 0.8.0 | Explainable rule-based contact and company scoring, hot / warm / cold bands (§25) | its own switch |
+| **E1** lists and segments | 0.9.0 | Static lists and dynamic segments, bulk add (§25) | its own switch |
+| **E2** informative circulars | 0.10.0 | One e-mail per recipient through MailKit's queue, per-purpose unsubscribe, consent rules, bounces, send log (§25) | `campaigns.enabled` |
+| **G** reports | later → 1.0.0 | Deal scoring, deeper forecasts, velocity and cohorts, open / click tracking, two-way sync with external calendars | `reports.enabled` |
 
-**Non-goals (all phases, spec 245 "out of scope"):** telephony (CTI), social media inboxes, AI scoring, a marketing
+The phase plan was set by the owner on 2026-11-19 (§25); it replaces the earlier order B → C → D → E → F → G.
+
+**Non-goals (all phases, spec 245 "out of scope"):** telephony (CTI), social media inboxes, AI scoring (rule-based,
+explainable scoring is phase S), a marketing
 automation engine (multi-step journeys), an accounting ledger (the CRM records invoices and payment state; ledgers
 belong to the host or an accounting product), payment card processing, native apps. Phase A does not ship a public JSON
 API (Q-O6) or attachments (Q-O9).
@@ -186,7 +195,8 @@ Invalid; Limit }` (**0.1.0**: no `Skipped`; a skipped duplicate is `Duplicate`),
 | `<p>crm_settings` | PK `tenant_id`; `trash_days` (7–365, 30), `timeline_years` (1–10, 5), `import_keep_days` (1–90, 30), `merge_keep_days` (1–365, 90), `version`, `updated_by_id`, `updated_at` | — | Upsert under version |
 | `<p>crm_company` | `tenant_id`, `name` (200), `name_key` (200, lowercase, duplicate hints), `legal_name` (200) NULL, `tax_id` (64) NULL, `tax_id_key` (64) NULL (uppercase, no spaces / dots / dashes), `website` (255) NULL, `domain_key` (190) NULL (host of the website, no `www.`), `email` (254) NULL, `phone` (40) NULL, `street` (255), `postal_code` (20), `city` (120), `region` (120), `country` (2) NULL, `industry` (80) NULL, `description` (text ≤ 5000) NULL, `owner_id` NULL, `custom` (json), `status`, `merged_into_id` NULL, `trashed_at` NULL, `version`, `created_at`, `created_by_id` NULL, `updated_at`, `updated_by_id` NULL | idx `(tenant_id, status, name_key)`, `(tenant_id, domain_key)`, `(tenant_id, tax_id_key)`, `(tenant_id, owner_id)` | Version on every edit |
 | `<p>crm_contact` | `tenant_id`, `first_name` (120), `last_name` (120), `display_name` (241), `sort_key` (241, lowercase "last first"), `email` (254) NULL, `email_key` (254) NULL, `phone` (40) NULL, `mobile` (40) NULL, `job_title` (120) NULL, `street`, `postal_code`, `city`, `region`, `country` NULL, `owner_id` NULL, `custom` (json), `status`, `merged_into_id` NULL, `trashed_at` NULL, `erased_at` NULL, `version`, `created_at`, `created_by_id`, `updated_at`, `updated_by_id` | **unique `(tenant_id, email_key)`** (NULLs allowed); idx `(tenant_id, status, sort_key)`, `(tenant_id, owner_id)` | Version; erasure blanks the personal columns |
-| `<p>crm_affiliation` | `tenant_id`, `contact_id`, `company_id`, `role` (120) NULL, `is_primary`, `created_at` | **unique `(contact_id, company_id)`**; idx `(tenant_id, company_id)` | Insert / delete; primary flag changed under the contact's version |
+| `<p>crm_affiliation` | `tenant_id`, `contact_id`, `company_id`, `role` (120) NULL, `is_primary` (the contact's primary company), `created_at`, **(0.2.0)** `is_primary_contact` (the company's primary contact, default false), `purpose_keys` (600, default `''`: the purposes as `,billing,orders,`) | **unique `(contact_id, company_id)`**; idx `(tenant_id, company_id)` | Insert / delete; primary flag changed under the contact's version |
+| `<p>crm_role_assignment` **(0.2.0)** | `tenant_id`, `subject_type`, `subject_id`, `role_key` (32), `created_at`, `created_by_id` NULL | **unique `(tenant_id, subject_id, role_key)`**; idx `(tenant_id, role_key, subject_type)` | Insert / delete under the record's lock (set semantics); a racing duplicate ⇒ one more run |
 | `<p>crm_tag` | `tenant_id`, `name` (60), `name_key` (60), `colour` (UiKit palette token), `version`, `created_at` | **unique `(tenant_id, name_key)`** | Version on rename |
 | `<p>crm_tagging` | `tenant_id`, `tag_id`, `subject_type`, `subject_id`, `created_at` | **unique `(tag_id, subject_type, subject_id)`**; idx `(tenant_id, subject_type, subject_id)` | Insert (duplicate = already tagged) / delete |
 | `<p>crm_field` | `tenant_id`, `subject_type`, `field_key`, `label` (80), `type`, `choices` (json list of ≤ 50 strings ≤ 80), `required`, `position`, `archived`, `version`, `created_at` | **unique `(tenant_id, subject_type, field_key)`** | Version; archived, never deleted (values stay in `custom`) |
@@ -252,6 +262,41 @@ first, keyset-paged by `id` (UUIDv7, so time order; **0.1.0**); a company page i
 | F | `crm_portal_access` (contact, token hash, expires, last_used_on), `crm_portal_session` |
 | G | none (reads; optional `crm_report_cache` with tenant key and TTL) |
 
+### 6.8 Party roles and affiliation purposes (0.2.0)
+
+- **Roles.** A company or a contact (also a standalone contact: a private customer) holds **any number** of party roles
+  from the configured catalogue `roles.catalogue` (built in: `customer`, `supplier`, `partner`; `distributor` is
+  translated but opt-in; a host adds its own keys). Keys match `^[a-z][a-z0-9_]{0,31}$` with `/D` (no trailing
+  newline), at most 32, compared byte for byte (`RoleKey`); labels are the translation keys `role.<key>` of the
+  `NowoCrmKitBundle` domain (7 locales for the built-in ones; a host translates its own keys in that domain). One row
+  per role in `crm_role_assignment` (binary NO PAD collation on `role_key`, like every key column).
+- **Not roles.** A prospect and a former customer are **lifecycle stages of the customer role** (the party lifecycle
+  funnels of phase B, 0.3.0), not roles; a competitor is a **tag**.
+- **A role removed from the configuration** never breaks a row: its assignments stay in the database and are
+  **hidden** (record views, lists, filters, CSV export, forms); a role edit only adds or removes configured roles, so
+  a hidden role is kept as it is and shows again when the key is configured again. The GDPR export lists **every
+  stored role**, configured or not (it shows what the database holds about the person). The same rule applies to
+  affiliation purposes.
+- **Affiliations.** At most one **primary company per contact** (`is_primary`, unchanged) and at most one **primary
+  contact per company** (`is_primary_contact`), enforced under the company's row lock (lock order contact → company,
+  as `affiliate()`); one or more **purposes** from `affiliations.purposes` (built in: `billing`, `orders`,
+  `technical`, `general`; same key rule, labels `purpose.<key>`), stored sorted and distinct in `purpose_keys` as
+  `,billing,orders,` so a filter is one exact `LIKE` with escaped wildcards.
+- **Filters.** `ListQuery::$role` (companies and contacts), `ListQuery::$purpose` and `ListQuery::$primaryContactOnly`
+  (contacts; one affiliation must match every affiliation filter, with `companyId` too); list pages filter by role,
+  purpose and "primary contacts only"; an unknown key in the URL is ignored.
+- **Import.** Columns `roles` (keys separated by `,` or `;`, both types), and for contacts `purposes` and
+  `primary_contact` (yes / no: `1`, `true`, `yes`, `y`, `x` / empty, `0`, `false`, `no`, `n`) of the affiliation to
+  the named company. Keys are compared exactly (never case folded); an unknown key makes the row `invalid`
+  (`error.role_unknown`, `error.purpose_unknown`). An import only adds roles and purposes, never removes them.
+- **Export.** The CSV of a list has a `roles` column (configured keys, the format the import reads back).
+- **Permissions** are unchanged and deny by default: roles, purposes and the primary flags are edited with `edit` on
+  the record; making someone the company's primary contact needs `edit` on the company. Role edits are audited
+  (`crm.roles.changed`, keys only), affiliation saves carry the primary-contact flag and the purpose keys
+  (`crm.affiliation.saved`), the company's primary contact `crm.affiliation.primary_contact` (ids only); all after the
+  commit. The 360° page shows the roles, the purposes and the primary contact; the GDPR export includes the roles and
+  every affiliation with its purposes and flags.
+
 ## 7. Public services (what a host calls)
 
 All in `Nowo\CrmKitBundle\Domain\Service`; inputs are VOs, enums, `RecordInput` / `ListQuery` or scalars, outputs read
@@ -261,6 +306,8 @@ invalid one is 404), not as `RecordId` objects; one `RecordServiceInterface` ser
 | Service (interface) | Methods (summary) |
 |---|---|
 | `RecordServiceInterface` **(0.1.0)** | `create(RecordInput): string`, `update(string $id, RecordInput, int $expectedVersion): int` (new version), `trash(SubjectType, string $id, int $v)`, `restore(SubjectType, string $id)`, `purge(SubjectType, string $id)` (from the trash, `manage`), `affiliate(string $contactId, string $companyId, ?string $role, bool $primary): string` (an existing pair is updated), `unaffiliate(string $affiliationId)`. `RecordInput(SubjectType $type, array $values, ?string $owner, ?array $custom, ?list $tagIds, bool $setOwner = true)`: raw core values (a missing key keeps the value), custom values (null keeps them), tag ids (null keeps them), `setOwner: false` keeps the owner |
+| `RecordServiceInterface` **(0.2.0)** | `affiliate(string $contactId, string $companyId, ?string $role, bool $primary, ?bool $primaryContact = null, ?list $purposes = null): string` (null keeps the stored flag / purposes), `setPrimaryContact(string $companyId, ?string $contactId)` (null clears), `setRoles(SubjectType, string $id, list $roles)` (set semantics over the configured roles); `RecordInput::$roles` (null keeps them) on create / update |
+| `CrmCatalogueInterface` **(0.2.0)** | `roles(): list<string>`, `purposes(): list<string>` (the configured keys) |
 | `CrmReaderInterface` | `record(SubjectType, id): RecordView` (a merged id returns the tombstone with `mergedIntoId`), `list(ListQuery): ListResult` (offset pages with the total), `timeline(SubjectType, id, int $limit = 50, ?string $before)`, `duplicates(SubjectType, id)`, `notes(SubjectType, id)`, `links(SubjectType, id)`, `panels(SubjectType, id)`, `consents(contactId)` (the history), `tags()`, `fields(SubjectType, bool $withArchived)`, `owners()` |
 | `TagServiceInterface` | `create(string $name, string $colour): string`, `change(id, name, colour, int $v)`, `delete(id)`, `assign(SubjectType, id, list<tag id>)` (set semantics); the tag list is `CrmReaderInterface::tags()` |
 | `FieldServiceInterface` | `define(SubjectType, string $key, string $label, FieldType, list $choices, bool $required, int $position): string`, `change(id, label, choices, required, position, int $v)` (key and type never change), `archive(id, bool $archived, int $v)` (also brings a field back); definitions through `CrmReaderInterface::fields()` |
@@ -400,6 +447,10 @@ nowo_crm_kit:
         stale_claim_seconds: 600   # a running import without progress for this long may be resumed (60..86400)
     gdpr:
         purposes: [marketing_email, newsletter, tracking]   # consent purposes the UI offers
+    roles:                         # 0.2.0
+        catalogue: [customer, supplier, partner]   # party role keys (≤ 32, ^[a-z][a-z0-9_]{0,31}$); distributor is opt-in
+    affiliations:                  # 0.2.0
+        purposes: [billing, orders, technical, general]   # what a contact is a company's contact for (same key rule)
     search:
         enabled: true              # SearchKit providers (bridge) when SearchKit is installed and ui.enabled
                                    # (0.1.0: no per_group key; SearchKit's query limit applies)
@@ -408,15 +459,15 @@ nowo_crm_kit:
         path: /crm
         page_size: 25              # 10..100
         layout: null               # null = UiKit admin layout
-    pipeline: { enabled: false }   # phase B (not in 0.1.0)
-    quotes: { enabled: false }     # phase C
-    invoices: { enabled: false }   # phase D
-    campaigns: { enabled: false }  # phase E
-    portal: { enabled: false }     # phase F
-    reports: { enabled: false }    # phase G
+    pipeline: { enabled: false }   # phase B, 0.3.0 (funnels)
+    quotes: { enabled: false }     # phase C, 0.5.0
+    invoices: { enabled: false }   # phase D, 0.6.0
+    portal: { enabled: false }     # phase F, 0.7.0
+    campaigns: { enabled: false }  # phase E2, 0.10.0 (circulars)
+    reports: { enabled: false }    # phase G, later
 ```
 
-Container validation: a later phase needs the earlier one it builds on (C needs B, D needs C); a phase that is not
+Container validation: a later phase needs the earlier one it builds on (decided in each phase's contract revision); a phase that is not
 built yet refuses `enabled: true` with a message naming the release that brings it; `ui.path` starts with `/`.
 Per-tenant settings (`trash_days`, `timeline_years`, `import_keep_days`, `merge_keep_days`) live in `crm_settings`
 (settings page, `manage`). No phase-A value is a typical `.env` value that changes at runtime, so no
@@ -438,7 +489,7 @@ the import prefix **and** `ui.path`.
 | Route (under `ui.path`) | Methods | Permission |
 |---|---|---|
 | `/` ⇒ redirect to `/companies` | GET | view |
-| `/companies` (q, tag, owner, status, sort, direction, page, per_page) | GET | view |
+| `/companies` (q, tag, owner, status, sort, direction, page, per_page; **0.2.0** role; contacts also purpose, primary_contact) | GET | view |
 | `/companies/new` | GET, POST | edit |
 | `/companies/{id}` (360°; a merged id redirects to the survivor) | GET | view |
 | `/companies/{id}/edit` | GET, POST | edit |
@@ -447,6 +498,7 @@ the import prefix **and** `ui.path`.
 | `/companies/{id}/merge` (pick; `?other=<id>` preview and confirm) | GET, POST | edit |
 | `/contacts…` | the same set | the same |
 | `/contacts/{id}/affiliations`, `/affiliations/{id}/remove` | POST | edit |
+| `/companies/{id}/primary-contact/{contact}` **(0.2.0)** (action token) | POST | edit on the company |
 | `/contacts/{id}/consent` | POST | edit |
 | `/contacts/{id}/vcard` | GET | view |
 | `/contacts/{id}/gdpr-export`, `/contacts/{id}/erase` | POST (both with the action token) | manage |
@@ -459,7 +511,7 @@ the import prefix **and** `ui.path`.
 | `/{companies\|contacts}/export.csv` **(0.1.0)** | GET | manage |
 | `/admin/settings` **(0.1.0)** | GET, POST | manage |
 
-### 11.2 Public JSON API (versioned; **0.2.0**, off by default, Q-O6)
+### 11.2 Public JSON API (versioned, off by default, Q-O6; **not in 0.2.0**: its release is open, Q-O16)
 
 `<api.prefix>/crm/v1/{companies,contacts}` (list with filters and keyset cursor, get, create, update, trash),
 `/companies/{id}/contacts`, `/contacts/{id}/consents`, `/links`, `/tags`. Auth: the host's firewall (ApiToken bundle in
@@ -517,7 +569,8 @@ permission of the action. Notes: the author edits / deletes own notes with `edit
 `TenantRef`, the `ActorRef` (nullable) and the occurred-at instant. A per-call after-commit buffer releases them; a
 rollback or a write-unit replay drops what the failed attempt collected. Audit entries (`crm.company.created`,
 `crm.contact.erased`, `crm.records.merged`, `crm.import.completed`, `crm.settings.changed`, …) are written through the
-audit sink after commit with counts and ids only. **(0.1.0)** Audited: record create / update / trash / restore / purge,
+audit sink after commit with counts and ids only. **(0.2.0)** `RolesChanged` (type, id, added and removed keys) and the audit keys `crm.roles.changed`,
+`crm.affiliation.primary_contact`. **(0.1.0)** Audited: record create / update / trash / restore / purge,
 merge, contact export and erasure, consent, note delete, tag and field administration, import upload / completion /
 cancel, settings, retention purge. Not audited (timeline and events only): note add / edit, tag assignment, host link
 add / remove, affiliations, host timeline entries.
@@ -545,6 +598,8 @@ are released after its own commit), and never does HTTP, mail or file I/O inside
 | Edit company / contact (fields, owner, tags in the form) | 1 unit | `version` posted, compared before the change, ORM version at flush; tags by unique `(tag, subject)` | stale ⇒ 409 `crm_record_stale`, form re-rendered |
 | Trash / restore / purge | 1 unit | version on trash; status checked under `FOR UPDATE`; counter −1 / +1 (restore checks the limit) | stale / limit ⇒ 409 |
 | Affiliate / unaffiliate, primary company | 1 unit | unique `(contact, company)`; affiliate locks the contact row, then the company row (`FOR UPDATE`, always in that order; imports too); unaffiliate locks the contact; both bump the contact's version; an existing pair is updated (role, primary); a merged or non-active parent ⇒ 409 | racing duplicate ⇒ one more run as an update, refused again ⇒ 409 `crm_write_conflict`; lock ⇒ CONFLICT_001 |
+| **(0.2.0)** Role edit (`setRoles`) | 1 unit | the record locked first (`FOR UPDATE`), then set semantics over the configured roles; unique `(tenant, record, role)`; a form edit or an import that does not lock the record and stores the same role ⇒ one more run | lock ⇒ CONFLICT_001; refused twice ⇒ 409 `crm_write_conflict` |
+| **(0.2.0)** The company's primary contact (`setPrimaryContact`, `affiliate(…, primaryContact: true)`, import column) | 1 unit | the contact locked, then the company (`FOR UPDATE`, the order of `affiliate()`); the company's affiliations re-read under the company lock, every other flag cleared; a merge of contacts locks the companies of both contacts after the contacts, in id order | lock ⇒ CONFLICT_001; never two primary contacts |
 | Tag create / rename / delete; assign | 1 unit | unique `(tenant, name_key)`; version on rename; assign = set difference, insert with unique catch (idempotent) | duplicate name ⇒ form error; stale ⇒ 409 |
 | Field define / update / archive | 1 unit | unique `(tenant, subject_type, field_key)`; version (archive: the version the page showed); count ≤ `max_per_subject` **(0.1.0)** counted after locking the `fields.<type>` counter row of the tenant (`FOR UPDATE`), so two racing defines cannot pass the bound | duplicate ⇒ form error; stale ⇒ 409 |
 | Note add / edit / delete | 1 unit | the parent record locked first (`FOR UPDATE`); version on edit; delete by id (gone ⇒ 404) | merged / non-active parent ⇒ 409; stale ⇒ 409 |
@@ -552,11 +607,17 @@ are released after its own commit), and never does HTTP, mail or file I/O inside
 | Consent record | 1 unit | the contact locked first; insert only; the current state is the latest `(recorded_at, id)` per purpose (UUIDv7 ordering breaks ties) | merged / erased contact ⇒ 409; lock ⇒ CONFLICT_001 |
 | Settings | 1 unit | upsert: insert with PK catch, then version | stale ⇒ 409 `crm_settings_stale` |
 | Import upload | 1 unit | rows inserted with the import row (unique `(import_id, row_no)`) | — |
-| **Import confirm / run** | **claim unit + one unit per chunk** | §15.4 | second confirm ⇒ 409 `crm_import_running` or the finished result; lock in a chunk ⇒ that chunk replays |
+| **Import confirm / run** | **claim unit + one unit per chunk** | §15.4; **(0.2.0, UD2-L-1)** each chunk first locks the existing contacts of its e-mails in id order, then the companies its rows name in id order (the lock order of every other path), never row by row | second confirm ⇒ 409 `crm_import_running` or the finished result; lock in a chunk ⇒ that chunk replays |
 | **Merge** | **1 unit** | §15.3 | stale / merged ⇒ 409 `crm_merge_stale` |
 | GDPR erasure | 1 unit | contact `FOR UPDATE`; status checked; children deleted by primary key after an exact re-select; the merge tombstones pointing at it (recursively) locked `FOR UPDATE` and blanked, their merge traces deleted | already erased ⇒ idempotent |
-| Retention purge (command) | 1 unit per batch of 200 | **(0.1.0)** single-run claim (claim row `FOR UPDATE`, conditional `UPDATE`, refreshed in every batch, released only while it is still the run's); trashed records and merge tombstones re-selected and re-checked (status, dates) under `FOR UPDATE`; timeline, import rows and merges deleted by id after a tenant re-check | second run ⇒ "another purge is running"; a run whose claim was taken over stops; batch replays |
+| Retention purge (command) | 1 unit per batch of 200 | **(0.1.0)** single-run claim (claim row `FOR UPDATE`, conditional `UPDATE`, refreshed in every batch, released only while it is still the run's); trashed records and merge tombstones re-selected and re-checked (status, dates) under `FOR UPDATE`; timeline, import rows and merges deleted by id after a tenant re-check | second run ⇒ "another purge is running" at once **(0.2.0, UD2-L-3)**: the claim row is read `FOR UPDATE SKIP LOCKED`, so a run never waits on another run's batch; a run whose claim was taken over stops; batch replays |
 | Counter rebuild (command) | 1 unit per tenant and resource | **(0.1.0)** the counter row `FOR UPDATE` first (selected, inserted only when missing, selected again), then `COUNT(*)` of active rows, then set | — |
+
+**(0.2.0, UD2-L-2) A replay clears the host's entity manager.** When a write unit is replayed after a deadlock, a
+lock-wait timeout or a serialization failure, transaction-doctrine (1.6) clears **every** open entity manager before
+the next attempt, the host's default one included, in private and in shared mode. A host that calls a CRM write while
+it holds managed entities of its own must re-read them after the call (or call the CRM before it loads them). This is
+inherited from transaction-doctrine; a write unit scoped to the bundle's own manager is a platform item.
 
 ### 15.1 Plan-limit counters
 
@@ -612,6 +673,8 @@ run(id, maxChunks): loop (0.1.0: the token is read from the claimed import):
                    unit (per chunk of chunk_rows):
                      SELECT import FOR UPDATE; still running with my claim_token? else stop (taken over / cancelled)
                      SELECT pending rows ORDER BY row_no LIMIT chunk_rows
+                     (0.2.0) lock the existing contacts of the rows' e-mails FOR UPDATE in id order, then the
+                     companies the rows name in id order (before any row is settled)
                      per row: validate → plan counter +1 (or outcome limit) → insert / update the record
                               (e-mail unique: a racing import or user stored it ⇒ the whole chunk replays once in a
                               fresh unit and the row becomes a duplicate) → UPDATE row SET outcome=? WHERE id=? AND
@@ -639,7 +702,8 @@ tracking only with `tracking` consent.
 
 ### 16.2 Export (`CrmPersonalDataInterface::export`, `manage`)
 
-One JSON document: the contact's fields and custom fields, affiliations (company names), tags, notes about the contact,
+One JSON document: the contact's fields and custom fields, **(0.2.0)** every stored party role (configured or not),
+affiliations (company names, **(0.2.0)** with the purposes, the primary-company and primary-contact flags), tags, notes about the contact,
 consents (full history), timeline entries, host links (type + id), merges where it was the merged record. Audited
 (`crm.contact.exported`), a timeline entry `exported`.
 
@@ -647,7 +711,8 @@ consents (full history), timeline entries, host links (type + id), merges where 
 
 Under the contact's lock: names become a fixed translated placeholder ("Erased contact"), every other personal column
 (e-mail, phone, mobile, job title, address, custom values) NULL / empty, `email_key` NULL, `status = Erased`,
-`erased_at`; notes, taggings, host links, affiliations, timeline entries and merge snapshots of the contact deleted;
+`erased_at`; notes, taggings, **(0.2.0)** role assignments, host links, affiliations, timeline entries and merge
+snapshots of the contact deleted;
 consent rows kept **without evidence** (proof that consent was given or withdrawn, art. 7.1 — Q-O8); the owner is
 cleared too; counter −1 when the contact was active; audit
 `crm.contact.erased` (ids only). An erased contact cannot be edited, restored or merged. Export ↔ erasure parity test
@@ -672,6 +737,9 @@ phase G (Q-O8).
 - Each phase adds **new tables only** (its own mapping group); a phase never alters a table of an earlier phase in a
   minor release except adding nullable columns or indexes, and UPGRADING lists the DDL of every release.
 - REQ-SEC-006 rule 9: any later collation change ships its detection queries in UPGRADING.
+- **(0.2.0)** adds one table (`crm_role_assignment`) and two columns of `crm_affiliation` that are `NOT NULL` with a
+  default (`is_primary_contact` false, `purpose_keys` `''`), so existing rows need no backfill; UPGRADING lists the DDL
+  for MySQL / MariaDB, PostgreSQL and SQLite.
 
 ## 18. Worker mode (FrankenPHP, kernel reset false; REQ-RUNTIME-002)
 
@@ -782,7 +850,7 @@ logo data URI, tokens), per call.
 | Q-O3 | A contact's e-mail is **unique per tenant** (case-insensitive key); duplicates are merged, not stored twice? | **Yes** (imports and campaigns need one person per address) | Duplicates allowed, merge only by hint |
 | Q-O4 | Deleting is **trash first** (restore for `trash_days`, default 30, then purged), purge from the trash needs `manage`? | **Yes** | Immediate hard delete |
 | Q-O5 | Bulk CSV export of lists needs `manage` (it exports personal data in bulk); one contact's vCard needs `view`? | **Yes** | `view` for everything |
-| Q-O6 | Phase A ships the UI and the PHP services; the public JSON API `/api/crm/v1` arrives in **0.2.0**, off by default, with `If-Match` versions and `Idempotency-Key`? | **Yes** | API in 0.1.0 |
+| Q-O6 | Phase A ships the UI and the PHP services; the public JSON API `/api/crm/v1` arrives in a later release (first planned for 0.2.0; moved by the phase plan of 2026-11-19, Q-O16), off by default, with `If-Match` versions and `Idempotency-Key`? | **Yes** | API in 0.1.0 |
 | Q-O7 | Plan limits are enforced by atomic counters per tenant and resource (companies, contacts; deals in B); the default is unlimited? | **Yes** | Count queries (racy) |
 | Q-O8 | GDPR erasure keeps the consent history **without evidence text** as proof (art. 7.1), deletes notes / timeline / links of the contact; an inactive-contact review is a phase G report, not an automatic deletion? | **Yes** | Delete consents too; automatic deletion of inactive contacts |
 | Q-O9 | Attachments wait until StorageKit stores non-image files (its roadmap), through a port with a StorageKit bridge in phase B? | **Yes** | A file store of the CRM's own now |
@@ -792,6 +860,9 @@ logo data URI, tokens), per call.
 | Q-O13 | Releases: 0.1.0 = phase A after `bundle-req-audit` of the scaffold and a SEC-004 audit (permissions, GDPR erasure, merge = data loss paths are audited immediately, batch rule 2026-11-07)? | **Yes** | One audit at 1.0.0 |
 | Q-O14 | Invoices (D) keep their own numbering per series in the CRM (VerifactuBundle has none) and the CRM models payment status (SepaPaymentBundle has none)? | **Yes** | Numbering in SerialNumberBundle |
 | Q-O15 | Campaigns (E) are built in the CRM (segments, suppression, unsubscribe, consent) on top of MailKit's sending and tracking, not in MailKit? | **Yes** (MailKit stays a transport / log / tracking layer) | Add campaigns to MailKit |
+| Q-O16 **(0.2.0)** | The public JSON API (Q-O6) was planned for 0.2.0; the phase plan of 2026-11-19 does not name it. Ship it with phase B (0.3.0), where the deal endpoints need it, with role / purpose filters from the start? | **Yes, with 0.3.0** | Its own release, or before 0.3.0 |
+| Q-O17 **(0.2.0)** | A role removed from `roles.catalogue` (and a removed purpose): its rows are kept and **hidden** everywhere except the GDPR export, and come back when the key is configured again? | **Yes** (built so) | Show them as "unknown role" / delete them with a command |
+| Q-O18 **(0.2.0)** | Roles apply to every contact, not only to contacts without a company (a person can be a private customer and a company's contact at once)? | **Yes** (built so) | Only standalone contacts |
 
 ## 23. Questions for Beacon (Q-B) — confirmed by Beacon 2026-11-19 (B1–B15)
 
@@ -836,7 +907,17 @@ differs is applied in the next commit and noted here with the date._
   POST with the action token; host links confirmed by their resolver; upload size checked before reading; the owner
   check skipped when unchanged; field archive with the shown version; "Continue" attributed to the clicking person.
 - Open items for later releases: the Messenger import handler, the link picker
-  (`CrmHostObjectResolverInterface::search()`), the public JSON API (0.2.0, Q-O6).
+  (`CrmHostObjectResolverInterface::search()`), the public JSON API (Q-O6; its release is open, Q-O16).
+
+### Status 2026-11-19 (0.2.0)
+
+- Owner request (2026-11-19): customers and suppliers in one entity with roles, contacts inside each, grouping
+  contacts for informative circulars; then funnels with per-stage statistics, quotes and invoices from the CRM, a
+  customer portal, tasks and agenda. 0.2.0 builds roles, the company's primary contact and affiliation purposes (§6.8)
+  and the UD-2 follow-ups (UD2-L-1: an import chunk locks its parents in id order before any row; UD2-L-2: the
+  replay note in §15 and INSTALLATION; UD2-L-3: a second purge answers "Another purge is running" at once). The
+  later releases follow §25.
+- Open: Q-O16 (JSON API release), Q-O17 and Q-O18 (built as recommended).
 
 ## Q-B answers from Beacon (2026-11-19): B1–B15 confirmed as implemented
 - B9: Beacon resolves the organisation from the header context (D-20261118-01). It answers 404 in Personal or when the feature is off.
@@ -850,3 +931,99 @@ differs is applied in the next commit and noted here with the date._
   denies its panel returns `null` (nothing shown) or a `Panel` with no items and an `emptyText` (the neutral
   placeholder); both render.
 
+## 25. Phase plan (owner, 2026-11-19)
+
+The owner's plan of 2026-11-19 replaces the earlier order of §1. Each release gets its own contract revision (tables,
+services, concurrency, permissions) before it is built; every release keeps the house bars (REQ-ARCH-001,
+REQ-RUNTIME-002 / 003 with two-connection race tests, REQ-SEC-006, deny by default, 7 locales, 100 % coverage).
+
+| Release | Phase | Content |
+|---|---|---|
+| **0.2.0** (this release) | A2 | Party roles; the company's primary contact and affiliation purposes; role and purpose filters, import and export columns; the UD-2 follow-ups (§6.8, §15) |
+| **0.3.0** | B, funnels | Funnels with per-stage statistics and next actions (below) |
+| **0.4.0** | B2, tasks and agenda | Tasks, automations, meetings and calls, "my agenda" (below) |
+| **0.5.0** | C, quotes | Below |
+| **0.6.0** | D, invoices | Below |
+| **0.7.0** | F, customer portal | Below |
+| **0.8.0** | S, scoring | Below |
+| **0.9.0** | E1, lists and segments | Below |
+| **0.10.0** | E2, informative circulars | Below |
+| later → **1.0.0** | G, reports | Deal scoring, forecasts, velocity and cohorts, open / click tracking, two-way sync with external calendars |
+
+### 25.1 0.3.0: funnels with per-stage statistics, and next actions
+
+- Tenant users with the permission define **funnels**: a name, ordered stages, won / lost terminal stages. Each stage
+  has a default probability (a deal can override it) and an optional age limit that flags rotting items.
+- Two kinds: **deal funnels** (a deal links to a company and / or a standalone contact, with an amount and next
+  actions) and **party lifecycle funnels** (contacts or companies move through stages, e.g. lead → prospect →
+  customer → recurring → former; the lifecycle of the customer role, §6.8).
+- **Stage history** per item: from → to, who, when, time in stage.
+- **Statistics per funnel:** count per stage now and at a past date; sum and weighted value (amount × probability)
+  per stage for deal funnels; conversion between consecutive stages and from the first stage to won; average time in
+  stage; stale items; won / lost in a period with the lost reasons. Filters: period, owner, role, tag (segments from
+  0.9.0). Output: a funnel chart and a table, and a CSV export with formula cells neutralised. Gated by a permission,
+  deny by default.
+- **Next actions** go through a new port `CrmTaskPort`, with an optional TaskBoard adapter: the task lives on a
+  configurable board and column with a typed link back to the CRM record; the record lists its open and done tasks;
+  an overdue next action marks the deal stale in the statistics. Without TaskBoard, a minimal built-in next-action
+  list is used.
+
+### 25.2 0.4.0: tasks and agenda
+
+- A task from any CRM record (company, contact, deal; quotes and invoices as they arrive).
+- Opt-in automations: a stage change creates a task from a TaskBoard template.
+- Meetings and calls with date, time, duration and attendees (internal users and CRM contacts), linked to the record,
+  shown in TaskBoard's calendar through a new TaskBoard timed event-source slot with reschedule (planned for
+  TaskBoard 2.24; TaskBoard has only day annotations today).
+- "My agenda" across CRM and tasks; reminders through NotifyKit; an ICS invite to contacts; a meeting marked done
+  becomes a timeline activity.
+- Linking never grants access in either direction: the other side shows a neutral placeholder when the viewer has no
+  access. Tenant isolation on every link.
+
+### 25.3 0.5.0: phase C, quotes
+
+- Product / service catalogue; quotes from a deal or directly on a company or contact; versions, PDF, a signed and
+  expiring accept / reject link, an e-sign hook.
+- An accepted quote moves the deal to won; a rejected quote records a lost reason; both feed the funnel statistics.
+- Status, amount and version shown on the deal and on the 360° page.
+
+### 25.4 0.6.0: phase D, invoices
+
+- From an accepted quote, from host billable lines, or by hand; atomic numbering per series; corrective invoices; an
+  issued invoice is never edited or deleted.
+- VeriFactu through VerifactuBundle after the commit; SEPA mandates and batches through SepaPaymentBundle.
+- Payment status, reminders through NotifyKit; opt-in automation: an overdue invoice creates a collection task.
+- Invoiced and paid totals per customer on the 360° page and in the statistics.
+- Separate permissions for create, issue and void, deny by default.
+- GDPR erasure anonymises the party but keeps issued invoices for the legal retention period.
+
+### 25.5 0.7.0: phase F, customer portal
+
+- The portal user is a contact, invited or signing in by magic link / passwordless through AuthKit.
+- A contact sees only their own party's documents; company invoices only when the affiliation purpose allows it
+  (e.g. `billing`, §6.8).
+- No enumerable ids, signed and expiring downloads, rate limits, tenant isolation; every access and download audited.
+- Invoices (list, status, PDF, corrective invoices); quotes (view, accept / reject); pending amount, a pay-link host
+  hook and the SEPA mandate status; contact data (view, request a change); consents and circular subscriptions per
+  purpose; self-service GDPR export.
+- Tenant brand through brand-contracts tokens, 7 locales, accessible and mobile-first.
+
+### 25.6 0.8.0: explainable scoring
+
+- Per-tenant rules that add or remove points: has an e-mail, a role, activity within / without N days, a field equals
+  a value, a funnel stage, meetings, quotes and invoices. Companies have their own rules or an aggregate.
+- The record shows the breakdown of points; bands hot / warm / cold with configurable thresholds.
+- Incremental on events plus a periodic recompute through Messenger, worker-safe; writes never inside a host
+  transaction. Rule changes are audited and start a background recompute. AI scoring is a non-goal.
+
+### 25.7 0.9.0: lists and segments
+
+Static lists and dynamic segments; criteria: role, tag, affiliation purpose, has an e-mail, consent purpose, score
+band, funnel stage. Bulk add from list views and from the record. Segments also filter the funnel statistics.
+
+### 25.8 0.10.0: lean informative circulars
+
+- One e-mail per recipient through MailKit's queue, with a rate limit; a send log per recipient.
+- Per-purpose unsubscribe; a new consent purpose `service_notice` (legitimate interest with opt-out); commercial
+  circulars need `marketing_email` / `newsletter` consent.
+- Bounces mark the address; the open signal goes to scoring; payment reminders can use this channel too.

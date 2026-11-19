@@ -16,6 +16,7 @@
 - [Services a host calls](#services-a-host-calls)
 - [Events](#events)
 - [Errors](#errors)
+- [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Pages and routes](#pages-and-routes)
 - [Imports](#imports)
 - [SearchKit](#searchkit)
@@ -26,7 +27,9 @@
 Phase A (0.1.0) gives a tenant **companies** and **contacts** with owners, tags, custom fields, notes, an activity
 timeline, affiliations (contact ↔ company with a role, one primary company), host links and host panels on a 360°
 page, CSV / vCard import, duplicate hints and merging, CSV / vCard export, GDPR consent / export / erasure /
-retention, trash with restore, plan-limit counters and a SearchKit provider. The host owns tenants, people, who may do
+retention, trash with restore, plan-limit counters and a SearchKit provider. 0.2.0 adds **party roles** (customer,
+supplier, partner, … several per record, also on a contact without a company), the company's **primary contact** and
+**affiliation purposes** (billing, orders, technical, general). The host owns tenants, people, who may do
 what, the plan, the brand and its own modules; the bundle asks the host through ports on every call.
 
 ## Set it up
@@ -302,7 +305,8 @@ resolves the tenant and the actor and checks the permission itself (404 / 403); 
 
 | Service | Methods |
 | --- | --- |
-| `RecordServiceInterface` | `create(RecordInput): string`, `update(string $id, RecordInput, int $expectedVersion): int`, `trash(SubjectType, string $id, int $expectedVersion)`, `restore(SubjectType, string $id)`, `purge(SubjectType, string $id)` (`manage`), `affiliate(string $contactId, string $companyId, ?string $role, bool $primary): string`, `unaffiliate(string $affiliationId)` |
+| `RecordServiceInterface` | `create(RecordInput): string`, `update(string $id, RecordInput, int $expectedVersion): int`, `trash(SubjectType, string $id, int $expectedVersion)`, `restore(SubjectType, string $id)`, `purge(SubjectType, string $id)` (`manage`), `affiliate(string $contactId, string $companyId, ?string $role, bool $primary, ?bool $primaryContact = null, ?list $purposes = null): string`, `unaffiliate(string $affiliationId)`, `setPrimaryContact(string $companyId, ?string $contactId)`, `setRoles(SubjectType, string $id, list<string> $roles)` |
+| `CrmCatalogueInterface` | `roles(): list<string>`, `purposes(): list<string>` (the configured keys) |
 | `CrmReaderInterface` | `record(SubjectType, id): RecordView`, `list(ListQuery): ListResult`, `timeline(SubjectType, id, int $limit = 50, ?string $before)`, `duplicates`, `notes`, `links`, `panels`, `consents(contactId)`, `tags()`, `fields(SubjectType, bool $withArchived)`, `owners()` |
 | `TagServiceInterface` | `create(name, colour): string`, `change(id, name, colour, int $v)`, `delete(id)` (`manage`); `assign(SubjectType, id, list<tagId>)` (`edit`, set semantics) |
 | `FieldServiceInterface` | `define(SubjectType, key, label, FieldType, choices, required, position): string`, `change(id, label, choices, required, position, int $v)`, `archive(id, bool $archived, int $v)` (`manage`) |
@@ -375,6 +379,7 @@ carries ids and VOs only.
 | `ConsentRecorded` | `contactId`, `purpose`, `granted` |
 | `ImportCompleted` | `type`, `importId`, `counts` (per outcome) |
 | `TagsChanged` | `type`, `id`, `added`, `removed` (tag ids) |
+| `RolesChanged` (0.2.0) | `type`, `id`, `added`, `removed` (role keys) |
 | `HostLinkAdded`, `HostLinkRemoved` | `type`, `id`, `hostType`, `hostId` |
 
 ```php
@@ -403,6 +408,39 @@ final readonly class ProjectClientSync
 Forms of the UI handle the expected cases themselves: a stale record form is shown again with the current values,
 a flash and status 409; POST actions (trash, restore, notes, tags, links, consent) flash the conflict and redirect.
 
+## Roles and affiliation purposes
+
+Since 0.2.0 ([CONFIGURATION.md](CONFIGURATION.md#roles-and-affiliation-purposes), contract section 6.8).
+
+- **Roles** say what a party is to the tenant: a company or a contact holds any number of them (`customer`,
+  `supplier`, `partner` built in; `distributor` and keys of your own by configuration). One entity serves customers
+  and suppliers: a supplier that also buys is a company with both roles. A private customer is a contact with the
+  `customer` role and no company. Prospect and former customer are lifecycle stages of the customer role (funnels,
+  0.3.0); a competitor is a tag.
+- **The company's primary contact**: at most one per company, set from the company page ("Make primary contact"), in
+  the affiliation form of the contact, through `setPrimaryContact()` / `affiliate(…, primaryContact: true)` or by an
+  import column; the previous one is cleared.
+- **Purposes** say what a contact is the company's contact for (several per affiliation).
+
+```php
+use Nowo\CrmKitBundle\Domain\Service\ListQuery;
+
+$supplierId = $records->create(new RecordInput(SubjectType::Company, ['name' => 'Parts Ltd'], roles: ['supplier']));
+$records->setRoles(SubjectType::Company, $supplierId, ['supplier', 'customer']);   // set semantics
+
+$records->affiliate($contactId, $supplierId, 'Accounts', primary: true, primaryContact: true, purposes: ['billing']);
+$records->setPrimaryContact($supplierId, $otherContactId);                          // clears the previous one
+
+$suppliers = $reader->list(new ListQuery(SubjectType::Company, role: 'supplier'));
+$billing   = $reader->list(new ListQuery(SubjectType::Contact, companyId: $supplierId, purpose: 'billing'));
+$primaries = $reader->list(new ListQuery(SubjectType::Contact, role: 'customer', primaryContactOnly: true));
+```
+
+`RecordView::$roles` holds the configured role keys of a record (catalogue order) and every `AffiliationView` its
+`primaryContact` flag and `purposes`. A key removed from the configuration stays in the database but is hidden; the
+GDPR export lists every stored role. The list pages filter by `role` (and, for contacts, `purpose` and
+`primary_contact=1`); unknown keys in the URL are ignored.
+
 ## Pages and routes
 
 Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<name>`; `{type}` is `companies` or
@@ -411,7 +449,7 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 | Name | Path | Methods | Permission |
 | --- | --- | --- | --- |
 | `home` | `/` | GET | redirect to companies |
-| `list` | `/{type}` (`q`, `tag`, `owner`, `status=trashed`, `sort=name\|created\|updated`, `direction`, `page`, `per_page`) | GET | view |
+| `list` | `/{type}` (`q`, `tag`, `role`, `owner`, `status=trashed`, `sort=name\|created\|updated`, `direction`, `page`, `per_page`; contacts also `purpose`, `primary_contact=1`) | GET | view |
 | `new` | `/{type}/new` | GET, POST | edit |
 | `show` | `/{type}/{id}` (a merged id redirects to the survivor) | GET | view |
 | `edit` | `/{type}/{id}/edit` | GET, POST | edit |
@@ -424,6 +462,7 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 | `tags_assign` | `/{type}/{id}/tags` | POST | edit |
 | `link_add`, `link_remove` | `/{type}/{id}/links`, `/links/{id}/remove` | POST | edit |
 | `affiliate`, `unaffiliate` | `/contacts/{id}/affiliations`, `/affiliations/{id}/remove` | POST | edit |
+| `primary_contact` (0.2.0) | `/companies/{id}/primary-contact/{contact}` (action token) | POST | edit on the company |
 | `consent` | `/contacts/{id}/consent` | POST | edit |
 | `vcard` | `/contacts/{id}/vcard` | GET | view |
 | `gdpr_export`, `erase` | `/contacts/{id}/gdpr-export` (JSON download), `/contacts/{id}/erase` | POST (both with the action token `crm_action[_token]`) | manage |
@@ -444,13 +483,19 @@ template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the bra
    `e-mail`, `surname`, `zip`, `vat`), errors per row and, for contacts, the existing contact with the same e-mail.
    The mapping is editable: a core field, `custom.<key>`, `tags` (comma-separated names of **existing** tags) or, for
    contacts, `company` (affiliates to an existing active company with exactly that name, case-insensitive), or skip.
+   0.2.0: `roles` (role keys separated by `,` or `;`, both types; added to the stored ones), and for contacts
+   `purposes` (purpose keys of the affiliation to the named company, added to the stored ones) and `primary_contact`
+   (`yes` / `no`, also `1`, `true`, `x` / empty, `0`, `false`: makes the contact the company's primary contact).
+   Keys must equal configured keys exactly; an unknown key or an unreadable yes / no makes the row `invalid`.
 3. **Confirm** with the duplicate policy: `skip` (a contact whose e-mail exists becomes `duplicate`) or `update` (the
    existing active contact is updated; a trashed one stays `duplicate`). Companies have no duplicate key: every valid
    row creates a company.
 4. **Run**: the confirm request runs `import.sync_rows` rows in chunks of `import.chunk_rows`; a larger import shows
    "Continue" (`do=run`, the same amount again). A worker that stopped leaves the import `running`;
    `nowo:crm-kit:import:resume` takes over claims older than `import.stale_claim_seconds`. Rows end as `created`,
-   `updated`, `duplicate`, `invalid` (with the first error key) or `limit` (plan limit reached).
+   `updated`, `duplicate`, `invalid` (with the first error key) or `limit` (plan limit reached). Each chunk first
+   locks the existing contacts and the named companies of all its rows (contacts, then companies, each in id order),
+   then settles the rows ([CONCURRENCY.md](CONCURRENCY.md#import)).
 
 No Messenger handler ships in 0.1.0: imports always run in requests and in the resume command.
 

@@ -8,6 +8,7 @@
 - [Feature gate and plan limits](#feature-gate-and-plan-limits)
 - [Doctrine](#doctrine)
 - [Fields, import and GDPR](#fields-import-and-gdpr)
+- [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Search](#search)
 - [UI](#ui)
 - [Later phases](#later-phases)
@@ -55,6 +56,10 @@ nowo_crm_kit:
         stale_claim_seconds: 600   # 60..86400: a running import without progress for this long may be taken over
     gdpr:
         purposes: [marketing_email, newsletter, tracking]   # distinct keys ^[a-z][a-z0-9_.]{0,63}$
+    roles:
+        catalogue: [customer, supplier, partner]   # party roles; ≤ 32 distinct keys ^[a-z][a-z0-9_]{0,31}$
+    affiliations:
+        purposes: [billing, orders, technical, general]   # what a contact is a company's contact for; same rule
     search:
         enabled: true              # SearchKit providers when SearchKit is installed and the UI is on
     ui:
@@ -62,12 +67,12 @@ nowo_crm_kit:
         path: /crm                 # starts with "/"; base path of the routes (under the import prefix)
         page_size: 25              # 10..100, default rows per list page
         layout: null               # Twig layout of the pages; null = UiKit's admin layout
-    pipeline:  { enabled: false }  # phase B (0.2.0)
-    quotes:    { enabled: false }  # phase C (0.3.0)
-    invoices:  { enabled: false }  # phase D (0.4.0)
-    campaigns: { enabled: false }  # phase E (0.5.0)
-    portal:    { enabled: false }  # phase F (0.6.0)
-    reports:   { enabled: false }  # phase G (0.7.0)
+    pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
+    quotes:    { enabled: false }  # phase C, quotes (0.5.0)
+    invoices:  { enabled: false }  # phase D, invoices (0.6.0)
+    portal:    { enabled: false }  # phase F, customer portal (0.7.0)
+    campaigns: { enabled: false }  # phase E2, informative circulars (0.10.0)
+    reports:   { enabled: false }  # phase G, reports (later)
 ```
 
 ## Ports
@@ -137,6 +142,32 @@ warm-up). See [INSTALLATION.md](INSTALLATION.md#schema-and-migrations).
   (run it every few minutes) takes it over, and anyone with `edit` may cancel it from its page.
 - `gdpr.purposes`: the consent purposes the UI offers and the service accepts.
 
+## Roles and affiliation purposes
+
+Since 0.2.0. Both lists hold at most 32 distinct keys matching `^[a-z][a-z0-9_]{0,31}$` (anchored with `/D`: no
+trailing newline); anything else fails the container build. Keys are compared byte for byte, never case folded.
+
+- `roles.catalogue`: the party roles a company or contact may hold, several at once. Built in: `customer`,
+  `supplier`, `partner`; `distributor` has translations but is opt-in (add it to the list). An empty list switches
+  roles off (no form field, no filter). Prospect and former customer are lifecycle stages of the customer role
+  (funnels, 0.3.0), and a competitor is a tag, so none of them is built in.
+- `affiliations.purposes`: what a contact is a company's contact for (several per affiliation). Built in: `billing`,
+  `orders`, `technical`, `general`.
+- **Labels** are the translation keys `role.<key>` and `purpose.<key>` of the `NowoCrmKitBundle` domain; the built-in
+  keys are translated in the 7 locales. For a key of your own, add the labels to
+  `translations/NowoCrmKitBundle.<locale>.yaml` of the application:
+
+  ```yaml
+  role:
+      wholesaler: Wholesaler
+  purpose:
+      logistics: Logistics
+  ```
+- **Removing a key** never breaks a stored row: its assignments stay in the database but are hidden from the record
+  pages, lists, filters, forms and the CSV export (the GDPR export still lists them). A role edit only touches
+  configured roles, so a hidden role is kept; adding the key back shows it again. To drop the rows, delete them with
+  SQL (`DELETE FROM nowo_crm_role_assignment WHERE role_key = '…'`).
+
 ## Search
 
 `search.enabled` registers two SearchKit providers, `nowo_crm_kit.search.company` and `nowo_crm_kit.search.contact`
@@ -159,8 +190,8 @@ limit.
 ## Later phases
 
 `pipeline`, `quotes`, `invoices`, `campaigns`, `portal` and `reports` exist so a configuration can be written now.
-`enabled: true` fails the container build with a message naming the release that brings the phase. See
-[ROADMAP.md](ROADMAP.md).
+`enabled: true` fails the container build with a message naming the release that brings the phase (funnels 0.3.0,
+quotes 0.5.0, invoices 0.6.0, portal 0.7.0, circulars 0.10.0, reports later). See [ROADMAP.md](ROADMAP.md).
 
 ## Per-tenant settings
 
@@ -179,5 +210,6 @@ No phase-A value changes at runtime like an `.env` secret, so no runtime setting
 ## Container parameters
 
 Every value is published as `nowo_crm_kit.<path>` (for example `nowo_crm_kit.ui.enabled`,
-`nowo_crm_kit.import.chunk_rows`, `nowo_crm_kit.access.roles`), plus `nowo_crm_kit.import.sync_chunks` (chunks run in
+`nowo_crm_kit.import.chunk_rows`, `nowo_crm_kit.access.roles`, `nowo_crm_kit.roles.catalogue`,
+`nowo_crm_kit.affiliations.purposes`), plus `nowo_crm_kit.import.sync_chunks` (chunks run in
 the confirm request). The alias `nowo_crm_kit.entity_manager` (public) points at the bundle's entity manager.

@@ -7,6 +7,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Party roles**: a company or a contact holds any number of roles from `roles.catalogue` (built in: `customer`,
+  `supplier`, `partner`; `distributor` translated and opt-in), stored in the new table `crm_role_assignment` (unique
+  per tenant, record and role; binary NO PAD key). Roles are edited in the record form, through
+  `RecordInput::$roles` and `RecordServiceInterface::setRoles()` (set semantics, the record locked first), shown on
+  the 360° page and in the lists, filtered by `ListQuery::$role` and the list pages, imported (`roles` column, keys
+  separated by `,` or `;`) and exported (`roles` CSV column). Event `RolesChanged`; audit `crm.roles.changed` (keys
+  only) after the commit. A role removed from the configuration keeps its rows, hidden everywhere except the GDPR
+  export.
+- **The company's primary contact** (`crm_affiliation.is_primary_contact`, at most one per company, under the
+  company's row lock with the contact → company lock order): `affiliate(…, primaryContact:)`,
+  `RecordServiceInterface::setPrimaryContact()`, a "Make primary contact" action on the company page
+  (`/companies/{id}/primary-contact/{contact}`), an import column `primary_contact` and the filter
+  `ListQuery::$primaryContactOnly`. Audit `crm.affiliation.primary_contact`.
+- **Affiliation purposes** from `affiliations.purposes` (built in: `billing`, `orders`, `technical`, `general`; stored
+  as `crm_affiliation.purpose_keys`): `affiliate(…, purposes:)`, the affiliation form, the import column `purposes`,
+  the filter `ListQuery::$purpose`.
+- `CrmCatalogueInterface` (`roles()`, `purposes()`), value objects `RoleKey` and `AffiliationPurpose`, timeline kinds
+  `roles_changed` and `primary_contact`, translations of every new key in the 7 locales.
+- Merges move the roles (no duplicate), unite the purposes of a shared affiliation and keep one primary company per
+  contact and one primary contact per company; purge and GDPR erasure delete the roles; the GDPR export lists every
+  stored role and every affiliation with its purposes and flags.
+- Two-connection race tests (MySQL 8.4, MariaDB 11.4, PostgreSQL 16): concurrent role edits, two "set primary
+  contact" calls on one company, an import chunk waiting on a locked parent before it settles any row.
+
+### Changed
+
+- **UD2-L-1**: an import chunk locks, before it settles any row, the existing contacts of its e-mails in id order and
+  then the companies its rows name in id order (the lock order of every other path), instead of row by row.
+- **UD2-L-3**: a second `nowo:crm-kit:purge` that starts while a batch of the first holds the claim row prints
+  "Another purge is running" at once (the claim row is read `FOR UPDATE SKIP LOCKED`) instead of a lock conflict.
+- **UD2-L-2** (documented): a write unit replayed after a deadlock clears every open entity manager, the host's
+  included (inherited from transaction-doctrine); see CONCURRENCY and INSTALLATION.
+- The phase plan of 2026-11-19: funnels 0.3.0, tasks and agenda 0.4.0, quotes 0.5.0, invoices 0.6.0, customer portal
+  0.7.0, scoring 0.8.0, lists and segments 0.9.0, circulars 0.10.0, reports later; the switches of the later phases
+  name their new release.
+- `RecordView` gains `roles`, `AffiliationView` gains `primaryContact` and `purposes` (new trailing constructor
+  arguments with defaults); `RecordServiceInterface` gains `setRoles()` and `setPrimaryContact()`, and `affiliate()`
+  two optional arguments; `CrmStoreInterface` (internal) gains `contactIdsByEmailKeys()`, `affiliatedCompanyIds()`
+  and `roleAssignments()`.
+- The CSV export has a `roles` column after `owner`.
+- The minimum database versions are MySQL 8.0, MariaDB 10.6 and PostgreSQL 9.5 (`SKIP LOCKED`).
+
 ## [0.1.0] - 2026-11-19
 
 ### Added

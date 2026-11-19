@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 import { expectNoHorizontalScroll, login, logout } from './helpers';
 
 /**
- * The CRM end to end against the running demo (one serial flow on a fresh stack): mia creates a company and a
- * contact, links them, adds a note and imports contacts from a CSV file; ana only reads; admin adds a custom field.
+ * The CRM end to end against the running demo (one serial flow on a fresh stack): mia creates a company with two
+ * party roles and a contact, links them (purpose, primary contact), adds a note and imports contacts from a CSV file;
+ * ana only reads and filters by role; admin adds a custom field.
  */
 test.describe.configure({ mode: 'serial' });
 
@@ -27,8 +28,12 @@ test.describe('CRM Kit demo', () => {
     await page.goto('/crm/companies/new');
     await page.locator('input[name="crm_record[name]"]').fill(company);
     await page.locator('input[name="crm_record[city]"]').fill('Madrid');
+    await page.locator('input[name="crm_record[roles][]"][value="customer"]').check();
+    await page.locator('input[name="crm_record[roles][]"][value="supplier"]').check();
     await page.getByTestId('crm-record-form').locator('button[type="submit"]').first().click();
     await expect(page.getByTestId('crm-record')).toContainText(company);
+    await expect(page.getByTestId('crm-roles')).toContainText('Customer');
+    await expect(page.getByTestId('crm-roles')).toContainText('Supplier');
     await page.getByTestId('crm-link-form').locator('input[name="crm_link[hostId]"]').fill('P-1');
     await page.getByTestId('crm-link-form').locator('button[type="submit"]').click();
     await expect(page.getByTestId('crm-panel')).toContainText('Website relaunch');
@@ -46,8 +51,13 @@ test.describe('CRM Kit demo', () => {
     const companies = page.getByTestId('crm-affiliation-form').locator('select');
     const value = await companies.locator('option', { hasText: company }).first().getAttribute('value');
     await companies.selectOption(value ?? '');
+    await page.getByTestId('crm-affiliation-form').locator('input[name="crm_affiliation[purposes][]"][value="billing"]').check();
+    await page.getByTestId('crm-affiliation-form').locator('input[name="crm_affiliation[primary_contact]"]').check();
     await page.getByTestId('crm-affiliation-form').locator('button[type="submit"]').click();
     await expect(page.getByTestId('crm-affiliations')).toContainText(company);
+    await expect(page.getByTestId('crm-purposes')).toContainText('Billing');
+    await page.getByTestId('crm-affiliations').getByRole('link', { name: company }).click();
+    await expect(page.getByTestId('crm-primary-contact')).toBeVisible();
     await logout(page);
   });
 
@@ -68,8 +78,10 @@ test.describe('CRM Kit demo', () => {
 
   test('ana reads but cannot create (403), and lists fit a phone', async ({ page }) => {
     await login(page, 'ana');
-    await page.goto(`/crm/companies?q=${encodeURIComponent(company)}`);
+    await page.goto(`/crm/companies?q=${encodeURIComponent(company)}&role=supplier`);
     await expect(page.getByTestId('crm-list-company')).toContainText(company);
+    await page.goto(`/crm/companies?q=${encodeURIComponent(company)}&role=distributor`);
+    await expect(page.getByTestId('crm-list-company')).not.toContainText(company);
     const response = await page.goto('/crm/companies/new');
     expect(response?.status()).toBe(403);
     await page.setViewportSize({ width: 375, height: 800 });

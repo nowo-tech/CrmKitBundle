@@ -16,7 +16,8 @@
 
 ## Status and scope
 
-0.1.0 ships phase A (companies and contacts). The security model is contract sections 5 (value objects), 6.1
+0.1.0 ships phase A (companies and contacts); 0.2.0 adds party roles, the company's primary contact and affiliation
+purposes (contract section 6.8) with the same model: no new permission, deny by default. The security model is contract sections 5 (value objects), 6.1
 (exact identifiers), 11.3 (errors), 13 (permission matrix), 15 (concurrency, [CONCURRENCY.md](CONCURRENCY.md)) and 16
 (GDPR).
 
@@ -46,7 +47,8 @@
 | Action | view | edit | manage |
 | --- | --- | --- | --- |
 | Lists, 360° pages, timeline, notes, links, panels, consents, duplicates, vCard of one contact, header search | ✓ | | |
-| Create / edit / trash / restore records, notes, tag assignment, host links, affiliations, consent records, import, merge (on both records), host timeline entries | | ✓ | |
+| Create / edit / trash / restore records, notes, tag assignment, **roles** (0.2.0), host links, affiliations with their purposes, consent records, import, merge (on both records), host timeline entries | | ✓ | |
+| The company's primary contact (0.2.0): `edit` on the company (the contact needs `view`; through the affiliation form also `edit` on the contact) | | ✓ | |
 | Edit or delete another person's note | | ✓ + ✓ | ✓ |
 | Tag and field administration, settings, purge from the trash, CSV export of lists, GDPR export and erasure | | | ✓ |
 
@@ -58,12 +60,16 @@ deletes their own notes with `edit` on the record; another person's note needs `
 - Every table has `tenant_id`; every query filters by it and every row returned is re-checked in PHP with `===`
   (tenant, and owner when a list filters by owner) before it is used (REQ-SEC-006 rule 2).
 - Every `id` / `*_id` column and the key columns (`email_key`, `name_key`, `tax_id_key`, `domain_key`, `sort_key`,
-  `field_key`, `purpose`, `host_type`, `claim_token`, `resource`) use `utf8mb4_0900_bin` (MySQL 8) or
+  `field_key`, `purpose`, `purpose_keys`, `role_key`, `host_type`, `claim_token`, `resource`) use `utf8mb4_0900_bin` (MySQL 8) or
   `utf8mb4_nopad_bin` (MariaDB): `bob` ≠ `Bob`, `bob ` ≠ `bob`, and NBSP or ZWSP look-alikes never match.
 - `TenantRef`, `ActorRef` and host ids refuse invalid UTF-8, control and format characters (ZWSP, BOM, bidi marks),
   line / paragraph separators and edge whitespace or NBSP; they are never trimmed, truncated or case folded.
 - Record, note, tag, field, link, affiliation and import ids must be canonical lowercase UUIDs, otherwise the call is
   404 before any query.
+- Role and affiliation-purpose keys (0.2.0) match `^[a-z][a-z0-9_]{0,31}$` with `/D` (no trailing newline) in the
+  configuration, and every input key must equal a configured key byte for byte (never trimmed in the service, never
+  case folded); import cells are only trimmed of the separator's spaces. A key in a list URL that is not configured is
+  ignored. The purpose filter is an exact `LIKE` on `,<key>,` with `%`, `_` and `!` escaped.
 - Host object resolvers must return exactly the requested ids; a view whose id differs byte for byte is dropped.
 - The actor directory must return exactly the requested actor; a profile for another ref is ignored.
 
@@ -95,18 +101,22 @@ The tenant is the controller; the bundle is the tool.
 
 - **Consent** per contact and purpose (`gdpr.purposes`), append-only, with source, evidence, actor and time; the
   current state is the latest row per purpose.
-- **Export** (`manage`): one JSON document with the contact's fields and custom values, companies, tags, notes, consent
+- **Export** (`manage`): one JSON document with the contact's fields and custom values, every stored party role
+  (also roles no longer configured), companies with the affiliation purposes and flags, tags, notes, consent
   history, timeline entries, host links (type + id) and merges where it was the merged record. The export itself is
   audited (`crm.contact.exported`) and leaves an `exported` timeline entry.
 - **Erasure** (`manage`, idempotent): under the contact's row lock, the name becomes "Erased contact", every other
   personal column, the custom values and the owner are emptied, the e-mail key is released, the status becomes
-  `erased`; notes, taggings, host links, affiliations, timeline entries and merge snapshots of the contact are
-  deleted; consent rows are kept **without their evidence** as proof that consent was given or withdrawn; the plan
+  `erased`; notes, taggings, role assignments, host links, affiliations, timeline entries and merge snapshots of the
+  contact are deleted; consent rows are kept **without their evidence** as proof that consent was given or withdrawn; the plan
   counter is released when the contact was active. An erased contact cannot be edited, restored or merged.
 - **Retention** (`nowo:crm-kit:purge`): trashed records after `trash_days` with every child row, timeline entries
   after `timeline_years`, import rows after `import_keep_days`, merge snapshots after `merge_keep_days`; one audit
   entry per tenant with counts only.
-- **Audit and logs** carry ids, counts and codes only, never names, e-mails or note text. A failing panel provider is
+- **Audit and logs** carry ids, counts and codes only, never names, e-mails or note text: role edits are audited as
+  `crm.roles.changed` with the added and removed keys, the company's primary contact as
+  `crm.affiliation.primary_contact` with the contact id, affiliation saves with the flags and purpose keys, after the
+  commit. A failing panel provider is
   logged with class names only.
 
 ## Host extension points

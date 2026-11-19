@@ -37,7 +37,12 @@ transaction on the bundle's entity manager (`DoctrineTransactionRunner`):
   released only after the commit, so a replay or a rollback records nothing twice;
 - a unique-key refusal inside the unit becomes `DuplicateRowException`, an optimistic-lock failure at flush
   `StaleRowException`; the services decide what each means (below);
-- no HTTP, mail or file I/O inside a transaction (an import file is parsed before the unit that stores its rows).
+- no HTTP, mail or file I/O inside a transaction (an import file is parsed before the unit that stores its rows);
+- **a replay clears the host's entity manager too** (UD2-L-2, inherited from transaction-doctrine 1.6): before the
+  next attempt, its `WriteUnit` clears every open entity manager, the host's default one included, in private and in
+  shared mode. A host that holds managed entities while it calls a CRM write must re-read them after the call (or call
+  the CRM first). A refused write without a replay leaves the host's manager as it was. A write unit scoped to the
+  bundle's own manager is a platform item of transaction-doctrine.
 
 The bundle's write controllers also carry `#[AsWriteUnit]`, so with the transaction bundle's controller attribute
 switched on the whole action is replayed (that attribute opens no transaction, so the services' units still run on
@@ -79,6 +84,8 @@ for JSON).
 | Restore | Record `FOR UPDATE`, status must be `trashed`; counter +1 with the limit | Limit: `crm_limit_reached`; not trashed: `crm_record_stale` | 409 domain |
 | Purge (`manage`) | Record `FOR UPDATE`, status must be `trashed`; children deleted by primary key | Not trashed: `crm_record_stale` | 409 domain |
 | Affiliate / unaffiliate | Affiliate: contact `FOR UPDATE`, then company `FOR UPDATE` (always this order, imports too); unaffiliate: contact `FOR UPDATE`; the contact's version moves; unique `(contact_id, company_id)` | A merged or non-active contact or company: 409; a racing insert of the same pair: one more run, now as an update of that row; refused again: `crm_write_conflict` | 409 domain |
+| **Role edit** (0.2.0, `setRoles`) | The record `FOR UPDATE` first; set semantics over the configured roles (a role no longer configured is never touched); unique `(tenant_id, subject_id, role_key)` | Two role edits of one record run one after the other; a form edit or an import (no record lock) storing the same role at the same moment: one more run, now that row is there; refused again: `crm_write_conflict` | lock: `CONFLICT_001`; `crm_write_conflict` |
+| **The company's primary contact** (0.2.0: `setPrimaryContact`, `affiliate(…, primaryContact: true)`, the import column) | The contact `FOR UPDATE`, then the company `FOR UPDATE` (the order of affiliate); the company's affiliations re-read under the company lock and every other flag cleared; `edit` on the company | Two "set primary" calls on one company run one after the other: the later one wins, never two primary contacts | lock: `CONFLICT_001` |
 | Tag create / rename | Name key unique `(tenant_id, name_key)`, checked first, then the key; `version` on rename | Taken name: form error `error.tag_taken`; stale rename: `crm_record_stale` | form error / 409 |
 | Tag delete | Taggings deleted with the tag in one unit | — | — |
 | Tag assign | Record `FOR UPDATE`; set difference; taggings unique | A racing duplicate tagging: one more run against its rows | — |
@@ -90,12 +97,12 @@ for JSON).
 | Consent record | The contact `FOR UPDATE` first; insert only; the current state is the latest `(recorded_at, id)` per purpose (UUIDv7 ids order rows of the same second) | Merged / erased contact: 409 (a merge or an erasure waits for it, or it waits for them) | 409 domain |
 | Settings | Version 0 = insert (primary key `tenant_id`), else `version` | A racing first save or a moved version: `crm_settings_stale` | 409 domain |
 | Import upload | One unit: the import row and its parsed rows (unique `(import_id, row_no)`) | — | — |
-| **Import confirm / run** | Claim by conditional `UPDATE`; per chunk the import row `FOR UPDATE`; rows settled `WHERE outcome = 'pending'`; counters by atomic `UPDATE` ([Import](#import)) | Second confirm: `crm_import_running`; a racing e-mail in a chunk: the chunk runs once more, the row becomes `duplicate` / `updated`; refused again: `crm_write_conflict`. An existing contact a row updates is locked `FOR UPDATE` (status re-read: merged / erased ⇒ `duplicate`), then the named company | `crm_import_running`; `crm_write_conflict` (409 domain); a lock wait ⇒ `CONFLICT_002` when the claim of the same request already committed |
+| **Import confirm / run** | Claim by conditional `UPDATE`; per chunk the import row `FOR UPDATE`; rows settled `WHERE outcome = 'pending'`; **before any row of a chunk is settled, the existing contacts of its e-mails are locked in id order, then the companies its rows name in id order** (UD2-L-1); counters by atomic `UPDATE` ([Import](#import)) | Second confirm: `crm_import_running`; a racing e-mail in a chunk: the chunk runs once more, the row becomes `duplicate` / `updated`; refused again: `crm_write_conflict`. An existing contact a row updates is locked `FOR UPDATE` (status re-read: merged / erased ⇒ `duplicate`), then the named company | `crm_import_running`; `crm_write_conflict` (409 domain); a lock wait ⇒ `CONFLICT_002` when the claim of the same request already committed |
 | Import cancel | Conditional `UPDATE … WHERE status = 'preview'` (or `running` with a stale claim) | Lost race: `crm_import_running` | 409 domain |
 | **Merge** | Both records `FOR UPDATE` in id order, versions re-checked ([Merge](#merge)) | `crm_merge_stale` | 409 domain |
 | GDPR erasure | Contact `FOR UPDATE`, status re-checked; children deleted by primary key after an exact re-select; the merge tombstones pointing at it, and theirs in turn, `FOR UPDATE` and blanked, their merge traces deleted | Already erased: nothing to do (idempotent) | — |
 | GDPR export | A unit (it writes the `exported` timeline entry) | — | — |
-| Retention purge (command) | Single run: a claim row (`__crm__` / `__purge__` in `crm_counter`): locked like a counter row, then a conditional `UPDATE`; a claim older than an hour is taken over. Every batch refreshes the claim in its own unit (`WHERE value = <this run's claim>`); the release in `finally` frees it only while it is still this run's. One unit per batch of 200: trashed records and merge tombstones (past `merge_keep_days`) re-selected `FOR UPDATE` and re-checked (status, date); timeline entries, import rows and merge traces deleted by id with the tenant, counted by the rows really deleted | A second run: "another purge is running"; a run whose claim was taken over stops at its next batch; a record restored meanwhile is skipped | — |
+| Retention purge (command) | Single run: a claim row (`__crm__` / `__purge__` in `crm_counter`): locked like a counter row, then a conditional `UPDATE`; a claim older than an hour is taken over. Every batch refreshes the claim in its own unit (`WHERE value = <this run's claim>`); the release in `finally` frees it only while it is still this run's. One unit per batch of 200: trashed records and merge tombstones (past `merge_keep_days`) re-selected `FOR UPDATE` and re-checked (status, date); timeline entries, import rows and merge traces deleted by id with the tenant, counted by the rows really deleted | A second run: "another purge is running", **at once** (UD2-L-3: the claim row is read `FOR UPDATE SKIP LOCKED`, so a run never waits on a batch of another run; between batches the conditional `UPDATE` refuses it); a run whose claim was taken over stops at its next batch; a record restored meanwhile is skipped | — |
 | Counter rebuild (command) | One unit per tenant and resource: the counter row `FOR UPDATE` first (selected, inserted only when missing, selected again), then the count of active rows, then set; a create waits for it | — | — |
 
 ## Plan-limit counters
@@ -156,6 +163,7 @@ confirm   UPDATE crm_import SET status='running', claim_token=?, claimed_at=now,
 run       per chunk of import.chunk_rows, one unit each:
             SELECT status, claim_token FROM crm_import WHERE id=? FOR UPDATE    # still running with my token? else stop
             pending rows ORDER BY row_no LIMIT chunk_rows
+            lock the existing contacts of the rows' e-mails FOR UPDATE (id order), then the named companies (id order)
             per row: validate → existing contact by e-mail? (skip / update) → counter +1 or outcome 'limit' → insert
             UPDATE crm_import_row SET outcome=?, record_id=?, message=? WHERE id=? AND outcome='pending'
             UPDATE crm_import SET rows_done = rows_done + n, created_count = created_count + c, …, claimed_at=now
@@ -174,7 +182,9 @@ handler ships in 0.1.0.
 ## Isolation and locks
 
 The bundle assumes READ COMMITTED (REQ-DB-003) and short lock waits. Row locks are taken in a fixed order (two records
-by id; a parent record before its children; a contact before a company; a survivor before its tombstones; the import
+by id; a parent record before its children; contacts before companies, each kind by id: affiliate, the company's
+primary contact, a merge of contacts (the two contacts, then their companies) and an import chunk (all its contacts,
+then all its companies) follow it; a survivor before its tombstones; the import
 row before its rows), so the paths cannot deadlock against themselves; a deadlock with another path is replayed by
 the write unit. SQLite has one writer and no `FOR UPDATE` (the clause is left out there). No lock,
 transaction or entity survives the call (FrankenPHP worker mode, kernel reset false).
@@ -192,6 +202,11 @@ transaction or entity survives the call (FrankenPHP worker mode, kernel reset fa
   counter row while a define waits (`max_per_subject` never passed); holds the counter row of a rebuild while a create
   waits; holds the purge claim while a second purge waits; and checks a lock conflict after a commit earlier in the
   same request answers `CONFLICT_002`.
+- `tests/Integration/Database/RaceTest.php` (0.2.0): two role edits of one record (the second waits on the record
+  lock, then runs; an injected racing role row is one more run, never a duplicate), two "set primary contact" calls on
+  one company (the second waits, gives up, then wins; never two primary contacts), an import chunk that waits on a
+  locked company before it settles any row (nothing stored, then the whole chunk), and a second purge that answers
+  "Another purge is running" while a batch holds the claim row.
 - `tests/Integration/Database/HostKindsAndWorkerTest.php`: on the single-entity-manager host a stale edit leaves the
   host's manager open and its entity managed; a write inside a host transaction is refused.
 - `tests/Integration/Database/GdprTest.php`: erasure blanks the merge tombstones in the database rows (not only the

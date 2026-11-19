@@ -15,7 +15,8 @@ Design: [CONTRACT.md](CONTRACT.md) sections 3, 4 and 20.
 ```
 src/Domain/Model/          entities (plain PHP; XML mapping in Resources/config/doctrine), RecordFields
 src/Domain/Enum/           CrmPermission, SubjectType, RecordStatus, FieldType, ActivityKind, Consent / Import enums
-src/Domain/Value/          VOs: TenantRef, ActorRef, RecordId, SubjectRef, HostObjectRef, EmailAddress, TagName, ...
+src/Domain/Value/          VOs: TenantRef, ActorRef, RecordId, SubjectRef, HostObjectRef, EmailAddress, TagName, RoleKey,
+                           AffiliationPurpose, ...
 src/Domain/Port/           host ports: tenant resolver, access checker, feature gate, plan limits, actor directory,
                            audit sink, panel providers, host object resolvers, id generator
 src/Domain/Service/        public service interfaces + RecordInput, ListQuery
@@ -24,7 +25,7 @@ src/Domain/Event/          after-commit events (ids and VOs only)
 src/Domain/Exception/      NotAvailable (404), AccessDenied (403), Conflict (409 domain), InvalidInput (422 / 400)
 src/Domain/Import/         CsvParser, VcardParser (pure functions on bytes)
 src/Application/           services implementing the interfaces; CrmAccess (the gate), WriteSupport, PlanCounter,
-                           RecordValidator, ImportMapping, RecordPurger, Taggings, RecordViews
+                           RecordValidator, ImportMapping, RecordPurger, Taggings, Roles, PartyCatalogue, RecordViews
 src/Application/Port/      CrmStoreInterface (persistence port owned by the application)
 src/Application/Shared/    Effects (per-call after-commit buffer), TransactionRunnerInterface, unit exceptions
 src/Infrastructure/Doctrine/   DoctrineCrmStore, DoctrineTransactionRunner, CrmMetadataListener, BinaryCollation,

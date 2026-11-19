@@ -45,7 +45,6 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\AllowAllCrmKitAccessChecke
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ConfigurableCrmKitAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmResourceAccessChecker;
-use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\LegacyCrmAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\TenantAwareCrmKitAccessCheckerInterface;
@@ -292,29 +291,6 @@ final class PortsAndHttpTest extends TestCase
         $auth->fail = false;
 
         // The deprecated 0.1.0 port: the new permissions reach it as the ones it knew.
-        $inner = new class implements CrmAccessCheckerInterface {
-            /** @var list<string> */
-            public array $asked = [];
-
-            public function isGranted(CrmPermission $permission, TenantRef $tenant, ?SubjectRef $subject = null): bool
-            {
-                $this->asked[] = $permission->value;
-
-                return true;
-            }
-
-            public function currentActor(): ?ActorRef
-            {
-                return $this->asked === [] ? null : new ActorRef('ana');
-            }
-        };
-        $legacy = new LegacyCrmAccessChecker($inner);
-        self::assertNull($legacy->currentActor());
-        foreach (CrmPermission::cases() as $permission) {
-            $legacy->isGranted($permission, $tenant);
-        }
-        self::assertSame(['view', 'edit', 'manage', 'amounts_view', 'campaigns_send', 'edit', 'edit', 'edit', 'manage', 'manage'], $inner->asked);
-        self::assertSame('ana', (new LegacyCrmAccessChecker($inner))->currentActor()?->value);
         $directory = new SecurityActorDirectory($tokens);
         self::assertSame('ana', $directory->actor($tenant, new ActorRef('ana'))?->name);
         self::assertNull($directory->actor($tenant, new ActorRef('Ana')));

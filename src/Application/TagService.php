@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use InvalidArgumentException;
 use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
@@ -32,6 +33,16 @@ final readonly class TagService implements TagServiceInterface
      */
     public function __construct(private WriteSupport $support, private Taggings $taggings)
     {
+    }
+
+    /**
+     * A copy bound to `$caller` for one call (0.3.0: an API principal); never assigned to a property.
+     *
+     * @internal
+     */
+    public function as(CrmCallerInterface $caller): self
+    {
+        return new self($this->support->as($caller), $this->taggings->as($caller));
     }
 
     /**

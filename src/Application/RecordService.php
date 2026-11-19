@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
@@ -60,6 +61,16 @@ final readonly class RecordService implements RecordServiceInterface
         private Roles $roles,
         private PartyCatalogue $catalogue,
     ) {
+    }
+
+    /**
+     * A copy bound to `$caller` for one call (0.3.0: an API principal); never assigned to a property.
+     *
+     * @internal
+     */
+    public function as(CrmCallerInterface $caller): self
+    {
+        return new self($this->support->as($caller), $this->counter, $this->taggings->as($caller), $this->directory, $this->purger, $this->roles->as($caller), $this->catalogue);
     }
 
     /**
@@ -405,7 +416,7 @@ final readonly class RecordService implements RecordServiceInterface
         if ($input->owner === null || $input->owner === '') {
             return null;
         }
-        $owners = array_map(static fn (ActorProfile $p): string => $p->ref->value, $this->directory->owners($context->tenant));
+        $owners = array_map(static fn (ActorProfile $p): string => $p->ref->value, $this->support->access->owners($context, $this->directory));
         if (ActorRef::isReserved($input->owner) || !in_array($input->owner, $owners, true)) {
             throw InvalidInputException::field('owner', 'error.owner_unknown');
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
@@ -27,6 +28,16 @@ final readonly class Taggings
      */
     public function __construct(private WriteSupport $support)
     {
+    }
+
+    /**
+     * A copy bound to `$caller` for one call (0.3.0: an API principal); never assigned to a property.
+     *
+     * @internal
+     */
+    public function as(CrmCallerInterface $caller): self
+    {
+        return new self($this->support->as($caller));
     }
 
     /**

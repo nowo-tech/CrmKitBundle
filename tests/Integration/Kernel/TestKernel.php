@@ -16,6 +16,9 @@ use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
+use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
@@ -28,7 +31,9 @@ use function is_string;
 use function sys_get_temp_dir;
 
 /**
- * Kernel of the integration tests: FrameworkBundle, DoctrineBundle (ORM) and the bundle.
+ * Kernel of the integration tests: FrameworkBundle, DoctrineBundle (ORM) and the bundle. The test-only key
+ * `access_checker` of the bundle configuration (the root key was removed in 0.3.0) points the application's
+ * `CrmAccessCheckerInterface` at a test service through a compiler pass; null keeps the bundle's default.
  */
 final class TestKernel extends Kernel
 {
@@ -46,6 +51,23 @@ final class TestKernel extends Kernel
         private readonly bool $transactionBundle = true,
     ) {
         parent::__construct('test', false);
+    }
+
+    protected function build(ContainerBuilder $container): void
+    {
+        $checker = $this->bundleConfig['access_checker'] ?? null;
+        if (is_string($checker) && $checker !== '') {
+            $container->addCompilerPass(new class($checker) implements CompilerPassInterface {
+                public function __construct(private readonly string $checker)
+                {
+                }
+
+                public function process(ContainerBuilder $container): void
+                {
+                    $container->setAlias(CrmAccessCheckerInterface::class, $this->checker)->setPublic(true);
+                }
+            });
+        }
     }
 
     /**
@@ -130,7 +152,9 @@ final class TestKernel extends Kernel
             ]);
         }
         ($this->configure)($container, self::defaultDatabaseUrl());
-        $container->extension('nowo_crm_kit', $this->bundleConfig);
+        $bundle = $this->bundleConfig;
+        unset($bundle['access_checker']);
+        $container->extension('nowo_crm_kit', $bundle);
         $container->services()->set('logger', NullLogger::class);
         TestServices::register($container);
     }

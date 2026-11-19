@@ -8,7 +8,6 @@ use LogicException;
 use Nowo\CrmKitBundle\Application\CrmReader;
 use Nowo\CrmKitBundle\Bridge\SearchKit\CrmSearchProvider;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
-use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
@@ -16,7 +15,6 @@ use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
-use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\LegacyCrmAccessChecker;
 use Nowo\SearchKitBundle\Contract\SearchProviderInterface;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponsePolicy;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
@@ -55,12 +53,6 @@ final class CrmPortsPass implements CompilerPassInterface
             if (is_string($id) && $id !== '') {
                 $container->setAlias($interface, $id);
             }
-        }
-        // Deprecated since 0.2.0: a 0.1.0 host checker, wrapped so the new permissions reach it as the ones it knew.
-        $legacy = $container->getParameter($p . 'access_checker');
-        if (is_string($legacy) && $legacy !== '') {
-            $container->setDefinition(LegacyCrmAccessChecker::class, (new Definition(LegacyCrmAccessChecker::class))->setArguments([new Reference($legacy)]));
-            $container->setAlias(CrmAccessCheckerInterface::class, LegacyCrmAccessChecker::class)->setPublic(true);
         }
         $clock = $container->getParameter($p . 'clock');
         // FrameworkBundle (required) always defines `clock`.

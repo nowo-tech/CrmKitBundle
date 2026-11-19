@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Application;
 
 use DateTimeZone;
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
+use Nowo\CrmKitBundle\Application\Access\SessionCaller;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
+use Nowo\CrmKitBundle\Domain\Value\ActorProfile;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
@@ -23,7 +27,10 @@ use function in_array;
 
 /**
  * The gate of every call (contract section 13): tenant (none ⇒ 404), feature gate (off ⇒ 404), actor (none ⇒ 404),
- * then the permission (refused ⇒ 403). Asks the ports on every call; keeps nothing (worker mode).
+ * then the permission (refused ⇒ 403). Asks the ports on every call; keeps nothing (worker mode). **(0.3.0)** The
+ * tenant, the actor, the decisions and the visibility come from the call's {@see CrmCallerInterface}: the session's
+ * ({@see SessionCaller}, the configured ports) unless {@see self::bind()} returned a copy bound to another caller (an
+ * API principal). A bound copy lives for one call only.
  */
 final readonly class CrmAccess
 {
@@ -36,7 +43,35 @@ final readonly class CrmAccess
         private CrmAccessCheckerInterface $checker,
         private ClockInterface $clock,
         private ?CrmRecordVisibilityInterface $visibility = null,
+        private ?CrmCallerInterface $caller = null,
     ) {
+    }
+
+    /**
+     * A copy of the gate for one call of `$caller` (0.3.0; never assigned to a property).
+     */
+    public function bind(CrmCallerInterface $caller): self
+    {
+        return new self($this->tenants, $this->gate, $this->checker, $this->clock, $this->visibility, $caller);
+    }
+
+    /**
+     * The caller of this gate: the bound one, else the session's.
+     */
+    public function caller(): CrmCallerInterface
+    {
+        return $this->caller ?? new SessionCaller($this->tenants, $this->checker, $this->visibility);
+    }
+
+    /**
+     * The owners the actor may pick: the bound caller's own list when it has one (an API principal on the default
+     * directory), else the directory's.
+     *
+     * @return list<ActorProfile>
+     */
+    public function owners(CrmContext $context, CrmActorDirectoryInterface $directory): array
+    {
+        return $this->caller()->selfOwners($context->tenant) ?? $directory->owners($context->tenant);
     }
 
     /**
@@ -46,7 +81,7 @@ final readonly class CrmAccess
      */
     public function visibleOwners(CrmContext $context): ?array
     {
-        $owners = $this->visibility?->visibleOwners($context->tenant, $context->actor);
+        $owners = $this->caller()->visibleOwners($context->tenant, $context->actor);
 
         // Whatever the visibility service (the bundle's or a host's) returns, the anonymised placeholder is never a
         // visible owner (audits VD-1, VD2-7).
@@ -70,17 +105,18 @@ final readonly class CrmAccess
      */
     public function base(): CrmContext
     {
-        $tenant = $this->tenants->current();
+        $caller = $this->caller();
+        $tenant = $caller->tenant();
         if (!$tenant instanceof TenantRef || !$this->gate->isEnabled($tenant)) {
             throw new NotAvailableException();
         }
-        $actor = $this->checker->currentActor();
+        $actor = $caller->actor();
         // The anonymised placeholder never acts, whichever checker returned it (audit VD-1).
         if (!$actor instanceof ActorRef || ActorRef::isReserved($actor->value)) {
             throw new NotAvailableException();
         }
 
-        return new CrmContext($tenant, $actor, $this->clock->now()->setTimezone(new DateTimeZone('UTC')));
+        return new CrmContext($tenant, $actor, $this->clock->now()->setTimezone(new DateTimeZone('UTC')), $caller->origin());
     }
 
     /**
@@ -103,7 +139,7 @@ final readonly class CrmAccess
      */
     public function require(CrmContext $context, CrmPermission $permission, ?SubjectRef $subject = null): void
     {
-        if (!$this->checker->isGranted($permission, $context->tenant, $subject)) {
+        if (!$this->caller()->isGranted($permission, $context->tenant, $subject)) {
             throw new AccessDeniedException();
         }
     }
@@ -119,6 +155,6 @@ final readonly class CrmAccess
             return false;
         }
 
-        return $this->checker->isGranted($permission, $context->tenant, $subject);
+        return $this->caller()->isGranted($permission, $context->tenant, $subject);
     }
 }

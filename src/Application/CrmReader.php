@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
@@ -67,6 +68,16 @@ final readonly class CrmReader implements CrmReaderInterface
         ?LoggerInterface $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
+    }
+
+    /**
+     * A copy bound to `$caller` for one call (0.3.0: an API principal); never assigned to a property.
+     *
+     * @internal
+     */
+    public function as(CrmCallerInterface $caller): self
+    {
+        return new self($this->support->as($caller), $this->views, $this->directory, $this->panels, $this->resolvers, $this->logger);
     }
 
     /**
@@ -267,7 +278,7 @@ final readonly class CrmReader implements CrmReaderInterface
     {
         $context = $this->support->access->context(CrmPermission::View);
 
-        return $this->directory->owners($context->tenant);
+        return $this->support->access->owners($context, $this->directory);
     }
 
     /**

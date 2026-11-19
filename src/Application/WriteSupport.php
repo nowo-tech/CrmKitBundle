@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Application\Shared\StaleRowException;
@@ -43,6 +44,16 @@ final readonly class WriteSupport
         private CrmAuditSinkInterface $audit,
         private ?EventDispatcherInterface $events = null,
     ) {
+    }
+
+    /**
+     * A copy whose access gate is bound to `$caller`, for one call (0.3.0).
+     *
+     * @internal
+     */
+    public function as(CrmCallerInterface $caller): self
+    {
+        return new self($this->access->bind($caller), $this->store, $this->runner, $this->ids, $this->audit, $this->events);
     }
 
     /**
@@ -122,12 +133,17 @@ final readonly class WriteSupport
     }
 
     /**
-     * Appends a timeline entry.
+     * Appends a timeline entry. **(0.3.0)** A write through the API adds `via` (the channel) and `token` (the token's
+     * name) to the parameters, so the timeline reads "… via ‹token›".
      *
      * @param array<string, bool|int|string|null> $params
      */
     public function activity(CrmContext $context, SubjectType $type, string $id, ActivityKind $kind, array $params = []): void
     {
+        if ($context->origin !== null) {
+            $params['via']   = $context->origin->channel;
+            $params['token'] = $context->origin->tokenName;
+        }
         $this->store->add(new Activity($this->id(), $context->tenant->value, $type, $id, $kind, $context->actor->value, $params, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
     }
 
@@ -138,6 +154,6 @@ final readonly class WriteSupport
      */
     public function audit(Effects $effects, CrmContext $context, string $action, ?SubjectType $type = null, ?string $id = null, array $details = []): void
     {
-        $effects->audit(new AuditEntry($context->tenant, $context->actor, $action, $type?->value, $id, $details, $context->now));
+        $effects->audit(new AuditEntry($context->tenant, $context->actor, $action, $type?->value, $id, $details, $context->now, $context->origin));
     }
 }

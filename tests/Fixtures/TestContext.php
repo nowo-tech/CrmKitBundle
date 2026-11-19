@@ -78,6 +78,13 @@ final class TestContext
      */
     public function holds(string $tenant, string $actor, CrmPermission $permission, ?SubjectRef $subject): bool
     {
+        // The grants of the tests use the five permissions of 0.1.0: create / delete / import are held as edit, export
+        // and erase as manage.
+        $permission = match ($permission) {
+            CrmPermission::Create, CrmPermission::Delete, CrmPermission::Import => CrmPermission::Edit,
+            CrmPermission::Export, CrmPermission::Erase                         => CrmPermission::Manage,
+            default                                                             => $permission,
+        };
         $mine = $this->grants[$tenant][$actor] ?? [];
         if ($subject instanceof SubjectRef && in_array($permission->value . ':' . $subject->id->value, $this->denied, true)) {
             return false;

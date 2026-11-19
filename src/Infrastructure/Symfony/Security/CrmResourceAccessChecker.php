@@ -41,11 +41,23 @@ final readonly class CrmResourceAccessChecker
      */
     public function isGranted(?object $user, ?ActorRef $actor, TenantRef $tenant, CrmPermission $action, SubjectRef $subject): bool
     {
-        $owner = $subject->owner?->value;
         // Without a visibility service every record is shared; without an actor only ownerless records are.
-        $owners  = $this->visibility instanceof CrmRecordVisibilityInterface ? ($actor instanceof ActorRef ? $this->visibility->visibleOwners($tenant, $actor) : []) : null;
+        $owners = $this->visibility instanceof CrmRecordVisibilityInterface ? ($actor instanceof ActorRef ? $this->visibility->visibleOwners($tenant, $actor) : []) : null;
+
+        return $this->decide($user, $actor, $tenant, $action, $subject, $owners);
+    }
+
+    /**
+     * The decision with the visible owners already known (0.3.0: an API principal's), and the call's channel and
+     * token for the listeners.
+     *
+     * @param list<string>|null $owners the visible owners of the person (null: every record)
+     */
+    public function decide(?object $user, ?ActorRef $actor, TenantRef $tenant, CrmPermission $action, SubjectRef $subject, ?array $owners, string $channel = 'web', ?string $tokenId = null): bool
+    {
+        $owner   = $subject->owner?->value;
         $default = $owners === null || $owner === null || in_array($owner, $owners, true);
-        $event   = new RecordAccessCheckEvent($user, $actor?->value, $tenant->value, $subject->type->value, $subject->id->value, $owner, $action->value, $default);
+        $event   = new RecordAccessCheckEvent($user, $actor?->value, $tenant->value, $subject->type->value, $subject->id->value, $owner, $action->value, $default, $channel, $tokenId);
         $this->events?->dispatch($event, CrmKitEvents::RECORD_ACCESS_CHECK);
 
         return $event->isGranted();

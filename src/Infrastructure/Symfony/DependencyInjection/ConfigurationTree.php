@@ -42,9 +42,6 @@ final class ConfigurationTree
         foreach (['tenant_resolver', 'feature_gate', 'plan_limits', 'actor_directory', 'audit_sink', 'clock'] as $port) {
             $children->scalarNode($port)->defaultNull()->info('Service id of the host implementation; null = the bundle default.')->end();
         }
-        $children->scalarNode('access_checker')->defaultNull()
-            ->info('DEPRECATED since 0.2.0 (removed in 0.3.0): service id of a 0.1.0 CrmAccessCheckerInterface (create / delete / import are asked as edit, export / erase as manage). Use security.access_checker and nowo_crm_kit.record_access_check listeners.')
-        ->end();
         $security = $children->arrayNode('security')->addDefaultsIfNotSet()->info('REQ-UI-002: who may use the CRM. Each *_roles list grants its area to any of its roles; an empty list (access, manage, amounts, campaigns only) means any authenticated user.')->children();
         $security->arrayNode('access_roles')->info('Opening the CRM (lists, 360° pages, search); [] = any authenticated user.')->scalarPrototype()->cannotBeEmpty()->end()->defaultValue(['ROLE_ADMIN'])->end();
         $security->scalarNode('access_checker')->defaultNull()->info('Service id of a host CrmKitAccessCheckerInterface; null = ConfigurableCrmKitAccessChecker (these role lists).')->end();

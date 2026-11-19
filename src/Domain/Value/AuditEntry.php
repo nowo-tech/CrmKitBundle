@@ -8,7 +8,8 @@ use DateTimeImmutable;
 
 /**
  * One audit line (contract section 14): an action key `crm.*`, the subject's id and counts or codes only — never
- * names, e-mails or note text.
+ * names, e-mails or note text. **(0.3.0)** A write through the API carries its {@see AuditOrigin}: the channel, the
+ * token id and the token's display name (the one documented exception: a token name names a token, not a person).
  */
 final readonly class AuditEntry
 {
@@ -24,6 +25,7 @@ final readonly class AuditEntry
         public ?string $subjectId,
         public array $details,
         public DateTimeImmutable $at,
+        public ?AuditOrigin $origin = null,
     ) {
     }
 }

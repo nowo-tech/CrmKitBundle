@@ -85,6 +85,24 @@ final class ImportTest extends CrmTestCase
         self::assertSame('Ada Lovelace', $this->text("SELECT display_name FROM nowo_crm_contact WHERE email_key = 'ada@x.test'"));
     }
 
+    public function testContinueAttributesTheRowsToThePersonWhoClicked(): void
+    {
+        $this->boot(['import' => ['chunk_rows' => 10]]);
+        $this->admin();
+        $imports = $this->service(ImportServiceInterface::class);
+        $rows    = "email,last_name\n";
+        for ($i = 0; $i < 15; ++$i) {
+            $rows .= "p{$i}@x.test,P{$i}\n";
+        }
+        $id = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'p.csv', $rows);
+        $imports->confirm($id, ['email' => 'email', 'last_name' => 'last_name'], DuplicatePolicy::Skip, 1);
+        self::assertFalse($imports->run($id, 1));
+        $this->actAs('leo', 'view', 'edit');
+        self::assertTrue($imports->run($id));
+        self::assertSame('ana', $this->text("SELECT created_by_id FROM nowo_crm_contact WHERE email_key = 'p0@x.test'"));
+        self::assertSame('leo', $this->text("SELECT created_by_id FROM nowo_crm_contact WHERE email_key = 'p14@x.test'"));
+    }
+
     public function testCompaniesVcardsAndRefusals(): void
     {
         $this->boot();

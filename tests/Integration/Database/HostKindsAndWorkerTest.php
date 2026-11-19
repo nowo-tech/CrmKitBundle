@@ -7,9 +7,11 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 use Doctrine\ORM\Tools\SchemaTool;
 use LogicException;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\RecordInput;
 use Nowo\CrmKitBundle\Tests\Fixtures\HostEntity\HostNote;
 use Nowo\CrmKitBundle\Tests\Integration\Kernel\Host;
 use Nowo\SearchKitBundle\Contract\SearchProviderInterface;
@@ -56,6 +58,21 @@ final class HostKindsAndWorkerTest extends CrmTestCase
         $em->flush();
         $this->service(NoteServiceInterface::class)->add(SubjectType::Company, $id, 'x');
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_note'));
+
+        // A refused write (a stale edit) rolls back without closing the host's manager or detaching its entity.
+        try {
+            $this->records()->update($id, new RecordInput(SubjectType::Company, ['city' => 'Madrid']), 99);
+            self::fail('lost update');
+        } catch (ConflictException $e) {
+            self::assertSame(ConflictException::STALE, $e->errorCode);
+        }
+        self::assertTrue($em->isOpen(), 'the host manager stays open');
+        self::assertSame($em, $this->em(), 'and is not reset');
+        self::assertTrue($em->contains($note), 'the host entity stays managed');
+        self::assertSame('', $this->text("SELECT COALESCE(city, '') FROM nowo_crm_company WHERE id = ?", [$id]));
+        $this->service(NoteServiceInterface::class)->add(SubjectType::Company, $id, 'after');
+        self::assertSame(2, $this->int('SELECT COUNT(*) FROM nowo_crm_note'));
+        self::assertTrue($em->contains($note));
     }
 
     public function testTheDddHost(): void

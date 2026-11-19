@@ -349,9 +349,11 @@ flash:
         crm_import_running: Cet import est déjà en cours ou terminé.
         crm_limit_reached: 'La limite de votre offre est atteinte : plus aucune fiche de ce type ne peut être ajoutée.'
         crm_settings_stale: Quelqu'un a modifié les paramètres au même moment. Vérifiez-les et enregistrez à nouveau.
+        crm_write_conflict: 'Une autre modification des mêmes données est arrivée au même moment. Réessayez.'
 error:
     required: Ce champ est obligatoire.
     invalid: Cette valeur n'est pas valide.
+    host_object_unknown: 'Cet objet n''existe pas ou vous ne pouvez pas le voir.'
     too_long: Cette valeur est trop longue.
     unknown_field: Champ inconnu.
     email: Ce n'est pas une adresse e-mail.

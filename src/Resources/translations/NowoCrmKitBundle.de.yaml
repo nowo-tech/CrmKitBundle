@@ -349,9 +349,11 @@ flash:
         crm_import_running: Dieser Import läuft bereits oder ist abgeschlossen.
         crm_limit_reached: 'Das Limit Ihres Tarifs ist erreicht: Es können keine weiteren Datensätze dieser Art hinzugefügt werden.'
         crm_settings_stale: Jemand hat die Einstellungen gleichzeitig geändert. Prüfen Sie sie und speichern Sie erneut.
+        crm_write_conflict: 'Eine andere Änderung derselben Daten kam im selben Moment an. Versuchen Sie es erneut.'
 error:
     required: Dieses Feld ist erforderlich.
     invalid: Dieser Wert ist ungültig.
+    host_object_unknown: 'Dieses Objekt existiert nicht oder Sie können es nicht sehen.'
     too_long: Dieser Wert ist zu lang.
     unknown_field: Unbekanntes Feld.
     email: Keine E-Mail-Adresse.

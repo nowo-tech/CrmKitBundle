@@ -251,20 +251,30 @@ interface CrmStoreInterface
     /** Gives one unit back (never below 0). */
     public function releaseCounter(TenantRef $tenant, string $resource): void;
 
-    /** Locks a counter row `FOR UPDATE` (created at 0 when missing); held until the unit ends. */
+    /**
+     * Locks a counter row `FOR UPDATE` (created at 0 when missing: `SELECT … FOR UPDATE` first, the insert only when
+     * no row, then `SELECT … FOR UPDATE` again, so two lockers of an existing row never deadlock); held until the unit
+     * ends.
+     */
     public function lockCounter(TenantRef $tenant, string $resource): void;
 
     /** Sets a counter (rebuild); the caller locked its row first. */
     public function setCounter(TenantRef $tenant, string $resource, int $value): void;
 
     /**
-     * Claims the single run of the retention purge (conditional UPDATE): true when free or the claim is older than
-     * `$staleBefore` (unix times).
+     * Claims the single run of the retention purge (the claim row locked as {@see self::lockCounter()} does, then a
+     * conditional UPDATE): true when free or the claim is older than `$staleBefore` (unix times).
      */
     public function claimPurge(int $now, int $staleBefore): bool;
 
-    /** Frees the purge claim. */
-    public function releasePurge(): void;
+    /**
+     * Moves this run's claim from `$claim` to `max($now, $claim + 1)` (once per batch, so a long run is never taken
+     * over): the new claim, or null when another run holds it now.
+     */
+    public function refreshPurge(int $claim, int $now): ?int;
+
+    /** Frees the purge claim, only while it is still this run's (`value = $claim`). */
+    public function releasePurge(int $claim): void;
 
     /** Active records of the tenant. */
     public function countActive(TenantRef $tenant, SubjectType $type): int;
@@ -282,6 +292,22 @@ interface CrmStoreInterface
      * @return list<string>
      */
     public function trashedBefore(TenantRef $tenant, SubjectType $type, DateTimeImmutable $before, int $limit): array;
+
+    /**
+     * Ids of merge tombstones last changed before the time (retention: `merge_keep_days`).
+     *
+     * @return list<string>
+     */
+    public function mergedBefore(TenantRef $tenant, SubjectType $type, DateTimeImmutable $before, int $limit): array;
+
+    /**
+     * Locks (`FOR UPDATE`, id order) the merge tombstones that point at one of the records.
+     *
+     * @param list<string> $survivorIds
+     *
+     * @return list<CrmRecord>
+     */
+    public function lockTombstones(SubjectType $type, TenantRef $tenant, array $survivorIds): array;
 
     /** Deletes timeline entries older than the time (one batch); how many. */
     public function deleteActivitiesBefore(TenantRef $tenant, DateTimeImmutable $before, int $limit): int;

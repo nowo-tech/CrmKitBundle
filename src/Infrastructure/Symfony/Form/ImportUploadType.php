@@ -12,9 +12,13 @@ use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\File;
+
+use function is_int;
+use function max;
 
 /**
- * An import upload: what, which format and the file.
+ * An import upload: what, which format and the file (at most `max_bytes`: `import.max_bytes`).
  *
  * @extends AbstractType<mixed>
  */
@@ -30,10 +34,11 @@ final class ImportUploadType extends AbstractType
      */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $this->withBuilder($builder, function (): void {
+        $maxBytes = $options['max_bytes'];
+        $this->withBuilder($builder, function () use ($maxBytes): void {
             $this->addTypedField('subject', ChoiceType::class, ['label' => 'import.form.subject', 'choices' => ['import.subject.contacts' => 'contact', 'import.subject.companies' => 'company']]);
             $this->addTypedField('format', ChoiceType::class, ['label' => 'import.form.format', 'choices' => ['import.format.csv' => 'csv', 'import.format.vcard' => 'vcard']]);
-            $this->addTypedField('file', FileType::class, ['label' => 'import.form.file', 'help' => 'import.form.file_help']);
+            $this->addTypedField('file', FileType::class, ['label' => 'import.form.file', 'help' => 'import.form.file_help', 'constraints' => [new File(maxSize: is_int($maxBytes) ? max(1, $maxBytes) : 5242880)]]);
         });
     }
 
@@ -48,7 +53,9 @@ final class ImportUploadType extends AbstractType
             'csrf_token_id'      => 'nowo_crm_kit_import',
             'allow_extra_fields' => false,
             'translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN,
+            'max_bytes'          => 5242880,
         ]);
+        $resolver->setAllowedTypes('max_bytes', 'int');
     }
 
     /**

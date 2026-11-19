@@ -7,6 +7,7 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 use Nowo\CrmKitBundle\Application\CrmPersonalData;
 use Nowo\CrmKitBundle\Domain\Enum\ConsentSource;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
+use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\ImportFormat;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
@@ -15,6 +16,7 @@ use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmSettingsInterface;
+use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
@@ -27,7 +29,9 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 
 use function implode;
+use function is_string;
 use function iterator_to_array;
+use function json_decode;
 use function json_encode;
 
 /**
@@ -70,6 +74,43 @@ final class GdprTest extends CrmTestCase
         self::assertContains('ContactErased', $this->recorder()->eventNames());
     }
 
+    public function testMergeAndErasureLeaveNoPersonalDataInTheRows(): void
+    {
+        $this->boot();
+        $this->admin();
+        $this->service(FieldServiceInterface::class)->define(SubjectType::Contact, 'tier', 'Tier', FieldType::Text, [], false, 1);
+        $merges = $this->service(MergeServiceInterface::class);
+        $reader = $this->service(CrmReaderInterface::class);
+        $c      = $this->records()->create(new RecordInput(SubjectType::Contact, ['first_name' => 'Ada', 'last_name' => 'Lovelace', 'email' => 'ada@x.test'], 'leo', ['tier' => 'A']));
+        $a      = $this->records()->create(new RecordInput(SubjectType::Contact, ['first_name' => 'Ada', 'last_name' => 'King', 'email' => 'ada2@x.test', 'phone' => '+34 600', 'city' => 'London'], 'leo', ['tier' => 'B']));
+        $b      = $this->contact('Augusta', 'Byron', 'ada3@x.test', ['mobile' => '+44 1']);
+        // b → a, then a → c: a chain of two tombstones behind c.
+        $merges->merge(SubjectType::Contact, $a, $b, [], $reader->record(SubjectType::Contact, $a)->version, 1);
+        $merges->merge(SubjectType::Contact, $c, $a, ['phone'], $reader->record(SubjectType::Contact, $c)->version, $reader->record(SubjectType::Contact, $a)->version);
+        $row = $this->connection()->fetchAssociative('SELECT first_name, last_name, display_name, email, email_key, phone, mobile, city, owner_id, custom, status, merged_into_id FROM nowo_crm_contact WHERE id = ?', [$a]);
+        self::assertIsArray($row);
+        self::assertSame(['merged', $c], [$row['status'], $row['merged_into_id']]);
+        foreach (['first_name', 'last_name', 'email', 'email_key', 'phone', 'mobile', 'city', 'owner_id'] as $column) {
+            self::assertNull($row[$column], 'the tombstone keeps no ' . $column);
+        }
+        self::assertSame('', $row['display_name']);
+        self::assertSame([], json_decode(is_string($row['custom']) ? $row['custom'] : '', true));
+        self::assertSame('+34 600', $reader->record(SubjectType::Contact, $c)->values['phone'], 'the survivor took it');
+        self::assertSame(2, $this->int('SELECT COUNT(*) FROM nowo_crm_merge'), 'the snapshots are the audit copy');
+
+        // A tombstone written before this rule (personal values left): the erasure of its survivor blanks it.
+        $this->connection()->executeStatement("UPDATE nowo_crm_contact SET last_name = 'Byron', email = 'ada3@x.test', mobile = '+44 1' WHERE id = ?", [$b]);
+        $this->service(CrmPersonalDataInterface::class)->erase($c);
+        foreach ([$a, $b] as $tombstone) {
+            self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE id = ? AND (last_name IS NOT NULL OR email IS NOT NULL OR mobile IS NOT NULL OR phone IS NOT NULL OR owner_id IS NOT NULL OR display_name <> '')", [$tombstone]));
+            self::assertSame(1, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE id = ? AND status = 'merged'", [$tombstone]));
+        }
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_merge'), 'merge traces of the erased person are gone');
+        foreach (['ada@x.test', 'ada2@x.test', 'ada3@x.test', 'Lovelace', 'King', 'Byron', '+34 600', '+44 1', 'London'] as $gone) {
+            self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_contact WHERE email = ? OR last_name = ? OR phone = ? OR mobile = ? OR city = ?', [$gone, $gone, $gone, $gone, $gone]), $gone);
+        }
+    }
+
     public function testRetentionPurgeAndCounterRebuild(): void
     {
         $this->boot();
@@ -98,6 +139,8 @@ final class GdprTest extends CrmTestCase
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_company WHERE id = ?', [$old]));
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_import_row'));
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_merge'));
+        self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_company WHERE status = 'merged'"), 'tombstones past merge_keep_days');
+        self::assertStringContainsString('merge tombstones: 1', $run->getDisplay());
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_activity'));
         self::assertContains('crm.retention.purged', $this->recorder()->actions());
         self::assertSame(2, $run->execute(['--tenant' => 'bad ']));

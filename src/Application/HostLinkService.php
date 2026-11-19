@@ -15,6 +15,7 @@ use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
 use Nowo\CrmKitBundle\Domain\Value\HostObjectRef;
@@ -38,9 +39,9 @@ use function trim;
 final readonly class HostLinkService implements HostLinkServiceInterface, TimelineInterface
 {
     /**
-     * Wires the collaborators.
+     * @param iterable<CrmHostObjectResolverInterface> $resolvers the host's resolvers (tag `nowo_crm_kit.host_object`)
      */
-    public function __construct(private WriteSupport $support)
+    public function __construct(private WriteSupport $support, private iterable $resolvers = [])
     {
     }
 
@@ -54,8 +55,14 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
         if ($label !== null && RecordValidator::check($label, 200, 'text') !== null) {
             throw InvalidInputException::field('label', 'error.invalid');
         }
+        // A type with a resolver links only objects the resolver confirms (in the tenant, visible to the actor,
+        // byte-exact id); a type without one is a free reference.
+        $resolver = $this->resolver($host->type);
+        if ($resolver instanceof CrmHostObjectResolverInterface && ($resolver->resolve($context->tenant, [$host->id])[$host->id] ?? null)?->id !== $host->id) {
+            throw InvalidInputException::field('hostId', 'error.host_object_unknown');
+        }
         $work = function (Effects $effects) use ($context, $type, $subjectId, $host, $label): string {
-            $this->support->load($context, $type, $subjectId, CrmPermission::Edit);
+            $this->support->load($context, $type, $subjectId, CrmPermission::Edit, lock: true);
             foreach ($this->support->store->links($context->tenant, $type, $subjectId) as $link) {
                 if ($link->getHostType() === $host->type && $link->getHostId() === $host->id) {
                     return $link->getId();
@@ -88,7 +95,7 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
             if (!$link instanceof HostLink) {
                 throw new NotAvailableException();
             }
-            $this->support->load($context, $link->getSubjectType(), $link->getSubjectId(), CrmPermission::Edit);
+            $this->support->load($context, $link->getSubjectType(), $link->getSubjectId(), CrmPermission::Edit, lock: true);
             $this->support->store->remove($link); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, $link->getSubjectType(), $link->getSubjectId(), ActivityKind::Unlinked, ['host_type' => $link->getHostType()]);
             $this->support->audit($effects, $context, 'crm.link.removed', $link->getSubjectType(), $link->getSubjectId(), ['host_type' => $link->getHostType()]);
@@ -117,6 +124,20 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
     }
 
     /**
+     * The resolver of a host object type, if the host has one.
+     */
+    private function resolver(string $type): ?CrmHostObjectResolverInterface
+    {
+        foreach ($this->resolvers as $resolver) {
+            if ($resolver->type() === $type) {
+                return $resolver;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Whether every parameter key is a plain word (`^[a-z][a-z0-9_]{0,39}$`).
      *
      * @param array<string, mixed> $params
@@ -138,7 +159,7 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
     public function record(SubjectType $type, string $subjectId, string $labelKey, array $params = [], ?string $url = null): void
     {
         $context = $this->support->access->base();
-        if (preg_match('/\A[a-z0-9_.-]{1,120}\z/D', $labelKey) !== 1 || count($params) > 20 || !$this->keys($params) || ($url !== null && (!str_starts_with($url, '/') || str_starts_with($url, '//') || mb_strlen($url) > 500))) {
+        if (preg_match('/\A[a-z0-9_.-]{1,120}\z/D', $labelKey) !== 1 || count($params) > 20 || !$this->keys($params) || ($url !== null && (!str_starts_with($url, '/') || str_starts_with($url, '//') || str_starts_with($url, '/\\') || mb_strlen($url) > 500))) {
             throw InvalidInputException::field('_', 'error.invalid');
         }
         foreach ($params as $value) {
@@ -147,7 +168,7 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
             }
         }
         $this->support->write(function (Effects $effects) use ($context, $type, $subjectId, $labelKey, $params, $url): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $this->support->load($context, $type, $subjectId, CrmPermission::Edit);
+            $this->support->load($context, $type, $subjectId, CrmPermission::Edit, lock: true);
             $translation = [];
             foreach ($params as $key => $value) {
                 $translation['%' . $key . '%'] = $value;

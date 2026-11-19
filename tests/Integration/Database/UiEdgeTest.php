@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
+use LogicException;
 use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
@@ -12,6 +13,7 @@ use Nowo\CrmKitBundle\Domain\Service\RecordInput;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 use function file_put_contents;
+use function str_repeat;
 use function sys_get_temp_dir;
 use function tempnam;
 
@@ -93,16 +95,33 @@ final class UiEdgeTest extends CrmTestCase
         self::assertSame(422, $this->client->getResponse()->getStatusCode(), 'no CSRF token');
     }
 
-    public function testAWriteInsideARunningTransactionJoinsIt(): void
+    public function testAnUploadOverTheSizeLimitIsRefusedBeforeItIsRead(): void
+    {
+        $this->boot(['import' => ['max_bytes' => 1024]]);
+        $this->admin();
+        $path = (string) tempnam(sys_get_temp_dir(), 'crm');
+        file_put_contents($path, "name\n" . str_repeat("Acme Tools Incorporated\n", 100));
+        $upload = $this->client->request('GET', '/crm/import')->filter('[data-testid="crm-import-upload"] form')->form();
+        $this->client->submit($upload, ['crm_import[subject]' => 'company', 'crm_import[file]' => new UploadedFile($path, 'big.csv', 'text/csv', null, true)]);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_import'));
+    }
+
+    public function testAWriteInsideARunningTransactionIsRefusedAndAReadRunsInIt(): void
     {
         $this->boot();
         $this->admin();
+        $id         = $this->company('Before');
         $connection = $this->connection();
         $connection->beginTransaction();
-        $id = $this->company('Inside');
-        self::assertSame('Inside', $this->service(CrmReaderInterface::class)->record(SubjectType::Company, $id)->label);
+        try {
+            $this->company('Inside');
+            self::fail('wrote inside the host transaction');
+        } catch (LogicException $e) {
+            self::assertStringContainsString('call it outside your transaction', $e->getMessage());
+        }
+        self::assertSame('Before', $this->service(CrmReaderInterface::class)->record(SubjectType::Company, $id)->label);
         $connection->rollBack();
-        $this->em()->clear();
-        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_company'));
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_company'));
     }
 }

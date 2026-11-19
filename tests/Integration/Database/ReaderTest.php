@@ -87,10 +87,15 @@ final class ReaderTest extends CrmTestCase
         $l1    = $links->link(SubjectType::Company, $acme, new HostObjectRef('project', 'p1'));
         self::assertSame($l1, $links->link(SubjectType::Company, $acme, new HostObjectRef('project', 'p1')), 'idempotent');
         $links->link(SubjectType::Company, $acme, new HostObjectRef('project', 'p2'));
-        $links->link(SubjectType::Company, $acme, new HostObjectRef('project', 'P1'));
+        try {
+            $links->link(SubjectType::Company, $acme, new HostObjectRef('project', 'P1'));
+            self::fail('linked an object the resolver does not confirm');
+        } catch (InvalidInputException $e) {
+            self::assertSame(['hostId' => 'error.host_object_unknown'], $e->errors);
+        }
         $links->link(SubjectType::Company, $acme, new HostObjectRef('invoice', 'F-1'), 'Invoice F-1');
         $links->link(SubjectType::Company, $acme, new HostObjectRef('ticket', 'T-9'));
-        self::assertSame(['Invoice F-1', 'Website', 'Shop', 'ticket T-9'], array_map(static fn (LinkView $l): string => $l->label, $this->reader()->links(SubjectType::Company, $acme)), 'P1 does not exist; P2 look-alike ignored');
+        self::assertSame(['Invoice F-1', 'Website', 'Shop', 'ticket T-9'], array_map(static fn (LinkView $l): string => $l->label, $this->reader()->links(SubjectType::Company, $acme)), 'P2 look-alike ignored');
         self::assertCount(1, $links->subjectsLinkedTo(new HostObjectRef('project', 'p1')));
         self::assertSame([], $links->subjectsLinkedTo(new HostObjectRef('project', 'p9')));
         $this->service(TimelineInterface::class)->record(SubjectType::Contact, $ada, 'host.ticket_opened', ['ticket' => 'T-9'], '/tickets/9');
@@ -105,7 +110,7 @@ final class ReaderTest extends CrmTestCase
 
         $panels = $this->reader()->panels(SubjectType::Company, $acme);
         self::assertSame('projects', $panels[0]['key']);
-        self::assertSame(['Project p1', 'Project p2', 'Project P1'], array_map(static fn (PanelItem $i): string => $i->title, $panels[0]['panel']->items));
+        self::assertSame(['Project p1', 'Project p2'], array_map(static fn (PanelItem $i): string => $i->title, $panels[0]['panel']->items));
         self::assertSame([], $this->reader()->panels(SubjectType::Contact, $ada));
         $this->ctx()->panelFails = true;
         self::assertSame([], $this->reader()->panels(SubjectType::Company, $acme));
@@ -120,7 +125,7 @@ final class ReaderTest extends CrmTestCase
         $this->admin();
         $acme     = $this->company('Acme');
         $timeline = $this->service(TimelineInterface::class);
-        foreach ([['Bad Key', [], null], ['k', ['Bad' => 1], null], ['k', [], '//evil'], ['k', ['a' => str_repeat('x', 201)], null]] as [$key, $params, $url]) {
+        foreach ([['Bad Key', [], null], ['k', ['Bad' => 1], null], ['k', [], '//evil'], ['k', [], '/\\evil'], ['k', ['a' => str_repeat('x', 201)], null]] as [$key, $params, $url]) {
             try {
                 $timeline->record(SubjectType::Company, $acme, $key, $params, $url);
                 self::fail('accepted ' . $key);

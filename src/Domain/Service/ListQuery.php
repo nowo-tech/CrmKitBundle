@@ -19,6 +19,9 @@ final readonly class ListQuery
     /** Sortable columns. */
     public const SORTS = ['name', 'created', 'updated'];
 
+    /** Highest page (a bounded OFFSET: deeper pages are reached with filters). */
+    public const MAX_PAGE = 10000;
+
     public string $sort;
 
     public string $direction;
@@ -45,7 +48,7 @@ final readonly class ListQuery
     ) {
         $this->sort      = in_array($sort, self::SORTS, true) ? $sort : 'name';
         $this->direction = $direction === 'desc' ? 'desc' : 'asc';
-        $this->page      = max(1, $page);
+        $this->page      = min(self::MAX_PAGE, max(1, $page));
         $this->perPage   = min(100, max(1, $perPage));
     }
 }

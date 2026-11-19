@@ -158,8 +158,8 @@ final readonly class UiSupport
     }
 
     /**
-     * Runs a POST action that redirects; domain conflicts and input errors become a flash and a redirect to `$back`
-     * (a conflict keeps its 409 status: the page the browser follows to shows the flash).
+     * Runs a POST action that redirects; domain conflicts and input errors become a flash and the 303 redirect to
+     * `$back` (the page the browser follows to shows the flash). Lock conflicts are not caught: they keep their 409.
      *
      * @param callable(): Response $action
      */

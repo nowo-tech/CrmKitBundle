@@ -349,9 +349,11 @@ flash:
         crm_import_running: Deze import loopt al of is al voltooid.
         crm_limit_reached: 'De limiet van uw abonnement is bereikt: er kunnen geen records van dit soort meer worden toegevoegd.'
         crm_settings_stale: Iemand heeft de instellingen op hetzelfde moment gewijzigd. Controleer ze en sla opnieuw op.
+        crm_write_conflict: 'Een andere wijziging van dezelfde gegevens kwam op hetzelfde moment binnen. Probeer het opnieuw.'
 error:
     required: Dit veld is verplicht.
     invalid: Deze waarde is ongeldig.
+    host_object_unknown: 'Dit object bestaat niet of u kunt het niet zien.'
     too_long: Deze waarde is te lang.
     unknown_field: Onbekend veld.
     email: Geen e-mailadres.

@@ -9,7 +9,6 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
-use Nowo\CrmKitBundle\Application\Shared\WriteConflictException;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
@@ -44,6 +43,7 @@ use Psr\Clock\ClockInterface;
 
 use function array_filter;
 use function array_map;
+use function array_slice;
 use function array_sum;
 use function array_unique;
 use function array_values;
@@ -191,7 +191,8 @@ final readonly class ImportService implements ImportServiceInterface
             return $import->getStatus() === ImportStatus::Done;
         }
 
-        return $this->runClaimed($context->tenant, $id, (string) $import->getClaimToken(), $maxChunks);
+        // The rows of this run are attributed to the person who clicked (Continue), not to the uploader.
+        return $this->runClaimed($context->tenant, $id, (string) $import->getClaimToken(), $maxChunks, $context->actor->value);
     }
 
     /**
@@ -234,10 +235,10 @@ final readonly class ImportService implements ImportServiceInterface
     /**
      * Runs chunks while this claim holds the import.
      */
-    private function runClaimed(TenantRef $tenant, string $id, string $token, ?int $maxChunks): bool
+    private function runClaimed(TenantRef $tenant, string $id, string $token, ?int $maxChunks, ?string $actor = null): bool
     {
         for ($chunk = 0; $maxChunks === null || $chunk < $maxChunks; ++$chunk) {
-            $state = $this->chunkOnceMore($tenant, $id, $token);
+            $state = $this->chunkOnceMore($tenant, $id, $token, $actor);
             if ($state !== 'more') {
                 return $state === 'done';
             }
@@ -250,31 +251,32 @@ final readonly class ImportService implements ImportServiceInterface
      * One chunk; a unique key refused by a racing writer (an e-mail stored meanwhile) runs the chunk once more, where
      * that row becomes a duplicate.
      */
-    private function chunkOnceMore(TenantRef $tenant, string $id, string $token): string
+    private function chunkOnceMore(TenantRef $tenant, string $id, string $token, ?string $actor): string
     {
         try {
-            return $this->support->write(fn (Effects $effects): string => $this->chunk($effects, $tenant, $id, $token));
+            return $this->support->write(fn (Effects $effects): string => $this->chunk($effects, $tenant, $id, $token, $actor));
         } catch (DuplicateRowException) {
             try {
-                return $this->support->write(fn (Effects $effects): string => $this->chunk($effects, $tenant, $id, $token));
+                return $this->support->write(fn (Effects $effects): string => $this->chunk($effects, $tenant, $id, $token, $actor));
             } catch (DuplicateRowException $e) {
-                throw new WriteConflictException('crm_write_conflict', $e);
+                throw new ConflictException(ConflictException::WRITE_CONFLICT, null, $e);
             }
         }
     }
 
     /**
-     * Settles up to `chunk_rows` pending rows under the import row's lock: `more`, `done` or `lost` (claim gone).
+     * Settles up to `chunk_rows` pending rows under the import row's lock: `more`, `done` or `lost` (claim gone). The
+     * rows are attributed to `$actor` (the person running it), else to the uploader, else to the system actor.
      */
-    private function chunk(Effects $effects, TenantRef $tenant, string $id, string $token): string
+    private function chunk(Effects $effects, TenantRef $tenant, string $id, string $token, ?string $actor): string
     {
         $store = $this->support->store;
         if (!$store->holdsImport($id, $token)) {
             return 'lost';
         }
-        $import  = $this->import($tenant, $id);
-        $now     = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
-        $actor   = $import->getCreatedById() !== null && ExactId::isValid($import->getCreatedById()) ? $import->getCreatedById() : self::SYSTEM_ACTOR;
+        $import = $this->import($tenant, $id);
+        $now    = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
+        $actor ??= $import->getCreatedById() !== null && ExactId::isValid($import->getCreatedById()) ? $import->getCreatedById() : self::SYSTEM_ACTOR;
         $context = new CrmContext($tenant, new ActorRef($actor), $now);
         $type    = $import->getSubjectType();
         $fields  = $store->fields($tenant, $type, true);
@@ -328,6 +330,9 @@ final readonly class ImportService implements ImportServiceInterface
             $existing = null;
             if ($type === SubjectType::Contact && ($values['email'] ?? null) !== null) {
                 $existing = $store->contactByEmailKey($context->tenant, mb_strtolower((string) $values['email'], 'UTF-8'));
+                // The parent of the row's children (tags, affiliation): locked before they are written, so a merge or
+                // an erasure running meanwhile is seen (its status re-read under the lock).
+                $existing = $existing instanceof Contact ? ($store->lockRecords(SubjectType::Contact, $context->tenant, [$existing->getId()])[$existing->getId()] ?? null) : null;
             }
             if ($existing instanceof Contact) {
                 if ($import->getDuplicatePolicy() === DuplicatePolicy::Skip || !$existing->isActive()) {
@@ -383,19 +388,20 @@ final readonly class ImportService implements ImportServiceInterface
             return;
         }
         [$matches] = $store->list($context->tenant, new ListQuery(SubjectType::Company, $company, perPage: 5));
-        foreach ($matches as $match) {
-            if (mb_strtolower($match->label(), 'UTF-8') !== mb_strtolower($company, 'UTF-8')) {
-                continue;
-            }
-            foreach ($store->affiliations($context->tenant, SubjectType::Contact, $record->getId()) as $affiliation) {
-                if ($affiliation->getCompanyId() === $match->getId()) {
-                    return;
-                }
-            }
-            $store->add(new Affiliation($this->support->id(), $context->tenant->value, $record->getId(), $match->getId(), null, $store->affiliations($context->tenant, SubjectType::Contact, $record->getId()) === [], $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
-
+        $named     = array_values(array_map(static fn (CrmRecord $m): string => $m->getId(), array_filter($matches, static fn (CrmRecord $m): bool => mb_strtolower($m->label(), 'UTF-8') === mb_strtolower($company, 'UTF-8'))));
+        // Contact first (locked by row(), or new), then the company: the order of affiliate(); its status re-read
+        // under the lock, so a company merged or trashed meanwhile gets no affiliation.
+        $active = array_values(array_filter($store->lockRecords(SubjectType::Company, $context->tenant, array_slice($named, 0, 1)), static fn (CrmRecord $m): bool => $m->isActive()));
+        $match  = $active[0] ?? null;
+        if (!$match instanceof CrmRecord) {
             return;
         }
+        foreach ($store->affiliations($context->tenant, SubjectType::Contact, $record->getId()) as $affiliation) {
+            if ($affiliation->getCompanyId() === $match->getId()) {
+                return;
+            }
+        }
+        $store->add(new Affiliation($this->support->id(), $context->tenant->value, $record->getId(), $match->getId(), null, $store->affiliations($context->tenant, SubjectType::Contact, $record->getId()) === [], $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
     }
 
     private function import(TenantRef $tenant, string $id): Import

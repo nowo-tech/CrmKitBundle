@@ -4,7 +4,7 @@
 
 - [Composer](#composer)
 - [Private entity manager](#private-entity-manager)
-- [Transaction bundle](#transaction-bundle)
+- [Transaction bundle (required)](#transaction-bundle-required)
 - [Routes](#routes)
 - [Schema and migrations](#schema-and-migrations)
 - [Scheduled commands](#scheduled-commands)
@@ -17,10 +17,11 @@
 composer require nowo-tech/crm-kit-bundle
 ```
 
-With Symfony Flex the recipe registers `Nowo\CrmKitBundle\NowoCrmKitBundle`, writes
+With Symfony Flex the recipe registers `Nowo\CrmKitBundle\NowoCrmKitBundle` and the required
+`Nowo\TransactionDoctrine\Symfony\NowoTransactionDoctrineBundle`, writes
 `config/packages/nowo_crm_kit.yaml` (access roles empty, UI off) and declares the **private entity manager**
 `nowo_crm_kit` in `config/packages/nowo_crm_kit_doctrine.yaml`. Without Flex, register the bundle in
-`config/bundles.php` and write both files yourself.
+`config/bundles.php` (both bundles) and write both files yourself.
 
 Requirements: PHP >= 8.2 < 8.6, Symfony 7.4 / 8.x, Doctrine DBAL 3.8+ / 4, ORM 3.7+ with DoctrineBundle,
 `nowo-tech/ui-kit-bundle` ^2.55, `nowo-tech/form-kit-bundle` ^2.23, `nowo-tech/transaction-doctrine` ^1.6.
@@ -47,16 +48,33 @@ The bundle prepends its XML mapping (`NowoCrmKitBundle`, prefix `Nowo\CrmKitBund
 `nowo_crm_kit.doctrine.entity_manager` names a manager that is not declared, the container build fails with the fix.
 
 A host that must keep a single entity manager sets `nowo_crm_kit.doctrine.entity_manager: null`: the bundle then uses
-the default manager in explicit transactions, detaches only its own entities and refuses to write while the host has
-pending changes of its own.
+the default manager in transactions it opens, flushes and commits itself; a refused write rolls back and detaches only
+the bundle's entities, so the manager stays open and the host's entities stay managed. It refuses to write while the
+host has pending changes of its own.
 
-## Transaction bundle
+Call the CRM's write services outside your own transactions: a write inside an open transaction on the same
+connection is refused (`LogicException`), because the CRM releases its events and audit entries after its own commit.
+With Messenger, dispatch CRM writes from a bus without the `doctrine_transaction` middleware.
+
+## Transaction bundle (required)
 
 Register `Nowo\TransactionDoctrine\Symfony\NowoTransactionDoctrineBundle` (from `nowo-tech/transaction-doctrine`,
-already required) so lock conflicts are answered by its responder: 409 with `CONFLICT_001` + `Retry-After` +
-`X-Conflict-Code`, or `CONFLICT_002` when part of the request already committed. Without it the bundle uses a write
-unit of its own and a fallback listener on its routes with the same status, codes and headers
-([CONCURRENCY.md](CONCURRENCY.md)).
+already required):
+
+```php
+// config/bundles.php
+return [
+    // ...
+    Nowo\TransactionDoctrine\Symfony\NowoTransactionDoctrineBundle::class => ['all' => true],
+    Nowo\CrmKitBundle\NowoCrmKitBundle::class => ['all' => true],
+];
+```
+
+Its write unit replays deadlocks, its commit ledger and request watermark tell a conflict after a commit earlier in
+the same request (`CONFLICT_002`), and its responder answers lock conflicts: 409 with `CONFLICT_001` + `Retry-After` +
+`X-Conflict-Code`, or `CONFLICT_002` without `Retry-After`. Without the bundle the container build fails with this fix.
+When you turn its `conflict_response` off, a fallback listener on the CRM's routes keeps the same status, codes and
+headers ([CONCURRENCY.md](CONCURRENCY.md)).
 
 ## Routes
 

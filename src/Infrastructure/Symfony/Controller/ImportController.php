@@ -43,6 +43,7 @@ final readonly class ImportController
         private ImportServiceInterface $imports,
         private RecordForms $forms,
         private int $syncChunks = 5,
+        private int $maxBytes = 5242880,
     ) {
     }
 
@@ -53,7 +54,7 @@ final readonly class ImportController
     {
         return $this->ui->guard(function () use ($request): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->ui->require(CrmPermission::Edit);
-            $form = $this->ui->form(ImportUploadType::class, null, [], 'crm_import');
+            $form = $this->ui->form(ImportUploadType::class, null, ['max_bytes' => $this->maxBytes], 'crm_import');
             $form->handleRequest($request);
             if ($form->isSubmitted() && $form->isValid()) {
                 $data = $form->getData();
@@ -62,8 +63,9 @@ final readonly class ImportController
                 try {
                     $type   = SubjectType::from(is_string($data['subject'] ?? null) ? $data['subject'] : 'contact');
                     $format = ImportFormat::from(is_string($data['format'] ?? null) ? $data['format'] : 'csv');
-                    // FileType only lets a valid upload through.
-                    $id = $file instanceof UploadedFile ? $this->imports->upload($type, $format, $file->getClientOriginalName(), (string) file_get_contents($file->getPathname())) : throw new ImportFileException('import.error.read');
+                    // FileType and its File(maxSize) constraint only let a valid upload through; the size is checked
+                    // again before the file is read into memory (`import.max_bytes`).
+                    $id = $file instanceof UploadedFile ? ($file->getSize() <= $this->maxBytes ? $this->imports->upload($type, $format, $file->getClientOriginalName(), (string) file_get_contents($file->getPathname())) : throw new ImportFileException('import.error.too_large')) : throw new ImportFileException('import.error.read');
 
                     return $this->ui->redirect('nowo_crm_kit_import_show', ['id' => $id]);
                 } catch (ImportFileException $e) {

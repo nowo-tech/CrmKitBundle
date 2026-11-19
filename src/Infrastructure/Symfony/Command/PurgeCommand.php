@@ -19,7 +19,7 @@ use function sprintf;
 /**
  * `nowo:crm-kit:purge` (contract section 16.4): the retention purge, daily.
  */
-#[AsCommand(name: 'nowo:crm-kit:purge', description: 'Deletes trashed records, old timeline entries, import rows and merge traces past their retention.')]
+#[AsCommand(name: 'nowo:crm-kit:purge', description: 'Deletes trashed records, merge tombstones, old timeline entries, import rows and merge traces past their retention.')]
 final class PurgeCommand extends Command
 {
     /**
@@ -48,11 +48,11 @@ final class PurgeCommand extends Command
         }
         $counts = $this->purger->purge($only, $input->getOption('dry-run') === true);
         if ($counts === null) {
-            $output->writeln('Another purge is running; nothing done.');
+            $output->writeln('Another purge is running; nothing (more) done.');
 
             return Command::SUCCESS;
         }
-        $output->writeln(sprintf('records: %d, timeline entries: %d, import rows: %d, merge traces: %d', $counts['records'], $counts['activities'], $counts['import_rows'], $counts['merges']));
+        $output->writeln(sprintf('records: %d, merge tombstones: %d, timeline entries: %d, import rows: %d, merge traces: %d', $counts['records'], $counts['tombstones'], $counts['activities'], $counts['import_rows'], $counts['merges']));
 
         return Command::SUCCESS;
     }

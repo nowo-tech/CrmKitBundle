@@ -276,14 +276,39 @@ abstract class CrmRecord
     }
 
     /**
-     * Turns the record into a tombstone pointing at the survivor of a merge.
+     * Turns the record into a tombstone pointing at the survivor of a merge (contract section 16.3): every personal
+     * value is removed; id, tenant, status and the survivor stay. The merge trace (`crm_merge`) keeps the snapshot.
      */
     public function mergeInto(string $survivorId, DateTimeImmutable $now, ?string $actor): void
     {
         $this->status       = RecordStatus::Merged;
         $this->mergedIntoId = $survivorId;
+        $this->blank();
         $this->releaseKeys();
         $this->touch($now, $actor);
+    }
+
+    /**
+     * Removes what is left of a merge tombstone's personal data (erasure of its survivor); a no-op on an already
+     * blank tombstone except the change mark.
+     */
+    public function anonymise(DateTimeImmutable $now, ?string $actor): void
+    {
+        $this->blank();
+        $this->releaseKeys();
+        $this->touch($now, $actor);
+    }
+
+    /**
+     * Removes every personal value: the fields, the custom values and the owner.
+     */
+    protected function blank(): void
+    {
+        foreach (RecordFields::names(static::type()) as $field) {
+            $this->apply([$field => null]);
+        }
+        $this->custom  = [];
+        $this->ownerId = null;
     }
 
     /**

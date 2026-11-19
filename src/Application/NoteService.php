@@ -43,7 +43,7 @@ final readonly class NoteService implements NoteServiceInterface
         $body    = $this->body($body);
 
         return $this->support->write(function (Effects $effects) use ($context, $type, $subjectId, $body, $pinned): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $this->support->load($context, $type, $subjectId, CrmPermission::Edit);
+            $this->support->load($context, $type, $subjectId, CrmPermission::Edit, lock: true);
             $id = $this->support->id();
             $this->support->store->add(new Note($id, $context->tenant->value, $type, $subjectId, $body, $pinned, $context->actor->value, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, $type, $subjectId, ActivityKind::NoteAdded, ['note' => $id]);
@@ -95,7 +95,7 @@ final readonly class NoteService implements NoteServiceInterface
         if (!$note instanceof Note) {
             throw new NotAvailableException();
         }
-        $this->support->load($context, $note->getSubjectType(), $note->getSubjectId(), CrmPermission::Edit);
+        $this->support->load($context, $note->getSubjectType(), $note->getSubjectId(), CrmPermission::Edit, lock: true);
         if ($note->getAuthorId() !== $context->actor->value) {
             $this->support->access->require($context, CrmPermission::Manage);
         }

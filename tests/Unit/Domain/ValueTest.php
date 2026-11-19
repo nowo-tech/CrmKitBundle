@@ -13,6 +13,7 @@ use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
+use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Value\ActorProfile;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\AuditEntry;
@@ -148,6 +149,7 @@ final class ValueTest extends TestCase
         $panel = new Panel('T', [new PanelItem('a')]);
         self::assertSame(Panel::MAIN, $panel->position);
         self::assertSame('neutral', $panel->items[0]->tone);
+        self::assertSame([1, ListQuery::MAX_PAGE, 7], [(new ListQuery(SubjectType::Company, page: -3))->page, (new ListQuery(SubjectType::Company, page: 999999))->page, (new ListQuery(SubjectType::Company, page: 7))->page]);
     }
 
     public function testOneHostClassMayImplementBothExtensionPoints(): void

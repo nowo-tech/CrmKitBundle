@@ -81,12 +81,8 @@ class Contact extends CrmRecord
      */
     public function erase(string $placeholder, DateTimeImmutable $now, ?string $actor): void
     {
-        foreach (RecordFields::names(SubjectType::Contact) as $field) {
-            $this->apply([$field => null]);
-        }
+        $this->blank();
         $this->apply(['last_name' => $placeholder]);
-        $this->custom   = [];
-        $this->ownerId  = null;
         $this->status   = RecordStatus::Erased;
         $this->erasedAt = $now;
         $this->releaseKeys();

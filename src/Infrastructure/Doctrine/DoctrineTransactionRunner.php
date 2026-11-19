@@ -13,6 +13,7 @@ use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\StaleRowException;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\TransactionDoctrine\WriteUnit\WriteUnitInterface;
+use Throwable;
 
 use function str_starts_with;
 
@@ -22,15 +23,21 @@ use function str_starts_with;
  * - `write()`: a transaction-doctrine write unit (replay after a deadlock / lock-wait timeout, `ConcurrencyConflict`
  *   ⇒ 409 + Retry-After after the last attempt) around one explicit transaction that flushes before the commit; a
  *   unique key refusal becomes {@see DuplicateRowException}, an optimistic lock failure {@see StaleRowException}.
- *   A write inside a running transaction (its own, or a host's on a shared connection) runs and flushes into it.
- * - `read()`: runs and clears.
- * - Both clear the entity manager when the outermost unit ends, and a closed entity manager is reset through the
- *   registry before the next unit (worker mode: no managed entity and no broken manager survive a call).
+ *   A write is refused inside a transaction that is already running (a host's on the same connection): the bundle
+ *   releases its events and audit after its own commit, which an outer transaction could still roll back.
+ * - `read()`: runs and clears (inside a running transaction it only runs).
+ * - Both forget the bundle's entities when the unit ends. On the private entity manager a refused unit closes it
+ *   (Doctrine's `wrapInTransaction`) and it is reset through the registry before the next unit (worker mode: no
+ *   managed entity and no broken manager survive a call).
  *
- * Never flushes the host's entity manager (rule 6): with `entity_manager: null` it is the default one, used only in
- * explicit transactions; there the runner forgets only the bundle's entities and refuses to write while the host has
- * pending changes of its own (audit ST-M4). A configured name that resolves to the registry's default manager (for
- * example `default`) is the same shared manager and gets the same safeguards.
+ * Never flushes the host's entity manager (rule 6): with `entity_manager: null` it is the default one, and the
+ * runner opens, flushes and commits its transaction itself; on a failure it rolls back and forgets only the
+ * bundle's entities, so the manager stays open and the host's entities stay managed. The only closed shared manager
+ * is one Doctrine closed during a failed flush (then it is unusable for the host too, and reset before the next
+ * unit). It also refuses to write while the host has pending changes of its own (audit ST-M4). A configured name
+ * that resolves to the registry's default manager (for example `default`) is the same shared manager and gets the
+ * same safeguards. A deadlock replay clears every open entity manager (transaction-doctrine's write unit), the host's
+ * included.
  */
 final readonly class DoctrineTransactionRunner implements TransactionRunnerInterface
 {
@@ -49,26 +56,23 @@ final readonly class DoctrineTransactionRunner implements TransactionRunnerInter
 
     /**
      * Runs a write unit.
+     *
+     * @throws LogicException inside a running transaction, or with pending host changes on a shared manager
      */
     public function write(callable $work): mixed
     {
         $manager = $this->manager();
         if ($manager->getConnection()->isTransactionActive()) {
-            // Inside a running unit (ours, or a host transaction on a shared connection: a host unit of work): one
-            // transaction, one replay layer; our changes are flushed into it.
-            $this->refuseForeignChanges($manager);
-            $result = $work();
-            $manager->flush();
-
-            return $result;
+            throw new LogicException('nowo_crm_kit writes in transactions of its own and releases their events and audit after its commit: call it outside your transaction (with Messenger, from a bus without the doctrine_transaction middleware).');
         }
         $this->refuseForeignChanges($manager);
 
         return $this->writeUnit->run(function () use ($work): mixed { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $manager = $this->manager();
+            $shared  = $this->shared($manager);
             $this->release($manager);
             try {
-                return $manager->wrapInTransaction(static function (EntityManagerInterface $manager) use ($work): mixed { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                return $shared ? $this->sharedTransaction($manager, $work) : $manager->wrapInTransaction(static function (EntityManagerInterface $manager) use ($work): mixed { // @igor-ignore - the runner calls this closure at once and keeps nothing
                     $result = $work();
                     $manager->flush();
 
@@ -79,9 +83,36 @@ final readonly class DoctrineTransactionRunner implements TransactionRunnerInter
             } catch (OptimisticLockException $e) {
                 throw new StaleRowException($e);
             } finally {
-                $this->release($this->manager());
+                // Shared: never reset here (only a failed flush closes it, and the next unit resets it); private: a
+                // refused unit closed it, reset now.
+                $this->release($shared ? $manager : $this->manager());
             }
         });
+    }
+
+    /**
+     * One transaction on the host's shared entity manager without closing it on a failure: begin, work, flush,
+     * commit; any failure rolls back (the bundle's entities are forgotten by the caller).
+     *
+     * @param callable(): mixed $work
+     */
+    private function sharedTransaction(EntityManagerInterface $manager, callable $work): mixed
+    {
+        $connection = $manager->getConnection();
+        $connection->beginTransaction();
+        try {
+            $result = $work();
+            $manager->flush();
+            $connection->commit();
+
+            return $result;
+        } catch (Throwable $e) {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+
+            throw $e;
+        }
     }
 
     /**

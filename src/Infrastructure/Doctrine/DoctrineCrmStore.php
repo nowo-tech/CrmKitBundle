@@ -50,6 +50,7 @@ use function in_array;
 use function is_array;
 use function is_numeric;
 use function is_string;
+use function max;
 use function mb_strtolower;
 use function method_exists;
 use function preg_replace;
@@ -573,8 +574,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
      */
     public function lockCounter(TenantRef $tenant, string $resource): void
     {
-        $this->insertCounter($tenant, $resource, 0);
-        $this->connection()->fetchOne('SELECT value FROM ' . $this->table(Counter::class) . ' WHERE tenant_id = ? AND resource = ?' . $this->forUpdate(), [$tenant->value, $resource]);
+        $this->lockedCounter($tenant, $resource);
     }
 
     /**
@@ -582,8 +582,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
      */
     public function claimPurge(int $now, int $staleBefore): bool
     {
-        $tenant = new TenantRef(self::SYSTEM_TENANT);
-        $this->insertCounter($tenant, self::PURGE_CLAIM, 0);
+        $this->lockedCounter(new TenantRef(self::SYSTEM_TENANT), self::PURGE_CLAIM);
 
         return $this->connection()->executeStatement(
             'UPDATE ' . $this->table(Counter::class) . ' SET value = ? WHERE tenant_id = ? AND resource = ? AND value < ?',
@@ -595,9 +594,28 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * {@inheritDoc}
      */
-    public function releasePurge(): void
+    public function refreshPurge(int $claim, int $now): ?int
     {
-        $this->connection()->executeStatement('UPDATE ' . $this->table(Counter::class) . ' SET value = 0 WHERE tenant_id = ? AND resource = ?', [self::SYSTEM_TENANT, self::PURGE_CLAIM]);
+        // Always a new value (MySQL counts only changed rows), so "0 rows" means only "not ours any more".
+        $next = max($now, $claim + 1);
+
+        return $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Counter::class) . ' SET value = ? WHERE tenant_id = ? AND resource = ? AND value = ?',
+            [$next, self::SYSTEM_TENANT, self::PURGE_CLAIM, $claim],
+            [0 => ParameterType::INTEGER, 3 => ParameterType::INTEGER],
+        ) === 1 ? $next : null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function releasePurge(int $claim): void
+    {
+        $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Counter::class) . ' SET value = 0 WHERE tenant_id = ? AND resource = ? AND value = ?',
+            [self::SYSTEM_TENANT, self::PURGE_CLAIM, $claim],
+            [2 => ParameterType::INTEGER],
+        );
     }
 
     /**
@@ -625,7 +643,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     public function tenants(): array
     {
         $tenants = [];
-        foreach ([Company::class, Contact::class, CrmSettings::class] as $class) {
+        foreach ([Company::class, Contact::class, CrmSettings::class, Import::class, MergeRecord::class, Activity::class] as $class) {
             foreach ($this->connection()->fetchFirstColumn('SELECT DISTINCT tenant_id FROM ' . $this->table($class)) as $tenant) {
                 if (is_string($tenant)) {
                     $tenants[$tenant] = true;
@@ -649,6 +667,35 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             ->orderBy('r.id')->setMaxResults($limit)->getQuery()->getResult();
 
         return array_map(static fn (CrmRecord $r): string => $r->getId(), $this->exact($rows, $this->class($type), $tenant));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function mergedBefore(TenantRef $tenant, SubjectType $type, DateTimeImmutable $before, int $limit): array
+    {
+        $rows = $this->em()->createQueryBuilder()->select('r')->from($this->class($type), 'r')
+            ->where('r.tenantId = :tenant')->andWhere('r.status = :merged')->andWhere('r.updatedAt < :before')
+            ->setParameter('tenant', $tenant->value)->setParameter('merged', RecordStatus::Merged)->setParameter('before', $before, UtcDateTimeImmutableType::NAME)
+            ->orderBy('r.id')->setMaxResults($limit)->getQuery()->getResult();
+
+        return array_map(static fn (CrmRecord $r): string => $r->getId(), $this->exact($rows, $this->class($type), $tenant));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function lockTombstones(SubjectType $type, TenantRef $tenant, array $survivorIds): array
+    {
+        if ($survivorIds === []) {
+            return [];
+        }
+        $query = $this->em()->createQueryBuilder()->select('r')->from($this->class($type), 'r')
+            ->where('r.mergedIntoId IN (:ids)')->andWhere('r.tenantId = :tenant')->andWhere('r.status = :merged')->orderBy('r.id')
+            ->setParameter('ids', $survivorIds, ArrayParameterType::STRING)->setParameter('tenant', $tenant->value)->setParameter('merged', RecordStatus::Merged)
+            ->getQuery()->setLockMode(LockMode::PESSIMISTIC_WRITE)->setHint(Query::HINT_REFRESH, true);
+
+        return array_values(array_filter($this->exact($query->getResult(), $this->class($type), $tenant), static fn (CrmRecord $r): bool => in_array($r->getMergedIntoId(), $survivorIds, true)));
     }
 
     /**
@@ -701,9 +748,9 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         if ($ids === []) {
             return 0;
         }
-        $this->connection()->executeStatement('DELETE FROM ' . $table . ' WHERE id IN (?)', [$ids], [ArrayParameterType::STRING]);
 
-        return count($ids);
+        // The rows really deleted (another run may have taken some meanwhile).
+        return (int) $this->connection()->executeStatement('DELETE FROM ' . $table . ' WHERE tenant_id = ? AND id IN (?)', [$tenant->value, $ids], [ParameterType::STRING, ArrayParameterType::STRING]);
     }
 
     /**
@@ -802,6 +849,23 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         }
 
         return $row;
+    }
+
+    /**
+     * The counter row's value, locked `FOR UPDATE`: the row is selected first and inserted only when missing, then
+     * selected again. Never `INSERT IGNORE` on an existing row before the lock: on MySQL two such sessions take
+     * shared locks on the duplicate and then deadlock on the upgrade.
+     */
+    private function lockedCounter(TenantRef $tenant, string $resource): int
+    {
+        $sql   = 'SELECT value FROM ' . $this->table(Counter::class) . ' WHERE tenant_id = ? AND resource = ?' . $this->forUpdate();
+        $value = $this->connection()->fetchOne($sql, [$tenant->value, $resource]);
+        if (!is_numeric($value)) {
+            $this->insertCounter($tenant, $resource, 0);
+            $value = $this->connection()->fetchOne($sql, [$tenant->value, $resource]);
+        }
+
+        return is_numeric($value) ? (int) $value : 0;
     }
 
     private function counterExists(TenantRef $tenant, string $resource): bool

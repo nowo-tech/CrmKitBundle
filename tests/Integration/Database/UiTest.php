@@ -134,7 +134,9 @@ final class UiTest extends CrmTestCase
 
         $this->client->request('GET', '/crm/contacts/' . $ada . '/vcard');
         self::assertStringContainsString('BEGIN:VCARD', (string) $this->client->getResponse()->getContent());
-        $this->client->request('GET', '/crm/contacts/' . $ada . '/gdpr-export');
+        self::assertSame(405, $this->httpStatus('GET', '/crm/contacts/' . $ada . '/gdpr-export'), 'a POST with the action token only');
+        self::assertCount(1, $this->client->request('GET', '/crm/contacts/' . $ada)->filter('form[action$="/gdpr-export"]'), 'the page posts it');
+        $this->client->request('POST', '/crm/contacts/' . $ada . '/gdpr-export', ['crm_action' => ['_token' => $this->actionToken('/crm/contacts/' . $ada)]]);
         self::assertStringContainsString('"email":"ada@x.test"', (string) $this->client->getResponse()->getContent());
 
         $pick = $this->client->request('GET', '/crm/contacts/' . $ada . '/merge');
@@ -246,8 +248,14 @@ final class UiTest extends CrmTestCase
         $edit = $this->client->followRedirect();
         $this->client->submit($edit->filter('form[name="crm_field"]')->form(), ['crm_field[label]' => ' ']);
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
-        $this->client->submit($edit->filter('form[name="crm_action"]')->form());
+        $archive = $edit->filter('form[name="crm_action"]')->form();
+        $this->client->submit($archive);
         self::assertSame(303, $this->client->getResponse()->getStatusCode());
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_field WHERE archived = ?', [true]));
+        $this->client->submit($archive);
+        self::assertSame(303, $this->client->getResponse()->getStatusCode(), 'the version the page showed moved: a flash, no blind toggle');
+        self::assertStringContainsString('/admin/fields/', (string) $this->client->getResponse()->headers->get('Location'));
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_field WHERE archived = ?', [true]), 'still archived');
         self::assertSame(404, $this->httpStatus('GET', '/crm/admin/fields/01900000-0000-7000-8000-00000000ffff'));
 
         $page = $this->client->request('GET', '/crm/admin/settings');
@@ -267,6 +275,7 @@ final class UiTest extends CrmTestCase
         $id = $this->company('Acme');
         $this->service(NoteServiceInterface::class)->add(SubjectType::Company, $id, 'n');
         $this->service(HostLinkServiceInterface::class)->link(SubjectType::Company, $id, new HostObjectRef('project', 'p1'));
+        $token = $this->actionToken('/crm/companies/' . $id);
         $this->actAs('zoe', 'view');
         self::assertSame(200, $this->httpStatus('GET', '/crm/companies/' . $id));
         self::assertSame(403, $this->httpStatus('GET', '/crm/companies/new'));
@@ -288,7 +297,7 @@ final class UiTest extends CrmTestCase
         self::assertSame(404, $this->httpStatus('GET', '/crm/contacts'));
         self::assertSame(404, $this->httpStatus('GET', '/crm/contacts/' . $id . '/vcard'));
         $this->actAs('ana');
-        $this->client->xmlHttpRequest('GET', '/crm/contacts/' . $id . '/gdpr-export');
+        $this->client->xmlHttpRequest('POST', '/crm/contacts/' . $id . '/gdpr-export', ['crm_action' => ['_token' => $token]]);
         self::assertSame(404, $this->client->getResponse()->getStatusCode());
     }
 

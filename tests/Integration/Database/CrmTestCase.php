@@ -232,6 +232,17 @@ abstract class CrmTestCase extends KernelTestCase
         $this->actAs('ana', 'view', 'edit', 'manage');
     }
 
+    /**
+     * The action CSRF token (`crm_action[_token]`) of the session, read from a page that shows an action form.
+     */
+    protected function actionToken(string $page): string
+    {
+        $token = $this->client->request('GET', $page)->filter('input[name="crm_action[_token]"]')->first()->attr('value');
+        self::assertIsString($token);
+
+        return $token;
+    }
+
     protected function httpStatus(string $method, string $path): int
     {
         $this->client->request($method, $path);

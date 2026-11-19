@@ -223,12 +223,13 @@ final readonly class AdminController
             }
             $this->access->context(CrmPermission::Manage);
             $form    = $this->ui->form(FieldDefinitionType::class, ['key' => $field->key, 'label' => $field->label, 'type' => $field->type->value, 'choices' => implode("\n", $field->choices), 'required' => $field->required, 'position' => $field->position, 'version' => (string) $field->version], ['types' => $this->types(), 'versioned' => true], 'crm_field');
-            $archive = $this->ui->form(ActionType::class, null, [], 'crm_action');
+            $archive = $this->ui->form(ActionType::class, ['version' => (string) $field->version], ['versioned' => true], 'crm_action');
             $status  = Response::HTTP_OK;
             try {
                 $archive->handleRequest($request);
                 if ($archive->isSubmitted() && $archive->isValid()) {
-                    $this->fields->archive($id, !$field->archived, $field->version);
+                    // The version the page showed: a field changed meanwhile is a conflict, never archived blind.
+                    $this->fields->archive($id, !$field->archived, $this->int($archive, 'version'));
                     $this->ui->flash($request, 'success', $field->archived ? 'field.restored' : 'field.archived_flash');
 
                     return $this->ui->redirect('nowo_crm_kit_fields');

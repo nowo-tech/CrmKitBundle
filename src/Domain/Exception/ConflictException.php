@@ -10,7 +10,8 @@ use Throwable;
 /**
  * A domain conflict (contract section 11.3): 409 with its own body code and no `Retry-After` (retrying the same request
  * cannot succeed): `crm_record_stale`, `crm_record_merged`, `crm_record_trashed`, `crm_merge_stale`,
- * `crm_import_running`, `crm_limit_reached`, `crm_settings_stale`.
+ * `crm_import_running`, `crm_limit_reached`, `crm_settings_stale`, `crm_write_conflict` (a unique key refused the
+ * write twice: another writer stored the same row at the same moment; a retry from the client is safe).
  */
 final class ConflictException extends RuntimeException implements CrmException
 {
@@ -27,6 +28,8 @@ final class ConflictException extends RuntimeException implements CrmException
     public const LIMIT = 'crm_limit_reached';
 
     public const SETTINGS_STALE = 'crm_settings_stale';
+
+    public const WRITE_CONFLICT = 'crm_write_conflict';
 
     /**
      * @param string $errorCode one of the constants

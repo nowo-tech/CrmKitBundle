@@ -52,7 +52,7 @@ final readonly class ConsentService implements ConsentServiceInterface
         }
 
         return $this->support->write(function (Effects $effects) use ($context, $contactId, $purpose, $granted, $source, $evidence): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $this->support->load($context, SubjectType::Contact, $contactId, CrmPermission::Edit);
+            $this->support->load($context, SubjectType::Contact, $contactId, CrmPermission::Edit, lock: true);
             $id = $this->support->id();
             $this->support->store->add(new Consent($id, $context->tenant->value, $contactId, $purpose->value, $granted, $source, $evidence, $context->actor->value, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, SubjectType::Contact, $contactId, $granted ? ActivityKind::ConsentGiven : ActivityKind::ConsentWithdrawn, ['purpose' => $purpose->value]);

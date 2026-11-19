@@ -238,18 +238,20 @@ final readonly class RecordPartsController
     }
 
     /**
-     * The GDPR export of a contact (JSON).
+     * The GDPR export of a contact (JSON): a POST with the action token (`crm_action[_token]`), since it writes a
+     * timeline entry and an audit entry.
      */
     #[AsWriteUnit]
-    public function gdprExport(string $id): Response
+    public function gdprExport(Request $request, string $id): Response
     {
-        return $this->ui->guard(function () use ($id): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+        return $this->ui->act($request, function () use ($request, $id): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $this->submitted($request, ActionType::class, 'crm_action');
             $response = new JsonResponse($this->personalData->export($id));
             $response->headers->set('Content-Disposition', 'attachment; filename="contact-' . $id . '.json"');
             $response->headers->set('Cache-Control', 'no-store, private');
 
             return $response;
-        });
+        }, $this->ui->toRecord(SubjectType::Contact, $id));
     }
 
     /**

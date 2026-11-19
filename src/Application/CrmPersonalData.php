@@ -13,6 +13,7 @@ use Nowo\CrmKitBundle\Domain\Event\ContactErased;
 use Nowo\CrmKitBundle\Domain\Model\Activity;
 use Nowo\CrmKitBundle\Domain\Model\Consent;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
+use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
 use Nowo\CrmKitBundle\Domain\Model\Note;
@@ -20,6 +21,7 @@ use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use Nowo\CrmKitBundle\Domain\Read\AffiliationView;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 
+use function array_filter;
 use function array_map;
 use function array_values;
 
@@ -28,7 +30,8 @@ use const DATE_ATOM;
 /**
  * GDPR export and erasure of a contact (contract section 16). Erasure blanks the personal columns, deletes notes,
  * taggings, links, affiliations, timeline entries and merge traces of the contact, keeps consent rows without their
- * evidence, and is idempotent. Stateless.
+ * evidence, blanks the merge tombstones that point at it (recursively, under lock) with their merge traces, and is
+ * idempotent. Stateless.
  */
 final readonly class CrmPersonalData implements CrmPersonalDataInterface
 {
@@ -106,6 +109,21 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
             }
             foreach ($store->consents($context->tenant, $contactId) as $row) {
                 $row->anonymise();
+            }
+            // The merge tombstones of this contact, and theirs in turn: locked, blanked, their merge traces deleted.
+            $seen  = [$contactId => true];
+            $level = [$contactId];
+            while ($level !== []) {
+                $found = array_values(array_filter($store->lockTombstones(SubjectType::Contact, $context->tenant, $level), static fn (CrmRecord $t): bool => !isset($seen[$t->getId()])));
+                $level = [];
+                foreach ($found as $tombstone) {
+                    $seen[$tombstone->getId()] = true;
+                    $level[]                   = $tombstone->getId();
+                    $tombstone->anonymise($context->now, $context->actor->value);
+                    foreach ($store->mergesOf($context->tenant, $tombstone->getId()) as $row) {
+                        $store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                    }
+                }
             }
             if ($record->isActive()) {
                 $this->counter->release($context->tenant, SubjectType::Contact);

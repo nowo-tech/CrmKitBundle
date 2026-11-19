@@ -45,7 +45,7 @@
                 <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'link.title'|trans({}, _d) }}</h2>
                 <ul>
                 {% for link in links %}
-                    <li data-testid="crm-link">{% if link.url and (link.url starts with '/' or link.url starts with 'https://' or link.url starts with 'http://') and not (link.url starts with '//') %}<a href="{{ link.url }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}
+                    <li data-testid="crm-link">{% if link.url and (link.url starts with '/' or link.url starts with 'https://' or link.url starts with 'http://') and not (link.url starts with '//') and not (link.url starts with '/\\') %}<a href="{{ link.url }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}
                         {% if buttons.links[link.id] is defined %}{{ include(nowo_ui_partial('action', _b), {action: buttons.links[link.id], context: 'row', bundle: _b}) }}{% endif %}</li>
                 {% endfor %}
                 </ul>
@@ -66,13 +66,13 @@
                 {% else %}
                     <ul>
                     {% for row in panel.items %}
-                        <li>{% if row.url and (row.url starts with '/' or row.url starts with 'https://' or row.url starts with 'http://') and not (row.url starts with '//') %}<a href="{{ row.url }}">{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}
+                        <li>{% if row.url and (row.url starts with '/' or row.url starts with 'https://' or row.url starts with 'http://') and not (row.url starts with '//') and not (row.url starts with '/\\') %}<a href="{{ row.url }}">{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}
                             {% if row.subtitle %} · {{ row.subtitle }}{% endif %}
                             {% if row.badge %} <span class="{{ nowo_ui_class('badge', _b) }} crm-kit-badge--{{ row.tone|replace({' ': ''}) }}">{{ row.badge }}</span>{% endif %}</li>
                     {% endfor %}
                     </ul>
                 {% endif %}
-                {% if panel.moreUrl and (panel.moreUrl starts with '/' and not (panel.moreUrl starts with '//')) %}<p><a href="{{ panel.moreUrl }}">{{ 'panel.more'|trans({}, _d) }}</a></p>{% endif %}
+                {% if panel.moreUrl and (panel.moreUrl starts with '/' and not (panel.moreUrl starts with '//') and not (panel.moreUrl starts with '/\\')) %}<p><a href="{{ panel.moreUrl }}">{{ 'panel.more'|trans({}, _d) }}</a></p>{% endif %}
             </div>
         </section>
     {% endfor %}
@@ -130,7 +130,7 @@
                 {% for entry in timeline %}
                     <li data-testid="crm-activity" data-kind="{{ entry.kind.value }}">
                         <time datetime="{{ entry.occurredAt|date('c') }}">{{ entry.occurredAt|date('Y-m-d H:i') }}</time> ·
-                        {% if entry.kind.value == 'host' %}{{ (entry.params._label ?? '')|trans(entry.params|filter((v, k) => k starts with '%')) }}{% if entry.params._url ?? null %} <a href="{{ entry.params._url }}">{{ 'timeline.open'|trans({}, _d) }}</a>{% endif %}{% else %}{{ ('activity.' ~ entry.kind.value)|trans({'%actor%': entry.actorName ?? '—'}, _d) }}{% endif %}
+                        {% if entry.kind.value == 'host' %}{{ (entry.params._label ?? '')|trans(entry.params|filter((v, k) => k starts with '%')) }}{% set _url = entry.params._url ?? '' %}{% if _url starts with '/' and not (_url starts with '//') and not (_url starts with '/\\') %} <a href="{{ _url }}">{{ 'timeline.open'|trans({}, _d) }}</a>{% endif %}{% else %}{{ ('activity.' ~ entry.kind.value)|trans({'%actor%': entry.actorName ?? '—'}, _d) }}{% endif %}
                         {% if entry.subjectLabel %} · <a href="{{ path('nowo_crm_kit_show', {type: 'contacts', id: entry.subjectId}) }}">{{ entry.subjectLabel }}</a>{% endif %}
                     </li>
                 {% endfor %}

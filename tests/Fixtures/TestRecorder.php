@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Fixtures;
 
+use Closure;
 use Nowo\CrmKitBundle\Domain\Event\CrmEvent;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Value\AuditEntry;
@@ -22,9 +23,15 @@ final class TestRecorder implements CrmAuditSinkInterface
     /** @var list<CrmEvent> */
     public array $events = [];
 
+    /** @var (Closure(AuditEntry): void)|null called after each entry (a test acting at that moment) */
+    public ?Closure $onRecord = null;
+
     public function record(AuditEntry $entry): void
     {
         $this->audit[] = $entry;
+        if ($this->onRecord instanceof Closure) {
+            ($this->onRecord)($entry);
+        }
     }
 
     public function onEvent(CrmEvent $event): void

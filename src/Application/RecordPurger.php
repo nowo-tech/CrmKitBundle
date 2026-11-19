@@ -24,7 +24,8 @@ use function count;
 /**
  * Deletes records with their children, and the retention purge (contract section 16.4): trashed records after
  * `trash_days`, timeline entries after `timeline_years`, import rows after `import_keep_days`, merge traces after
- * `merge_keep_days`. Batches of 200, one transaction each, re-checked inside. Stateless.
+ * `merge_keep_days` (with the merge tombstones last changed before then). Batches of 200, one transaction each,
+ * re-checked inside. Stateless.
  *
  * @internal
  */
@@ -79,44 +80,51 @@ final readonly class RecordPurger
 
     /**
      * Runs the retention purge for every tenant (or one); counts per kind, or null when another run holds the
-     * single-run claim (a claim older than an hour is taken over: a run that died).
+     * single-run claim (a claim older than an hour is taken over: a run that died). The claim is refreshed in every
+     * batch, so a long run keeps it; a run whose claim was taken over stops at its next batch (null) and never frees
+     * the other run's claim.
      *
-     * @return array{records: int, activities: int, import_rows: int, merges: int}|null
+     * @return array{records: int, tombstones: int, activities: int, import_rows: int, merges: int}|null
      */
     public function purge(?TenantRef $only = null, bool $dryRun = false): ?array
     {
-        if ($dryRun) {
-            return $this->run($only, true);
-        }
         $now = $this->clock->now()->getTimestamp();
+        if ($dryRun) {
+            return $this->run($only, true, new PurgeClaim($now));
+        }
         if (!$this->runner->write(fn (): bool => $this->store->claimPurge($now, $now - self::STALE_CLAIM_SECONDS))) {
             return null;
         }
+        $claim = new PurgeClaim($now);
 
         try {
-            return $this->run($only, false);
+            return $this->run($only, false, $claim);
+        } catch (PurgeClaimLostException) {
+            return null;
         } finally {
-            $this->runner->write(fn () => $this->store->releasePurge());
+            $this->runner->write(fn () => $this->store->releasePurge($claim->value));
         }
     }
 
     /**
      * The purge itself.
      *
-     * @return array{records: int, activities: int, import_rows: int, merges: int}
+     * @return array{records: int, tombstones: int, activities: int, import_rows: int, merges: int}
      */
-    private function run(?TenantRef $only, bool $dryRun): array
+    private function run(?TenantRef $only, bool $dryRun, PurgeClaim $claim): array
     {
-        $totals  = ['records' => 0, 'activities' => 0, 'import_rows' => 0, 'merges' => 0];
+        $totals  = ['records' => 0, 'tombstones' => 0, 'activities' => 0, 'import_rows' => 0, 'merges' => 0];
         $tenants = $only instanceof TenantRef ? [$only] : array_map(static fn (string $t): TenantRef => new TenantRef($t), $this->runner->read(fn (): array => $this->store->tenants()));
         foreach ($tenants as $tenant) {
-            $now      = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
-            $settings = $this->runner->read(fn (): ?CrmSettings => $this->store->settings($tenant)) ?? new CrmSettings($tenant->value, $now);
-            $counts   = [
-                'records'     => $this->purgeTrash($tenant, $now->sub(new DateInterval('P' . $settings->getTrashDays() . 'D')), $dryRun),
-                'activities'  => $this->batches(fn (): int => $this->store->deleteActivitiesBefore($tenant, $now->sub(new DateInterval('P' . $settings->getTimelineYears() . 'Y')), self::BATCH), $dryRun),
-                'import_rows' => $this->batches(fn (): int => $this->store->deleteImportRowsBefore($tenant, $now->sub(new DateInterval('P' . $settings->getImportKeepDays() . 'D')), self::BATCH), $dryRun),
-                'merges'      => $this->batches(fn (): int => $this->store->deleteMergesBefore($tenant, $now->sub(new DateInterval('P' . $settings->getMergeKeepDays() . 'D')), self::BATCH), $dryRun),
+            $now          = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
+            $settings     = $this->runner->read(fn (): ?CrmSettings => $this->store->settings($tenant)) ?? new CrmSettings($tenant->value, $now);
+            $mergedBefore = $now->sub(new DateInterval('P' . $settings->getMergeKeepDays() . 'D'));
+            $counts       = [
+                'records'     => $this->purgeRecords($tenant, $now->sub(new DateInterval('P' . $settings->getTrashDays() . 'D')), $dryRun, $claim, RecordStatus::Trashed),
+                'tombstones'  => $this->purgeRecords($tenant, $mergedBefore, $dryRun, $claim, RecordStatus::Merged),
+                'activities'  => $this->batches(fn (): int => $this->store->deleteActivitiesBefore($tenant, $now->sub(new DateInterval('P' . $settings->getTimelineYears() . 'Y')), self::BATCH), $dryRun, $claim),
+                'import_rows' => $this->batches(fn (): int => $this->store->deleteImportRowsBefore($tenant, $now->sub(new DateInterval('P' . $settings->getImportKeepDays() . 'D')), self::BATCH), $dryRun, $claim),
+                'merges'      => $this->batches(fn (): int => $this->store->deleteMergesBefore($tenant, $mergedBefore, self::BATCH), $dryRun, $claim),
             ];
             foreach ($counts as $kind => $count) {
                 $totals[$kind] += $count;
@@ -129,22 +137,26 @@ final readonly class RecordPurger
         return $totals;
     }
 
-    private function purgeTrash(TenantRef $tenant, DateTimeImmutable $before, bool $dryRun): int
+    /**
+     * Deletes trashed records past `trash_days`, or merge tombstones past `merge_keep_days` (their status and time
+     * re-checked under the lock).
+     */
+    private function purgeRecords(TenantRef $tenant, DateTimeImmutable $before, bool $dryRun, PurgeClaim $claim, RecordStatus $status): int
     {
         $count = 0;
         foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
             do {
-                $ids = $this->runner->read(fn (): array => $this->store->trashedBefore($tenant, $type, $before, self::BATCH));
+                $ids = $this->runner->read(fn (): array => $status === RecordStatus::Trashed ? $this->store->trashedBefore($tenant, $type, $before, self::BATCH) : $this->store->mergedBefore($tenant, $type, $before, self::BATCH));
                 if ($dryRun) {
-                    $count += count($ids);
+                    $count += $status === RecordStatus::Trashed ? count($ids) : 0;
 
                     continue 2;
                 }
-                $done = $this->runner->write(function () use ($tenant, $type, $ids, $before): int { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                $done = $this->claimed($claim, function () use ($tenant, $type, $ids, $before, $status): int { // @igor-ignore - the runner calls this closure at once and keeps nothing
                     $deleted = 0;
                     foreach ($this->store->lockRecords($type, $tenant, $ids) as $record) {
-                        $trashedAt = $record->getTrashedAt();
-                        if ($record->getStatus() === RecordStatus::Trashed && $trashedAt instanceof DateTimeImmutable && $trashedAt < $before) {
+                        $at = $status === RecordStatus::Trashed ? $record->getTrashedAt() : $record->getUpdatedAt();
+                        if ($record->getStatus() === $status && $at instanceof DateTimeImmutable && $at < $before) {
                             $this->deleteRecord($tenant, $record);
                             ++$deleted;
                         }
@@ -164,17 +176,36 @@ final readonly class RecordPurger
      *
      * @param callable(): int $batch
      */
-    private function batches(callable $batch, bool $dryRun): int
+    private function batches(callable $batch, bool $dryRun, PurgeClaim $claim): int
     {
         if ($dryRun) {
             return 0;
         }
         $total = 0;
         do {
-            $deleted = $this->runner->write($batch);
+            $deleted = $this->claimed($claim, $batch);
             $total += $deleted;
         } while ($deleted === self::BATCH);
 
         return $total;
+    }
+
+    /**
+     * One batch in one write unit, with the claim refreshed in the same transaction; the new claim time is kept only
+     * after the commit (a replayed attempt refreshes from the committed one).
+     *
+     * @param callable(): int $batch
+     */
+    private function claimed(PurgeClaim $claim, callable $batch): int
+    {
+        // Another run took the claim over: PurgeClaimLostException, caught by purge().
+        [$deleted, $next] = $this->runner->write(function () use ($claim, $batch): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $next = $this->store->refreshPurge($claim->value, $this->clock->now()->getTimestamp()) ?? throw new PurgeClaimLostException();
+
+            return [$batch(), $next];
+        });
+        $claim->value = $next; // @igor-ignore - per-run holder, never a shared service
+
+        return $deleted;
     }
 }

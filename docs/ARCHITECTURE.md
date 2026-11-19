@@ -56,11 +56,13 @@ Enforced by `tests/Architecture/LayerDependencyTest`:
    record of another tenant is 404. Nothing is cached.
 3. Writes run in `WriteSupport::write()`: a transaction-doctrine write unit around one transaction on the bundle's
    entity manager, flushed before the commit. Timeline rows are written inside the unit; events and audit entries are
-   collected in a per-call `Effects` buffer and released only after the commit (audit first, then events).
+   collected in a per-call `Effects` buffer and released only after the commit (audit first, then events). A write
+   inside a transaction that is already open is refused, so no outer rollback can undo what was released. Writes to
+   a child row (note, consent, link, affiliation) lock the parent record first.
 4. Reads run in `WriteSupport::read()`; the entity manager is cleared afterwards.
 5. Domain exceptions become 404 / 403 / 409 / 422 on the bundle's routes (`DomainExceptionListener`); lock conflicts
-   become 409 + `CONFLICT_001` / `CONFLICT_002` through transaction-doctrine's responder or the bundle's fallback
-   listener ([CONCURRENCY.md](CONCURRENCY.md)).
+   become 409 + `CONFLICT_001` / `CONFLICT_002` through transaction-doctrine's responder (its bundle is required), or
+   the bundle's fallback listener when the host turns that responder off ([CONCURRENCY.md](CONCURRENCY.md)).
 
 ## Persistence
 

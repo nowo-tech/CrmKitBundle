@@ -6,7 +6,6 @@ namespace Nowo\CrmKitBundle\Application;
 
 use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
-use Nowo\CrmKitBundle\Application\Shared\WriteConflictException;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
@@ -64,7 +63,7 @@ final readonly class RecordService implements RecordServiceInterface
         $values  = RecordValidator::values($input->type, $input->values, true);
         $owner   = $this->owner($context, $input);
 
-        return $this->guardEmail($context, $input, function () use ($context, $input, $values, $owner): string {
+        return $this->guardEmail($context, $input, null, function () use ($context, $input, $values, $owner): string {
             return $this->support->write(function (Effects $effects) use ($context, $input, $values, $owner): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 $store  = $this->support->store;
                 $id     = $this->support->id();
@@ -100,14 +99,15 @@ final readonly class RecordService implements RecordServiceInterface
         $context = $this->support->access->base();
         $values  = RecordValidator::values($input->type, $input->values, false);
 
-        return $this->guardEmail($context, $input, function () use ($context, $id, $input, $values, $expectedVersion): int {
+        return $this->guardEmail($context, $input, $id, function () use ($context, $id, $input, $values, $expectedVersion): int {
             return $this->support->write(function (Effects $effects) use ($context, $id, $input, $values, $expectedVersion): int { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 $store  = $this->support->store;
                 $record = $this->support->load($context, $input->type, $id, CrmPermission::Edit);
                 if ($record->getVersion() !== $expectedVersion) {
                     throw new ConflictException(ConflictException::STALE, $id);
                 }
-                $owner   = $input->setOwner ? $this->owner($context, $input) : $record->getOwnerId();
+                $wanted  = $input->owner === '' ? null : $input->owner;
+                $owner   = $input->setOwner && $wanted !== $record->getOwnerId() ? $this->owner($context, $input) : $record->getOwnerId();
                 $changed = $record->apply($values);
                 if ($record instanceof Contact) {
                     RecordValidator::contactName($record->values());
@@ -237,7 +237,7 @@ final readonly class RecordService implements RecordServiceInterface
     {
         $store   = $this->support->store;
         $contact = $this->support->load($context, SubjectType::Contact, $contactId, CrmPermission::Edit, lock: true);
-        $this->support->load($context, SubjectType::Company, $companyId, CrmPermission::View);
+        $this->support->load($context, SubjectType::Company, $companyId, CrmPermission::View, lock: true);
         $existing = null;
         foreach ($store->affiliations($context->tenant, SubjectType::Contact, $contactId) as $affiliation) {
             if ($affiliation->getCompanyId() === $companyId) {
@@ -263,8 +263,8 @@ final readonly class RecordService implements RecordServiceInterface
     }
 
     /**
-     * The second run of a write whose unique key was refused once: a second refusal is a lock conflict (409,
-     * CONFLICT_001), never a 500.
+     * The second run of a write whose unique key was refused once: a second refusal is the domain conflict
+     * `crm_write_conflict` (409 without `X-Conflict-Code`), never a 500.
      *
      * @template T
      *
@@ -277,7 +277,7 @@ final readonly class RecordService implements RecordServiceInterface
         try {
             return $write();
         } catch (DuplicateRowException $e) {
-            throw new WriteConflictException('crm_write_conflict', $e);
+            throw new ConflictException(ConflictException::WRITE_CONFLICT, null, $e);
         }
     }
 
@@ -300,7 +300,10 @@ final readonly class RecordService implements RecordServiceInterface
     }
 
     /**
-     * Maps a refused e-mail key to a form error naming the record that holds it.
+     * Maps a refused e-mail key to a form error naming the record that holds it: only when the input carries an e-mail
+     * and another record (not `$id`, the one being edited) holds it. Any other refused key runs the write once more; a
+     * second refusal is the domain conflict `crm_write_conflict` (409 without `X-Conflict-Code`: nothing committed, a
+     * retry from the client is safe).
      *
      * @template T
      *
@@ -308,20 +311,19 @@ final readonly class RecordService implements RecordServiceInterface
      *
      * @return T
      */
-    private function guardEmail(CrmContext $context, RecordInput $input, callable $write): mixed
+    private function guardEmail(CrmContext $context, RecordInput $input, ?string $id, callable $write): mixed
     {
+        $email = $input->type === SubjectType::Contact ? mb_strtolower(trim($input->values['email'] ?? ''), 'UTF-8') : '';
         for ($attempt = 1;; ++$attempt) {
             try {
                 return $write();
             } catch (DuplicateRowException $e) {
-                $email = $input->type === SubjectType::Contact ? mb_strtolower(trim($input->values['email'] ?? ''), 'UTF-8') : '';
-                $other = $this->support->read(fn (): ?CrmRecord => $this->support->store->contactByEmailKey($context->tenant, $email));
-                if ($other instanceof CrmRecord) {
+                $other = $email === '' ? null : $this->support->read(fn (): ?CrmRecord => $this->support->store->contactByEmailKey($context->tenant, $email));
+                if ($other instanceof CrmRecord && $other->getId() !== $id) {
                     throw InvalidInputException::field('email', 'error.email_taken', ['%id%' => $other->getId()]);
                 }
                 if ($attempt === 2) {
-                    // The other writer's row is gone again (it rolled back): a retry from the client is safe.
-                    throw new WriteConflictException('crm_write_conflict', $e);
+                    throw new ConflictException(ConflictException::WRITE_CONFLICT, null, $e);
                 }
             }
         }

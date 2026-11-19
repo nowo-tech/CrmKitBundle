@@ -72,7 +72,7 @@ final class UiRouteLoader extends Loader
         $this->add($routes, 'unaffiliate', $base . '/affiliations/{id}/remove', $p . 'unaffiliate', ['POST'], $id);
         $this->add($routes, 'consent', $base . '/contacts/{id}/consent', $p . 'consent', ['POST'], $id);
         $this->add($routes, 'vcard', $base . '/contacts/{id}/vcard', $p . 'vcard', ['GET'], $id);
-        $this->add($routes, 'gdpr_export', $base . '/contacts/{id}/gdpr-export', $p . 'gdprExport', ['GET'], $id);
+        $this->add($routes, 'gdpr_export', $base . '/contacts/{id}/gdpr-export', $p . 'gdprExport', ['POST'], $id);
         $this->add($routes, 'erase', $base . '/contacts/{id}/erase', $p . 'erase', ['POST'], $id);
         $this->add($routes, 'import', $base . '/import', $i . 'index', ['GET', 'POST']);
         $this->add($routes, 'import_show', $base . '/import/{id}', $i . 'show', ['GET', 'POST'], $id);

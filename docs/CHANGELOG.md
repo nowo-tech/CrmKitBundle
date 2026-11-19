@@ -13,6 +13,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   define at a time per tenant and type, audit entries for notes, tag assignments, links, affiliations and host
   timeline entries, the route × profile permission-matrix test, and a dependency-floor CI job
   (`nowo-tech/transaction-*` at their lowest allowed versions, demo locks checked by `.scripts/check-demo-lock.py`).
+- Audit UD of phase A, before the first tag:
+  - GDPR: a merge tombstone keeps no personal value (only id, tenant, status and survivor; the `crm_merge` snapshot is
+    the audit copy); an erasure locks and blanks the tombstones that point at the contact, recursively, and deletes
+    their merge traces; the retention purge deletes tombstones after `merge_keep_days`.
+  - Child writes lock their parent first: notes, consents, host links, host timeline entries and import updates lock
+    the record `FOR UPDATE`; an affiliation locks the contact, then the company (imports too); a child of a merged or
+    non-active record answers 409.
+  - Shared entity manager (`entity_manager: null`): the runner begins, flushes and commits itself; a refused write
+    rolls back and detaches only the bundle's entities, so the host's manager stays open and its entities managed.
+  - A write inside a transaction that is already open is refused (`LogicException`): the events and audit entries are
+    released after the bundle's own commit.
+  - `NowoTransactionDoctrineBundle` is required (the container build fails with the fix; the Flex recipe registers
+    it): its commit ledger, DBAL middleware and request watermark produce `CONFLICT_002`.
+  - A unique key refused twice is the domain conflict `crm_write_conflict` (409 without `X-Conflict-Code`); on an
+    edit the e-mail form error appears only when another record holds the e-mail.
+  - Counter rows and the purge claim are locked with `SELECT … FOR UPDATE` before any insert (no MySQL deadlock); the
+    purge claim is refreshed in every batch and released only while it is still the run's; batch deletes count the
+    rows really deleted; the purge also covers tenants that only have imports, merges or timeline entries.
+  - An edit that keeps the owner skips the directory check; a field archive uses the version the page showed; the
+    import "Continue" attributes its rows to the person who clicked; uploads over `import.max_bytes` are refused
+    before they are read (`File(maxSize)` on the form); the GDPR export is a POST with the action token; a host link
+    of a type with a resolver is stored only when the resolver confirms the object; URLs starting with `/\` are not
+    links; list pages are clamped to 1..10 000.
+  - Tests: two-connection races for child writes, field defines, counter rebuild against a create, two purges and a
+    `CONFLICT_002` after a commit in the same request; the permission matrix covers the POST actions; erasure is
+    checked on the database rows.
 - **Phase A: companies and contacts** (0.1.0, contract sections 5 to 18), always on when the bundle is enabled.
 - Companies and contacts on one service, `RecordServiceInterface` (`create`, `update`, `trash`, `restore`, `purge`,
   `affiliate`, `unaffiliate`) with `RecordInput` (type, core values, owner, custom values, tag ids, `setOwner`):
@@ -33,8 +59,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `TimelineInterface::record()`; a company's timeline includes the entries of up to 200 of its contacts.
 - Host links (`HostLinkServiceInterface`: `link` (idempotent), `unlink`, `subjectsLinkedTo` for the reverse lookup) and
   host object resolvers (`CrmHostObjectResolverInterface`, tag `nowo_crm_kit.host_object`): a link of a type with a
-  resolver shows the resolver's label and URL, or is hidden when the resolver does not return it; a type without a
-  resolver shows the stored label without a URL.
+  resolver is stored only when the resolver confirms the object and shows the resolver's label and URL (hidden when
+  the resolver no longer returns it); a type without a resolver shows the stored label without a URL.
 - Host panels on the 360° page (`CrmPanelProviderInterface`, tag `nowo_crm_kit.panel`): the provider gets the tenant,
   the record, the actor and the record's host links; a failing provider is logged (class names only) and skipped, a
   transient storage failure is rethrown.
@@ -45,7 +71,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   sort key ("last first").
 - Merge (`MergeServiceInterface`: preview, merge): both records locked `FOR UPDATE` in id order, versions re-checked,
   field-by-field choice, custom values united, children moved by primary key (unique children de-duplicated first),
-  the other record becomes a `merged` tombstone, a snapshot kept in `crm_merge`.
+  the other record becomes a `merged` tombstone without personal values, a snapshot kept in `crm_merge`.
 - CSV and vCard 3.0 / 4.0 import (`ImportServiceInterface`: upload, preview, confirm, run, cancel): UTF-8, BOM
   stripped, `,` or `;`, header row, at most `import.max_rows` rows and `import.max_bytes` bytes; detected and editable
   column mapping (core fields, `custom.<key>`, `tags`, and `company` for contacts); duplicate policy `skip` or
@@ -55,9 +81,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Exports (`CrmExporterInterface`): CSV of every record matching a list's filters (keyset batches, streamed, cells
   starting with `=`, `+`, `-`, `@`, tab or CR prefixed with `'`; `manage`) and a vCard 4.0 of one contact (`view`).
 - GDPR: consent per contact and purpose (`ConsentServiceInterface`, append-only, purposes from `gdpr.purposes`),
-  JSON export of a contact and erasure (`CrmPersonalDataInterface`, `manage`; idempotent; consent rows kept without
-  evidence), retention purge `nowo:crm-kit:purge` (trash after `trash_days`, timeline after `timeline_years`, import
-  rows after `import_keep_days`, merge snapshots after `merge_keep_days`; `--tenant`, `--dry-run`).
+  JSON export of a contact (a POST with the action token) and erasure (`CrmPersonalDataInterface`, `manage`;
+  idempotent; consent rows kept without evidence; the merge tombstones behind the contact blanked), retention purge
+  `nowo:crm-kit:purge` (single run; trash after `trash_days`, timeline after `timeline_years`, import rows after
+  `import_keep_days`, merge snapshots and tombstones after `merge_keep_days`; `--tenant`, `--dry-run`).
 - Per-tenant settings (`CrmSettingsInterface`, `manage`, versioned: `crm_settings_stale`).
 - Plan-limit counters (`crm_counter`): atomic `UPDATE … WHERE value < :limit` in the record's transaction, created with
   `INSERT IGNORE` / `ON CONFLICT DO NOTHING`; `nowo:crm-kit:counters:rebuild`.
@@ -73,10 +100,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   pages, CSRF on every POST; tag, field and settings administration under `/admin`.
 - SearchKit bridge: providers `nowo_crm_kit.search.company` and `nowo_crm_kit.search.contact` (groups `crm_companies`,
   `crm_contacts`), registered when SearchKit is installed, `ui.enabled` and `search.enabled`.
-- Concurrency (REQ-RUNTIME-003): write units through `nowo-tech/transaction-doctrine` ^1.6, lock conflicts answered 409
-  with `CONFLICT_001` + `Retry-After` + `X-Conflict-Code` (or `CONFLICT_002`), a fallback listener when the transaction
-  bundle is absent; two-connection race tests on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16
-  ([CONCURRENCY.md](CONCURRENCY.md)).
+- Concurrency (REQ-RUNTIME-003): write units through `nowo-tech/transaction-doctrine` ^1.6 (its bundle required), lock
+  conflicts answered 409 with `CONFLICT_001` + `Retry-After` + `X-Conflict-Code` (or `CONFLICT_002`), a fallback
+  listener when the host turns its conflict responder off; two-connection race tests on MySQL 8.4, MariaDB 11.4 and
+  PostgreSQL 16 ([CONCURRENCY.md](CONCURRENCY.md)).
 - Worker mode (REQ-RUNTIME-002): stateless services, the private entity manager cleared after every unit and at the
   end of every request and command ([FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md)).
 - Binary NO PAD collations on every id, reference and key column (MySQL 8 `utf8mb4_0900_bin`, MariaDB

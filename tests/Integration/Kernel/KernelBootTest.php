@@ -79,10 +79,21 @@ final class KernelBootTest extends KernelTestCase
         });
     }
 
-    public function testWithoutTheTransactionBundleTheFallbackAnswersConflicts(): void
+    public function testTheTransactionBundleIsRequired(): void
     {
-        $container = $this->bootKernel(TestServices::PORTS, null, true, false)->getContainer();
-        $services  = $container->get('test.service_container');
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('nowo_crm_kit needs Nowo\\TransactionDoctrine\\Symfony\\NowoTransactionDoctrineBundle');
+        $this->bootKernel(TestServices::PORTS, null, true, false);
+    }
+
+    public function testWithTheConflictResponderOffTheFallbackAnswersConflicts(): void
+    {
+        $standard  = Host::standard()->configure();
+        $container = $this->bootKernel(TestServices::PORTS, static function (ContainerConfigurator $container, string $url) use ($standard): void {
+            $standard($container, $url);
+            $container->extension('nowo_transaction_doctrine', ['conflict_response' => ['enabled' => false]]);
+        })->getContainer();
+        $services = $container->get('test.service_container');
         self::assertInstanceOf(ContainerInterface::class, $services);
         self::assertInstanceOf(WriteUnit::class, $services->get('nowo_crm_kit.write_unit'));
         self::assertInstanceOf(ConflictFallbackListener::class, $services->get(ConflictFallbackListener::class));

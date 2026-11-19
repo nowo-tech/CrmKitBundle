@@ -69,7 +69,8 @@ final readonly class RecordPage
             $actions[] = new Action('download', UiSupport::label('record.vcard'), $this->ui->url('nowo_crm_kit_vcard', ['id' => $view->id]), icon: 'download');
         }
         if ($type === SubjectType::Contact && $manage) {
-            $actions[] = new Action('download', UiSupport::label('record.gdpr_export'), $this->ui->url('nowo_crm_kit_gdpr_export', ['id' => $view->id]), icon: 'download');
+            // A POST with the action token: the export is a logged processing of personal data, never a plain link.
+            $actions[] = $this->post($token, 'download', 'record.gdpr_export', 'nowo_crm_kit_gdpr_export', ['id' => $view->id]);
         }
         $back = ['type' => $seg, 'subject' => $view->id];
         if ($edit) {

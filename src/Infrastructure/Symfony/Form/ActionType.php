@@ -8,11 +8,13 @@ use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
- * A button that only carries a CSRF token (trash, restore, purge, delete, remove).
+ * A button that only carries a CSRF token (trash, restore, purge, delete, remove), and with `versioned` the version
+ * the page showed (archive a field).
  *
  * @extends AbstractType<mixed>
  */
@@ -28,8 +30,10 @@ final class ActionType extends AbstractType
      */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $this->withBuilder($builder, static function (): void {
-            // CSRF only.
+        $this->withBuilder($builder, function () use ($options): void {
+            if ($options['versioned'] === true) {
+                $this->addTypedField('version', HiddenType::class, []);
+            }
         });
     }
 
@@ -44,6 +48,7 @@ final class ActionType extends AbstractType
             'csrf_token_id'      => 'nowo_crm_kit_action',
             'allow_extra_fields' => false,
             'translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN,
+            'versioned'          => false,
         ]);
     }
 

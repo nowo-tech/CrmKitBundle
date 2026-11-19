@@ -115,7 +115,8 @@ final readonly class MergeService implements MergeServiceInterface
             foreach ($other->getCustom() as $key => $value) {
                 $custom[$key] ??= $value;
             }
-            // The tombstone releases its unique keys before the survivor may take them (flush first).
+            $otherOwner = $other->getOwnerId();
+            // The tombstone releases its unique keys (and every personal value) before the survivor may take them.
             $other->mergeInto($survivorId, $context->now, $context->actor->value);
             $store->flush();
             $survivor->apply($values);
@@ -124,7 +125,7 @@ final readonly class MergeService implements MergeServiceInterface
             }
             $survivor->changeCustom($custom);
             if ($survivor->getOwnerId() === null) {
-                $survivor->changeOwner($other->getOwnerId());
+                $survivor->changeOwner($otherOwner);
             }
             $survivor->touch($context->now, $context->actor->value);
             $this->moveChildren($context, $type, $otherId, $survivorId);

@@ -7,7 +7,6 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 use DateTimeImmutable;
 use Nowo\CrmKitBundle\Application\CrmAccess;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
-use Nowo\CrmKitBundle\Application\Shared\WriteConflictException;
 use Nowo\CrmKitBundle\Domain\Enum\ConsentSource;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
@@ -25,8 +24,10 @@ use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\RecordInput;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
+use Nowo\CrmKitBundle\Domain\Value\AuditEntry;
 use Nowo\CrmKitBundle\Domain\Value\HostObjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
@@ -80,7 +81,7 @@ final class EdgeCasesTest extends CrmTestCase
             try {
                 $call();
                 self::fail('stored ' . $what);
-            } catch (WriteConflictException $e) {
+            } catch (ConflictException $e) {
                 self::assertSame('crm_write_conflict', $e->errorCode);
             }
         }
@@ -102,7 +103,7 @@ final class EdgeCasesTest extends CrmTestCase
         try {
             $imports->run($two);
             self::fail('stored');
-        } catch (WriteConflictException $e) {
+        } catch (ConflictException $e) {
             self::assertSame('crm_write_conflict', $e->errorCode);
         }
     }
@@ -147,6 +148,7 @@ final class EdgeCasesTest extends CrmTestCase
         $tenant = new TenantRef('acme');
         self::assertSame([], $store->records(SubjectType::Company, $tenant, []));
         self::assertSame([], $store->lockRecords(SubjectType::Company, $tenant, []));
+        self::assertSame([], $store->lockTombstones(SubjectType::Contact, $tenant, []));
         self::assertSame([], $store->taggings($tenant, SubjectType::Company, []));
         self::assertSame([], $store->activities($tenant, [], 10, null));
         self::assertSame(0, $store->deleteMergesBefore($tenant, new DateTimeImmutable(), 10));
@@ -178,6 +180,45 @@ final class EdgeCasesTest extends CrmTestCase
         self::assertSame(0, $purge->execute([]));
         self::assertStringContainsString('records: 0', $purge->getDisplay(), 'a claim older than an hour is taken over');
         self::assertSame(0, $this->int("SELECT value FROM nowo_crm_counter WHERE tenant_id = '__crm__'"), 'released after the run');
+    }
+
+    public function testAPurgeWhoseClaimWasTakenOverStops(): void
+    {
+        $this->boot();
+        $this->admin();
+        $this->service(CrmSettingsInterface::class)->update(7, 1, 1, 1, 0);
+        $this->company('Acme');
+        $this->ctx()->tenant = 'beta';
+        $this->ctx()->grant('beta', 'ana', 'view', 'edit', 'manage');
+        $this->company('Beta');
+        $this->clock()->modify('+6 years');
+        // While the run audits acme, another run takes the claim over: the run stops before beta and leaves it alone.
+        $this->recorder()->onRecord = function (AuditEntry $entry): void {
+            if ($entry->action === 'crm.retention.purged') {
+                $this->connection()->executeStatement("UPDATE nowo_crm_counter SET value = 7 WHERE tenant_id = '__crm__'");
+            }
+        };
+        $purge = new CommandTester((new Application($this->kernel))->find('nowo:crm-kit:purge'));
+        self::assertSame(0, $purge->execute([]));
+        self::assertStringContainsString('Another purge is running', $purge->getDisplay());
+        self::assertSame(7, $this->int("SELECT value FROM nowo_crm_counter WHERE tenant_id = '__crm__'"), 'the other run keeps its claim');
+        self::assertSame(1, $this->int("SELECT COUNT(*) FROM nowo_crm_activity WHERE tenant_id = 'beta'"), 'beta was not purged');
+        self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_activity WHERE tenant_id = 'acme'"), 'acme was');
+    }
+
+    public function testEditsKeepTheirOwnEmailAndAFormerOwner(): void
+    {
+        $this->boot();
+        $this->admin();
+        $vip = $this->service(TagServiceInterface::class)->create('VIP', 'red');
+        $ada = $this->records()->create(new RecordInput(SubjectType::Contact, ['last_name' => 'L', 'email' => 'ada@x.test'], 'leo'));
+        // A racing tagging refuses the first run: the e-mail holder is the edited contact itself, so no form error.
+        $this->ctx()->races['Tagging'] = 1;
+        self::assertSame(2, $this->records()->update($ada, new RecordInput(SubjectType::Contact, ['last_name' => 'L', 'email' => 'ada@x.test'], 'leo', null, [$vip]), 1));
+        // The owner left the directory: an edit that keeps it is not refused; a change to an unknown owner is.
+        unset($this->ctx()->owners['acme']['leo']);
+        self::assertSame(3, $this->records()->update($ada, new RecordInput(SubjectType::Contact, ['last_name' => 'Lovelace'], 'leo'), 2));
+        $this->expectErrors(['owner' => 'error.owner_unknown'], fn (): int => $this->records()->update($ada, new RecordInput(SubjectType::Contact, ['last_name' => 'L'], 'zed'), 3));
     }
 
     public function testEveryWriteIsAudited(): void

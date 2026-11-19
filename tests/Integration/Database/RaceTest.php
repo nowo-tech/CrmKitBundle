@@ -5,17 +5,24 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
-use Nowo\CrmKitBundle\Application\Shared\WriteConflictException;
+use Nowo\CrmKitBundle\Application\RecordPurger;
+use Nowo\CrmKitBundle\Domain\Enum\ConsentSource;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
+use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\ImportFormat;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
+use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
+use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordInput;
 use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
+use Nowo\CrmKitBundle\Domain\Value\FieldKey;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestContext;
@@ -51,7 +58,7 @@ final class RaceTest extends CrmTestCase
         try {
             $this->contact('Eve', 'L', 'eve@x.test');
             self::fail('stored');
-        } catch (WriteConflictException $e) {
+        } catch (ConflictException $e) {
             self::assertSame('crm_write_conflict', $e->errorCode);
         }
         try {
@@ -212,14 +219,142 @@ final class RaceTest extends CrmTestCase
         self::assertSame('Bilbao', $this->text('SELECT city FROM nowo_crm_company'));
     }
 
-    private function twoConnections(): bool
+    public function testChildWritesWaitForTheirLockedParent(): void
+    {
+        if (!$this->twoConnections()) {
+            return;
+        }
+        $ada   = $this->contact('Ada', 'L', 'ada@x.test');
+        $dup   = $this->contact('Ada', 'L');
+        $other = $this->second();
+        // A merge or an erasure holds the contact: a consent or a note for it waits, then gives up (nothing stored).
+        $this->holdRecords(SubjectType::Contact, [$ada], function () use ($other, $ada): void {
+            $this->expectLockConflict(static fn () => self::svc($other, ConsentServiceInterface::class)->record($ada, 'newsletter', true, ConsentSource::Form));
+            $this->expectLockConflict(static fn () => self::svc($other, NoteServiceInterface::class)->add(SubjectType::Contact, $ada, 'n'));
+        });
+        $this->service(MergeServiceInterface::class)->merge(SubjectType::Contact, $dup, $ada, [], 1, 1);
+        foreach ([static fn () => self::svc($other, ConsentServiceInterface::class)->record($ada, 'newsletter', true, ConsentSource::Form), static fn () => self::svc($other, NoteServiceInterface::class)->add(SubjectType::Contact, $ada, 'n')] as $write) {
+            try {
+                $write();
+                self::fail('a child of a merged record');
+            } catch (ConflictException $e) {
+                self::assertSame([ConflictException::MERGED, $dup], [$e->errorCode, $e->recordId]);
+            }
+        }
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_consent'));
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_note'));
+    }
+
+    public function testFieldDefinesSerialiseOnTheCounterRow(): void
+    {
+        if (!$this->twoConnections(['fields' => ['max_per_subject' => 1]])) {
+            return;
+        }
+        $other      = $this->second(['fields' => ['max_per_subject' => 1]]);
+        $runner     = $this->runner();
+        $connection = $runner->manager()->getConnection();
+        $connection->beginTransaction();
+        try {
+            // What a first define holds: the tenant's fields.company row, then its new field.
+            $this->service(CrmStoreInterface::class)->lockCounter(new TenantRef('acme'), 'fields.company');
+            $this->expectLockConflict(static fn () => self::svc($other, FieldServiceInterface::class)->define(SubjectType::Company, 'size', 'Size', FieldType::Text, [], false, 2));
+            $runner->manager()->persist(new FieldDefinition('01900000-0000-7000-8000-0000000000f1', 'acme', SubjectType::Company, new FieldKey('tier'), 'Tier', FieldType::Text, [], false, 1, $this->clock()->now()));
+            $runner->manager()->flush();
+        } finally {
+            $connection->commit();
+            $runner->manager()->clear();
+        }
+        try {
+            self::svc($other, FieldServiceInterface::class)->define(SubjectType::Company, 'size', 'Size', FieldType::Text, [], false, 2);
+            self::fail('passed max_per_subject');
+        } catch (InvalidInputException $e) {
+            self::assertSame(['key' => 'error.field_limit'], $e->errors);
+        }
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_field'));
+    }
+
+    public function testACounterRebuildAndACreateSerialise(): void
+    {
+        if (!$this->twoConnections()) {
+            return;
+        }
+        $this->company('A');
+        $other      = $this->second();
+        $store      = $this->service(CrmStoreInterface::class);
+        $connection = $this->runner()->manager()->getConnection();
+        $connection->beginTransaction();
+        try {
+            // What the rebuild holds: the counter row, locked before it counts and sets.
+            $store->lockCounter(new TenantRef('acme'), 'companies');
+            $this->expectLockConflict(static fn () => self::svc($other, RecordServiceInterface::class)->create(new RecordInput(SubjectType::Company, ['name' => 'B'])));
+            $store->setCounter(new TenantRef('acme'), 'companies', $store->countActive(new TenantRef('acme'), SubjectType::Company));
+        } finally {
+            $connection->commit();
+        }
+        self::svc($other, RecordServiceInterface::class)->create(new RecordInput(SubjectType::Company, ['name' => 'B']));
+        self::assertSame(2, $this->int("SELECT value FROM nowo_crm_counter WHERE resource = 'companies'"));
+        self::assertSame(2, $this->int('SELECT COUNT(*) FROM nowo_crm_company'));
+    }
+
+    public function testTwoPurgesOnTwoConnections(): void
+    {
+        if (!$this->twoConnections()) {
+            return;
+        }
+        $other      = $this->second();
+        $now        = $this->clock()->now()->getTimestamp();
+        $connection = $this->runner()->manager()->getConnection();
+        $connection->beginTransaction();
+        try {
+            self::assertTrue($this->service(CrmStoreInterface::class)->claimPurge($now, $now - RecordPurger::STALE_CLAIM_SECONDS));
+            $this->expectLockConflict(static fn () => self::svc($other, RecordPurger::class)->purge());
+        } finally {
+            $connection->commit();
+        }
+        self::assertNull(self::svc($other, RecordPurger::class)->purge(), 'the claim is held');
+        self::assertSame($now, $this->int("SELECT value FROM nowo_crm_counter WHERE tenant_id = '__crm__'"));
+    }
+
+    public function testALockConflictAfterACommitInTheSameRequestIsConflict002(): void
+    {
+        if (!$this->twoConnections()) {
+            return;
+        }
+        $this->contact('Bob', 'B');
+        $id      = $this->service(ImportServiceInterface::class)->upload(SubjectType::Contact, ImportFormat::Csv, 'a.csv', "email,last_name\nada@x.test,A\n");
+        $other   = $this->second();
+        $browser = $other->getContainer()->get('test.client');
+        self::assertInstanceOf(KernelBrowser::class, $browser);
+        $browser->disableReboot();
+        $form       = $browser->request('GET', '/crm/import/' . $id)->filter('form[name="crm_import_confirm"]')->form();
+        $connection = $this->runner()->manager()->getConnection();
+        $connection->beginTransaction();
+        try {
+            // The confirm commits its claim, then its first chunk waits on the contacts counter and gives up.
+            $this->service(CrmStoreInterface::class)->lockCounter(new TenantRef('acme'), 'contacts');
+            $browser->submit($form, ['crm_import_confirm[col_0]' => 'email', 'crm_import_confirm[col_1]' => 'last_name']);
+            $response = $browser->getResponse();
+            self::assertSame(409, $response->getStatusCode());
+            self::assertSame('CONFLICT_002', $response->headers->get('X-Conflict-Code'));
+            self::assertNull($response->headers->get('Retry-After'), 'part of the request committed: reload first');
+        } finally {
+            $connection->rollBack();
+        }
+        self::assertSame('running', $this->text('SELECT status FROM nowo_crm_import WHERE id = ?', [$id]), 'the claim stayed committed');
+        self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE email_key = 'ada@x.test'"));
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function twoConnections(array $config = []): bool
     {
         if (!self::serverDatabase()) {
             $this->addToAssertionCount(1); // two connections need a database server
 
             return false;
         }
-        $this->boot();
+        $this->boot($config);
         $this->admin();
 
         return true;
@@ -227,11 +362,13 @@ final class RaceTest extends CrmTestCase
 
     /**
      * A second kernel on its own connection, acting as `leo` with every grant, lock waits bounded to 1 s.
+     *
+     * @param array<string, mixed> $override
      */
-    private function second(): TestKernel
+    private function second(array $override = []): TestKernel
     {
         /** @var array<string, mixed> $config */
-        $config          = array_replace_recursive(TestServices::PORTS, ['ui' => ['enabled' => true]]);
+        $config          = array_replace_recursive(TestServices::PORTS, ['ui' => ['enabled' => true]], $override);
         $kernel          = $this->bootKernel(Host::standard()->bundleConfig($config), Host::standard()->configure());
         $context         = self::svc($kernel, TestContext::class, 'test.context');
         $context->actor  = 'leo';

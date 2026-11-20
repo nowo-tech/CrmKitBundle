@@ -45,7 +45,7 @@ no route is added.
 - **Removed**: the root key `access_checker` (deprecated since 0.2.0) and `LegacyCrmAccessChecker`. Move a 0.1.0 checker
   to `security.access_checker` (a `CrmKitAccessCheckerInterface`), and move record rules to
   `nowo_crm_kit.record_access_check` listeners. `CrmPermission::legacy()` is removed too.
-- **transaction-doctrine ^1.8** is required (`composer update nowo-tech/transaction-doctrine`). It fixes
+- **transaction-doctrine ^1.8.1** is required (`composer update nowo-tech/transaction-doctrine`). It fixes
   GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g, and a write-unit replay no longer clears your entity manager: it is put
   back to what the database holds (see CONCURRENCY).
 - **`ext-sodium`** is needed for the API's sealed cursors. It ships with PHP and is on by default.

@@ -36,7 +36,7 @@ use function str_starts_with;
  * is one Doctrine closed during a failed flush (then it is unusable for the host too, and reset before the next
  * unit). It also refuses to write while the host has pending changes of its own (audit ST-M4). A configured name
  * that resolves to the registry's default manager (for example `default`) is the same shared manager and gets the
- * same safeguards. A deadlock replay keeps the host's entity manager (transaction-doctrine ^1.8 puts it back to what
+ * same safeguards. A deadlock replay keeps the host's entity manager (transaction-doctrine ^1.8.1 puts it back to what
  * the database holds instead of clearing it).
  */
 final readonly class DoctrineTransactionRunner implements TransactionRunnerInterface

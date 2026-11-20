@@ -66,7 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed (0.3.0: audit VS)
 
-- **transaction-doctrine ^1.8** (was ^1.6): it fixes GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g, which the bundle's
+- **transaction-doctrine ^1.8.1** (was ^1.6; 1.8.1 rather than 1.8.0, whose replay could answer 409 when new entities referenced a host-managed entity): it fixes GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g, which the bundle's
   write units reach; a replay now keeps the host's entity manager instead of clearing it.
 
 - **Behaviour change for hosts:** the 0.2.x web lists showed records a `nowo_crm_kit.record_access_check` listener

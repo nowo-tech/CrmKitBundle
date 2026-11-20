@@ -94,7 +94,7 @@ API (Q-O6) or attachments (Q-O9).
 | Namespace / class | `Nowo\CrmKitBundle` / `NowoCrmKitBundle`; config root `nowo_crm_kit`; Twig namespace `@NowoCrmKit`; translation domain `NowoCrmKitBundle` (house set **en, es, it, fr, pt, de, nl**, REQ-I18N-002); FormKit profile `crm_kit`; route names `nowo_crm_kit_*` |
 | Releases | 0.x per phase; **1.0.0** after phase G, `bundle-req-audit` 100 % and the SEC-004 audits (Q-O13) |
 | PHP / Symfony | `>=8.2 <8.6`; `^7.4 \|\| ^8.0`; CI Symfony 7.4 and 8.1; demos Symfony 7.4 and 8.1 on FrankenPHP worker mode, MySQL |
-| Runtime deps (A) | `doctrine/dbal ^3.8.2 \|\| ^4.0`, `doctrine/orm ^3.7`, `doctrine/doctrine-bundle ^2.8 \|\| ^3.0`, `symfony/{framework-bundle,http-kernel,http-foundation,routing,config,dependency-injection,event-dispatcher,clock,console,form,validator,translation,twig-bundle,uid,security-csrf,string}`, `psr/clock`, `psr/log`, `nowo-tech/transaction-contract ^1.0`, **`nowo-tech/transaction-doctrine ^1.8`** (0.3.0; ^1.6 before), `nowo-tech/ui-kit-bundle ^2.55`, `nowo-tech/form-kit-bundle ^2.23`, `twig/extra-bundle` |
+| Runtime deps (A) | `doctrine/dbal ^3.8.2 \|\| ^4.0`, `doctrine/orm ^3.7`, `doctrine/doctrine-bundle ^2.8 \|\| ^3.0`, `symfony/{framework-bundle,http-kernel,http-foundation,routing,config,dependency-injection,event-dispatcher,clock,console,form,validator,translation,twig-bundle,uid,security-csrf,string}`, `psr/clock`, `psr/log`, `nowo-tech/transaction-contract ^1.0`, **`nowo-tech/transaction-doctrine ^1.8.1`** (0.3.0; ^1.6 before), `nowo-tech/ui-kit-bundle ^2.55`, `nowo-tech/form-kit-bundle ^2.23`, `twig/extra-bundle` |
 | Suggest | `nowo-tech/search-kit-bundle ^1.7` (header search), `symfony/messenger` (imports outside the request; **0.1.0** ships no handler yet), `symfony/security-bundle` (default role-map checker), later phases: `nowo-tech/notify-kit-bundle`, `nowo-tech/storage-kit-bundle`, `nowo-tech/mail-kit-bundle`, `nowo-tech/verifactu-bundle`, `nowo-tech/sepa-payment-bundle`, `nowo-tech/brand-contracts`, `dompdf/dompdf` (quote / invoice PDF) |
 | Not used | No JS framework (UiKit runtime scripts only), no CSS of its own beyond UiKit tokens and slots, no external service in phase A |
 
@@ -662,7 +662,7 @@ are released after its own commit), and never does HTTP, mail or file I/O inside
 lock-wait timeout or a serialization failure, transaction-doctrine (1.6) clears **every** open entity manager before
 the next attempt, the host's default one included, in private and in shared mode. A host that calls a CRM write while
 it holds managed entities of its own must re-read them after the call (or call the CRM before it loads them). This is
-inherited from transaction-doctrine; a write unit scoped to the bundle's own manager is a platform item. **(0.3.0)** Resolved: the bundle requires transaction-doctrine ^1.8, whose replays put a host manager that managed
+inherited from transaction-doctrine; a write unit scoped to the bundle's own manager is a platform item. **(0.3.0)** Resolved: the bundle requires transaction-doctrine ^1.8.1, whose replays put a host manager that managed
 entities back to what the database holds instead of clearing it (GHSA-9wh3-m3m5-jffx, GHSA-65w2-9r4h-848g).
 
 ### 15.1 Plan-limit counters

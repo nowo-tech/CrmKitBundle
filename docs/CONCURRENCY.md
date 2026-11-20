@@ -16,7 +16,7 @@ REQ-RUNTIME-003; design in [CONTRACT.md](CONTRACT.md) section 15.
 
 ## Write units
 
-Every write is one **write unit** of `nowo-tech/transaction-doctrine` ^1.8 (`WriteUnitInterface`) around one
+Every write is one **write unit** of `nowo-tech/transaction-doctrine` ^1.8.1 (`WriteUnitInterface`) around one
 transaction on the bundle's entity manager (`DoctrineTransactionRunner`):
 
 - flushed before the commit; replayed after a deadlock, a lock-wait timeout or a serialization failure (MySQL 1213 /
@@ -38,7 +38,7 @@ transaction on the bundle's entity manager (`DoctrineTransactionRunner`):
 - a unique-key refusal inside the unit becomes `DuplicateRowException`, an optimistic-lock failure at flush
   `StaleRowException`; the services decide what each means (below);
 - no HTTP, mail or file I/O inside a transaction (an import file is parsed before the unit that stores its rows);
-- **a replay keeps the host's entity manager** (0.3.0 requires transaction-doctrine ^1.8, which fixes
+- **a replay keeps the host's entity manager** (0.3.0 requires transaction-doctrine ^1.8.1, which fixes
   GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g; this replaces the risk UD2-L-2 accepted up to 0.2.x): before the next
   attempt, the `WriteUnit` no longer clears an open manager that managed entities before the first attempt; it puts it
   back to what the database holds (the attempt's unflushed work dropped, what the attempt brought in detached, the host

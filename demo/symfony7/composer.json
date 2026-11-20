@@ -8,7 +8,7 @@
         "doctrine/doctrine-bundle": "^2.13 || ^3.0",
         "doctrine/orm": "^3.7",
         "nowo-tech/form-kit-bundle": "^2.23",
-        "nowo-tech/transaction-doctrine": "^1.8",
+        "nowo-tech/transaction-doctrine": "^1.8.1",
         "nowo-tech/ui-kit-bundle": "^2.55",
         "nowo-tech/crm-kit-bundle": "@dev",
         "php": ">=8.2,<8.6",

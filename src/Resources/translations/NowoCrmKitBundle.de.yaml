@@ -1,5 +1,7 @@
 # CRM-Kit, Phase A (Unternehmen und Kontakte). Domain NowoCrmKitBundle. Parameter stehen in %.
 nav:
+    funnels: 'Trichter'
+    deals: 'Deals'
     label: CRM
     companies: Unternehmen
     contacts: Kontakte
@@ -8,6 +10,7 @@ nav:
     fields: Benutzerdefinierte Felder
     settings: Einstellungen
 type:
+    deal: 'Deal'
     company: Unternehmen
     contact: Kontakt
 status:
@@ -20,6 +23,7 @@ form:
     save: Speichern
     cancel: Abbrechen
 list:
+    next: 'Nächste Seite'
     title:
         company: Unternehmen
         contact: Kontakte
@@ -31,6 +35,7 @@ list:
     col:
         updated: Aktualisiert
     filter:
+        apply: 'Anwenden'
         role: 'Rolle'
         purpose: 'Ansprechpartner für'
         primary_contact: 'Hauptansprechpartner'
@@ -246,6 +251,11 @@ timeline:
     empty: Noch ist nichts passiert.
     open: Öffnen
 activity:
+    via_token: "über Agent ‹%token%›"
+    lifecycle_stage: 'Lebenszyklusphase geändert von %actor%'
+    next_action_closed: 'Nächste Aktion abgeschlossen von %actor%'
+    next_action_added: 'Nächste Aktion hinzugefügt von %actor%'
+    stage_moved: 'Phase geändert von %actor%'
     roles_changed: 'Rollen geändert von %actor%'
     primary_contact: 'Hauptansprechpartner geändert von %actor%'
     created: 'Angelegt von %actor%'
@@ -358,9 +368,11 @@ search:
     group:
         companies: Unternehmen
         contacts: Kontakte
+        deals: 'Deals'
     see_all: 'Alle %count% anzeigen'
 flash:
     conflict:
+        crm_stage_invalid: 'Diese Phase kann nicht verwendet werden: Sie gehört zu einem anderen Trichter, oder die Phase oder der Trichter ist archiviert oder abgeschlossen.'
         crm_record_stale: 'Jemand hat diesen Datensatz gleichzeitig geändert. Das Formular zeigt die aktuellen Werte: Prüfen Sie sie und speichern Sie erneut.'
         crm_record_merged: Dieser Datensatz wurde in einen anderen zusammengeführt.
         crm_record_trashed: Dieser Datensatz liegt im Papierkorb.
@@ -370,6 +382,16 @@ flash:
         crm_settings_stale: Jemand hat die Einstellungen gleichzeitig geändert. Prüfen Sie sie und speichern Sie erneut.
         crm_write_conflict: 'Eine andere Änderung derselben Daten kam im selben Moment an. Versuchen Sie es erneut.'
 error:
+    stage_invalid: 'Die Phase konnte nicht gespeichert werden: Prüfen Sie das Formular.'
+    next_action_invalid: 'Die nächste Aktion konnte nicht gespeichert werden: Prüfen Sie das Formular.'
+    amount_invalid: 'Geben Sie einen Betrag (höchstens 4 Dezimalstellen) und eine Währung mit 3 Buchstaben ein.'
+    lost_reason_unknown: 'Unbekannter Verlustgrund.'
+    lost_reason_required: 'Geben Sie an, warum der Deal verloren ging.'
+    stage_limit: 'Der Trichter hat die erlaubte Höchstzahl an Phasen.'
+    funnel_limit: 'Der Mandant hat die erlaubte Höchstzahl an Trichtern.'
+    funnel_kind: 'Dieser Trichter kann hier nicht verwendet werden.'
+    deal_party_required: 'Ein Deal braucht eine Firma oder einen Kontakt.'
+    deal_related_unknown: 'Wählen Sie eine Firma oder einen Kontakt, die Sie sehen.'
     forbidden: 'Sie dürfen das nicht ändern.'
     role_unknown: 'Unbekannte Rolle.'
     purpose_unknown: 'Unbekannter Zweck.'
@@ -409,3 +431,165 @@ purpose:
     orders: 'Bestellungen'
     technical: 'Technik'
     general: 'Allgemein'
+deals:
+    title: 'Deals'
+    empty: 'Noch keine Deals.'
+deal:
+    new: 'Neuer Deal'
+    edit: 'Bearbeiten'
+    edit_title: '%name% bearbeiten'
+    created: 'Deal angelegt.'
+    saved: 'Deal gespeichert.'
+    moved: 'Phase geändert.'
+    not_moved: 'Der Deal ist bereits in dieser Phase.'
+    trashed: 'Deal in den Papierkorb verschoben.'
+    restored: 'Deal wiederhergestellt.'
+    purged: 'Deal endgültig gelöscht.'
+    trash: 'In den Papierkorb'
+    trash_confirm: 'Diesen Deal in den Papierkorb verschieben?'
+    restore: 'Wiederherstellen'
+    purge: 'Endgültig löschen'
+    purge_confirm: 'Diesen Deal und seinen Verlauf endgültig löschen?'
+    funnel: 'Trichter'
+    status_label: 'Status'
+    status:
+        any: 'Offen, gewonnen oder verloren'
+        open: 'Offen'
+        won: 'Gewonnen'
+        lost: 'Verloren'
+        trashed: 'Im Papierkorb'
+    stale: 'Stockend'
+    stale_only: 'Nur stockende'
+    sort_label: 'Reihenfolge'
+    sort:
+        updated: 'Zuletzt geändert'
+        expected_close: 'Erwarteter Abschluss'
+        amount: 'Betrag'
+    hidden: 'Für Sie nicht sichtbar'
+    probability: 'Wahrscheinlichkeit'
+    weighted: 'Gewichteter Wert'
+    history_title: 'Phasenverlauf'
+    history:
+        created: 'Angelegt'
+        days: '%days% Tage in der vorigen Phase'
+        via: 'über %via%'
+    form:
+        title: 'Titel'
+        stage: 'Phase'
+        company: 'Firma'
+        contact: 'Kontakt'
+        owner: 'Verantwortlich'
+        amount: 'Betrag'
+        currency: 'Währung (ISO 4217)'
+        probability: 'Eigene Wahrscheinlichkeit (%)'
+        expected_close: 'Erwarteter Abschluss'
+        none: '— Keine —'
+    move:
+        title: 'In eine Phase verschieben'
+        save: 'Verschieben'
+        stage: 'Phase'
+        lost_reason: 'Verlustgrund'
+        lost_note: 'Notiz zum Verlust'
+board:
+    title: 'Board'
+    intro: 'Die Deals dieses Trichters nach Phase.'
+    empty: 'Keine Deals.'
+    more: 'Das Board zeigt die ersten 100 Deals.'
+    list: 'Alle in der Liste ansehen'
+next_action:
+    title: 'Nächste Aktionen'
+    empty: 'Keine nächsten Aktionen.'
+    add: 'Nächste Aktion hinzufügen'
+    save: 'Hinzufügen'
+    done: 'Erledigt'
+    cancel: 'Abbrechen'
+    added: 'Nächste Aktion hinzugefügt.'
+    closed: 'Nächste Aktion abgeschlossen.'
+    refused: 'Der Aufgabendienst hat die nächste Aktion abgelehnt. Nichts wurde gespeichert.'
+    task: 'Aufgabe öffnen'
+    task_hidden: 'Aufgabe für Sie nicht sichtbar'
+    status:
+        open: 'Offen'
+        done: 'Erledigt'
+        cancelled: 'Abgebrochen'
+    form:
+        title: 'Titel'
+        due_at: 'Fällig'
+        assignee: 'Zuständig'
+        me: '— Ich —'
+lifecycle:
+    title: 'Lebenszyklus'
+    none: 'Nicht in diesem Trichter'
+    save: 'Phase setzen'
+    saved: 'Lebenszyklusphase gespeichert.'
+    form:
+        stage: 'Lebenszyklusphase'
+funnels:
+    title: 'Trichter'
+    intro: 'Deal-Trichter und Lebenszyklus-Trichter von Firmen und Kontakten.'
+    empty: 'Noch keine Trichter.'
+funnel:
+    add: 'Neuer Trichter'
+    save: 'Anlegen'
+    edit: 'Bearbeiten'
+    created: 'Trichter angelegt.'
+    saved: 'Trichter gespeichert.'
+    stages: 'Phasen'
+    form:
+        name: 'Name'
+        kind: 'Art'
+        archived: 'Archiviert'
+    kind:
+        deal: 'Deals'
+        party_company: 'Lebenszyklus von Firmen'
+        party_contact: 'Lebenszyklus von Kontakten'
+stage:
+    add: 'Neue Phase'
+    save: 'Speichern'
+    edit: 'Bearbeiten'
+    created: 'Phase hinzugefügt.'
+    saved: 'Phase gespeichert.'
+    move_up: 'Nach oben'
+    move_down: 'Nach unten'
+    form:
+        name: 'Name'
+        kind: 'Art'
+        probability: 'Standardwahrscheinlichkeit (%)'
+        rot_days: 'Stockend nach (Tagen)'
+        archived: 'Archiviert'
+    kind:
+        open: 'Offen'
+        won: 'Gewonnen'
+        lost: 'Verloren'
+    default:
+        open: 'Qualifiziert'
+        won: 'Gewonnen'
+        lost: 'Verloren'
+        first: 'Neu'
+stats:
+    title: 'Statistik'
+    title_of: 'Statistik von %name%'
+    filter:
+        at: 'Zu einem früheren Zeitpunkt'
+        from: 'Abgeschlossen ab'
+        to: 'Abgeschlossen bis'
+    at: 'Am %at%'
+    now: 'Jetzt (%at%)'
+    conversion: 'Zur nächsten Phase'
+    average_days: 'Durchschnittliche Tage in der Phase'
+    win_rate: 'Gewonnen ab der ersten Phase: %rate% %'
+    closed: 'Im Zeitraum abgeschlossen: %won% gewonnen, %lost% verloren'
+    csv:
+        stage: 'Phase'
+        kind: 'Art'
+        count: 'Deals'
+        stale: 'Stockend'
+        currency: 'Währung'
+        value: 'Wert'
+        weighted: 'Gewichteter Wert'
+lost_reason:
+    price: 'Preis'
+    timing: 'Zeitpunkt'
+    competitor: 'Wettbewerber'
+    no_decision: 'Keine Entscheidung'
+    other: 'Sonstiges'

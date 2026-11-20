@@ -1,0 +1,27 @@
+{#
+  The funnels' block of the 360° page (0.3.0). Variables: pipeline (deals, lifecycle, actions, buttons, forms), record
+  (RecordView), segment.
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{%- set _b = 'NowoCrmKitBundle' -%}
+<section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-record-deals">
+    <div class="{{ nowo_ui_class('card_body', _b) }}">
+        <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'deals.title'|trans({}, _d) }}</h2>
+        {% if pipeline.deals is empty %}<p>{{ 'deals.empty'|trans({}, _d) }}</p>{% else %}
+            <ul>{% for deal in pipeline.deals %}<li data-testid="crm-record-deal"><a href="{{ path('nowo_crm_kit_deal_show', {id: deal.id}) }}">{{ deal.title }}</a> · {{ ('deal.status.' ~ deal.status.value)|trans({}, _d) }}{% if deal.amount %} · {{ deal.amount.amount }} {{ deal.amount.currency }}{% endif %}</li>{% endfor %}</ul>
+        {% endif %}
+        <p><a href="{{ path('nowo_crm_kit_deal_new', {(record.type.value == 'company' ? 'company' : 'contact'): record.id}) }}">{{ 'deal.new'|trans({}, _d) }}</a></p>
+    </div>
+</section>
+{% if pipeline.lifecycle is not empty %}
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-lifecycle">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'lifecycle.title'|trans({}, _d) }}</h2>
+            <ul>{% for l in pipeline.lifecycle %}<li>{{ l.funnel.name }}: {{ l.stage ? l.stage.name : 'lifecycle.none'|trans({}, _d) }}{% if l.since %} · {{ l.since|date('Y-m-d') }}{% endif %}</li>{% endfor %}</ul>
+        </div>
+    </section>
+    {% if pipeline.forms.lifecycle is defined %}
+        {{ include('@NowoCrmKit/_form.html.twig', {form: pipeline.forms.lifecycle, title: null, submit: 'lifecycle.save', action: path('nowo_crm_kit_lifecycle', {type: segment, id: record.id}), testid: 'crm-lifecycle-form', variant: 'btn_secondary'}) }}
+    {% endif %}
+{% endif %}
+{{ include('@NowoCrmKit/pipeline/_next_actions.html.twig', {actions: pipeline.actions, buttons: pipeline.buttons, form: pipeline.forms.action ?? null, action: path('nowo_crm_kit_next_action_add', {type: segment, id: record.id})}) }}

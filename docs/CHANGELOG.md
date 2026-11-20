@@ -7,6 +7,101 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (0.3.0: funnels)
+
+- **Funnels** (`pipeline.enabled`, off by default; tables and pages only while on): deal funnels and party lifecycle
+  funnels of companies or contacts with ordered stages (open, won, lost; default probability; age limit that flags
+  stale items), defined by people with `manage` (`FunnelService`, `/admin/funnels`).
+- **Deals** (`DealService`, `DealReader`): a title, a company and / or a contact the actor may view, an owner, an
+  amount (`Money`, decimal + ISO 4217) and a probability override behind `amounts_view`, an expected close; stage
+  moves with a required lost reason (`pipeline.lost_reasons`) for a lost stage, won / lost close the deal, an open
+  stage reopens it; insert-only stage history with the seconds spent in the stage left; trash, restore, purge after
+  `trash_days`; plan limit `limits.deals`. Owner-based visibility and `nowo_crm_kit.record_access_check` with subject
+  type `deal`; keyset lists ordered by last change, expected close or amount.
+- **Statistics per funnel** (`FunnelStatistics`): count and stale count per stage now, counts at a past instant,
+  value and weighted value per currency with `amounts_view`, conversion to the next stage, win rate, average time in
+  stage, deals closed in a period with their lost reasons; owner, role and tag filters; same visibility as the lists;
+  CSV with formula cells neutralised.
+- **Next actions** (`NextActionService`) on companies, contacts and deals through the new port `CrmTaskPort`
+  (`pipeline.task_port`): the built-in list by default, or TaskBoard tasks through `TaskBoardCrmTaskPort`
+  (`pipeline.taskboard.board_id`, `pipeline.taskboard.column`, a host `CrmTaskBoardUserResolverInterface`). The port
+  runs before the CRM's write unit with the caller's dedupe key; a deal's `next_action_at` follows the earliest due
+  open action and an overdue one marks the deal stale.
+- **Lifecycle stages** of companies and contacts (`PartyStageService`) and the pages: deal list and board, deal page
+  (stage move, history, next actions, trash / restore / purge), deal forms, statistics, funnels administration, and
+  deals, lifecycle and next actions on the 360° page. 7 locales.
+- GDPR: the export of a contact lists its deals, lifecycle stages, stage history and next actions; erasing it unlinks
+  its deals and deletes the rest. Merges point deals and funnel rows at the survivor; a purged record's deals are
+  unlinked. `nowo:crm-kit:counters:rebuild` and `nowo:crm-kit:purge` know deals.
+
+### Added (0.3.0: the API)
+
+- **`Api\Operation` layer** (`api.enabled`, off by default): the operations an in-process caller (an MCP host's
+  `crm_*` tools) and the JSON API share. It covers search, company / contact get, timeline, notes, consents
+  (read-only), tags, links, affiliations, identity, creates with the duplicate check first, updates with a required
+  base version, trash, affiliation set / remove, note add, tag add / remove, next actions, deals (search, get, create,
+  update, stage move, trash) and funnels with statistics. `CrmApiPrincipal` carries the security user, the CRM actor, a
+  grant (`view` / `edit` / `manage` + amounts, consents and destructive ticks), the reach (tenants) and the token. The
+  checks run in a fixed order: out of reach 404 `ACCESS_001`, then the grant 403 `TOKEN_001`, then the person 403
+  `ACCESS_002`. Codes are `ABC_123`-shaped, and read models keep untrusted text under `text`. See
+  [API.md](API.md).
+- **Idempotency**: every write needs an `Idempotency-Key`. The claim is the first statement of the write unit and the
+  outcome its last (table `crm_api_idempotency`, ids only, 24 h by default), so a concurrent duplicate waits and
+  replays. A key reused with another input is 409 `IDEMP_002`. `nowo:crm-kit:api:purge-idempotency` and the daily
+  purge delete expired keys.
+- **Sealed keyset cursors** (`ext-sodium`, key derived from `kernel.secret`) on every API list. There is no offset and
+  no total, and a cursor of another query is 400 `INPUT_003`.
+- **Audit with the token**: `AuditEntry::$origin` (`AuditOrigin`: channel, token id, token name). API writes add `via` and
+  `token` to their timeline entries, and the 360° page shows "via agent ‹token›" (7 locales).
+- **`/crm/v1` JSON API** (`api.http.enabled`, off by default; route type `nowo_crm_kit_api` under `api.http.prefix`;
+  parameters `nowo_crm_kit.api_prefix` and `nowo_crm_kit.api_path`). It has host hooks `CrmApiAuthenticatorInterface`
+  and `CrmApiTenantResolverInterface`, sends `ETag`, `X-Error-Code` and `Idempotency-Replayed`, and answers lock
+  conflicts per REQ-RUNTIME-003 rule 6. The OpenAPI 3.1 document is `docs/openapi/crm-v1.yaml`.
+- **Shipped contract**: `tests/Contract/crm-api-v1.json` (the operation catalogue) and `tests/Support/CrmApiConformance`
+  (the grant matrix a host can run against its own kernel).
+- `RecordAccessCheckEvent` and `RecordVisibilityEvent` gain `getChannel()` and `getTokenId()`.
+  `ScopedRecordVisibility::visibleOwnersFor()`, `CrmResourceAccessChecker::decide()`, `CrmAccess::bind()` and
+  `as($caller)` on the Application services run a call as a given caller. New keyset indexes on companies, contacts and
+  notes.
+
+### Changed (0.3.0: audit VS)
+
+- **transaction-doctrine ^1.8.1** (was ^1.6; 1.8.1 rather than 1.8.0, whose replay could answer 409 when new entities referenced a host-managed entity): it fixes GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g, which the bundle's
+  write units reach; a replay now keeps the host's entity manager instead of clearing it.
+
+- **Behaviour change for hosts:** the 0.2.x web lists showed records a `nowo_crm_kit.record_access_check` listener
+  denied (only `security.resource_scoping` filtered them); 0.3.0 hides them in every list, export, label and
+  timeline. Totals become the SQL count minus the page's denied rows (see UPGRADING).
+
+- **Every list hides records a listener denies** (owner decision Q2): the 0.2 web lists, the CSV export, related labels
+  (a company's contacts, a contact's companies), the company timeline, duplicate hints, the merge preview, the API
+  search, affiliations and timelines pass each row through `nowo_crm_kit.record_access_check`, one batch per page
+  (`CrmBatchAccessCheckerInterface`, implemented by the default checker). See UPGRADING.
+- **API company creates behave like the pages** (owner decision Q1): a match the principal may not view no longer
+  answers `CRM_006`; the company is created. `CRM_006` stays for a contact's e-mail (a unique key).
+- A contact created with `company` is affiliated in the create's own write unit; a refused affiliation writes nothing,
+  and a replay writes nothing.
+- The deal list's cursor is sealed and keyed on the last visible deal; pages scan past denied deals (bounded).
+- `crm_contacts` is a sensitive SearchKit group (personal data).
+- The API's error listener leaves the firewall's 401 / 403 and HTTP exceptions to Symfony.
+- Next-action task states are read with the API token's host context; a dedupe key that names another subject is
+  refused (`IDEMP_002` through the API).
+
+### Removed (0.3.0)
+
+- The root configuration key `access_checker` (a 0.1.0 `CrmAccessCheckerInterface`, deprecated since 0.2.0),
+  `LegacyCrmAccessChecker` and `CrmPermission::legacy()`.
+
+### Changed (0.3.0: header search)
+
+- **SearchKit groups on SearchKit's provider base (SearchKit ^1.9, PHP >= 8.3)**: `crm_companies` and `crm_contacts`
+  are now `EntitySearchDefinition`s (`Bridge\SearchKit\CrmRecordSearchDefinition`) instead of `CrmSearchProvider`, and
+  a new group `crm_deals` (`CrmDealSearchDefinition`, with `pipeline.enabled`) finds deals by title, company and stage,
+  with the amount shown only to people with `amounts_view`. Every candidate passes `nowo_crm_kit.record_access_check`
+  after the SQL visibility filter; SearchKit's `nowo_search_kit.item_visibility` event, group switches, paged results and
+  revalidated recents apply. SearchKit stays optional and out of `composer.json` (`.github/ci/search-kit.sh` adds it to
+  the PHP >= 8.3 CI jobs).
+
 ## [0.2.1] - 2026-11-19
 
 ### Added

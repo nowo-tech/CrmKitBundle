@@ -25,6 +25,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
+use function class_exists;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 /**
@@ -32,6 +33,11 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
  */
 final class TestServices
 {
+    /** SearchKit's test kit (optional: PHP >= 8.3), as literals. */
+    public const SEARCH_KIT_COUNTER = 'Nowo\\SearchKitBundle\\Test\\QueryCounter';
+
+    public const SEARCH_KIT_MIDDLEWARE = 'Nowo\\SearchKitBundle\\Test\\QueryCountingMiddleware';
+
     public const USERS = ['ana' => ['password' => 'x', 'roles' => ['ROLE_USER']], 'root' => ['password' => 'x', 'roles' => ['ROLE_ADMIN']], 'leo' => ['password' => 'x', 'roles' => ['ROLE_USER']]];
 
     public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, RecordsPurged::class, ActorAnonymised::class, TagsChanged::class, RolesChanged::class, HostLinkAdded::class, HostLinkRemoved::class];
@@ -57,11 +63,22 @@ final class TestServices
             $recorder->tag('kernel.event_listener', ['event' => $event, 'method' => 'onEvent']);
         }
         $s->set('test.actor_resolver', TestActorResolver::class)->public();
+        $s->set('test.api_state', TestApiState::class)->public();
+        $s->set('test.api_authenticator', TestApiAuthenticator::class)->args([service('test.api_state')])->public();
+        $s->set('test.areas', TestAreas::class)->args([service('test.context')])->public()
+            ->tag('kernel.event_listener', ['event' => 'nowo_crm_kit.record_access_check', 'method' => 'onRecord'])
+            ->tag('kernel.event_listener', ['event' => 'nowo_crm_kit.record_visibility', 'method' => 'onVisibility']);
+        $s->set('test.task_port', TestTaskPort::class)->public();
         $s->set('test.queries', QueryLog::class)->public();
         $s->set('test.query_counter', QueryCounter::class)->args([service('test.queries')])->tag('doctrine.middleware');
         $s->set('test.clock', MockClock::class)->args(['2026-11-18 10:00:00', 'UTC'])->public();
         $s->set('test.panel', TestPanel::class)->args([service('test.context')])->tag(CrmPanelProviderInterface::PANEL_TAG);
         $s->set('test.projects', TestProjects::class)->tag(CrmHostObjectResolverInterface::HOST_OBJECT_TAG);
+        if (class_exists(self::SEARCH_KIT_MIDDLEWARE)) {
+            // SearchKit's provider test kit (SearchKit >= 1.9, PHP >= 8.3): its counter on the bundle's connection.
+            $s->set('test.search_kit_counter', self::SEARCH_KIT_COUNTER)->public();
+            $s->set('test.search_kit_middleware', self::SEARCH_KIT_MIDDLEWARE)->args([service('test.search_kit_counter')])->tag('doctrine.middleware');
+        }
         $s->set('test.race', RaceInjector::class)->args([service('test.context')])->tag('doctrine.event_listener', ['event' => 'prePersist'])->tag('doctrine.event_listener', ['event' => 'preUpdate'])->tag('doctrine.event_listener', ['event' => 'preRemove']);
     }
 }

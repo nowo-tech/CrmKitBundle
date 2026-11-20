@@ -9,14 +9,17 @@ parameters:
     bootstrapFiles:
         - tests/bootstrap.php
     excludePaths:
-        - demo/*
-        - vendor/*
-        - tests/Stubs/*
+        analyseAndScan:
+            - demo/*
+            - vendor/*
+            - tests/Stubs/*
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
     ignoreErrors: []
 
 includes:
+  # 0.3.0: the SearchKit groups need SearchKit (PHP >= 8.3); left out where it is not installed.
+  - phpstan-search-kit.php
   - vendor/nowo-tech/phpstan-frankenphp/ruleset-classic.neon
   # worker-strict includes default worker rules + request-superglobal hygiene (kernel not reset).
   - vendor/nowo-tech/phpstan-frankenphp/ruleset-worker-strict.neon

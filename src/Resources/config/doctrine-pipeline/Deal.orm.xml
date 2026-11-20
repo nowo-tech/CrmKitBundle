@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Pipeline\Deal" table="crm_deal">
+        <indexes>
+            <index name="crm_deal_stage" columns="tenant_id,funnel_id,stage_id,status"/>
+            <index name="crm_deal_keyset_updated" columns="tenant_id,status,updated_at,id"/>
+            <index name="crm_deal_company" columns="tenant_id,company_id"/>
+            <index name="crm_deal_contact" columns="tenant_id,contact_id"/>
+            <index name="crm_deal_owner" columns="tenant_id,owner_id"/>
+        </indexes>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="funnelId" column="funnel_id" type="string" length="36"/>
+        <field name="stageId" column="stage_id" type="string" length="36"/>
+        <field name="title" column="title" type="string" length="200"/>
+        <field name="companyId" column="company_id" type="string" length="36" nullable="true"/>
+        <field name="contactId" column="contact_id" type="string" length="36" nullable="true"/>
+        <field name="ownerId" column="owner_id" type="string" length="128" nullable="true"/>
+        <field name="amount" column="amount" type="decimal" precision="18" scale="4" nullable="true"/>
+        <field name="currency" column="currency" type="string" length="3" nullable="true"/>
+        <field name="probability" column="probability" type="smallint" nullable="true"/>
+        <field name="expectedClose" column="expected_close" type="date_immutable" nullable="true"/>
+        <field name="status" column="status" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\DealStatus"/>
+        <field name="trashedFrom" column="trashed_from" type="string" length="16" nullable="true" enum-type="Nowo\CrmKitBundle\Domain\Enum\DealStatus"/>
+        <field name="lostReason" column="lost_reason" type="string" length="32" nullable="true"/>
+        <field name="lostNote" column="lost_note" type="string" length="500" nullable="true"/>
+        <field name="stageEnteredAt" column="stage_entered_at" type="nowo_crm_utc_datetime_micro"/>
+        <field name="closedAt" column="closed_at" type="nowo_crm_utc_datetime" nullable="true"/>
+        <field name="nextActionAt" column="next_action_at" type="nowo_crm_utc_datetime" nullable="true"/>
+        <field name="trashedAt" column="trashed_at" type="nowo_crm_utc_datetime" nullable="true"/>
+        <field name="version" column="version" type="integer" version="true"/>
+        <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime"/>
+        <field name="createdById" column="created_by_id" type="string" length="128" nullable="true"/>
+        <field name="updatedAt" column="updated_at" type="nowo_crm_utc_datetime_micro"/>
+        <field name="updatedById" column="updated_by_id" type="string" length="128" nullable="true"/>
+    </entity>
+</doctrine-mapping>

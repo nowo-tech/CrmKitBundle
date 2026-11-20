@@ -5,34 +5,34 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler;
 
 use LogicException;
-use Nowo\CrmKitBundle\Application\CrmReader;
-use Nowo\CrmKitBundle\Bridge\SearchKit\CrmSearchProvider;
-use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
-use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
+use Nowo\CrmKitBundle\Bridge\TaskBoard\CrmTaskBoardUserResolverInterface;
+use Nowo\CrmKitBundle\Bridge\TaskBoard\TaskBoardCrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\ConfiguredCrmApiTenantResolver;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\SecurityUserCrmApiAuthenticator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
-use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\LegacyCrmAccessChecker;
-use Nowo\SearchKitBundle\Contract\SearchProviderInterface;
+use Nowo\TaskBoardBundle\Api\Operation\TaskApiReadOperations;
+use Nowo\TaskBoardBundle\Api\Operation\TaskApiTaskOperations;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponsePolicy;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
-use function interface_exists;
+use function class_exists;
 use function is_string;
 
 /**
  * Points the port aliases at the host's services and wires the optional infrastructure (contract sections 8 and 10):
  * a configured service id replaces each default; transaction-doctrine's write unit (its bundle is required: the
  * container build fails with the fix without it) and the 409 fallback listener when its conflict responder is turned
- * off; the clock; the SearchKit
- * providers when SearchKit is installed, the UI is on and `search.enabled`.
+ * off; the clock; the task port of the next actions. (The SearchKit groups are registered by the extension, 0.3.0.)
  *
  * @internal
  */
@@ -56,11 +56,12 @@ final class CrmPortsPass implements CompilerPassInterface
                 $container->setAlias($interface, $id);
             }
         }
-        // Deprecated since 0.2.0: a 0.1.0 host checker, wrapped so the new permissions reach it as the ones it knew.
-        $legacy = $container->getParameter($p . 'access_checker');
-        if (is_string($legacy) && $legacy !== '') {
-            $container->setDefinition(LegacyCrmAccessChecker::class, (new Definition(LegacyCrmAccessChecker::class))->setArguments([new Reference($legacy)]));
-            $container->setAlias(CrmAccessCheckerInterface::class, LegacyCrmAccessChecker::class)->setPublic(true);
+        // 0.3.0: the JSON API's authenticator and tenant resolver (the host's services, else the defaults).
+        if ($container->hasParameter($p . 'api.http.authenticator')) {
+            $authenticator = $container->getParameter($p . 'api.http.authenticator');
+            $tenants       = $container->getParameter($p . 'api.http.tenant_resolver');
+            $container->setAlias($p . 'api.authenticator', is_string($authenticator) && $authenticator !== '' ? $authenticator : SecurityUserCrmApiAuthenticator::class);
+            $container->setAlias($p . 'api.tenant_resolver', is_string($tenants) && $tenants !== '' ? $tenants : ConfiguredCrmApiTenantResolver::class);
         }
         $clock = $container->getParameter($p . 'clock');
         // FrameworkBundle (required) always defines `clock`.
@@ -77,13 +78,43 @@ final class CrmPortsPass implements CompilerPassInterface
                 ->setArguments([new Definition(ConflictResponsePolicy::class)])
                 ->addTag('kernel.event_listener', ['event' => 'kernel.exception', 'method' => 'onKernelException', 'priority' => 64]));
         }
-        if ($container->getParameter($p . 'ui.enabled') === true && $container->getParameter($p . 'search.enabled') === true && interface_exists(SearchProviderInterface::class) && $container->has('router') && $container->has('translator')) {
-            foreach ([SubjectType::Company, SubjectType::Contact] as $i => $type) {
-                $container->setDefinition($p . 'search.' . $type->value, (new Definition(CrmSearchProvider::class))
-                    ->setArguments([$type, new Reference(CrmReader::class), new Reference('router'), new Reference('translator')])
-                    ->addTag('nowo_search_kit.provider', ['priority' => 60 - $i])
-                    ->setPublic(true));
-            }
+        if ($container->getParameter($p . 'pipeline.enabled') === true) {
+            $this->taskPort($container);
         }
+    }
+
+    /**
+     * The task port of the next actions (0.3.0): `pipeline.task_port`, else the TaskBoard bridge when
+     * `pipeline.taskboard.board_id` is set (TaskBoard installed and a {@see CrmTaskBoardUserResolverInterface} service
+     * registered: the build fails with the fix otherwise), else the built-in list.
+     */
+    private function taskPort(ContainerBuilder $container): void
+    {
+        $p    = ServiceDefinitions::P;
+        $port = $container->getParameter($p . 'pipeline.task_port');
+        if (is_string($port) && $port !== '') {
+            $container->setAlias(CrmTaskPort::class, $port)->setPublic(true);
+
+            return;
+        }
+        $board = $container->getParameter($p . 'pipeline.taskboard.board_id');
+        if (!is_string($board) || $board === '') {
+            return;
+        }
+        if (!class_exists(TaskApiTaskOperations::class) || !$container->has(TaskApiTaskOperations::class) || !$container->has(TaskApiReadOperations::class)) {
+            throw new LogicException('nowo_crm_kit.pipeline.taskboard.board_id needs nowo-tech/task-board-bundle (its API operations): install and enable it, or leave board_id empty.');
+        }
+        if (!$container->has(CrmTaskBoardUserResolverInterface::class)) {
+            throw new LogicException('nowo_crm_kit.pipeline.taskboard needs a service ' . CrmTaskBoardUserResolverInterface::class . ' (the TaskBoard user of a CRM actor).');
+        }
+        $column = $container->getParameter($p . 'pipeline.taskboard.column');
+        $container->setDefinition(TaskBoardCrmTaskPort::class, (new Definition(TaskBoardCrmTaskPort::class))->setArguments([
+            new Reference(TaskApiTaskOperations::class),
+            new Reference(TaskApiReadOperations::class),
+            new Reference(CrmTaskBoardUserResolverInterface::class),
+            $board,
+            is_string($column) && $column !== '' ? $column : null,
+        ]));
+        $container->setAlias(CrmTaskPort::class, TaskBoardCrmTaskPort::class)->setPublic(true);
     }
 }

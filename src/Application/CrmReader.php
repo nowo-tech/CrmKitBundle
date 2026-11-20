@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
@@ -40,7 +41,9 @@ use Throwable;
 use function array_map;
 use function array_slice;
 use function array_values;
+use function count;
 use function is_a;
+use function max;
 use function preg_match;
 
 /**
@@ -70,6 +73,16 @@ final readonly class CrmReader implements CrmReaderInterface
     }
 
     /**
+     * A copy bound to `$caller` for one call (0.3.0: an API principal); never assigned to a property.
+     *
+     * @internal
+     */
+    public function as(CrmCallerInterface $caller): self
+    {
+        return new self($this->support->as($caller), $this->views, $this->directory, $this->panels, $this->resolvers, $this->logger);
+    }
+
+    /**
      * One record.
      */
     public function record(SubjectType $type, string $id): RecordView
@@ -77,7 +90,7 @@ final readonly class CrmReader implements CrmReaderInterface
         return $this->support->read(function () use ($type, $id): RecordView { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$context, $record] = $this->load($type, $id);
 
-            return $this->views->one($context->tenant, $record, $this->support->access->visibleOwners($context));
+            return $this->views->one($context->tenant, $record, $this->support->access->visibleOwners($context), $this->viewable($context));
         });
     }
 
@@ -90,8 +103,11 @@ final readonly class CrmReader implements CrmReaderInterface
 
         return $this->support->read(function () use ($context, $query): ListResult { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$records, $total] = $this->support->store->list($context->tenant, $query, $this->support->access->visibleOwners($context));
+            // 0.3.0: a record a nowo_crm_kit.record_access_check listener denies is left out of the page, and out of
+            // the total as far as this page shows (the total is the SQL count less the denied rows of the page).
+            $visible = $this->support->access->viewableRecords($context, $records);
 
-            return new ListResult($this->views->many($context->tenant, $query->type, $records), $total);
+            return new ListResult($this->views->many($context->tenant, $query->type, $visible), max(0, $total - (count($records) - count($visible))));
         });
     }
 
@@ -105,7 +121,7 @@ final readonly class CrmReader implements CrmReaderInterface
             $subjects           = [[$type, $id]];
             $labels             = [];
             if ($type === SubjectType::Company) {
-                foreach (array_slice($this->views->affiliations($context->tenant, $type, $id, $this->support->access->visibleOwners($context)), 0, self::TIMELINE_CONTACTS) as $affiliation) {
+                foreach (array_slice($this->views->affiliations($context->tenant, $type, $id, $this->support->access->visibleOwners($context), $this->viewable($context)), 0, self::TIMELINE_CONTACTS) as $affiliation) {
                     $subjects[]                      = [SubjectType::Contact, $affiliation->contactId];
                     $labels[$affiliation->contactId] = $affiliation->contactName;
                 }
@@ -139,7 +155,7 @@ final readonly class CrmReader implements CrmReaderInterface
         return $this->support->read(function () use ($type, $id): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$context, $record] = $this->load($type, $id);
 
-            return $this->views->many($context->tenant, $type, $this->support->store->duplicates($record, 10, $this->support->access->visibleOwners($context)));
+            return $this->views->many($context->tenant, $type, $this->support->access->viewableRecords($context, $this->support->store->duplicates($record, 10, $this->support->access->visibleOwners($context))));
         });
     }
 
@@ -267,7 +283,7 @@ final readonly class CrmReader implements CrmReaderInterface
     {
         $context = $this->support->access->context(CrmPermission::View);
 
-        return $this->directory->owners($context->tenant);
+        return $this->support->access->owners($context, $this->directory);
     }
 
     /**
@@ -295,9 +311,23 @@ final readonly class CrmReader implements CrmReaderInterface
                 $company = $record->getId();
             }
             [$records, $total] = $this->support->store->search($type, $context->tenant, $text, $limit, $company, $this->support->access->visibleOwners($context));
+            $visible           = $this->support->access->viewableRecords($context, $records);
 
-            return [$this->views->many($context->tenant, $type, $records), $total];
+            return [$this->views->many($context->tenant, $type, $visible), max(0, $total - (count($records) - count($visible)))];
         });
+    }
+
+    /**
+     * The record decision of a page for the call (0.3.0), for related labels.
+     *
+     * @return callable(list<SubjectRef>): array<string, true>
+     */
+    private function viewable(CrmContext $context): callable
+    {
+        /** @param list<SubjectRef> $subjects */
+        $viewable = fn (array $subjects): array => $this->support->access->viewable($context, $subjects); // @igor-ignore - a per-call closure; nothing is kept on the service
+
+        return $viewable;
     }
 
     /**

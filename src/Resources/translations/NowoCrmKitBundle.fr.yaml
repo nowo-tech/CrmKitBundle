@@ -1,5 +1,7 @@
 # CRM kit, phase A (sociétés et contacts). Domaine NowoCrmKitBundle. Les paramètres sont entourés de %.
 nav:
+    funnels: 'Entonnoirs'
+    deals: 'Affaires'
     label: CRM
     companies: Sociétés
     contacts: Contacts
@@ -8,6 +10,7 @@ nav:
     fields: Champs personnalisés
     settings: Paramètres
 type:
+    deal: 'Affaire'
     company: Société
     contact: Contact
 status:
@@ -20,6 +23,7 @@ form:
     save: Enregistrer
     cancel: Annuler
 list:
+    next: 'Page suivante'
     title:
         company: Sociétés
         contact: Contacts
@@ -31,6 +35,7 @@ list:
     col:
         updated: Mis à jour
     filter:
+        apply: 'Appliquer'
         role: 'Rôle'
         purpose: 'Contact pour'
         primary_contact: 'Contact principal'
@@ -246,6 +251,11 @@ timeline:
     empty: Rien ne s'est encore passé.
     open: Ouvrir
 activity:
+    via_token: "via l'agent ‹%token%›"
+    lifecycle_stage: 'Étape du cycle de vie changée par %actor%'
+    next_action_closed: 'Prochaine action clôturée par %actor%'
+    next_action_added: 'Prochaine action ajoutée par %actor%'
+    stage_moved: 'Étape changée par %actor%'
     roles_changed: 'Rôles modifiés par %actor%'
     primary_contact: 'Contact principal modifié par %actor%'
     created: 'Créé par %actor%'
@@ -358,9 +368,11 @@ search:
     group:
         companies: Sociétés
         contacts: Contacts
+        deals: 'Affaires'
     see_all: 'Voir les %count%'
 flash:
     conflict:
+        crm_stage_invalid: 'Cette étape ne peut pas être utilisée : elle appartient à un autre entonnoir, ou l’étape ou l’entonnoir est archivé ou clos.'
         crm_record_stale: 'Quelqu''un a modifié cette fiche au même moment. Le formulaire affiche les valeurs actuelles : vérifiez-les et enregistrez à nouveau.'
         crm_record_merged: Cette fiche a été fusionnée dans une autre.
         crm_record_trashed: Cette fiche est dans la corbeille.
@@ -370,6 +382,16 @@ flash:
         crm_settings_stale: Quelqu'un a modifié les paramètres au même moment. Vérifiez-les et enregistrez à nouveau.
         crm_write_conflict: 'Une autre modification des mêmes données est arrivée au même moment. Réessayez.'
 error:
+    stage_invalid: 'L’étape n’a pas pu être enregistrée : vérifiez le formulaire.'
+    next_action_invalid: 'La prochaine action n’a pas pu être enregistrée : vérifiez le formulaire.'
+    amount_invalid: 'Saisissez un montant (4 décimales au plus) et une devise de 3 lettres.'
+    lost_reason_unknown: 'Motif de perte inconnu.'
+    lost_reason_required: 'Indiquez pourquoi l’affaire a été perdue.'
+    stage_limit: 'L’entonnoir a le nombre maximal d’étapes.'
+    funnel_limit: 'Le locataire a le nombre maximal d’entonnoirs.'
+    funnel_kind: 'Cet entonnoir ne peut pas être utilisé ici.'
+    deal_party_required: 'Une affaire a besoin d’une entreprise ou d’un contact.'
+    deal_related_unknown: 'Choisissez une entreprise ou un contact que vous voyez.'
     forbidden: 'Vous ne pouvez pas modifier ceci.'
     role_unknown: 'Rôle inconnu.'
     purpose_unknown: 'Objet inconnu.'
@@ -409,3 +431,165 @@ purpose:
     orders: 'Commandes'
     technical: 'Technique'
     general: 'Général'
+deals:
+    title: 'Affaires'
+    empty: 'Aucune affaire pour l’instant.'
+deal:
+    new: 'Nouvelle affaire'
+    edit: 'Modifier'
+    edit_title: 'Modifier %name%'
+    created: 'Affaire créée.'
+    saved: 'Affaire enregistrée.'
+    moved: 'Étape changée.'
+    not_moved: 'L’affaire est déjà à cette étape.'
+    trashed: 'Affaire mise à la corbeille.'
+    restored: 'Affaire restaurée.'
+    purged: 'Affaire supprimée définitivement.'
+    trash: 'Mettre à la corbeille'
+    trash_confirm: 'Mettre cette affaire à la corbeille ?'
+    restore: 'Restaurer'
+    purge: 'Supprimer définitivement'
+    purge_confirm: 'Supprimer définitivement cette affaire et son historique ?'
+    funnel: 'Entonnoir'
+    status_label: 'Statut'
+    status:
+        any: 'Ouverte, gagnée ou perdue'
+        open: 'Ouverte'
+        won: 'Gagnée'
+        lost: 'Perdue'
+        trashed: 'À la corbeille'
+    stale: 'En souffrance'
+    stale_only: 'En souffrance seulement'
+    sort_label: 'Ordre'
+    sort:
+        updated: 'Dernière modification'
+        expected_close: 'Clôture prévue'
+        amount: 'Montant'
+    hidden: 'Non visible pour vous'
+    probability: 'Probabilité'
+    weighted: 'Valeur pondérée'
+    history_title: 'Historique des étapes'
+    history:
+        created: 'Créée'
+        days: '%days% jours dans l’étape précédente'
+        via: 'via %via%'
+    form:
+        title: 'Titre'
+        stage: 'Étape'
+        company: 'Entreprise'
+        contact: 'Contact'
+        owner: 'Responsable'
+        amount: 'Montant'
+        currency: 'Devise (ISO 4217)'
+        probability: 'Probabilité propre (%)'
+        expected_close: 'Clôture prévue'
+        none: '— Aucun —'
+    move:
+        title: 'Passer à une étape'
+        save: 'Déplacer'
+        stage: 'Étape'
+        lost_reason: 'Motif de perte'
+        lost_note: 'Note de perte'
+board:
+    title: 'Tableau'
+    intro: 'Les affaires de cet entonnoir par étape.'
+    empty: 'Aucune affaire.'
+    more: 'Le tableau montre les 100 premières affaires.'
+    list: 'Tout voir dans la liste'
+next_action:
+    title: 'Prochaines actions'
+    empty: 'Aucune prochaine action.'
+    add: 'Ajouter une prochaine action'
+    save: 'Ajouter'
+    done: 'Faite'
+    cancel: 'Annuler'
+    added: 'Prochaine action ajoutée.'
+    closed: 'Prochaine action clôturée.'
+    refused: 'Le service de tâches a refusé la prochaine action. Rien n’a été enregistré.'
+    task: 'Ouvrir la tâche'
+    task_hidden: 'Tâche non visible pour vous'
+    status:
+        open: 'Ouverte'
+        done: 'Faite'
+        cancelled: 'Annulée'
+    form:
+        title: 'Titre'
+        due_at: 'Échéance'
+        assignee: 'Assignée à'
+        me: '— Moi —'
+lifecycle:
+    title: 'Cycle de vie'
+    none: 'Pas dans cet entonnoir'
+    save: 'Fixer l’étape'
+    saved: 'Étape du cycle de vie enregistrée.'
+    form:
+        stage: 'Étape du cycle de vie'
+funnels:
+    title: 'Entonnoirs'
+    intro: 'Entonnoirs d’affaires et de cycle de vie des entreprises et des contacts.'
+    empty: 'Aucun entonnoir pour l’instant.'
+funnel:
+    add: 'Nouvel entonnoir'
+    save: 'Créer'
+    edit: 'Modifier'
+    created: 'Entonnoir créé.'
+    saved: 'Entonnoir enregistré.'
+    stages: 'Étapes'
+    form:
+        name: 'Nom'
+        kind: 'Type'
+        archived: 'Archivé'
+    kind:
+        deal: 'Affaires'
+        party_company: 'Cycle de vie des entreprises'
+        party_contact: 'Cycle de vie des contacts'
+stage:
+    add: 'Nouvelle étape'
+    save: 'Enregistrer'
+    edit: 'Modifier'
+    created: 'Étape ajoutée.'
+    saved: 'Étape enregistrée.'
+    move_up: 'Monter'
+    move_down: 'Descendre'
+    form:
+        name: 'Nom'
+        kind: 'Type'
+        probability: 'Probabilité par défaut (%)'
+        rot_days: 'En souffrance après (jours)'
+        archived: 'Archivée'
+    kind:
+        open: 'Ouverte'
+        won: 'Gagnée'
+        lost: 'Perdue'
+    default:
+        open: 'Qualifiée'
+        won: 'Gagnée'
+        lost: 'Perdue'
+        first: 'Nouveau'
+stats:
+    title: 'Statistiques'
+    title_of: 'Statistiques de %name%'
+    filter:
+        at: 'À un moment passé'
+        from: 'Clôturées depuis'
+        to: 'Clôturées jusqu’au'
+    at: 'Le %at%'
+    now: 'Maintenant (%at%)'
+    conversion: 'Vers l’étape suivante'
+    average_days: 'Jours moyens dans l’étape'
+    win_rate: 'Gagnées depuis la première étape : %rate% %'
+    closed: 'Clôturées sur la période : %won% gagnées, %lost% perdues'
+    csv:
+        stage: 'Étape'
+        kind: 'Type'
+        count: 'Affaires'
+        stale: 'En souffrance'
+        currency: 'Devise'
+        value: 'Valeur'
+        weighted: 'Valeur pondérée'
+lost_reason:
+    price: 'Prix'
+    timing: 'Calendrier'
+    competitor: 'Concurrent'
+    no_decision: 'Pas de décision'
+    other: 'Autre'

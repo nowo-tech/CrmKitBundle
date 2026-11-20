@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Command;
 
 use InvalidArgumentException;
+use Nowo\CrmKitBundle\Api\Port\CrmApiIdempotencyStoreInterface;
 use Nowo\CrmKitBundle\Application\RecordPurger;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
+use Psr\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,13 +21,13 @@ use function sprintf;
 /**
  * `nowo:crm-kit:purge` (contract section 16.4): the retention purge, daily.
  */
-#[AsCommand(name: 'nowo:crm-kit:purge', description: 'Deletes trashed records, merge tombstones, old timeline entries, import rows and merge traces past their retention.')]
+#[AsCommand(name: 'nowo:crm-kit:purge', description: 'Deletes trashed records and deals, merge tombstones, old timeline entries, import rows and merge traces past their retention.')]
 final class PurgeCommand extends Command
 {
     /**
      * Wires the purger.
      */
-    public function __construct(private readonly RecordPurger $purger)
+    public function __construct(private readonly RecordPurger $purger, private readonly ?CrmApiIdempotencyStoreInterface $idempotency = null, private readonly ?ClockInterface $clock = null)
     {
         parent::__construct();
     }
@@ -33,7 +35,7 @@ final class PurgeCommand extends Command
     protected function configure(): void
     {
         $this->addOption('tenant', null, InputOption::VALUE_REQUIRED, 'Only this tenant');
-        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Count what would be deleted (trashed records only)');
+        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Count what would be deleted (trashed records and deals only)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -52,7 +54,11 @@ final class PurgeCommand extends Command
 
             return Command::SUCCESS;
         }
-        $output->writeln(sprintf('records: %d, merge tombstones: %d, timeline entries: %d, import rows: %d, merge traces: %d', $counts['records'], $counts['tombstones'], $counts['activities'], $counts['import_rows'], $counts['merges']));
+        if ($this->idempotency instanceof CrmApiIdempotencyStoreInterface && $this->clock instanceof ClockInterface && $input->getOption('dry-run') !== true) {
+            // 0.3.0: the API's expired idempotency keys, outside any write unit.
+            $output->writeln(sprintf('expired idempotency keys: %d', ApiPurgeIdempotencyCommand::purge($this->idempotency, $this->clock)));
+        }
+        $output->writeln(sprintf('records: %d, merge tombstones: %d, timeline entries: %d, import rows: %d, merge traces: %d, deals: %d', $counts['records'], $counts['tombstones'], $counts['activities'], $counts['import_rows'], $counts['merges'], $counts['deals']));
 
         return Command::SUCCESS;
     }

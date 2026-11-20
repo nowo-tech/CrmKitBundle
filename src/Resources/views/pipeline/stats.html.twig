@@ -1,0 +1,45 @@
+{#
+  The statistics of a deal funnel (0.3.0): filters, a funnel chart (bars by count), the table per stage and currency,
+  the win rate and the deals closed in the period. Variables: page (ShowPage), funnel, stats (FunnelStats), max (largest
+  count), filters (FormView).
+#}
+{% extends '@NowoUiKit/page/show.html.twig' %}
+
+{% block nowo_ui_show_after %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {%- set _b = page.bundle -%}
+    {{ include('@NowoCrmKit/_form.html.twig', {form: filters, title: null, submit: 'list.filter.apply', action: path('nowo_crm_kit_funnel_stats', {id: funnel.id}), testid: 'crm-stats-filters', variant: 'btn_secondary'}) }}
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-stats-chart">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ (stats.past ? 'stats.at' : 'stats.now')|trans({'%at%': stats.at|date('Y-m-d H:i')}, _d) }}</h2>
+            {% for s in stats.stages %}
+                <div class="crm-kit-funnel-bar" data-testid="crm-stats-bar" data-kind="{{ s.kind.value }}">
+                    <span class="crm-kit-funnel-bar__label">{{ s.name }}</span>
+                    <meter class="crm-kit-funnel-bar__fill" min="0" max="{{ max }}" value="{{ s.count }}">{{ s.count }}</meter> {{ s.count }}
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-stats-table">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            <table class="{{ nowo_ui_class('table', _b) }}">
+                <thead><tr><th>{{ 'stats.csv.stage'|trans({}, _d) }}</th><th>{{ 'stats.csv.count'|trans({}, _d) }}</th><th>{{ 'stats.csv.stale'|trans({}, _d) }}</th>{% if not stats.valuesHidden %}<th>{{ 'stats.csv.value'|trans({}, _d) }}</th><th>{{ 'stats.csv.weighted'|trans({}, _d) }}</th>{% endif %}<th>{{ 'stats.conversion'|trans({}, _d) }}</th><th>{{ 'stats.average_days'|trans({}, _d) }}</th></tr></thead>
+                <tbody>
+                {% for s in stats.stages %}
+                    <tr data-testid="crm-stats-row">
+                        <td>{{ s.name }}</td><td>{{ s.count }}</td><td>{{ s.stale ?? '—' }}</td>
+                        {% if not stats.valuesHidden %}<td>{% for v in s.values ?? [] %}{{ v.sum }} {{ v.currency }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td><td>{% for v in s.values ?? [] %}{{ v.weighted }} {{ v.currency }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>{% endif %}
+                        <td>{{ s.conversion is not null ? (s.conversion * 100)|round(1) ~ ' %' : '—' }}</td>
+                        <td>{{ s.averageSeconds is not null ? (s.averageSeconds / 86400)|round(1) : '—' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% if stats.winRate is not null %}<p data-testid="crm-stats-win-rate">{{ 'stats.win_rate'|trans({'%rate%': (stats.winRate * 100)|round(1)}, _d) }}</p>{% endif %}
+            {% if stats.closed %}
+                <p data-testid="crm-stats-closed">{{ 'stats.closed'|trans({'%won%': stats.closed.won, '%lost%': stats.closed.lost}, _d) }}</p>
+                {% if stats.closed.reasons is not empty %}<ul>{% for reason, n in stats.closed.reasons %}<li>{{ reason ? ('lost_reason.' ~ reason)|trans({}, _d) : '—' }}: {{ n }}</li>{% endfor %}</ul>{% endif %}
+            {% endif %}
+        </div>
+    </section>
+{% endblock %}

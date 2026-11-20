@@ -17,6 +17,7 @@ use Nowo\CrmKitBundle\Domain\Read\TagView;
 use Nowo\CrmKitBundle\Domain\Value\ActorProfile;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\ExactId;
+use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 
 use function array_keys;
@@ -43,10 +44,11 @@ final readonly class RecordViews
      *
      * @param list<CrmRecord> $records
      * @param list<string>|null $visibleOwners resource scoping of the counterparts ({@see CrmAccess::visibleOwners()})
+     * @param (callable(list<SubjectRef>): array<string, true>)|null $viewable the record decision of a page (0.3.0)
      *
      * @return list<RecordView>
      */
-    public function many(TenantRef $tenant, SubjectType $type, array $records, bool $withAffiliations = false, ?array $visibleOwners = null): array
+    public function many(TenantRef $tenant, SubjectType $type, array $records, bool $withAffiliations = false, ?array $visibleOwners = null, ?callable $viewable = null): array
     {
         if ($records === []) {
             return [];
@@ -92,7 +94,7 @@ final readonly class RecordViews
                 $record->getCreatedAt(),
                 $record->getUpdatedAt(),
                 $record->getTrashedAt(),
-                $withAffiliations ? $this->affiliations($tenant, $type, $record->getId(), $visibleOwners) : [],
+                $withAffiliations ? $this->affiliations($tenant, $type, $record->getId(), $visibleOwners, $viewable) : [],
                 $this->catalogue->knownRoles($roles[$record->getId()] ?? []),
             );
         }
@@ -104,20 +106,22 @@ final readonly class RecordViews
      * One view, with affiliations (counterparts limited to the visible owners).
      *
      * @param list<string>|null $visibleOwners
+     * @param (callable(list<SubjectRef>): array<string, true>)|null $viewable the record decision of a page (0.3.0)
      */
-    public function one(TenantRef $tenant, CrmRecord $record, ?array $visibleOwners = null): RecordView
+    public function one(TenantRef $tenant, CrmRecord $record, ?array $visibleOwners = null, ?callable $viewable = null): RecordView
     {
-        return $this->many($tenant, $record::type(), [$record], true, $visibleOwners)[0];
+        return $this->many($tenant, $record::type(), [$record], true, $visibleOwners, $viewable)[0];
     }
 
     /**
      * The affiliations of a record with both labels (only active counterparts the actor may see).
      *
      * @param list<string>|null $visibleOwners
+     * @param (callable(list<SubjectRef>): array<string, true>)|null $viewable the record decision of a page (0.3.0)
      *
      * @return list<AffiliationView>
      */
-    public function affiliations(TenantRef $tenant, SubjectType $type, string $id, ?array $visibleOwners = null): array
+    public function affiliations(TenantRef $tenant, SubjectType $type, string $id, ?array $visibleOwners = null, ?callable $viewable = null): array
     {
         $links = $this->store->affiliations($tenant, $type, $id);
         if ($links === []) {
@@ -128,10 +132,19 @@ final readonly class RecordViews
         $records   = $this->store->records($other, $tenant, array_values($otherIds));
         $self      = $this->store->record($type, $tenant, $id);
         $selfLabel = $self?->label() ?? '';
-        $views     = [];
+        // 0.3.0: the other sides also pass the record decision (RECORD_ACCESS_CHECK), one batch for the record.
+        $granted = null;
+        if ($viewable !== null) {
+            $subjects = [];
+            foreach ($records as $record) {
+                $subjects[] = SubjectRef::of($other, $record->getId(), $record->getOwnerId());
+            }
+            $granted = $viewable($subjects);
+        }
+        $views = [];
         foreach ($links as $link) {
             $counterpart = $records[$type === SubjectType::Contact ? $link->getCompanyId() : $link->getContactId()] ?? null;
-            if (!$counterpart instanceof CrmRecord || !$counterpart->isActive() || !CrmAccess::visible($visibleOwners, $counterpart->getOwnerId())) {
+            if (!$counterpart instanceof CrmRecord || !$counterpart->isActive() || !CrmAccess::visible($visibleOwners, $counterpart->getOwnerId()) || ($granted !== null && !isset($granted[$other->value . ':' . $counterpart->getId()]))) {
                 continue;
             }
             $views[] = new AffiliationView(

@@ -51,16 +51,16 @@ final readonly class CrmExporter implements CrmExporterInterface
         yield self::line($header);
         $after = null;
         do {
-            $views = $this->support->read(function () use ($context, $query, $owners, &$after): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            [$fetched, $views] = $this->support->read(function () use ($context, $query, $owners, &$after): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 $records = $this->support->store->batch($context->tenant, $query, $after, self::BATCH, $owners);
                 $after   = $records === [] ? $after : $records[count($records) - 1]->getId();
 
-                return $this->views->many($context->tenant, $query->type, $records);
+                return [count($records), $this->views->many($context->tenant, $query->type, $this->support->access->viewableRecords($context, $records))];
             });
             foreach ($views as $view) {
                 yield self::line($this->cells($view, $keys));
             }
-        } while (count($views) === self::BATCH);
+        } while ($fetched === self::BATCH);
     }
 
     /**

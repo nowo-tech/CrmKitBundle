@@ -31,4 +31,8 @@ enum ActivityKind: string
     case Imported         = 'imported';
     case Exported         = 'exported';
     case Host             = 'host';
+    case StageMoved       = 'stage_moved';
+    case NextActionAdded  = 'next_action_added';
+    case NextActionClosed = 'next_action_closed';
+    case LifecycleStage   = 'lifecycle_stage';
 }

@@ -13,6 +13,9 @@ use Symfony\Contracts\EventDispatcher\Event;
  * `view`, `edit`, `create`, `delete`, `import`, `export`, `manage`, `erase`, …) and the default decision of
  * {@see CrmResourceAccessChecker}. A listener calls grant() or deny();
  * **a deny wins** over any grant, before or after it. Request-scoped; ids only (REQ-ARCH-001 rule 4).
+ * **(0.3.0)** {@see self::getChannel()} tells the CRM's pages (`web`) from the API (`api`, `mcp`, …) and
+ * {@see self::getTokenId()} names the token, so a host may deny agents what it allows on the pages; the subject type
+ * can also be `deal`.
  */
 final class RecordAccessCheckEvent extends Event
 {
@@ -22,7 +25,9 @@ final class RecordAccessCheckEvent extends Event
 
     /**
      * @param object|null $user the security user (null only with `security.allow_unauthenticated`)
-     * @param string $subjectType `company` or `contact`
+     * @param string $subjectType `company`, `contact` or (0.3.0) `deal`
+     * @param string $channel `web`, `api`, `mcp`, …
+     * @param string|null $tokenId the API token's id (null on the pages)
      */
     public function __construct(
         private readonly ?object $user,
@@ -33,7 +38,21 @@ final class RecordAccessCheckEvent extends Event
         private readonly ?string $ownerId,
         private readonly string $action,
         private readonly bool $defaultGranted,
+        private readonly string $channel = 'web',
+        private readonly ?string $tokenId = null,
     ) {
+    }
+
+    /** `web` (the CRM's pages), `api`, `mcp`, … (0.3.0). */
+    public function getChannel(): string
+    {
+        return $this->channel;
+    }
+
+    /** The API token's id, or null on the pages (0.3.0). */
+    public function getTokenId(): ?string
+    {
+        return $this->tokenId;
     }
 
     /** The security user, or null. */
@@ -54,7 +73,7 @@ final class RecordAccessCheckEvent extends Event
         return $this->tenantKey;
     }
 
-    /** `company` or `contact`. */
+    /** `company`, `contact` or (0.3.0) `deal`. */
     public function getSubjectType(): string
     {
         return $this->subjectType;

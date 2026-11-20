@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Api\ApiIdempotency" table="crm_api_idempotency">
+        <indexes>
+            <index name="crm_api_idem_expires" columns="expires_at"/>
+        </indexes>
+        <id name="scopeHash" column="scope_hash" type="string" length="64"><generator strategy="NONE"/></id>
+        <id name="keyHash" column="key_hash" type="string" length="64"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="operation" column="operation" type="string" length="48"/>
+        <field name="fingerprint" column="fingerprint" type="string" length="64"/>
+        <field name="outcome" column="outcome" type="smallint" nullable="true"/>
+        <field name="resultIds" column="result_ids" type="json" nullable="true"/>
+        <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime_micro"/>
+        <field name="expiresAt" column="expires_at" type="nowo_crm_utc_datetime"/>
+    </entity>
+</doctrine-mapping>

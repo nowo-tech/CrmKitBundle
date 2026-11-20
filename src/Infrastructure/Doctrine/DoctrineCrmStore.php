@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Doctrine;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\LockMode;
@@ -35,6 +36,7 @@ use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\ImportRow;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
 use Nowo\CrmKitBundle\Domain\Model\Note;
+use Nowo\CrmKitBundle\Domain\Model\Pipeline\PartyStage;
 use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
 use Nowo\CrmKitBundle\Domain\Model\Tag;
 use Nowo\CrmKitBundle\Domain\Model\Tagging;
@@ -42,6 +44,7 @@ use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Value\HostObjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType;
 
 use function array_filter;
 use function array_keys;
@@ -61,6 +64,7 @@ use function sort;
 use function str_replace;
 use function strtoupper;
 use function trim;
+use function ucfirst;
 
 use const SORT_STRING;
 
@@ -250,6 +254,79 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         }
 
         return $this->visible($this->exact($qb->getQuery()->getResult(), $this->class($query->type), $tenant, $query->ownerId), $visibleOwners);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function keyset(TenantRef $tenant, ListQuery $query, bool $byUpdated, ?array $after, int $limit, ?array $visibleOwners = null, ?array $stage = null): array
+    {
+        $qb    = $this->filtered($tenant, $query, $visibleOwners);
+        $field = $byUpdated ? 'r.updatedAt' : ($query->type === SubjectType::Company ? 'r.nameKey' : 'r.sortKey');
+        $dir   = $byUpdated ? 'DESC' : 'ASC';
+        $qb->orderBy($field, $dir)->addOrderBy('r.id', $dir)->setMaxResults($limit); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        if ($after !== null) {
+            $op = $byUpdated ? '<' : '>';
+            $qb->andWhere('(' . $field . ' ' . $op . ' :kv OR (' . $field . ' = :kv AND r.id ' . $op . ' :kid))') // @igor-ignore - a query builder local to this call
+                ->setParameter('kv', $byUpdated ? new DateTimeImmutable($after['v'], new DateTimeZone('UTC')) : $after['v'], $byUpdated ? UtcMicroDateTimeImmutableType::NAME : null)
+                ->setParameter('kid', $after['id']);
+        }
+        if ($stage !== null) {
+            $qb->andWhere('EXISTS (SELECT 1 FROM ' . PartyStage::class . ' ps WHERE ps.subjectId = r.id AND ps.subjectType = :psType AND ps.funnelId = :psFunnel AND ps.stageId = :psStage AND ps.tenantId = :tenant)') // @igor-ignore - a query builder local to this call
+                ->setParameter('psType', $query->type)->setParameter('psFunnel', $stage['funnel'])->setParameter('psStage', $stage['stage']);
+        }
+
+        return $this->visible($this->exact($qb->getQuery()->getResult(), $this->class($query->type), $tenant, $query->ownerId), $visibleOwners);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function keyOf(CrmRecord $record, bool $byUpdated): string
+    {
+        if ($byUpdated) {
+            return $record->getUpdatedAt()->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s.u');
+        }
+
+        return $record instanceof Company ? $record->getNameKey() : ($record instanceof Contact ? $record->getSortKey() : $record->getId());
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function notesAfter(TenantRef $tenant, SubjectType $type, string $id, ?array $after, int $limit): array
+    {
+        $qb = $this->em()->createQueryBuilder()->select('n')->from(Note::class, 'n')
+            ->where('n.tenantId = :tenant')->andWhere('n.subjectType = :type')->andWhere('n.subjectId = :id')
+            ->setParameter('tenant', $tenant->value)->setParameter('type', $type)->setParameter('id', $id)
+            ->orderBy('n.pinned', 'DESC')->addOrderBy('n.id', 'DESC')->setMaxResults($limit);
+        if ($after !== null) {
+            $qb->andWhere($after['pinned'] ? '(n.pinned = :false OR n.id < :kid)' : '(n.pinned = :false AND n.id < :kid)')
+                ->setParameter('false', false)->setParameter('kid', $after['id']);
+        }
+
+        return $this->exact($qb->getQuery()->getResult(), Note::class, $tenant);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function matching(SubjectType $type, TenantRef $tenant, string $field, string $key, bool $lock): array
+    {
+        if (!in_array($field, ['emailKey', 'taxIdKey', 'domainKey', 'nameKey'], true)) {
+            throw new LogicException('Unknown key field.');
+        }
+        $query = $this->em()->createQueryBuilder()->select('r')->from($this->class($type), 'r')
+            ->where('r.tenantId = :tenant')->andWhere('r.' . $field . ' = :key')->andWhere('r.status IN (:statuses)')
+            ->setParameter('tenant', $tenant->value)->setParameter('key', $key)
+            ->setParameter('statuses', [RecordStatus::Active->value, RecordStatus::Trashed->value], ArrayParameterType::STRING)
+            ->orderBy('r.createdAt', 'ASC')->addOrderBy('r.id', 'ASC')->setMaxResults(20)->getQuery();
+        if ($lock) {
+            $query->setLockMode(LockMode::PESSIMISTIC_WRITE);
+        }
+        $getter = 'get' . ucfirst($field);
+
+        return array_values(array_filter($this->exact($query->getResult(), CrmRecord::class, $tenant), static fn (CrmRecord $r): bool => method_exists($r, $getter) && $key === $r->{$getter}()));
     }
 
     /**
@@ -1088,7 +1165,12 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
      */
     private function class(SubjectType $type): string
     {
-        return $type === SubjectType::Company ? Company::class : Contact::class;
+        return match ($type) {
+            SubjectType::Company => Company::class,
+            SubjectType::Contact => Contact::class,
+            // Deals (0.3.0) are not records: the funnel store reads them.
+            SubjectType::Deal => throw new LogicException('A deal is not a company or a contact.'),
+        };
     }
 
     private function em(): EntityManagerInterface

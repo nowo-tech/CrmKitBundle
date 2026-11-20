@@ -8,6 +8,8 @@
             <index name="crm_company_domain" columns="tenant_id,domain_key"/>
             <index name="crm_company_tax" columns="tenant_id,tax_id_key"/>
             <index name="crm_company_owner" columns="tenant_id,owner_id"/>
+            <index name="crm_company_keyset_name" columns="tenant_id,status,name_key,id"/>
+            <index name="crm_company_keyset_updated" columns="tenant_id,status,updated_at,id"/>
         </indexes>
         <field name="name" column="name" type="string" length="200"/>
         <field name="nameKey" column="name_key" type="string" length="200"/>

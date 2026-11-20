@@ -1,7 +1,8 @@
 {#
   The 360° page of a company or contact (contract section 9). Variables: page (ShowPage), record (RecordView),
   segment, can_edit, can_manage, can_merge, forms (note, notes[id], tags, link, affiliation, affiliations[id], consent), buttons (notes, links,
-  affiliations, primary_contact: View\Action per affiliation id), back (return params), notes, timeline, links, panels, duplicates, consents.
+  affiliations, primary_contact: View\Action per affiliation id), back (return params), notes, timeline, links, panels, duplicates, consents,
+  pipeline (0.3.0: deals, lifecycle, next actions; null while the funnels are off).
 #}
 {% extends '@NowoUiKit/page/show.html.twig' %}
 
@@ -65,6 +66,10 @@
         {% if forms.link is defined %}
             {{ include('@NowoCrmKit/_form.html.twig', {form: forms.link, title: 'link.add', submit: 'link.save', action: path('nowo_crm_kit_link_add', {type: segment, id: record.id}), testid: 'crm-link-form', variant: 'btn_secondary'}) }}
         {% endif %}
+    {% endif %}
+
+    {% if pipeline is not null %}
+        {{ include('@NowoCrmKit/pipeline/_record.html.twig') }}
     {% endif %}
 
     {% for item in panels %}
@@ -141,7 +146,7 @@
                 {% for entry in timeline %}
                     <li data-testid="crm-activity" data-kind="{{ entry.kind.value }}">
                         <time datetime="{{ entry.occurredAt|date('c') }}">{{ entry.occurredAt|date('Y-m-d H:i') }}</time> ·
-                        {% if entry.kind.value == 'host' %}{{ (entry.params._label ?? '')|trans(entry.params|filter((v, k) => k starts with '%')) }}{% set _url = entry.params._url ?? '' %}{% if _url starts with '/' and not (_url starts with '//') and not (_url starts with '/\\') %} <a href="{{ _url }}">{{ 'timeline.open'|trans({}, _d) }}</a>{% endif %}{% else %}{{ ('activity.' ~ entry.kind.value)|trans({'%actor%': entry.actorName ?? '—'}, _d) }}{% endif %}
+                        {% if entry.kind.value == 'host' %}{{ (entry.params._label ?? '')|trans(entry.params|filter((v, k) => k starts with '%')) }}{% set _url = entry.params._url ?? '' %}{% if _url starts with '/' and not (_url starts with '//') and not (_url starts with '/\\') %} <a href="{{ _url }}">{{ 'timeline.open'|trans({}, _d) }}</a>{% endif %}{% else %}{{ ('activity.' ~ entry.kind.value)|trans({'%actor%': entry.actorName ?? '—'}, _d) }}{% endif %}{% if entry.params.via is defined and entry.params.via is not same as('web') and entry.params.token is defined %} {{ 'activity.via_token'|trans({'%token%': entry.params.token}, _d) }}{% endif %}
                         {% if entry.subjectLabel %} · <a href="{{ path('nowo_crm_kit_show', {type: 'contacts', id: entry.subjectId}) }}">{{ entry.subjectLabel }}</a>{% endif %}
                     </li>
                 {% endfor %}

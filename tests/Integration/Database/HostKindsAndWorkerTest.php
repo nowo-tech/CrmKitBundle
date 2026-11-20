@@ -8,14 +8,10 @@ use Doctrine\ORM\Tools\SchemaTool;
 use LogicException;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
-use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
-use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordInput;
 use Nowo\CrmKitBundle\Tests\Fixtures\HostEntity\HostNote;
 use Nowo\CrmKitBundle\Tests\Integration\Kernel\Host;
-use Nowo\SearchKitBundle\Contract\SearchProviderInterface;
-use Nowo\SearchKitBundle\Model\SearchQuery;
 
 use function gc_collect_cycles;
 use function memory_get_usage;
@@ -23,7 +19,7 @@ use function memory_get_usage;
 /**
  * Host kinds (REQ-ARCH-001) and worker mode (REQ-RUNTIME-002): the single-EM host keeps its own entities and pending
  * changes; one kept-alive kernel serves two tenants and two actors without crossed data, without a managed entity
- * left after a request, with flat memory; the SearchKit providers answer per call.
+ * left after a request, with flat memory.
  */
 final class HostKindsAndWorkerTest extends CrmTestCase
 {
@@ -121,24 +117,5 @@ final class HostKindsAndWorkerTest extends CrmTestCase
         self::assertSame(12, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE tenant_id = 'acme'"));
         self::assertSame(12, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE tenant_id = 'beta'"));
         self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_contact WHERE tenant_id = 'acme' AND display_name LIKE 'Beta%'"));
-    }
-
-    public function testTheSearchKitProviders(): void
-    {
-        $this->boot();
-        $this->admin();
-        $acme = $this->company('Acme');
-        $ada  = $this->contact('Ada', 'L', 'ada@x.test', ['city' => 'Madrid']);
-        $this->records()->affiliate($ada, $acme, null, true);
-        $companies = $this->kernel->getContainer()->get('nowo_crm_kit.search.company');
-        $contacts  = $this->kernel->getContainer()->get('nowo_crm_kit.search.contact');
-        self::assertInstanceOf(SearchProviderInterface::class, $companies);
-        self::assertInstanceOf(SearchProviderInterface::class, $contacts);
-        $group = $companies->search(new SearchQuery('acm', null, 5, null, false, 'ana'));
-        self::assertSame(['crm_companies', 'Acme', 1, '/crm/companies?q=acm'], [$group?->key, $group?->items[0]->title, $group?->total, $group?->moreUrl]);
-        $people = $contacts->search(new SearchQuery('ada', null, 5, $acme, false, 'ana'));
-        self::assertSame('ada@x.test · Madrid', $people?->items[0]->subtitle);
-        self::assertNull($contacts->search(new SearchQuery('zzz', null, 5, null, false, 'ana')));
-        self::assertCount(1, $this->service(CrmReaderInterface::class)->list(new ListQuery(SubjectType::Company))->rows);
     }
 }

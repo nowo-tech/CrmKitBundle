@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\Pipeline\NextAction" table="crm_next_action">
+        <unique-constraints>
+            <unique-constraint name="crm_next_action_dedupe" columns="tenant_id,dedupe_key"/>
+        </unique-constraints>
+        <indexes>
+            <index name="crm_next_action_subject" columns="tenant_id,subject_type,subject_id,status,due_at"/>
+        </indexes>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="subjectType" column="subject_type" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\SubjectType"/>
+        <field name="subjectId" column="subject_id" type="string" length="36"/>
+        <field name="title" column="title" type="string" length="200"/>
+        <field name="dueAt" column="due_at" type="nowo_crm_utc_datetime"/>
+        <field name="assigneeId" column="assignee_id" type="string" length="128" nullable="true"/>
+        <field name="status" column="status" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\NextActionStatus"/>
+        <field name="taskType" column="task_type" type="string" length="32" nullable="true"/>
+        <field name="taskId" column="task_id" type="string" length="128" nullable="true"/>
+        <field name="dedupeKey" column="dedupe_key" type="string" length="64"/>
+        <field name="createdById" column="created_by_id" type="string" length="128" nullable="true"/>
+        <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime"/>
+        <field name="doneAt" column="done_at" type="nowo_crm_utc_datetime" nullable="true"/>
+        <field name="version" column="version" type="integer" version="true"/>
+    </entity>
+</doctrine-mapping>

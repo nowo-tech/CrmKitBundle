@@ -1,5 +1,7 @@
 # CRM kit, fase A (empresas e contactos). Domínio NowoCrmKitBundle. Os parâmetros vêm entre %.
 nav:
+    funnels: 'Funis'
+    deals: 'Negócios'
     label: CRM
     companies: Empresas
     contacts: Contactos
@@ -8,6 +10,7 @@ nav:
     fields: Campos personalizados
     settings: Definições
 type:
+    deal: 'Negócio'
     company: Empresa
     contact: Contacto
 status:
@@ -20,6 +23,7 @@ form:
     save: Guardar
     cancel: Cancelar
 list:
+    next: 'Página seguinte'
     title:
         company: Empresas
         contact: Contactos
@@ -31,6 +35,7 @@ list:
     col:
         updated: Atualizado
     filter:
+        apply: 'Aplicar'
         role: 'Função'
         purpose: 'Contacto para'
         primary_contact: 'Contacto principal'
@@ -246,6 +251,11 @@ timeline:
     empty: Ainda não aconteceu nada.
     open: Abrir
 activity:
+    via_token: "via agente ‹%token%›"
+    lifecycle_stage: 'Etapa do ciclo de vida alterada por %actor%'
+    next_action_closed: 'Próxima ação fechada por %actor%'
+    next_action_added: 'Próxima ação adicionada por %actor%'
+    stage_moved: 'Etapa alterada por %actor%'
     roles_changed: 'Funções alteradas por %actor%'
     primary_contact: 'Contacto principal alterado por %actor%'
     created: 'Criado por %actor%'
@@ -358,9 +368,11 @@ search:
     group:
         companies: Empresas
         contacts: Contactos
+        deals: 'Negócios'
     see_all: 'Ver os %count%'
 flash:
     conflict:
+        crm_stage_invalid: 'Esta etapa não pode ser usada: pertence a outro funil, ou a etapa ou o funil está arquivado ou fechado.'
         crm_record_stale: 'Alguém alterou este registo ao mesmo tempo. O formulário mostra os valores atuais: verifique-os e guarde novamente.'
         crm_record_merged: Este registo foi unido a outro.
         crm_record_trashed: Este registo está no lixo.
@@ -370,6 +382,16 @@ flash:
         crm_settings_stale: Alguém alterou as definições ao mesmo tempo. Verifique-as e guarde novamente.
         crm_write_conflict: 'Outra alteração dos mesmos dados chegou ao mesmo tempo. Tente novamente.'
 error:
+    stage_invalid: 'Não foi possível guardar a etapa: verifique o formulário.'
+    next_action_invalid: 'Não foi possível guardar a próxima ação: verifique o formulário.'
+    amount_invalid: 'Introduza um valor (até 4 casas decimais) e uma moeda de 3 letras.'
+    lost_reason_unknown: 'Motivo de perda desconhecido.'
+    lost_reason_required: 'Indique porque o negócio foi perdido.'
+    stage_limit: 'O funil tem o número máximo de etapas.'
+    funnel_limit: 'O inquilino tem o número máximo de funis.'
+    funnel_kind: 'Este funil não pode ser usado aqui.'
+    deal_party_required: 'Um negócio precisa de uma empresa ou de um contacto.'
+    deal_related_unknown: 'Escolha uma empresa ou um contacto que possa ver.'
     forbidden: 'Não pode alterar isto.'
     role_unknown: 'Função desconhecida.'
     purpose_unknown: 'Finalidade desconhecida.'
@@ -409,3 +431,165 @@ purpose:
     orders: 'Encomendas'
     technical: 'Técnico'
     general: 'Geral'
+deals:
+    title: 'Negócios'
+    empty: 'Ainda não há negócios.'
+deal:
+    new: 'Novo negócio'
+    edit: 'Editar'
+    edit_title: 'Editar %name%'
+    created: 'Negócio criado.'
+    saved: 'Negócio guardado.'
+    moved: 'Etapa alterada.'
+    not_moved: 'O negócio já está nessa etapa.'
+    trashed: 'Negócio movido para o lixo.'
+    restored: 'Negócio restaurado.'
+    purged: 'Negócio eliminado definitivamente.'
+    trash: 'Mover para o lixo'
+    trash_confirm: 'Mover este negócio para o lixo?'
+    restore: 'Restaurar'
+    purge: 'Eliminar definitivamente'
+    purge_confirm: 'Eliminar definitivamente este negócio e o seu histórico?'
+    funnel: 'Funil'
+    status_label: 'Estado'
+    status:
+        any: 'Aberto, ganho ou perdido'
+        open: 'Aberto'
+        won: 'Ganho'
+        lost: 'Perdido'
+        trashed: 'No lixo'
+    stale: 'Parado'
+    stale_only: 'Só parados'
+    sort_label: 'Ordem'
+    sort:
+        updated: 'Última alteração'
+        expected_close: 'Fecho previsto'
+        amount: 'Valor'
+    hidden: 'Não visível para si'
+    probability: 'Probabilidade'
+    weighted: 'Valor ponderado'
+    history_title: 'Histórico de etapas'
+    history:
+        created: 'Criado'
+        days: '%days% dias na etapa anterior'
+        via: 'via %via%'
+    form:
+        title: 'Título'
+        stage: 'Etapa'
+        company: 'Empresa'
+        contact: 'Contacto'
+        owner: 'Responsável'
+        amount: 'Valor'
+        currency: 'Moeda (ISO 4217)'
+        probability: 'Probabilidade própria (%)'
+        expected_close: 'Fecho previsto'
+        none: '— Nenhum —'
+    move:
+        title: 'Mover para uma etapa'
+        save: 'Mover'
+        stage: 'Etapa'
+        lost_reason: 'Motivo de perda'
+        lost_note: 'Nota de perda'
+board:
+    title: 'Quadro'
+    intro: 'Os negócios deste funil por etapa.'
+    empty: 'Sem negócios.'
+    more: 'O quadro mostra os primeiros 100 negócios.'
+    list: 'Ver todos na lista'
+next_action:
+    title: 'Próximas ações'
+    empty: 'Sem próximas ações.'
+    add: 'Adicionar uma próxima ação'
+    save: 'Adicionar'
+    done: 'Feita'
+    cancel: 'Cancelar'
+    added: 'Próxima ação adicionada.'
+    closed: 'Próxima ação fechada.'
+    refused: 'O serviço de tarefas recusou a próxima ação. Nada foi guardado.'
+    task: 'Abrir a tarefa'
+    task_hidden: 'Tarefa não visível para si'
+    status:
+        open: 'Aberta'
+        done: 'Feita'
+        cancelled: 'Cancelada'
+    form:
+        title: 'Título'
+        due_at: 'Prazo'
+        assignee: 'Atribuída a'
+        me: '— Eu —'
+lifecycle:
+    title: 'Ciclo de vida'
+    none: 'Não está neste funil'
+    save: 'Definir etapa'
+    saved: 'Etapa do ciclo de vida guardada.'
+    form:
+        stage: 'Etapa do ciclo de vida'
+funnels:
+    title: 'Funis'
+    intro: 'Funis de negócios e de ciclo de vida de empresas e contactos.'
+    empty: 'Ainda não há funis.'
+funnel:
+    add: 'Novo funil'
+    save: 'Criar'
+    edit: 'Editar'
+    created: 'Funil criado.'
+    saved: 'Funil guardado.'
+    stages: 'Etapas'
+    form:
+        name: 'Nome'
+        kind: 'Tipo'
+        archived: 'Arquivado'
+    kind:
+        deal: 'Negócios'
+        party_company: 'Ciclo de vida de empresas'
+        party_contact: 'Ciclo de vida de contactos'
+stage:
+    add: 'Nova etapa'
+    save: 'Guardar'
+    edit: 'Editar'
+    created: 'Etapa adicionada.'
+    saved: 'Etapa guardada.'
+    move_up: 'Subir'
+    move_down: 'Descer'
+    form:
+        name: 'Nome'
+        kind: 'Tipo'
+        probability: 'Probabilidade por omissão (%)'
+        rot_days: 'Parado após (dias)'
+        archived: 'Arquivada'
+    kind:
+        open: 'Aberta'
+        won: 'Ganha'
+        lost: 'Perdida'
+    default:
+        open: 'Qualificado'
+        won: 'Ganho'
+        lost: 'Perdido'
+        first: 'Novo'
+stats:
+    title: 'Estatísticas'
+    title_of: 'Estatísticas de %name%'
+    filter:
+        at: 'Num momento passado'
+        from: 'Fechados desde'
+        to: 'Fechados até'
+    at: 'Em %at%'
+    now: 'Agora (%at%)'
+    conversion: 'Para a etapa seguinte'
+    average_days: 'Média de dias na etapa'
+    win_rate: 'Ganhos desde a primeira etapa: %rate% %'
+    closed: 'Fechados no período: %won% ganhos, %lost% perdidos'
+    csv:
+        stage: 'Etapa'
+        kind: 'Tipo'
+        count: 'Negócios'
+        stale: 'Parados'
+        currency: 'Moeda'
+        value: 'Valor'
+        weighted: 'Valor ponderado'
+lost_reason:
+    price: 'Preço'
+    timing: 'Momento'
+    competitor: 'Concorrente'
+    no_decision: 'Sem decisão'
+    other: 'Outro'

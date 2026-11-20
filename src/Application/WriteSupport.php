@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Application\Shared\StaleRowException;
@@ -19,6 +20,7 @@ use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
 use Nowo\CrmKitBundle\Domain\Value\AuditEntry;
+use Nowo\CrmKitBundle\Domain\Value\AuditOrigin;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -46,6 +48,16 @@ final readonly class WriteSupport
     }
 
     /**
+     * A copy whose access gate is bound to `$caller`, for one call (0.3.0).
+     *
+     * @internal
+     */
+    public function as(CrmCallerInterface $caller): self
+    {
+        return new self($this->access->bind($caller), $this->store, $this->runner, $this->ids, $this->audit, $this->events);
+    }
+
+    /**
      * Runs `$work` in one write unit; releases its effects after the commit. A version that moved under the flush
      * becomes `crm_record_stale` (or `$staleCode`).
      *
@@ -58,11 +70,15 @@ final readonly class WriteSupport
     public function write(callable $work, string $staleCode = ConflictException::STALE): mixed
     {
         $effects = new Effects();
+        $caller  = $this->access->caller();
         try {
-            $result = $this->runner->write(static function () use ($work, $effects): mixed { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $result = $this->runner->write(static function () use ($work, $effects, $caller): mixed { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 $effects->clear();
+                $caller->beginUnit();
+                $result = $work($effects);
+                $caller->endUnit($result);
 
-                return $work($effects);
+                return $result;
             });
         } catch (StaleRowException $e) {
             throw new ConflictException($staleCode, null, $e);
@@ -122,12 +138,17 @@ final readonly class WriteSupport
     }
 
     /**
-     * Appends a timeline entry.
+     * Appends a timeline entry. **(0.3.0)** A write through the API adds `via` (the channel) and `token` (the token's
+     * name) to the parameters, so the timeline reads "… via ‹token›".
      *
      * @param array<string, bool|int|string|null> $params
      */
     public function activity(CrmContext $context, SubjectType $type, string $id, ActivityKind $kind, array $params = []): void
     {
+        if ($context->origin instanceof AuditOrigin) {
+            $params['via']   = $context->origin->channel;
+            $params['token'] = $context->origin->tokenName;
+        }
         $this->store->add(new Activity($this->id(), $context->tenant->value, $type, $id, $kind, $context->actor->value, $params, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
     }
 
@@ -138,6 +159,6 @@ final readonly class WriteSupport
      */
     public function audit(Effects $effects, CrmContext $context, string $action, ?SubjectType $type = null, ?string $id = null, array $details = []): void
     {
-        $effects->audit(new AuditEntry($context->tenant, $context->actor, $action, $type?->value, $id, $details, $context->now));
+        $effects->audit(new AuditEntry($context->tenant, $context->actor, $action, $type?->value, $id, $details, $context->now, $context->origin));
     }
 }

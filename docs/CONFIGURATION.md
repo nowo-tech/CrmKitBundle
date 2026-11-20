@@ -65,13 +65,23 @@ nowo_crm_kit:
     affiliations:
         purposes: [billing, orders, technical, general]   # what a contact is a company's contact for; same rule
     search:
-        enabled: true              # SearchKit providers when SearchKit is installed and the UI is on
+        enabled: true              # SearchKit groups (SearchKit >= 1.9) when it is installed and the UI is on
     ui:
         enabled: false             # routes are opt-in (REQ-UI-001)
         path: /crm                 # starts with "/"; base path of the routes (under the import prefix)
         page_size: 25              # 10..100, default rows per list page
         layout: null               # Twig layout of the pages; null = UiKit's admin layout
     pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
+    api:                           # 0.3.0: see API.md
+        enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)
+        page_size: 25              # 10..100: default page of the keyset lists
+        idempotency_ttl_seconds: 86400   # 3600..604800
+        http:
+            enabled: false         # the /crm/v1 routes (needs api.enabled)
+            prefix: /api           # routes under <prefix>/crm/v1
+            authenticator: null    # a CrmApiAuthenticatorInterface service id; null = the firewall user + default_grant
+            tenant_resolver: null  # a CrmApiTenantResolverInterface service id; null = the configured tenant resolver
+            default_grant: { level: view, amounts: false, consents: false, destructive: false }
     quotes:    { enabled: false }  # phase C, quotes (0.5.0)
     invoices:  { enabled: false }  # phase D, invoices (0.6.0)
     portal:    { enabled: false }  # phase F, customer portal (0.7.0)
@@ -207,10 +217,11 @@ trailing newline); anything else fails the container build. Keys are compared by
 
 ## Search
 
-`search.enabled` registers two SearchKit providers, `nowo_crm_kit.search.company` and `nowo_crm_kit.search.contact`
-(tag `nowo_search_kit.provider`, priorities 60 and 59), when SearchKit is installed **and** `ui.enabled` is true (the
-results link to the CRM pages). SearchKit needs PHP >= 8.3. The number of results per group is SearchKit's query
-limit.
+`search.enabled` registers the SearchKit groups `crm_companies`, `crm_contacts` and, with `pipeline.enabled`,
+`crm_deals` (services `nowo_crm_kit.search.company`, `.contact`, `.deal`; tag `nowo_search_kit.entity_definition`,
+priorities 60, 59 and 58) when SearchKit **>= 1.9** is installed **and** `ui.enabled` is true (the results link to the
+CRM pages). SearchKit needs PHP >= 8.3. Per group, `nowo_search_kit.groups.<key>.enabled` and `.priority` (SearchKit's
+configuration) switch it off or reorder it; the number of results per page and the candidate window are SearchKit's.
 
 ## UI
 
@@ -249,4 +260,5 @@ No phase-A value changes at runtime like an `.env` secret, so no runtime setting
 Every value is published as `nowo_crm_kit.<path>` (for example `nowo_crm_kit.ui.enabled`,
 `nowo_crm_kit.import.chunk_rows`, `nowo_crm_kit.security.access_roles`, `nowo_crm_kit.roles.catalogue`,
 `nowo_crm_kit.affiliations.purposes`), plus `nowo_crm_kit.import.sync_chunks` (chunks run in
-the confirm request). The alias `nowo_crm_kit.entity_manager` (public) points at the bundle's entity manager.
+the confirm request). **0.3.0:** `nowo_crm_kit.api_prefix` (`/api`) and `nowo_crm_kit.api_path` (`/api/crm/v1`, for the
+firewall pattern `^%nowo_crm_kit.api_path%/`). The alias `nowo_crm_kit.entity_manager` (public) points at the bundle's entity manager.

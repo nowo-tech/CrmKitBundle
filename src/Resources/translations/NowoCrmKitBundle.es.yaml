@@ -1,5 +1,7 @@
 # CRM kit, fase A (empresas y contactos). Dominio NowoCrmKitBundle. Los parámetros van entre %.
 nav:
+    funnels: 'Embudos'
+    deals: 'Oportunidades'
     label: CRM
     companies: Empresas
     contacts: Contactos
@@ -8,6 +10,7 @@ nav:
     fields: Campos personalizados
     settings: Ajustes
 type:
+    deal: 'Oportunidad'
     company: Empresa
     contact: Contacto
 status:
@@ -20,6 +23,7 @@ form:
     save: Guardar
     cancel: Cancelar
 list:
+    next: 'Página siguiente'
     title:
         company: Empresas
         contact: Contactos
@@ -31,6 +35,7 @@ list:
     col:
         updated: Actualizado
     filter:
+        apply: 'Aplicar'
         role: 'Rol'
         purpose: 'Contacto para'
         primary_contact: 'Contacto principal'
@@ -246,6 +251,11 @@ timeline:
     empty: Aún no ha ocurrido nada.
     open: Abrir
 activity:
+    via_token: "vía agente ‹%token%›"
+    lifecycle_stage: 'Etapa del ciclo de vida cambiada por %actor%'
+    next_action_closed: 'Próxima acción cerrada por %actor%'
+    next_action_added: 'Próxima acción añadida por %actor%'
+    stage_moved: 'Etapa cambiada por %actor%'
     roles_changed: 'Roles cambiados por %actor%'
     primary_contact: 'Contacto principal cambiado por %actor%'
     created: 'Creado por %actor%'
@@ -358,9 +368,11 @@ search:
     group:
         companies: Empresas
         contacts: Contactos
+        deals: 'Oportunidades'
     see_all: 'Ver los %count%'
 flash:
     conflict:
+        crm_stage_invalid: 'Esta etapa no se puede usar: pertenece a otro embudo, o la etapa o el embudo están archivados o cerrados.'
         crm_record_stale: 'Alguien ha modificado este registro al mismo tiempo. El formulario muestra los valores actuales: revísalos y vuelve a guardar.'
         crm_record_merged: Este registro se ha fusionado en otro.
         crm_record_trashed: Este registro está en la papelera.
@@ -370,6 +382,16 @@ flash:
         crm_settings_stale: Alguien ha modificado los ajustes al mismo tiempo. Revísalos y vuelve a guardar.
         crm_write_conflict: 'Otro cambio de los mismos datos llegó al mismo tiempo. Inténtalo de nuevo.'
 error:
+    stage_invalid: 'No se pudo guardar la etapa: revisa el formulario.'
+    next_action_invalid: 'No se pudo guardar la próxima acción: revisa el formulario.'
+    amount_invalid: 'Introduce un importe (hasta 4 decimales) y una moneda de 3 letras.'
+    lost_reason_unknown: 'Motivo de pérdida desconocido.'
+    lost_reason_required: 'Indica por qué se perdió la oportunidad.'
+    stage_limit: 'El embudo tiene el máximo de etapas permitido.'
+    funnel_limit: 'El inquilino tiene el máximo de embudos permitido.'
+    funnel_kind: 'Este embudo no se puede usar aquí.'
+    deal_party_required: 'Una oportunidad necesita una empresa o un contacto.'
+    deal_related_unknown: 'Elige una empresa o un contacto que puedas ver.'
     forbidden: 'No puedes cambiar esto.'
     role_unknown: 'Rol desconocido.'
     purpose_unknown: 'Finalidad desconocida.'
@@ -409,3 +431,165 @@ purpose:
     orders: 'Pedidos'
     technical: 'Técnico'
     general: 'General'
+deals:
+    title: 'Oportunidades'
+    empty: 'Todavía no hay oportunidades.'
+deal:
+    new: 'Nueva oportunidad'
+    edit: 'Editar'
+    edit_title: 'Editar %name%'
+    created: 'Oportunidad creada.'
+    saved: 'Oportunidad guardada.'
+    moved: 'Etapa cambiada.'
+    not_moved: 'La oportunidad ya está en esa etapa.'
+    trashed: 'Oportunidad movida a la papelera.'
+    restored: 'Oportunidad restaurada.'
+    purged: 'Oportunidad eliminada definitivamente.'
+    trash: 'Mover a la papelera'
+    trash_confirm: '¿Mover esta oportunidad a la papelera?'
+    restore: 'Restaurar'
+    purge: 'Eliminar definitivamente'
+    purge_confirm: '¿Eliminar definitivamente esta oportunidad y su historial?'
+    funnel: 'Embudo'
+    status_label: 'Estado'
+    status:
+        any: 'Abierta, ganada o perdida'
+        open: 'Abierta'
+        won: 'Ganada'
+        lost: 'Perdida'
+        trashed: 'En la papelera'
+    stale: 'Estancada'
+    stale_only: 'Solo estancadas'
+    sort_label: 'Orden'
+    sort:
+        updated: 'Último cambio'
+        expected_close: 'Cierre previsto'
+        amount: 'Importe'
+    hidden: 'No visible para ti'
+    probability: 'Probabilidad'
+    weighted: 'Valor ponderado'
+    history_title: 'Historial de etapas'
+    history:
+        created: 'Creada'
+        days: '%days% días en la etapa anterior'
+        via: 'vía %via%'
+    form:
+        title: 'Título'
+        stage: 'Etapa'
+        company: 'Empresa'
+        contact: 'Contacto'
+        owner: 'Responsable'
+        amount: 'Importe'
+        currency: 'Moneda (ISO 4217)'
+        probability: 'Probabilidad propia (%)'
+        expected_close: 'Cierre previsto'
+        none: '— Ninguno —'
+    move:
+        title: 'Mover a una etapa'
+        save: 'Mover'
+        stage: 'Etapa'
+        lost_reason: 'Motivo de pérdida'
+        lost_note: 'Nota de pérdida'
+board:
+    title: 'Tablero'
+    intro: 'Las oportunidades de este embudo por etapa.'
+    empty: 'Sin oportunidades.'
+    more: 'El tablero muestra las 100 primeras oportunidades.'
+    list: 'Ver todas en la lista'
+next_action:
+    title: 'Próximas acciones'
+    empty: 'Sin próximas acciones.'
+    add: 'Añadir una próxima acción'
+    save: 'Añadir'
+    done: 'Hecha'
+    cancel: 'Cancelar'
+    added: 'Próxima acción añadida.'
+    closed: 'Próxima acción cerrada.'
+    refused: 'El servicio de tareas rechazó la próxima acción. No se guardó nada.'
+    task: 'Abrir la tarea'
+    task_hidden: 'Tarea no visible para ti'
+    status:
+        open: 'Abierta'
+        done: 'Hecha'
+        cancelled: 'Cancelada'
+    form:
+        title: 'Título'
+        due_at: 'Vence'
+        assignee: 'Asignada a'
+        me: '— Yo —'
+lifecycle:
+    title: 'Ciclo de vida'
+    none: 'No está en este embudo'
+    save: 'Fijar etapa'
+    saved: 'Etapa del ciclo de vida guardada.'
+    form:
+        stage: 'Etapa del ciclo de vida'
+funnels:
+    title: 'Embudos'
+    intro: 'Embudos de oportunidades y de ciclo de vida de empresas y contactos.'
+    empty: 'Todavía no hay embudos.'
+funnel:
+    add: 'Nuevo embudo'
+    save: 'Crear'
+    edit: 'Editar'
+    created: 'Embudo creado.'
+    saved: 'Embudo guardado.'
+    stages: 'Etapas'
+    form:
+        name: 'Nombre'
+        kind: 'Tipo'
+        archived: 'Archivado'
+    kind:
+        deal: 'Oportunidades'
+        party_company: 'Ciclo de vida de empresas'
+        party_contact: 'Ciclo de vida de contactos'
+stage:
+    add: 'Nueva etapa'
+    save: 'Guardar'
+    edit: 'Editar'
+    created: 'Etapa añadida.'
+    saved: 'Etapa guardada.'
+    move_up: 'Subir'
+    move_down: 'Bajar'
+    form:
+        name: 'Nombre'
+        kind: 'Tipo'
+        probability: 'Probabilidad por defecto (%)'
+        rot_days: 'Estancada tras (días)'
+        archived: 'Archivada'
+    kind:
+        open: 'Abierta'
+        won: 'Ganada'
+        lost: 'Perdida'
+    default:
+        open: 'Cualificada'
+        won: 'Ganada'
+        lost: 'Perdida'
+        first: 'Nuevo'
+stats:
+    title: 'Estadísticas'
+    title_of: 'Estadísticas de %name%'
+    filter:
+        at: 'En un momento pasado'
+        from: 'Cerradas desde'
+        to: 'Cerradas hasta'
+    at: 'El %at%'
+    now: 'Ahora (%at%)'
+    conversion: 'A la etapa siguiente'
+    average_days: 'Días de media en la etapa'
+    win_rate: 'Ganadas desde la primera etapa: %rate% %'
+    closed: 'Cerradas en el periodo: %won% ganadas, %lost% perdidas'
+    csv:
+        stage: 'Etapa'
+        kind: 'Tipo'
+        count: 'Oportunidades'
+        stale: 'Estancadas'
+        currency: 'Moneda'
+        value: 'Valor'
+        weighted: 'Valor ponderado'
+lost_reason:
+    price: 'Precio'
+    timing: 'Momento'
+    competitor: 'Competencia'
+    no_decision: 'Sin decisión'
+    other: 'Otro'

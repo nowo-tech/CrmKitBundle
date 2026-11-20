@@ -38,6 +38,46 @@ final class LayerDependencyTest extends TestCase
         self::assertSame([], $this->violations('/Application/', '/^(Symfony|Doctrine|Nowo\\\\CrmKitBundle\\\\(Infrastructure|Bridge))\\\\/'));
     }
 
+    public function testTheApiImportsNoFrameworkAndNoOuterLayer(): void
+    {
+        self::assertSame([], $this->violations('/Api/', '/^(Symfony|Doctrine|Nowo\\\\CrmKitBundle\\\\(Infrastructure|Bridge))\\\\/'));
+    }
+
+    public function testNoOperationUsesTheSystemApisOrTheUnexposedServices(): void
+    {
+        // Owner rules (0.3.0): the batch lookups and the actor personal data are system APIs without permission
+        // checks; consent changes, merges, erasure, purge, imports, exports, settings and campaigns are never exposed.
+        $forbidden = '/(CrmBatchLookup|CrmBatchLookupStoreInterface|CrmActorPersonalData|ActorPersonalData|ConsentService|MergeService|CrmPersonalData|ImportService|CrmExporter|SettingsService|FieldService|HostLinkService|RecordPurger|FunnelService)(Interface)?$/';
+        self::assertSame([], $this->violations('/Api/', $forbidden));
+        self::assertSame([], $this->violations('/Application/Pipeline/', '/(CrmBatchLookup|CrmBatchLookupStoreInterface|CrmActorPersonalData)(Interface)?$/'));
+    }
+
+    public function testNoOperationRestoresOrPurges(): void
+    {
+        // Owner rules (0.3.0): restoring from the trash and purging stay on the pages (DealService::restore() / purge(),
+        // RecordService::restore() / purge()); an API trash is undone only by a person.
+        $violations = [];
+        foreach ($this->sourceFiles() as $path => $source) {
+            if (str_starts_with($path, '/Api/') && preg_match('/->(restore|purge)\(/', $source) === 1) {
+                $violations[] = $path;
+            }
+        }
+
+        self::assertSame([], $violations);
+    }
+
+    public function testOnlyTheApiLayerOfInfrastructureImportsTheHttpFoundationForTheApi(): void
+    {
+        $violations = [];
+        foreach ($this->sourceFiles() as $path => $source) {
+            if (str_contains($source, 'Nowo\\CrmKitBundle\\Api\\') && !str_starts_with($path, '/Api/') && !str_starts_with($path, '/Infrastructure/') && !str_starts_with($path, '/Application/')) {
+                $violations[] = $path;
+            }
+        }
+
+        self::assertSame([], $violations);
+    }
+
     public function testOnlyBridgesImportOptionalPackages(): void
     {
         $violations = [];

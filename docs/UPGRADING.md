@@ -11,6 +11,95 @@
 
 ## Unreleased
 
+**Funnels (0.3.0, `pipeline.enabled`).** Nothing changes while the funnels stay off: no table is mapped and no route
+is added. To turn them on, set `nowo_crm_kit.pipeline.enabled: true` and create the tables (`doctrine:migrations:diff
+--em=nowo_crm_kit` produces the same DDL as below; `<p>` is `doctrine.table_prefix`, `nowo_` by default).
+
+- `SubjectType` gains `Deal` (`deal`; `segment()` `deals`, `isRecord()` false) and `CrmResource` gains `Deals`.
+  `nowo_crm_kit.record_access_check` listeners that assumed `company | contact` must expect `deal`
+  (`getSubjectType()`); a `match` over `SubjectType` in host code needs the new case.
+- `nowo:crm-kit:purge` returns and prints a `deals` count; `RecordPurger::purge()` gains the `deals` key.
+- The 360° page renders a funnels block while they are on; the area navigation gains Deals and Funnels.
+
+MySQL 8.4 / MariaDB 11.4 (identifier columns use `utf8mb4_0900_bin` on MySQL, `utf8mb4_nopad_bin` on MariaDB):
+
+```sql
+CREATE TABLE nowo_crm_funnel (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, kind VARCHAR(16) NOT NULL, subject_type VARCHAR(16) DEFAULT NULL, name VARCHAR(120) NOT NULL, position INT NOT NULL, archived TINYINT(1) NOT NULL, version INT DEFAULT 1 NOT NULL, created_at DATETIME NOT NULL, updated_at DATETIME(6) NOT NULL, INDEX nowo_crm_funnel_list (tenant_id, kind, archived, position), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_stage (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, funnel_id VARCHAR(36) NOT NULL, name VARCHAR(80) NOT NULL, position INT NOT NULL, kind VARCHAR(8) NOT NULL, probability SMALLINT NOT NULL, rot_days INT DEFAULT NULL, archived TINYINT(1) NOT NULL, version INT DEFAULT 1 NOT NULL, INDEX nowo_crm_stage_funnel (tenant_id, funnel_id, position), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_deal (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, funnel_id VARCHAR(36) NOT NULL, stage_id VARCHAR(36) NOT NULL, title VARCHAR(200) NOT NULL, company_id VARCHAR(36) DEFAULT NULL, contact_id VARCHAR(36) DEFAULT NULL, owner_id VARCHAR(128) DEFAULT NULL, amount NUMERIC(18, 4) DEFAULT NULL, currency VARCHAR(3) DEFAULT NULL, probability SMALLINT DEFAULT NULL, expected_close DATE DEFAULT NULL, status VARCHAR(16) NOT NULL, trashed_from VARCHAR(16) DEFAULT NULL, lost_reason VARCHAR(32) DEFAULT NULL, lost_note VARCHAR(500) DEFAULT NULL, stage_entered_at DATETIME(6) NOT NULL, closed_at DATETIME DEFAULT NULL, next_action_at DATETIME DEFAULT NULL, trashed_at DATETIME DEFAULT NULL, version INT DEFAULT 1 NOT NULL, created_at DATETIME NOT NULL, created_by_id VARCHAR(128) DEFAULT NULL, updated_at DATETIME(6) NOT NULL, updated_by_id VARCHAR(128) DEFAULT NULL, INDEX nowo_crm_deal_stage (tenant_id, funnel_id, stage_id, status), INDEX nowo_crm_deal_keyset_updated (tenant_id, status, updated_at, id), INDEX nowo_crm_deal_company (tenant_id, company_id), INDEX nowo_crm_deal_contact (tenant_id, contact_id), INDEX nowo_crm_deal_owner (tenant_id, owner_id), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_stage_change (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, item_type VARCHAR(16) NOT NULL, item_id VARCHAR(36) NOT NULL, funnel_id VARCHAR(36) NOT NULL, from_stage_id VARCHAR(36) DEFAULT NULL, to_stage_id VARCHAR(36) NOT NULL, actor_id VARCHAR(128) DEFAULT NULL, via VARCHAR(16) DEFAULT NULL, occurred_at DATETIME(6) NOT NULL, seconds_in_from BIGINT DEFAULT NULL, INDEX nowo_crm_stage_change_funnel (tenant_id, funnel_id, occurred_at), INDEX nowo_crm_stage_change_item (tenant_id, item_type, item_id, occurred_at), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_party_stage (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, funnel_id VARCHAR(36) NOT NULL, subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36) NOT NULL, stage_id VARCHAR(36) NOT NULL, entered_at DATETIME(6) NOT NULL, version INT DEFAULT 1 NOT NULL, INDEX nowo_crm_party_stage_stage (tenant_id, funnel_id, stage_id), UNIQUE INDEX nowo_crm_party_stage_unique (funnel_id, subject_id), PRIMARY KEY (id));
+CREATE TABLE nowo_crm_next_action (id VARCHAR(36) NOT NULL, tenant_id VARCHAR(128) NOT NULL, subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36) NOT NULL, title VARCHAR(200) NOT NULL, due_at DATETIME NOT NULL, assignee_id VARCHAR(128) DEFAULT NULL, status VARCHAR(16) NOT NULL, task_type VARCHAR(32) DEFAULT NULL, task_id VARCHAR(128) DEFAULT NULL, dedupe_key VARCHAR(64) NOT NULL, created_by_id VARCHAR(128) DEFAULT NULL, created_at DATETIME NOT NULL, done_at DATETIME DEFAULT NULL, version INT DEFAULT 1 NOT NULL, INDEX nowo_crm_next_action_subject (tenant_id, subject_type, subject_id, status, due_at), UNIQUE INDEX nowo_crm_next_action_dedupe (tenant_id, dedupe_key), PRIMARY KEY (id));
+```
+
+PostgreSQL 16: the same tables with `BOOLEAN` for `archived`, `TIMESTAMP(0) WITHOUT TIME ZONE` for the plain
+instants, `TIMESTAMP(6) WITHOUT TIME ZONE` for `updated_at`, `stage_entered_at`, `occurred_at`, `entered_at`, and
+`CREATE INDEX` / `CREATE UNIQUE INDEX` statements for the keys. SQLite: `TEXT` / `INTEGER` / `NUMERIC` columns with the
+same keys. No column of an earlier table changes and no backfill is needed; the `deals` row of `crm_counter` is created
+on the first deal.
+
+
+**The API (0.3.0, `api.enabled`, `api.http.enabled`).** Nothing changes while both stay off. No table is mapped and
+no route is added.
+
+- **Removed**: the root key `access_checker` (deprecated since 0.2.0) and `LegacyCrmAccessChecker`. Move a 0.1.0 checker
+  to `security.access_checker` (a `CrmKitAccessCheckerInterface`), and move record rules to
+  `nowo_crm_kit.record_access_check` listeners. `CrmPermission::legacy()` is removed too.
+- **transaction-doctrine ^1.8.1** is required (`composer update nowo-tech/transaction-doctrine`). It fixes
+  GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g, and a write-unit replay no longer clears your entity manager: it is put
+  back to what the database holds (see CONCURRENCY).
+- **`ext-sodium`** is needed for the API's sealed cursors. It ships with PHP and is on by default.
+- **Turn the API on.** Set `api.enabled: true` and create the idempotency table and the keyset indexes:
+
+```sql
+-- MySQL 8.4 / MariaDB 11.4 (MariaDB: utf8mb4_nopad_bin); <p> = nowo_
+CREATE TABLE nowo_crm_api_idempotency (scope_hash VARCHAR(64) NOT NULL, key_hash VARCHAR(64) NOT NULL, tenant_id VARCHAR(128) NOT NULL, operation VARCHAR(48) NOT NULL, fingerprint VARCHAR(64) NOT NULL, outcome SMALLINT DEFAULT NULL, result_ids JSON DEFAULT NULL, created_at DATETIME(6) NOT NULL, expires_at DATETIME NOT NULL, INDEX nowo_crm_api_idem_expires (expires_at), PRIMARY KEY (scope_hash, key_hash));
+CREATE INDEX nowo_crm_company_keyset_name    ON nowo_crm_company (tenant_id, status, name_key, id);
+CREATE INDEX nowo_crm_company_keyset_updated ON nowo_crm_company (tenant_id, status, updated_at, id);
+CREATE INDEX nowo_crm_contact_keyset_name    ON nowo_crm_contact (tenant_id, status, sort_key, id);
+CREATE INDEX nowo_crm_contact_keyset_updated ON nowo_crm_contact (tenant_id, status, updated_at, id);
+CREATE INDEX nowo_crm_note_keyset            ON nowo_crm_note (tenant_id, subject_type, subject_id, pinned, id);
+```
+
+  The hash, operation and id columns use the binary collation (the metadata listener sets it, and
+  `doctrine:migrations:diff --em=nowo_crm_kit` produces the same DDL). PostgreSQL 16 uses `JSON` and
+  `TIMESTAMP(6) WITHOUT TIME ZONE` / `TIMESTAMP(0) WITHOUT TIME ZONE`. SQLite uses `CLOB` / `DATETIME`.
+- **Every host migrates the five keyset indexes**, with or without the API: they are part of the base mapping (the
+  pages and the API lists use them), so `doctrine:schema:validate` reports them missing until they exist. The
+  idempotency table is needed only with `api.enabled`.
+- **Lists hide records a listener denies (BC change, owner decision Q2).** Every list, search, related label and
+  timeline now passes its rows through the record decision (`nowo_crm_kit.record_access_check`, batched per page),
+  not only through the SQL visibility of `security.resource_scoping`. A record a host listener denies `view` no longer
+  appears in the 0.2 web lists, the CSV export of a list, a company's contacts, a contact's companies, the company
+  timeline (its contacts' entries), the duplicate hints or the merge preview. A list page can then be shorter than the
+  page size (a denied row still takes its slot), a page can be empty while the pager offers more, and its total is the
+  SQL count less the denied rows of that page, so it can differ from page to page: it reveals where denied rows sit in
+  the order, never their content. Funnel statistics are aggregated in SQL
+  and still count deals that only a listener denies (their visibility is the owner scoping); they never show such a
+  deal itself.
+- **Header search by tax id.** The groups match the stored tax id key (upper case, without separators) as typed: a
+  query with separators (`B-12`) no longer matches; search `B12`.
+- **TaskBoard bridge.** `pipeline.taskboard` names one board for every tenant: it is meant for a single-tenant host
+  (or a host whose board is shared on purpose); a multi-tenant host implements `CrmTaskPort` itself. Erasing a contact
+  deletes its next actions but not the tasks a host port created for them; remove them on your side
+  (`ContactErased` event) when your retention requires it.
+- **JSON API.** Set `api.http.enabled: true`, import the routes (`resource: .`, `type: nowo_crm_kit_api`) and protect
+  `^%nowo_crm_kit.api_path%/` with a firewall. Without `api.http.authenticator`, the firewall's user is the principal,
+  with `api.http.default_grant` (view only by default).
+- **Listeners**: `RecordAccessCheckEvent` / `RecordVisibilityEvent` gain `getChannel()` (`web`, `api`, `mcp`) and
+  `getTokenId()`. A deny for agents only looks like `if ($event->getChannel() !== 'web') { $event->deny(); }`.
+- **`AuditEntry`** gains `?AuditOrigin $origin` (the last constructor argument). A host sink that copies fields keeps
+  working; one that wants the token reads `$entry->origin`.
+- **`CrmCallerInterface`** is new and internal. A host never implements it: the bundle builds the callers.
+
+**Header search (0.3.0).** The SearchKit groups need **SearchKit ^1.9** (`composer require nowo-tech/search-kit-bundle:^1.9`,
+PHP >= 8.3); with an older SearchKit they are not registered. Their keys stay `crm_companies` and `crm_contacts`, plus
+`crm_deals` with `pipeline.enabled`; `nowo_search_kit.groups.<key>` switches one off. The services
+`nowo_crm_kit.search.company` / `.contact` are now `EntitySearchDefinition`s (tag `nowo_search_kit.entity_definition`)
+and `Bridge\SearchKit\CrmSearchProvider` is removed: a host that decorated or called it uses SearchKit's generated
+provider (`nowo_search_kit.entity_provider.nowo_crm_kit.search.company`, …) instead. Results now also pass SearchKit's
+`nowo_search_kit.item_visibility` event.
+
 ## To 0.2.1
 
 From **0.2.0**:

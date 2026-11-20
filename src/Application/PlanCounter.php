@@ -30,21 +30,24 @@ final readonly class PlanCounter
      *
      * @throws ConflictException
      */
-    public function take(TenantRef $tenant, SubjectType $type): void
+    public function take(TenantRef $tenant, SubjectType $type, ?callable $current = null): void
     {
-        if (!$this->tryTake($tenant, $type)) {
+        if (!$this->tryTake($tenant, $type, $current)) {
             throw new ConflictException(ConflictException::LIMIT);
         }
     }
 
     /**
-     * Takes one unit; false at the limit.
+     * Takes one unit; false at the limit. `$current` counts the live rows when the counter row does not exist yet
+     * (deals, 0.3.0: the funnels count their own; records default to the active companies or contacts).
+     *
+     * @param (callable(): int)|null $current
      */
-    public function tryTake(TenantRef $tenant, SubjectType $type): bool
+    public function tryTake(TenantRef $tenant, SubjectType $type, ?callable $current = null): bool
     {
         $resource = $type->resource();
 
-        return $this->store->takeCounter($tenant, $resource->value, $this->limits->limit($tenant, $resource), fn (): int => $this->store->countActive($tenant, $type));
+        return $this->store->takeCounter($tenant, $resource->value, $this->limits->limit($tenant, $resource), $current ?? fn (): int => $this->store->countActive($tenant, $type));
     }
 
     /**
@@ -56,13 +59,15 @@ final readonly class PlanCounter
     }
 
     /**
-     * Recounts the active records of a tenant (inside the caller's unit).
+     * Recounts the active records of a tenant (inside the caller's unit); `$current` counts deals (0.3.0).
+     *
+     * @param (callable(): int)|null $current
      */
-    public function rebuild(TenantRef $tenant, SubjectType $type): int
+    public function rebuild(TenantRef $tenant, SubjectType $type, ?callable $current = null): int
     {
         // Lock the counter row first, then count: a create racing the rebuild waits for it (REQ-RUNTIME-003).
         $this->store->lockCounter($tenant, $type->resource()->value); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
-        $count = $this->store->countActive($tenant, $type);
+        $count = $current === null ? $this->store->countActive($tenant, $type) : $current();
         $this->store->setCounter($tenant, $type->resource()->value, $count); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
 
         return $count;

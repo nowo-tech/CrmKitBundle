@@ -38,16 +38,27 @@ final readonly class ScopedRecordVisibility implements CrmRecordVisibilityInterf
      */
     public function visibleOwners(TenantRef $tenant, ActorRef $actor): ?array
     {
+        $user = $this->tokens?->getToken()?->getUser();
+
+        return $this->visibleOwnersFor($user instanceof UserInterface ? $user : null, $tenant, $actor);
+    }
+
+    /**
+     * The visible owners of a given person (0.3.0: an API principal's user): `$manageReach` false keeps a settings
+     * manager to the scoped set (an API token below the manage level never widens the reach).
+     *
+     * @return list<string>|null
+     */
+    public function visibleOwnersFor(?object $user, TenantRef $tenant, ActorRef $actor, bool $manageReach = true, string $channel = 'web', ?string $tokenId = null): ?array
+    {
         if (!$this->scoping) {
             return null;
         }
-        $user = $this->tokens?->getToken()?->getUser();
-        $user = $user instanceof UserInterface ? $user : null;
-        $all  = $this->areas instanceof TenantAwareCrmKitAccessCheckerInterface ? $this->areas->canManageSettings($user, $tenant->value) : $this->areas->canManageSettings($user);
+        $all = $manageReach && ($this->areas instanceof TenantAwareCrmKitAccessCheckerInterface ? $this->areas->canManageSettings($user, $tenant->value) : $this->areas->canManageSettings($user));
         if ($all) {
             return null;
         }
-        $event = new RecordVisibilityEvent($user, $actor->value, $tenant->value);
+        $event = new RecordVisibilityEvent($user, $actor->value, $tenant->value, $channel, $tokenId);
         $this->events?->dispatch($event, CrmKitEvents::RECORD_VISIBILITY);
 
         // The anonymised placeholder is dropped by CrmAccess::visibleOwners(), for this adapter and a host's alike.

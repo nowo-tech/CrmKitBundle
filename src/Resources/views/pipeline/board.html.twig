@@ -1,0 +1,30 @@
+{#
+  The board of a deal funnel (0.3.0): one column per stage with its deals. Variables: page (ShowPage), funnel
+  (FunnelView), columns (stage id => list of DealView), more (bool: the board shows the first 100 deals).
+#}
+{% extends '@NowoUiKit/page/show.html.twig' %}
+
+{% block nowo_ui_show_after %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {%- set _b = page.bundle -%}
+    <div class="crm-kit-board" data-testid="crm-board-columns">
+        {% for stage in funnel.stages|filter(s => not s.archived) %}
+            <section class="{{ nowo_ui_class('card', _b) }} crm-kit-board__column" data-testid="crm-board-stage" data-kind="{{ stage.kind.value }}">
+                <div class="{{ nowo_ui_class('card_body', _b) }}">
+                    <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ stage.name }} <small>({{ (columns[stage.id] ?? [])|length }})</small></h2>
+                    {% for deal in columns[stage.id] ?? [] %}
+                        <article class="crm-kit-board__card" data-testid="crm-board-deal"{% if deal.stale %} data-stale="1"{% endif %}>
+                            <a href="{{ path('nowo_crm_kit_deal_show', {id: deal.id}) }}">{{ deal.title }}</a>
+                            {% if deal.amount %}<br><small>{{ deal.amount.amount }} {{ deal.amount.currency }}</small>{% endif %}
+                            {% if deal.companyLabel %}<br><small>{{ deal.companyLabel }}</small>{% endif %}
+                            {% if deal.stale %} <span class="{{ nowo_ui_class('badge', _b) }}">{{ 'deal.stale'|trans({}, _d) }}</span>{% endif %}
+                        </article>
+                    {% else %}
+                        <p><small>{{ 'board.empty'|trans({}, _d) }}</small></p>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+    {% if more %}<p>{{ 'board.more'|trans({}, _d) }} <a href="{{ path('nowo_crm_kit_deals', {funnel: funnel.id}) }}">{{ 'board.list'|trans({}, _d) }}</a></p>{% endif %}
+{% endblock %}

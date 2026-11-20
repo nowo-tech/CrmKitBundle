@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
@@ -42,7 +43,7 @@ final readonly class MergeService implements MergeServiceInterface
     /**
      * Wires the collaborators.
      */
-    public function __construct(private WriteSupport $support, private RecordViews $views, private PlanCounter $counter)
+    public function __construct(private WriteSupport $support, private RecordViews $views, private PlanCounter $counter, private ?PipelineHousekeeping $pipeline = null)
     {
     }
 
@@ -78,7 +79,10 @@ final readonly class MergeService implements MergeServiceInterface
 
             $owners = $this->support->access->visibleOwners($context);
 
-            return new MergePreview($this->views->one($context->tenant, $survivor, $owners), $this->views->one($context->tenant, $other, $owners), $fields, $moves);
+            /** @param list<SubjectRef> $subjects */
+            $viewable = fn (array $subjects): array => $this->support->access->viewable($context, $subjects); // @igor-ignore - a per-call closure; nothing is kept on the service
+
+            return new MergePreview($this->views->one($context->tenant, $survivor, $owners, $viewable), $this->views->one($context->tenant, $other, $owners, $viewable), $fields, $moves);
         });
     }
 
@@ -138,6 +142,8 @@ final readonly class MergeService implements MergeServiceInterface
             }
             $survivor->touch($context->now, $context->actor->value);
             $this->moveChildren($context, $type, $otherId, $survivorId);
+            // 0.3.0: deals, stage history, lifecycle stages and next actions follow the survivor.
+            $this->pipeline?->moveRecord($context->tenant, $type, $otherId, $survivorId);
             $this->counter->release($context->tenant, $type);
             $store->add(new MergeRecord($this->support->id(), $context->tenant->value, $type, $survivorId, $otherId, $snapshot, $taken, $context->actor->value, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             $this->support->activity($context, $type, $survivorId, ActivityKind::Merged, ['merged' => $otherId, 'fields' => count($taken)]);

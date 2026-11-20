@@ -247,7 +247,7 @@ final readonly class CrmApiRelationOperations
     private function affiliationOf(CrmApiCall $call, CrmApiAffiliationSpec $spec, string $id): CrmApiItem
     {
         $support = $this->support->as($call->caller);
-        $views   = $support->read(fn (): array => $this->views->affiliations($call->context->tenant, SubjectType::Contact, $spec->contactId->value, $call->access->visibleOwners($call->context)));
+        $views   = $support->read(fn (): array => $this->views->affiliations($call->context->tenant, SubjectType::Contact, $spec->contactId->value, $call->access->visibleOwners($call->context), static fn (array $subjects): array => $call->access->viewable($call->context, $subjects)));
         foreach ($views as $view) {
             if ($view instanceof AffiliationView && $view->id === $id) {
                 return CrmApiPresenter::affiliation($view, SubjectType::Contact);

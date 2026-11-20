@@ -301,12 +301,16 @@ final class PipelineUiTest extends CrmTestCase
         $this->ctx()->tenant          = 'acme';
         $this->ctx()->enabled['acme'] = false;
         self::assertSame(404, $this->httpStatus('GET', '/crm/deals'));
-        // The cursor of a page is opaque but never trusted.
-        self::assertNull(PipelineController::after('not-base64!'));
-        self::assertNull(PipelineController::after(PipelineController::cursor(['v' => null, 'id' => 'nope'])));
-        self::assertNull(PipelineController::after(PipelineController::cursor(['v' => 'tomorrow', 'id' => $deal])));
-        self::assertSame(['v' => '2026-11-18 10:00:00.000000', 'id' => $deal], PipelineController::after(PipelineController::cursor(['v' => '2026-11-18 10:00:00.000000', 'id' => $deal])));
-        self::assertSame(['v' => null, 'id' => $deal], PipelineController::after(PipelineController::cursor(['v' => null, 'id' => $deal])));
+        // The cursor of a page is sealed and bound to the list's filters (audit VS-3).
+        $controller = $this->service(PipelineController::class);
+        $key        = ['v' => '2026-11-18 10:00:00.000000', 'id' => $deal];
+        $cursor     = $controller->cursor($key, ['q' => 'x']);
+        self::assertStringNotContainsString($deal, $cursor);
+        self::assertSame($key, $controller->after($cursor, ['q' => 'x']));
+        self::assertSame(['v' => null, 'id' => $deal], $controller->after($controller->cursor(['v' => null, 'id' => $deal], []), []));
+        self::assertNull($controller->after($cursor, ['q' => 'y']));
+        self::assertNull($controller->after('not-base64!', []));
+        self::assertNull($controller->after('', []));
     }
 
     private function port(): TestTaskPort

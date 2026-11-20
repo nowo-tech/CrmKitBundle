@@ -60,8 +60,24 @@ CREATE INDEX nowo_crm_note_keyset            ON nowo_crm_note (tenant_id, subjec
 
   The hash, operation and id columns use the binary collation (the metadata listener sets it, and
   `doctrine:migrations:diff --em=nowo_crm_kit` produces the same DDL). PostgreSQL 16 uses `JSON` and
-  `TIMESTAMP(6) WITHOUT TIME ZONE` / `TIMESTAMP(0) WITHOUT TIME ZONE`. SQLite uses `CLOB` / `DATETIME`. The five
-  indexes are created on every install: they also serve the pages.
+  `TIMESTAMP(6) WITHOUT TIME ZONE` / `TIMESTAMP(0) WITHOUT TIME ZONE`. SQLite uses `CLOB` / `DATETIME`.
+- **Every host migrates the five keyset indexes**, with or without the API: they are part of the base mapping (the
+  pages and the API lists use them), so `doctrine:schema:validate` reports them missing until they exist. The
+  idempotency table is needed only with `api.enabled`.
+- **Lists hide records a listener denies (BC change, owner decision Q2).** Every list, search, related label and
+  timeline now passes its rows through the record decision (`nowo_crm_kit.record_access_check`, batched per page),
+  not only through the SQL visibility of `security.resource_scoping`. A record a host listener denies `view` no longer
+  appears in the 0.2 web lists, the CSV export of a list, a company's contacts, a contact's companies, the company
+  timeline (its contacts' entries), the duplicate hints or the merge preview. A list page can then be shorter than the
+  page size, and its total is the SQL count less the denied rows of that page. Funnel statistics are aggregated in SQL
+  and still count deals that only a listener denies (their visibility is the owner scoping); they never show such a
+  deal itself.
+- **Header search by tax id.** The groups match the stored tax id key (upper case, without separators) as typed: a
+  query with separators (`B-12`) no longer matches; search `B12`.
+- **TaskBoard bridge.** `pipeline.taskboard` names one board for every tenant: it is meant for a single-tenant host
+  (or a host whose board is shared on purpose); a multi-tenant host implements `CrmTaskPort` itself. Erasing a contact
+  deletes its next actions but not the tasks a host port created for them; remove them on your side
+  (`ContactErased` event) when your retention requires it.
 - **JSON API.** Set `api.http.enabled: true`, import the routes (`resource: .`, `type: nowo_crm_kit_api`) and protect
   `^%nowo_crm_kit.api_path%/` with a firewall. Without `api.http.authenticator`, the firewall's user is the principal,
   with `api.http.default_grant` (view only by default).

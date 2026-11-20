@@ -79,7 +79,10 @@ final readonly class MergeService implements MergeServiceInterface
 
             $owners = $this->support->access->visibleOwners($context);
 
-            return new MergePreview($this->views->one($context->tenant, $survivor, $owners), $this->views->one($context->tenant, $other, $owners), $fields, $moves);
+            /** @param list<SubjectRef> $subjects */
+            $viewable = fn (array $subjects): array => $this->support->access->viewable($context, $subjects); // @igor-ignore - a per-call closure; nothing is kept on the service
+
+            return new MergePreview($this->views->one($context->tenant, $survivor, $owners, $viewable), $this->views->one($context->tenant, $other, $owners, $viewable), $fields, $moves);
         });
     }
 

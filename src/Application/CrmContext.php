@@ -19,7 +19,7 @@ final readonly class CrmContext
     /**
      * Wires the call's context.
      */
-    public function __construct(public TenantRef $tenant, public ActorRef $actor, public DateTimeImmutable $now, public ?AuditOrigin $origin = null)
+    public function __construct(public TenantRef $tenant, public ActorRef $actor, public DateTimeImmutable $now, public ?AuditOrigin $origin = null, public ?object $hostContext = null)
     {
     }
 

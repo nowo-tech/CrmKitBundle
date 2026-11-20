@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Security;
 
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmBatchAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\ExactId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
@@ -20,7 +21,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
  * The actor is the security user's identifier; with `security.allow_unauthenticated` and nobody signed in it is
  * `anonymous` (demos only). Stateless: the token is read per call.
  */
-final readonly class SecurityCrmAccessChecker implements CrmAccessCheckerInterface
+final readonly class SecurityCrmAccessChecker implements CrmBatchAccessCheckerInterface
 {
     /** Actor of an unauthenticated demo. */
     public const ANONYMOUS = 'anonymous';
@@ -52,6 +53,27 @@ final readonly class SecurityCrmAccessChecker implements CrmAccessCheckerInterfa
         }
 
         return !$subject instanceof SubjectRef || $this->resources->isGranted($user, $actor, $tenant, $permission, $subject);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function grantedSubjects(CrmPermission $permission, TenantRef $tenant, array $subjects): array
+    {
+        $actor = $this->currentActor();
+        $user  = $this->user();
+        if ($subjects === [] || !$actor instanceof ActorRef || !$this->area($permission, $user, $tenant)) {
+            return [];
+        }
+        $owners  = $this->resources->visibleOwners($tenant, $actor);
+        $granted = [];
+        foreach ($subjects as $subject) {
+            if ($this->resources->decide($user, $actor, $tenant, $permission, $subject, $owners)) {
+                $granted[$subject->key()] = true;
+            }
+        }
+
+        return $granted;
     }
 
     /**

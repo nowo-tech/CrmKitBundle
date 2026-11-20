@@ -52,6 +52,15 @@ final class CrmRecordSearchDefinition extends CrmSearchDefinition
     }
 
     /**
+     * Contacts are personal data (audit VS): their titles are sensitive, so SearchKit runs the group only while recents
+     * are revalidated or off, and never keeps contact names in the browser otherwise. Companies are not.
+     */
+    public function sensitive(): bool
+    {
+        return $this->type === SubjectType::Contact;
+    }
+
+    /**
      * `crm_companies` or `crm_contacts`.
      */
     public function group(): string

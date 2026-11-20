@@ -9,7 +9,6 @@ use Nowo\CrmKitBundle\Api\CrmApiCode;
 use Nowo\CrmKitBundle\Api\CrmApiOperation;
 use Nowo\CrmKitBundle\Api\CrmApiPrincipal;
 use Nowo\CrmKitBundle\Api\CrmApiRefusal;
-use Nowo\CrmKitBundle\Api\Input\CrmApiAffiliationSpec;
 use Nowo\CrmKitBundle\Api\Input\CrmApiCompanyLink;
 use Nowo\CrmKitBundle\Api\Input\CrmApiOwner;
 use Nowo\CrmKitBundle\Api\Input\CrmApiRecordChanges;
@@ -55,7 +54,6 @@ final readonly class CrmApiRecordOperations
         private RecordService $service,
         private CrmReader $reader,
         private WriteSupport $support,
-        private CrmApiRelationOperations $relations,
     ) {
     }
 
@@ -140,26 +138,31 @@ final readonly class CrmApiRecordOperations
             static fn (mixed $id): array => ['record' => is_string($id) ? $id : ''], // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
             function (CrmApiCall $bound) use ($call, $type, $draft): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $bound->require(CrmApiCapability::Create);
-                if ($draft->company instanceof CrmApiCompanyLink) {
-                    // Affiliating needs `edit`; the company must be one the principal sees.
+                $link        = $draft->company;
+                $affiliation = null;
+                if ($link instanceof CrmApiCompanyLink) {
+                    // Affiliating needs `edit`; the company must be one the principal sees, and changing its primary
+                    // contact needs `edit` on it. The affiliation is written in the create's own unit.
                     $bound->require(CrmApiCapability::Edit);
-                    $this->records->probe($bound, SubjectType::Company, $draft->company->companyId);
+                    $company = $this->records->probe($bound, SubjectType::Company, $link->companyId);
+                    if ($link->primaryContact !== null) {
+                        $bound->person(CrmPermission::Edit, $company);
+                    }
+                    $affiliation = [$link->companyId->value, $link->role, $link->primary ?? false, $link->primaryContact, $link->purposes];
                 }
                 $input = new RecordInput($type, $draft->values, $draft->owner->resolve($bound->principal->actor), $draft->custom, $draft->tagIds, true, $draft->roles);
                 try {
-                    $id = CrmApiErrors::run(fn (): string => $this->service->as($bound->caller)->createChecked($input, fn (CrmRecord $record) => $this->duplicates($bound, $record)));
+                    $id = CrmApiErrors::run(fn (): string => $this->service->as($bound->caller)->createChecked($input, fn (CrmRecord $record) => $this->duplicates($bound, $record), $affiliation));
                 } catch (CrmApiDuplicate $duplicate) {
                     return new CrmApiWritten($this->created($call, $type, $duplicate->recordId, $duplicate->key, []), false, false, 200);
                 }
-                $this->affiliateNew($call, $id, $draft);
 
                 return new CrmApiWritten($this->created($call, $type, $id, null, $this->hints($call, $type, $id)), false, true, 201);
             },
-            function (CrmApiReplay $r) use ($call, $type, $draft): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
+            function (CrmApiReplay $r) use ($call, $type): CrmApiWritten { // @igor-ignore - a per-call closure the writer runs at once; nothing is kept on the service
                 $id = $r->ids['record'] ?? '';
+                // A replay writes nothing: it reads the record again through the read path.
                 $this->records->probe($call, $type, RecordId::isValid($id) ? new RecordId($id) : throw CrmApiRefusal::notFound());
-                // The affiliation is a second unit: a replay repeats it (set semantics), so it ends done.
-                $this->affiliateNew($call, $id, $draft);
 
                 return new CrmApiWritten($this->created($call, $type, $id, null, []), true, true, $r->status);
             },
@@ -233,19 +236,16 @@ final readonly class CrmApiRecordOperations
                 $trashed ??= $match->getId();
             }
 
-            throw $trashed !== null ? CrmApiRefusal::of(CrmApiCode::TRASHED, ['record_id' => $trashed]) : CrmApiRefusal::of(CrmApiCode::HIDDEN_DUPLICATE);
+            if ($trashed !== null) {
+                throw CrmApiRefusal::of(CrmApiCode::TRASHED, ['record_id' => $trashed]);
+            }
+            // Only matches the principal may not view: a contact's e-mail is a unique key, so the create cannot
+            // succeed (CRM_006, no id); a company is created, as the pages allow namesakes (owner, Q1), so a hidden
+            // company is never revealed.
+            if ($record instanceof Contact) {
+                throw CrmApiRefusal::of(CrmApiCode::HIDDEN_DUPLICATE);
+            }
         }
-    }
-
-    /**
-     * Affiliates a new contact to the draft's company (a second write unit, set semantics).
-     */
-    private function affiliateNew(CrmApiCall $call, string $contactId, CrmApiRecordDraft $draft): void
-    {
-        if (!$draft->company instanceof CrmApiCompanyLink) {
-            return;
-        }
-        $this->relations->apply($call, new CrmApiAffiliationSpec(new RecordId($contactId), $draft->company));
     }
 
     /**

@@ -17,6 +17,20 @@ final class ContactSearchContractTest extends CrmSearchKitTestCase
         return 'nowo_crm_kit.search.contact';
     }
 
+    protected function sensitiveTitles(): bool
+    {
+        return true;
+    }
+
+    /**
+     * A host's `nowo_crm_kit.record_access_check` deny is decided in PHP after the SQL visibility filter, so such rows
+     * can take places in the candidate window (documented in USAGE: the total is then inexact, never wrong).
+     */
+    protected function hiddenRowsFilteredInSql(): bool
+    {
+        return false;
+    }
+
     protected function seed(int|string $tenant, string $text): string
     {
         return $this->record($tenant, SubjectType::Contact, $text);

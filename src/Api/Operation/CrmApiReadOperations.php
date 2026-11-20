@@ -25,6 +25,7 @@ use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\DealStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Model\Activity;
+use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\Note;
 use Nowo\CrmKitBundle\Domain\Read\ActivityView;
 use Nowo\CrmKitBundle\Domain\Read\AffiliationView;
@@ -36,6 +37,7 @@ use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 
+use function array_keys;
 use function array_map;
 use function array_slice;
 use function count;
@@ -54,6 +56,9 @@ use function usort;
  */
 final readonly class CrmApiReadOperations
 {
+    /** Most keyset batches one search page scans past rows a record listener denies. */
+    public const MAX_SCAN_ROUNDS = 10;
+
     /**
      * @param list<string> $consentPurposes `gdpr.purposes`
      */
@@ -93,23 +98,55 @@ final readonly class CrmApiReadOperations
         $owners    = $call->access->visibleOwners($call->context);
         $found     = [];
         $next      = null;
-        for ($p = $phase; $p < count($query->types) && $next === null; ++$p) {
-            $type = $query->types[$p];
-            $list = new ListQuery($type, $query->text, $query->tagId?->value, $query->ownerId?->value, role: $query->role?->value);
-            $rows = $support->read(static fn (): array => $support->store->keyset($call->context->tenant, $list, $byUpdated, $p === $phase ? $after : null, $limit - count($found) + 1, $owners, $query->stage?->canonical()));
-            foreach ($rows as $row) {
-                if (count($found) === $limit) {
-                    $last = $found[$limit - 1];
-                    $next = $this->cursors->seal(CrmApiOperation::Search, $filter, ['p' => $last[0], 'v' => $support->store->keyOf($last[1], $byUpdated), 'id' => $last[1]->getId()]);
+        $scanned   = null;
+        $rounds    = 0;
+        $batch     = $limit + 1;
+        // Rows a record listener denies are skipped (0.3.0): the scan goes on, batch after batch, up to
+        // MAX_SCAN_ROUNDS; past that the page is shorter and the cursor continues after the last row scanned.
+        for ($p = $phase; $p < count($query->types); ++$p) {
+            $type   = $query->types[$p];
+            $list   = new ListQuery($type, $query->text, $query->tagId?->value, $query->ownerId?->value, role: $query->role?->value);
+            $cursor = $p === $phase ? $after : null;
+            do {
+                if (++$rounds > self::MAX_SCAN_ROUNDS) {
+                    $next = $scanned === null ? null : $this->cursors->seal(CrmApiOperation::Search, $filter, $scanned);
 
-                    break;
+                    break 2;
                 }
-                $found[] = [$p, $row];
+                $rows    = $support->read(static fn (): array => $support->store->keyset($call->context->tenant, $list, $byUpdated, $cursor, $batch, $owners, $query->stage?->canonical()));
+                $visible = [];
+                foreach ($call->access->viewableRecords($call->context, $rows) as $row) {
+                    $visible[$row->getId()] = true;
+                }
+                foreach ($rows as $row) {
+                    if (isset($visible[$row->getId()])) {
+                        if (count($found) === $limit) {
+                            $last = $found[$limit - 1];
+                            $next = $this->cursors->seal(CrmApiOperation::Search, $filter, ['p' => $last[0], 'v' => $support->store->keyOf($last[1], $byUpdated), 'id' => $last[1]->getId()]);
+
+                            break 3;
+                        }
+                        $found[] = [$p, $row];
+                    }
+                    $cursor  = ['v' => $support->store->keyOf($row, $byUpdated), 'id' => $row->getId()];
+                    $scanned = ['p' => $p] + $cursor;
+                }
+            } while (count($rows) === $batch);
+        }
+        // One batch of views per type (no query per row).
+        $byType = [];
+        foreach ($found as [, $row]) {
+            $byType[$row::type()->value][] = $row;
+        }
+        $views = [];
+        foreach ($byType as $records) {
+            foreach ($this->views->many($call->context->tenant, $records[0]::type(), $records) as $view) {
+                $views[$view->type->value . ':' . $view->id] = $view;
             }
         }
         $items = [];
-        foreach ($found as [$p, $row]) {
-            $items[] = CrmApiPresenter::hit($this->views->many($call->context->tenant, $row::type(), [$row])[0]);
+        foreach ($found as [, $row]) {
+            $items[] = CrmApiPresenter::hit($views[$row::type()->value . ':' . $row->getId()]);
         }
 
         return new CrmApiPage($items, $next);
@@ -184,8 +221,19 @@ final readonly class CrmApiReadOperations
             $next    = $this->cursors->seal(CrmApiOperation::Timeline, $filter, ['id' => $entries[$page->limit - 1]->id]);
         }
         $support = $this->support->as($call->caller);
+        $hidden  = $this->hiddenReferences($call, $entries);
         $items   = [];
         foreach ($entries as $entry) {
+            // A record named by an entry's parameters (an affiliation's other side) is shown only when the principal
+            // may view it (audit VS-1, owner decision Q2).
+            foreach (['contact' => SubjectType::Contact, 'company' => SubjectType::Company] as $param => $type) {
+                $named = $entry->params[$param] ?? null;
+                if (is_string($named) && isset($hidden[$type->value . ':' . $named])) {
+                    $params         = $entry->params;
+                    $params[$param] = null;
+                    $entry          = new ActivityView($entry->id, $entry->subjectType, $entry->subjectId, $entry->subjectLabel, $entry->kind, $entry->actorName, $params, $entry->occurredAt);
+                }
+            }
             $noteId = $entry->params['note'] ?? null;
             $body   = in_array($entry->kind, [ActivityKind::NoteAdded, ActivityKind::NoteEdited], true) && is_string($noteId) && RecordId::isValid($noteId)
                 ? $support->read(static fn (): ?string => $support->store->note($call->context->tenant, $noteId)?->getBody())
@@ -274,7 +322,7 @@ final readonly class CrmApiReadOperations
             throw CrmApiRefusal::of('INPUT_003');
         }
         $support = $this->support->as($call->caller);
-        $views   = $support->read(fn (): array => $this->views->affiliations($call->context->tenant, $side, $id->value, $call->access->visibleOwners($call->context)));
+        $views   = $support->read(fn (): array => $this->views->affiliations($call->context->tenant, $side, $id->value, $call->access->visibleOwners($call->context), static fn (array $subjects): array => $call->access->viewable($call->context, $subjects)));
         $sortKey = static fn (AffiliationView $a): string => mb_strtolower($side === SubjectType::Contact ? $a->companyName : $a->contactName, 'UTF-8');
         usort($views, static fn (AffiliationView $a, AffiliationView $b): int => strcmp($sortKey($a), $sortKey($b)) ?: strcmp($a->id, $b->id));
         $rows = [];
@@ -325,6 +373,50 @@ final readonly class CrmApiReadOperations
         }
 
         return $this->present($call, $type, $id->value);
+    }
+
+    /**
+     * The keys (`type:id`) of the records the entries' `contact` / `company` parameters name and the principal may not
+     * view (missing ones included): two reads and one batched decision for the page.
+     *
+     * @param list<ActivityView> $entries
+     *
+     * @return array<string, true>
+     */
+    private function hiddenReferences(CrmApiCall $call, array $entries): array
+    {
+        $named = [SubjectType::Contact->value => [], SubjectType::Company->value => []];
+        foreach ($entries as $entry) {
+            foreach (['contact' => SubjectType::Contact, 'company' => SubjectType::Company] as $param => $type) {
+                $id = $entry->params[$param] ?? null;
+                if (is_string($id) && RecordId::isValid($id)) {
+                    $named[$type->value][$id] = true;
+                }
+            }
+        }
+        $support  = $this->support->as($call->caller);
+        $subjects = [];
+        $hidden   = [];
+        foreach ($named as $type => $ids) {
+            $kind    = SubjectType::from($type);
+            $records = $ids === [] ? [] : $support->read(static fn (): array => $support->store->records($kind, $call->context->tenant, array_keys($ids)));
+            foreach (array_keys($ids) as $id) {
+                $record = $records[$id] ?? null;
+                if ($record instanceof CrmRecord && $record->isActive()) {
+                    $subjects[] = SubjectRef::of($kind, $record->getId(), $record->getOwnerId());
+                } else {
+                    $hidden[$type . ':' . $id] = true;
+                }
+            }
+        }
+        $granted = $call->access->viewable($call->context, $subjects);
+        foreach ($subjects as $subject) {
+            if (!isset($granted[$subject->key()])) {
+                $hidden[$subject->key()] = true;
+            }
+        }
+
+        return $hidden;
     }
 
     /**

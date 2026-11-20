@@ -75,9 +75,37 @@ final readonly class PrincipalCaller implements CrmCallerInterface
     /**
      * {@inheritDoc}
      */
+    public function grantedSubjects(CrmPermission $permission, TenantRef $tenant, array $subjects): array
+    {
+        $capability = CrmApiCapability::forPermission($permission);
+        if ($subjects === [] || !$capability instanceof CrmApiCapability || !$capability->allows($this->principal->grant) || $tenant->value !== $this->tenant->value || !$this->area($permission, $tenant)) {
+            return [];
+        }
+        $owners  = $this->visibleOwners($tenant, $this->principal->actor);
+        $granted = [];
+        foreach ($subjects as $subject) {
+            if ($this->resources->decide($this->principal->user, $this->principal->actor, $tenant, $permission, $subject, $owners, $this->principal->channel, $this->principal->tokenId)) {
+                $granted[$subject->key()] = true;
+            }
+        }
+
+        return $granted;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function visibleOwners(TenantRef $tenant, ActorRef $actor): ?array
     {
         return $this->visibility->visibleOwnersFor($this->principal->user, $tenant, $actor, $this->principal->grant->level === CrmApiLevel::Manage, $this->principal->channel, $this->principal->tokenId);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function hostContext(): ?object
+    {
+        return $this->principal->hostContext;
     }
 
     /**

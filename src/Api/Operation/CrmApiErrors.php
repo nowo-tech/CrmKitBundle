@@ -54,6 +54,7 @@ final class CrmApiErrors
                 ConflictException::TRASHED       => CrmApiCode::TRASHED,
                 ConflictException::LIMIT         => CrmApiCode::LIMIT,
                 ConflictException::STAGE_INVALID => CrmApiCode::STAGE,
+                ConflictException::DEDUPE_REUSED => CrmApiCode::IDEMP_MISMATCH,
                 default                          => CrmApiCode::WRITE_CONFLICT,
             };
             $values = $extra === null ? [] : $extra($e);

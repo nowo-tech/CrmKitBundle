@@ -104,7 +104,9 @@ final readonly class NextActionService
         $existing = $this->pipeline->support->read(function () use ($context, $type, $subjectId, $dedupeKey): ?string { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->subject($context, $type, $subjectId, false);
 
-            return $this->pipeline->store->nextActionByDedupe($context->tenant, $dedupeKey)?->getId();
+            $row = $this->pipeline->store->nextActionByDedupe($context->tenant, $dedupeKey);
+
+            return $row instanceof NextAction ? $this->adopt($row, $type, $subjectId) : null;
         });
         if ($existing !== null) {
             return $existing;
@@ -164,12 +166,27 @@ final readonly class NextActionService
         });
     }
 
+    /**
+     * The id of a row stored earlier with the same dedupe key, only when it belongs to the same subject (audit VS): a
+     * key reused for another subject (an idempotency key used again after its claim expired) is refused.
+     *
+     * @throws ConflictException `crm_dedupe_reused`
+     */
+    private function adopt(NextAction $row, SubjectType $type, string $subjectId): string
+    {
+        if ($row->getSubjectType() !== $type || $row->getSubjectId() !== $subjectId) {
+            throw new ConflictException(ConflictException::DEDUPE_REUSED);
+        }
+
+        return $row->getId();
+    }
+
     private function write(Effects $effects, CrmContext $context, SubjectType $type, string $subjectId, string $title, DateTimeImmutable $dueAt, string $assignee, string $dedupeKey, CrmTaskRef $ref, bool $builtIn): string
     {
         $subject  = $this->subject($context, $type, $subjectId, true);
         $existing = $this->pipeline->store->nextActionByDedupe($context->tenant, $dedupeKey);
         if ($existing instanceof NextAction) {
-            return $existing->getId();
+            return $this->adopt($existing, $type, $subjectId);
         }
         $id = $this->pipeline->support->id();
         $this->pipeline->support->store->add(new NextAction($id, $context->tenant->value, $type, $subjectId, $title, $dueAt, $assignee, $ref->type, $builtIn ? $id : $ref->id, $dedupeKey, $context->actor->value, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service

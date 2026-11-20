@@ -46,7 +46,7 @@ final readonly class NextActionViews
                 $refs[$ref->key()] = $ref;
             }
         }
-        $states = $refs === [] ? [] : $this->tasks->states($context->tenant, $context->actor, null, array_values($refs));
+        $states = $refs === [] ? [] : $this->tasks->states($context->tenant, $context->actor, $context->hostContext, array_values($refs));
         $views  = [];
         foreach ($rows as $row) {
             $type    = $row->getTaskType();

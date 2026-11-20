@@ -12,7 +12,10 @@ use Nowo\TransactionDoctrine\WriteUnit\LockConflictExceptionInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
+
+use function is_a;
 
 /**
  * Answers every failure of a `/crm/v1` route in the API's error shape (0.3.0, design §11): `{"error": <static
@@ -39,7 +42,12 @@ final readonly class CrmApiExceptionListener
         if ($request->attributes->get(CrmApiRouteLoader::ROUTE_ATTRIBUTE) !== true) {
             return;
         }
-        $failure  = $event->getThrowable();
+        $failure = $event->getThrowable();
+        // The firewall's own answers (401 / 403, a login entry point) and HTTP exceptions keep their responses
+        // (audit VS-4): they are not failures of the API.
+        if ($failure instanceof HttpExceptionInterface || is_a($failure, 'Symfony\\Component\\Security\\Core\\Exception\\AuthenticationException') || is_a($failure, 'Symfony\\Component\\Security\\Core\\Exception\\AccessDeniedException')) {
+            return;
+        }
         $headers  = ['Cache-Control' => 'no-store, private'];
         $refusal  = null;
         $conflict = null;

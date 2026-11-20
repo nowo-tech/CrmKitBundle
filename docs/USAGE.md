@@ -719,6 +719,8 @@ The `Api\Operation` services and the `/crm/v1` JSON API are off by default. [API
 - idempotency keys, base versions and the audit with the token name;
 - sealed keyset cursors, untrusted text and the error codes;
 - what is never exposed;
+- that API company creates behave like the pages (a company the principal may not view is never a duplicate), and
+  that every list, search, label and timeline hides records a `nowo_crm_kit.record_access_check` listener denies;
 - the setup for a plain Symfony host and for an MCP host.
 
 ## SearchKit
@@ -740,7 +742,12 @@ With `nowo-tech/search-kit-bundle` **^1.9** installed (it needs PHP >= 8.3), `ui
 A scope that is the id of an active company of the tenant narrows contacts to that company's; any other scope, and any
 scope on companies or deals, finds nothing. A deal shows its stage, its company (only when the person may view the
 company: a hidden company's name is neither shown nor used as a match) and, only with `amounts_view`, its amount.
-Recents are revalidated: a stored result is shown again only while its record is still visible.
+Recents: with SearchKit's `nowo_search_kit.recent.safe` on (revalidated recents), a stored result is shown again only
+while its record is still visible. `crm_contacts` is a sensitive group (contact names are personal data): SearchKit
+runs it only while recents are revalidated or off, so contact names are never kept in the browser unchecked.
+`crm_companies` and `crm_deals` are not sensitive. A host's `nowo_crm_kit.record_access_check` deny is decided after
+the SQL filter, so a denied row can take a place in the candidate window: it is never shown or counted, but the total
+is then marked inexact.
 
 Switch one group off, or reorder the groups, with SearchKit's own `nowo_search_kit.groups.<key>` (`enabled`,
 `priority`); `search.enabled: false` registers none.

@@ -242,7 +242,6 @@ paths:
         - CONFLICT_002
         - CRM_004
         - CRM_003
-        - CRM_006
         - CRM_002
       parameters:
         -

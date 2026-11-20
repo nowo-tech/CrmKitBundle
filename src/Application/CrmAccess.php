@@ -10,6 +10,7 @@ use Nowo\CrmKitBundle\Application\Access\SessionCaller;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
+use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
@@ -22,6 +23,7 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Psr\Clock\ClockInterface;
 
 use function array_filter;
+use function array_map;
 use function array_values;
 use function in_array;
 
@@ -89,6 +91,38 @@ final readonly class CrmAccess
     }
 
     /**
+     * The keys (`SubjectRef::key()`) of the records the actor may view, decided for a page at once (0.3.0): every
+     * list, search, related label and timeline passes its rows through it, so a record a
+     * `nowo_crm_kit.record_access_check` listener denies appears nowhere.
+     *
+     * @param array<array-key, mixed> $subjects SubjectRef values (anything else is ignored)
+     *
+     * @return array<string, true>
+     */
+    public function viewable(CrmContext $context, array $subjects): array
+    {
+        $refs = array_values(array_filter($subjects, static fn (mixed $s): bool => $s instanceof SubjectRef));
+
+        return $refs === [] ? [] : $this->caller()->grantedSubjects(CrmPermission::View, $context->tenant, $refs);
+    }
+
+    /**
+     * The records of a page the actor may view, in their order.
+     *
+     * @template T of CrmRecord
+     *
+     * @param list<T> $records
+     *
+     * @return list<T>
+     */
+    public function viewableRecords(CrmContext $context, array $records): array
+    {
+        $granted = $this->viewable($context, array_map(static fn (CrmRecord $r): SubjectRef => SubjectRef::of($r::type(), $r->getId(), $r->getOwnerId()), $records));
+
+        return array_values(array_filter($records, static fn (CrmRecord $r): bool => isset($granted[$r::type()->value . ':' . $r->getId()])));
+    }
+
+    /**
      * Whether a record of this owner is visible under {@see self::visibleOwners()}.
      *
      * @param list<string>|null $owners
@@ -116,7 +150,7 @@ final readonly class CrmAccess
             throw new NotAvailableException();
         }
 
-        return new CrmContext($tenant, $actor, $this->clock->now()->setTimezone(new DateTimeZone('UTC')), $caller->origin());
+        return new CrmContext($tenant, $actor, $this->clock->now()->setTimezone(new DateTimeZone('UTC')), $caller->origin(), $caller->hostContext());
     }
 
     /**

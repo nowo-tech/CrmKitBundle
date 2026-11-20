@@ -36,9 +36,19 @@ final readonly class TestCaller implements CrmCallerInterface
         return $this->inner->isGranted($permission, $tenant, $subject);
     }
 
+    public function grantedSubjects(CrmPermission $permission, TenantRef $tenant, array $subjects): array
+    {
+        return $this->inner->grantedSubjects($permission, $tenant, $subjects);
+    }
+
     public function visibleOwners(TenantRef $tenant, ActorRef $actor): ?array
     {
         return $this->inner->visibleOwners($tenant, $actor);
+    }
+
+    public function hostContext(): ?object
+    {
+        return $this->inner->hostContext();
     }
 
     public function origin(): AuditOrigin

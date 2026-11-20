@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Tests\Fixtures;
 
 use Doctrine\DBAL\Driver\AbstractException;
+use Doctrine\DBAL\Exception\DeadlockException;
 use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\Event\LifecycleEventArgs;
@@ -50,6 +51,11 @@ final class RaceInjector
             --$this->context->races['NextActionLock'];
 
             throw new LockWaitTimeoutException(new class('Lock wait timeout exceeded.') extends AbstractException {}, null);
+        }
+        if ($object instanceof CrmRecord && ($this->context->races['Deadlock'] ?? 0) > 0) {
+            --$this->context->races['Deadlock'];
+
+            throw new DeadlockException(new class('Deadlock found when trying to get lock.') extends AbstractException {}, null);
         }
         if (($this->context->races[$short] ?? 0) > 0) {
             --$this->context->races[$short];

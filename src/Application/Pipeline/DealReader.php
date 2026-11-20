@@ -50,6 +50,9 @@ final readonly class DealReader
     public const NEXT_ACTIONS = 10;
 
     /** Largest page. */
+    /** Most keyset batches one page scans past deals a record listener denies (0.3.0). */
+    public const MAX_SCAN_ROUNDS = 10;
+
     public const MAX_PAGE = 100;
 
     /**
@@ -104,20 +107,39 @@ final readonly class DealReader
         $limit = max(1, min(self::MAX_PAGE, $limit));
 
         return $this->pipeline->support->read(function () use ($context, $query, $after, $limit): DealPage { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $owners = $this->pipeline->support->access->visibleOwners($context);
-            $rows   = $this->pipeline->store->deals($context->tenant, $query, $owners, $after, $limit, $this->cutoffs($context, $query->funnelId), $context->now);
-            $more   = count($rows) > $limit;
-            $rows   = array_slice($rows, 0, $limit);
-            $last   = $rows === [] ? null : $rows[count($rows) - 1];
-            // A host's per-record deny hides the row (the page may then be shorter; the key still moves on).
+            $owners  = $this->pipeline->support->access->visibleOwners($context);
+            $cutoffs = $this->cutoffs($context, $query->funnelId);
             $visible = [];
-            foreach ($rows as $deal) {
-                if ($this->pipeline->may($context, CrmPermission::View, $deal)) {
-                    $visible[] = $deal;
+            $next    = null;
+            $cursor  = $after;
+            // A host's per-record deny hides the row (0.3.0): the scan goes on past hidden rows, up to
+            // MAX_SCAN_ROUNDS batches; the next key is the last VISIBLE row's, or the last row scanned once the bound
+            // is reached (callers seal it).
+            for ($round = 1; $round <= self::MAX_SCAN_ROUNDS; ++$round) {
+                $rows    = $this->pipeline->store->deals($context->tenant, $query, $owners, $cursor, $limit, $cutoffs, $context->now);
+                $more    = count($rows) > $limit;
+                $rows    = array_slice($rows, 0, $limit);
+                $granted = $this->pipeline->support->access->viewable($context, array_map(static fn (Deal $d): SubjectRef => SubjectRef::of(SubjectType::Deal, $d->getId(), $d->getOwnerId()), $rows));
+                foreach ($rows as $deal) {
+                    if (isset($granted[SubjectType::Deal->value . ':' . $deal->getId()])) {
+                        if (count($visible) === $limit) {
+                            $next = self::key($visible[$limit - 1], $query->sort);
+
+                            break 2;
+                        }
+                        $visible[] = $deal;
+                    }
+                    $cursor = self::key($deal, $query->sort);
+                }
+                if (!$more) {
+                    break;
+                }
+                if ($round === self::MAX_SCAN_ROUNDS) {
+                    $next = $cursor;
                 }
             }
 
-            return new DealPage($this->views($context, $visible), $more && $last instanceof Deal ? self::key($last, $query->sort) : null);
+            return new DealPage($this->views($context, $visible), $next);
         });
     }
 

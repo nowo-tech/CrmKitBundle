@@ -35,6 +35,9 @@ final class ConflictException extends RuntimeException implements CrmException
     /** 0.3.0: the stage is not one of the deal's funnel, the funnel or the stage is archived, or a create targets a closed stage. */
     public const STAGE_INVALID = 'crm_stage_invalid';
 
+    /** A next action's dedupe key already names another subject (0.3.0). */
+    public const DEDUPE_REUSED = 'crm_dedupe_reused';
+
     /**
      * @param string $errorCode one of the constants
      * @param string|null $recordId the record the conflict is about (merged: the survivor)

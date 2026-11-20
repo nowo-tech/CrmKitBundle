@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Application\Access;
 
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmBatchAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
@@ -59,9 +60,35 @@ final readonly class SessionCaller implements CrmCallerInterface
     /**
      * {@inheritDoc}
      */
+    public function grantedSubjects(CrmPermission $permission, TenantRef $tenant, array $subjects): array
+    {
+        if ($this->checker instanceof CrmBatchAccessCheckerInterface) {
+            return $this->checker->grantedSubjects($permission, $tenant, $subjects);
+        }
+        $granted = [];
+        foreach ($subjects as $subject) {
+            if ($this->checker->isGranted($permission, $tenant, $subject)) {
+                $granted[$subject->key()] = true;
+            }
+        }
+
+        return $granted;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function visibleOwners(TenantRef $tenant, ActorRef $actor): ?array
     {
         return $this->visibility?->visibleOwners($tenant, $actor);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function hostContext(): ?object
+    {
+        return null;
     }
 
     /**

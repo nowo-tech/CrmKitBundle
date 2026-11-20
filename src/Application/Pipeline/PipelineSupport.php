@@ -89,20 +89,6 @@ final readonly class PipelineSupport
     }
 
     /**
-     * Whether the actor may do something on a deal.
-     */
-    public function may(CrmContext $context, CrmPermission $permission, Deal $deal): bool
-    {
-        try {
-            $this->require($context, $permission, $deal);
-
-            return true;
-        } catch (AccessDeniedException) {
-            return false;
-        }
-    }
-
-    /**
      * An active company or contact of the tenant the actor may view, as the relation of a deal; anything else (missing,
      * hidden, merged, trashed) is the same input error, so a hidden record cannot be told from a missing one.
      *

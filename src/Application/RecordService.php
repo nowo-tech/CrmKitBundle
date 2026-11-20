@@ -82,23 +82,32 @@ final readonly class RecordService implements RecordServiceInterface
     }
 
     /**
-     * Creates a company or contact; `$check` runs inside the write unit, after the plan counter row is locked and
-     * before the insert, with the new (not yet stored) record: it may throw to refuse (0.3.0: the API's duplicate
-     * check, which then answers with the existing record).
+     * Creates a company or contact; `$check` runs inside the write unit before and after the plan counter row is
+     * locked, before the insert, with the new (not yet stored) record: it may throw to refuse (0.3.0: the API's
+     * duplicate check, which then answers with the existing record).
+     *
+     * With `$affiliation` (`[companyId, role, primary, primaryContact, purposes]`, contacts only) the new contact is
+     * affiliated in the same write unit: role and purposes are validated first, and a refusal writes nothing.
      *
      * @param (callable(CrmRecord): void)|null $check
+     * @param array{0: string, 1: ?string, 2: bool, 3: ?bool, 4: ?list<string>}|null $affiliation
      *
      * @internal
      */
-    public function createChecked(RecordInput $input, ?callable $check = null): string
+    public function createChecked(RecordInput $input, ?callable $check = null, ?array $affiliation = null): string
     {
         $context = $this->support->access->context(CrmPermission::Create);
         $values  = RecordValidator::values($input->type, $input->values, true);
         $owner   = $this->owner($context, $input);
         $roles   = $input->roles === null ? [] : $this->catalogue->checkRoles($input->roles);
+        if ($affiliation !== null) {
+            [$companyId, $role, $primary, $primaryContact, $purposes] = $affiliation;
+            [$role, $purposes]                                        = $this->affiliationParts($role, $purposes);
+            $affiliation                                              = [$companyId, $role, $primary, $primaryContact, $purposes];
+        }
 
-        return $this->guardEmail($context, $input, null, function () use ($context, $input, $values, $owner, $roles, $check): string {
-            return $this->support->write(function (Effects $effects) use ($context, $input, $values, $owner, $roles, $check): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
+        return $this->guardEmail($context, $input, null, function () use ($context, $input, $values, $owner, $roles, $check, $affiliation): string {
+            return $this->support->write(function (Effects $effects) use ($context, $input, $values, $owner, $roles, $check, $affiliation): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 $store  = $this->support->store;
                 $id     = $this->support->id();
                 $record = $input->type === SubjectType::Company
@@ -110,6 +119,13 @@ final readonly class RecordService implements RecordServiceInterface
                 }
                 $record->changeOwner($owner);
                 $record->changeCustom(RecordValidator::custom($input->custom ?? [], $store->fields($context->tenant, $input->type, true), []));
+                // The check runs twice (0.3.0, audit VS): before the counter, so the records it locks come first, in
+                // the order of every other path (records, then the counter: trash, restore, merge, erasure, import);
+                // and again once the counter row serialises the creates of the type, which only meets the rows it
+                // already holds or rows a concurrent create has just committed (nobody else holds them).
+                if ($check !== null) {
+                    $check($record);
+                }
                 $this->counter->take($context->tenant, $input->type);
                 if ($check !== null) {
                     $check($record);
@@ -125,6 +141,10 @@ final readonly class RecordService implements RecordServiceInterface
                 }
                 $effects->event(new RecordCreated($context->tenant, $context->actor, $context->now, $input->type, $id));
                 $this->support->audit($effects, $context, 'crm.' . $input->type->value . '.created', $input->type, $id);
+                if ($affiliation !== null) {
+                    // The same unit: a refused affiliation (company hidden, merged, no edit) rolls the contact back too.
+                    $this->writeAffiliation($effects, $context, $id, $affiliation[0], $affiliation[1], $affiliation[2], $affiliation[3], $affiliation[4]);
+                }
 
                 return $id;
             });
@@ -241,13 +261,9 @@ final readonly class RecordService implements RecordServiceInterface
      */
     public function affiliate(string $contactId, string $companyId, ?string $role, bool $primary, ?bool $primaryContact = null, ?array $purposes = null): string
     {
-        $context = $this->support->access->base();
-        $role    = $role === null || trim($role) === '' ? null : trim($role);
-        if ($role !== null && (mb_strlen($role) > 120 || RecordValidator::check($role, 120, 'text') !== null)) {
-            throw InvalidInputException::field('role', 'error.invalid');
-        }
-        $purposes = $purposes === null ? null : $this->catalogue->checkPurposes($purposes);
-        $write    = fn (Effects $effects): string => $this->writeAffiliation($effects, $context, $contactId, $companyId, $role, $primary, $primaryContact, $purposes);
+        $context           = $this->support->access->base();
+        [$role, $purposes] = $this->affiliationParts($role, $purposes);
+        $write             = fn (Effects $effects): string => $this->writeAffiliation($effects, $context, $contactId, $companyId, $role, $primary, $primaryContact, $purposes);
 
         try {
             return $this->support->write($write);
@@ -350,6 +366,23 @@ final readonly class RecordService implements RecordServiceInterface
             $this->support->activity($context, SubjectType::Company, $affiliation->getCompanyId(), ActivityKind::Unaffiliated, ['contact' => $affiliation->getContactId()]);
             $this->support->audit($effects, $context, 'crm.affiliation.removed', SubjectType::Contact, $affiliation->getContactId(), ['company' => $affiliation->getCompanyId()]);
         });
+    }
+
+    /**
+     * The checked role (trimmed, null when empty) and purposes of an affiliation.
+     *
+     * @param list<string>|null $purposes
+     *
+     * @return array{?string, ?list<string>}
+     */
+    private function affiliationParts(?string $role, ?array $purposes): array
+    {
+        $role = $role === null || trim($role) === '' ? null : trim($role);
+        if ($role !== null && (mb_strlen($role) > 120 || RecordValidator::check($role, 120, 'text') !== null)) {
+            throw InvalidInputException::field('role', 'error.invalid');
+        }
+
+        return [$role, $purposes === null ? null : $this->catalogue->checkPurposes($purposes)];
     }
 
     /**

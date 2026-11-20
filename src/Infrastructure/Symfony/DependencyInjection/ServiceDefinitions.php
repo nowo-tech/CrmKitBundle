@@ -255,6 +255,8 @@ final class ServiceDefinitions
             ->tag('kernel.event_listener', ['event' => 'console.terminate', 'method' => 'clear', 'priority' => -2048]);
 
         // Application.
+        // The sealed keyset cursors of the API and of the deal list (0.3.0, audit VS-3).
+        $s->set(CrmApiCursorCodec::class)->args([param('kernel.secret')]);
         $s->set(CrmAccess::class)->args([service(CrmTenantResolverInterface::class), service(CrmFeatureGateInterface::class), service(CrmAccessCheckerInterface::class), $clock, service(CrmRecordVisibilityInterface::class)])->public();
         $s->set(WriteSupport::class)->args([service(CrmAccess::class), service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(IdGeneratorInterface::class), service(CrmAuditSinkInterface::class), $events]);
         $s->set(PlanCounter::class)->args([service(CrmStoreInterface::class), service(CrmPlanLimitsInterface::class)])->public();
@@ -400,7 +402,6 @@ final class ServiceDefinitions
         $s->set(CrmApiGuard::class)->args([service(CrmAccess::class), service(CrmApiCallerFactoryInterface::class), service(CrmApiOperations::class)]);
         $s->set(CrmApiIdempotency::class)->args([service(CrmApiIdempotencyStoreInterface::class), service($p . 'clock'), param($p . 'api.idempotency_ttl_seconds')]);
         $s->set(CrmApiWriter::class)->args([service(CrmApiGuard::class), service(CrmApiIdempotency::class)]);
-        $s->set(CrmApiCursorCodec::class)->args([param('kernel.secret')]);
         $s->set(CrmApiRecords::class)->args([service(WriteSupport::class)]);
         $pipe = null;
         if ($pipeline) {
@@ -409,7 +410,7 @@ final class ServiceDefinitions
         }
         $s->set(CrmApiReadOperations::class)->args([service(CrmApiGuard::class), service(CrmApiRecords::class), service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class), service(CrmApiCursorCodec::class), service(CrmApiOperations::class), param($p . 'gdpr.purposes'), $pipe])->public();
         $s->set(CrmApiRelationOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiRecords::class), service(RecordService::class), service(NoteService::class), service(TagService::class), service(RecordViews::class), service(WriteSupport::class)])->public();
-        $s->set(CrmApiRecordOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiRecords::class), service(CrmApiReadOperations::class), service(RecordService::class), service(CrmReader::class), service(WriteSupport::class), service(CrmApiRelationOperations::class)])->public();
+        $s->set(CrmApiRecordOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiRecords::class), service(CrmApiReadOperations::class), service(RecordService::class), service(CrmReader::class), service(WriteSupport::class)])->public();
         $s->set(CrmApiDealOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiCursorCodec::class), $pipe])->public();
         $s->set(CrmApiNextActionOperations::class)->args([service(CrmApiGuard::class), service(CrmApiWriter::class), service(CrmApiRecords::class), $pipe])->public();
         $s->set(ApiPurgeIdempotencyCommand::class)->args([service(CrmApiIdempotencyStoreInterface::class), service($p . 'clock')])->tag('console.command');
@@ -432,7 +433,7 @@ final class ServiceDefinitions
         $s = $container->services();
         $p = self::P;
         $s->set(PipelineForms::class)->args([service(RecordForms::class), service(CrmReaderInterface::class), param($p . 'pipeline.lost_reasons')]);
-        $s->set(PipelineController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(DealService::class), service(NextActionService::class), service(PartyStageService::class), service(PipelineForms::class), service(CrmAccess::class)])->public()->tag('controller.service_arguments');
+        $s->set(PipelineController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(DealService::class), service(NextActionService::class), service(PartyStageService::class), service(PipelineForms::class), service(CrmAccess::class), service(CrmApiCursorCodec::class)])->public()->tag('controller.service_arguments');
         $s->set(PipelineAdminController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(FunnelService::class), service(FunnelStatistics::class), service(PipelineForms::class), service(CrmAccess::class)])->public()->tag('controller.service_arguments');
         $s->set(PipelineRecordBlock::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(PartyStageService::class), service(NextActionService::class), service(PipelineForms::class)]);
         foreach ([DealFilterType::class, DealType::class, FunnelType::class, StageType::class, StageMoveType::class, NextActionType::class, StatsFilterType::class, LifecycleType::class] as $type) {

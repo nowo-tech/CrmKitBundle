@@ -38,6 +38,9 @@ final class TestTaskPort implements CrmTaskPort
     /** @var list<string> task ids states() returns */
     public array $visible = [];
 
+    /** @var list<object|null> the host contexts states() was asked with */
+    public array $stateContexts = [];
+
     /** Runs once inside the next create() (a concurrent request of the same key, say). */
     public ?Closure $onCreate = null;
 
@@ -59,7 +62,8 @@ final class TestTaskPort implements CrmTaskPort
 
     public function states(TenantRef $tenant, ActorRef $actor, ?object $hostContext, array $refs): array
     {
-        $states = [];
+        $this->stateContexts[] = $hostContext;
+        $states                = [];
         foreach ($refs as $ref) {
             if (in_array($ref->id, $this->visible, true)) {
                 $states[$ref->key()] = new CrmTaskState($ref, NextActionStatus::Open, '/tasks/' . $ref->id);

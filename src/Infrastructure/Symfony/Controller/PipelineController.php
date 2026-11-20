@@ -6,6 +6,10 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\CrmKitBundle\Api\CrmApiOperation;
+use Nowo\CrmKitBundle\Api\CrmApiRefusal;
+use Nowo\CrmKitBundle\Api\Input\CrmApiCursor;
+use Nowo\CrmKitBundle\Api\Operation\CrmApiCursorCodec;
 use Nowo\CrmKitBundle\Application\CrmAccess;
 use Nowo\CrmKitBundle\Application\Pipeline\DealInput;
 use Nowo\CrmKitBundle\Application\Pipeline\DealQuery;
@@ -52,21 +56,13 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-use function base64_decode;
-use function base64_encode;
 use function explode;
 use function in_array;
 use function is_array;
 use function is_numeric;
 use function is_string;
-use function json_decode;
-use function json_encode;
 use function preg_match;
-use function rtrim;
-use function strtr;
 use function trim;
-
-use const JSON_THROW_ON_ERROR;
 
 /**
  * The deal pages (0.3.0, `ui.enabled` and `pipeline.enabled`): the list (keyset pages), the board of a funnel, a deal
@@ -87,6 +83,7 @@ final readonly class PipelineController
         private PartyStageService $lifecycle,
         private PipelineForms $forms,
         private CrmAccess $access,
+        private CrmApiCursorCodec $cursors,
     ) {
     }
 
@@ -115,7 +112,8 @@ final readonly class PipelineController
                 staleOnly: $request->query->get('stale') === '1',
                 sort: $sort,
             );
-            $page  = $this->reader->deals($query, self::after((string) $request->query->get('after', '')), $this->ui->pageSize);
+            $keyed = ['funnel' => $query->funnelId, 'status' => $query->status?->value, 'q' => $query->text, 'stale' => $query->staleOnly, 'sort' => $query->sort];
+            $page  = $this->reader->deals($query, $this->after((string) $request->query->get('after', ''), $keyed), $this->ui->pageSize);
             $names = [];
             foreach ($funnels as $f) {
                 foreach ($f->stages as $s) {
@@ -143,7 +141,7 @@ final readonly class PipelineController
             $columns[] = new Column('close', UiSupport::label('deal.form.expected_close'), priority: 3);
             $columns[] = new Column('stale', UiSupport::label('deal.stale'), priority: 3);
             $actions   = $this->ui->can(CrmPermission::Create) && $funnels !== [] ? [Action::create($this->ui->url('nowo_crm_kit_deal_new'), UiSupport::label('deal.new'))] : [];
-            $next      = $page->next === null ? null : $this->ui->url('nowo_crm_kit_deals', ['after' => self::cursor($page->next)] + $request->query->all());
+            $next      = $page->next === null ? null : $this->ui->url('nowo_crm_kit_deals', ['after' => $this->cursor($page->next, $keyed)] + $request->query->all());
 
             return $this->ui->render('@NowoCrmKit/pipeline/deals.html.twig', [
                 'page' => new ListPage(
@@ -494,34 +492,35 @@ final readonly class PipelineController
     }
 
     /**
-     * The key of a keyset page in a URL (base64url JSON; never sealed: the pages show the same values).
+     * The key of a keyset page in a URL (0.3.0, audit VS-3): sealed with the API's cursor codec and bound to the
+     * list's filters, so no value of a row reaches the URL.
      *
      * @param array{v: string|null, id: string} $key
+     * @param array<string, mixed> $filters
      */
-    public static function cursor(array $key): string
+    public function cursor(array $key, array $filters): string
     {
-        return rtrim(strtr(base64_encode(json_encode([$key['v'], $key['id']], JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        return $this->cursors->seal(CrmApiOperation::DealSearch, CrmApiCursorCodec::filterHash(['ui' => $filters]), ['v' => $key['v'], 'id' => $key['id']]);
     }
 
     /**
-     * The key of the `after` parameter, or null when absent or malformed.
+     * The key of the `after` parameter, or null when absent, tampered with or for other filters (the list starts
+     * again).
+     *
+     * @param array<string, mixed> $filters
      *
      * @return array{v: string|null, id: string}|null
      */
-    public static function after(string $cursor): ?array
+    public function after(string $cursor, array $filters): ?array
     {
-        $json  = $cursor === '' ? false : base64_decode(strtr($cursor, '-_', '+/'), true);
-        $value = is_string($json) ? json_decode($json, true) : null;
-        if (!is_array($value) || !is_string($value[1] ?? null) || preg_match('/\A[0-9a-f-]{36}\z/', $value[1]) !== 1 || ($value[0] ?? null) !== null && !is_string($value[0])) {
+        try {
+            $key = $this->cursors->open(new CrmApiCursor($cursor), CrmApiOperation::DealSearch, CrmApiCursorCodec::filterHash(['ui' => $filters]));
+        } catch (CrmApiRefusal) {
             return null;
         }
+        $v = $key['v'] ?? null;
 
-        $sortValue = $value[0] ?? null;
-        if (is_string($sortValue) && preg_match('/\A-?[0-9][0-9 :.\-]{0,31}\z/', $sortValue) !== 1) {
-            return null;
-        }
-
-        return ['v' => is_string($sortValue) ? $sortValue : null, 'id' => $value[1]];
+        return is_string($key['id'] ?? null) && ($v === null || is_string($v)) ? ['v' => $v, 'id' => $key['id']] : null;
     }
 
     /**

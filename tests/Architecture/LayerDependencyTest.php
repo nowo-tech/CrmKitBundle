@@ -52,6 +52,20 @@ final class LayerDependencyTest extends TestCase
         self::assertSame([], $this->violations('/Application/Pipeline/', '/(CrmBatchLookup|CrmBatchLookupStoreInterface|CrmActorPersonalData)(Interface)?$/'));
     }
 
+    public function testNoOperationRestoresOrPurges(): void
+    {
+        // Owner rules (0.3.0): restoring from the trash and purging stay on the pages (DealService::restore() / purge(),
+        // RecordService::restore() / purge()); an API trash is undone only by a person.
+        $violations = [];
+        foreach ($this->sourceFiles() as $path => $source) {
+            if (str_starts_with($path, '/Api/') && preg_match('/->(restore|purge)\(/', $source) === 1) {
+                $violations[] = $path;
+            }
+        }
+
+        self::assertSame([], $violations);
+    }
+
     public function testOnlyTheApiLayerOfInfrastructureImportsTheHttpFoundationForTheApi(): void
     {
         $violations = [];

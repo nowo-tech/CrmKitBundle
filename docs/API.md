@@ -113,7 +113,8 @@ What a match answers:
 |---|---|
 | visible | 200 with the existing record, `duplicate: true` and `duplicate_of` (`email`, `tax_id`, `domain` or `name`); nothing is created |
 | trashed and visible | 409 `CRM_003` with `record_id` |
-| not visible | 409 `CRM_006`, with no id |
+| a contact e-mail the principal may not view | 409 `CRM_006`, with no id (the e-mail is a unique key) |
+| a company the principal may not view | ignored: the company is created, as the pages allow namesakes (owner decision Q1), so a hidden company is never revealed |
 
 A new record's answer lists up to 5 visible name matches as `possible_duplicates` (ids only).
 
@@ -201,7 +202,7 @@ The body is `{"error": "<static message>", "code": "<CODE>", ...extra}`. Every r
 | 409 | `CRM_003` | a matching record is in the trash | `record_id` when visible |
 | 409 | `CRM_004` | plan limit | — |
 | 409 | `CRM_005` | a unique key refused the write twice (a retry is safe) | — |
-| 409 | `CRM_006` | a matching record exists and is not visible | — |
+| 409 | `CRM_006` | a contact with the same e-mail exists and is not visible | — |
 | 422 | `CRM_007` | a lost stage without a lost reason | — |
 | 409 | `CRM_008` | the stage cannot be used here | — |
 | 503 | `CRM_009` | the task port is unavailable; nothing written | — |

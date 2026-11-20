@@ -64,6 +64,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `as($caller)` on the Application services run a call as a given caller. New keyset indexes on companies, contacts and
   notes.
 
+### Changed (0.3.0: audit VS)
+
+- **Every list hides records a listener denies** (owner decision Q2): the 0.2 web lists, the CSV export, related labels
+  (a company's contacts, a contact's companies), the company timeline, duplicate hints, the merge preview, the API
+  search, affiliations and timelines pass each row through `nowo_crm_kit.record_access_check`, one batch per page
+  (`CrmBatchAccessCheckerInterface`, implemented by the default checker). See UPGRADING.
+- **API company creates behave like the pages** (owner decision Q1): a match the principal may not view no longer
+  answers `CRM_006`; the company is created. `CRM_006` stays for a contact's e-mail (a unique key).
+- A contact created with `company` is affiliated in the create's own write unit; a refused affiliation writes nothing,
+  and a replay writes nothing.
+- The deal list's cursor is sealed and keyed on the last visible deal; pages scan past denied deals (bounded).
+- `crm_contacts` is a sensitive SearchKit group (personal data).
+- The API's error listener leaves the firewall's 401 / 403 and HTTP exceptions to Symfony.
+- Next-action task states are read with the API token's host context; a dedupe key that names another subject is
+  refused (`IDEMP_002` through the API).
+
 ### Removed (0.3.0)
 
 - The root configuration key `access_checker` (a 0.1.0 `CrmAccessCheckerInterface`, deprecated since 0.2.0),

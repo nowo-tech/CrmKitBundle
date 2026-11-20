@@ -42,9 +42,19 @@ final readonly class CrmResourceAccessChecker
     public function isGranted(?object $user, ?ActorRef $actor, TenantRef $tenant, CrmPermission $action, SubjectRef $subject): bool
     {
         // Without a visibility service every record is shared; without an actor only ownerless records are.
-        $owners = $this->visibility instanceof CrmRecordVisibilityInterface ? ($actor instanceof ActorRef ? $this->visibility->visibleOwners($tenant, $actor) : []) : null;
+        $owners = $actor instanceof ActorRef ? $this->visibleOwners($tenant, $actor) : ($this->visibility instanceof CrmRecordVisibilityInterface ? [] : null);
 
         return $this->decide($user, $actor, $tenant, $action, $subject, $owners);
+    }
+
+    /**
+     * The visible owners of an actor, once for a page (null: every record).
+     *
+     * @return list<string>|null
+     */
+    public function visibleOwners(TenantRef $tenant, ActorRef $actor): ?array
+    {
+        return $this->visibility?->visibleOwners($tenant, $actor);
     }
 
     /**

@@ -28,12 +28,25 @@ interface CrmCallerInterface
     public function isGranted(CrmPermission $permission, TenantRef $tenant, ?SubjectRef $subject = null): bool;
 
     /**
+     * The keys (`SubjectRef::key()`) of the records on which the permission is held, decided for a whole page at once
+     * (0.3.0): one area check and one visibility per call, then the record decision (`RECORD_ACCESS_CHECK`) per row.
+     *
+     * @param list<SubjectRef> $subjects
+     *
+     * @return array<string, true>
+     */
+    public function grantedSubjects(CrmPermission $permission, TenantRef $tenant, array $subjects): array;
+
+    /**
      * The owners whose records the actor may see in lists (null: every record of the tenant), as
      * `CrmRecordVisibilityInterface::visibleOwners()`.
      *
      * @return list<string>|null
      */
     public function visibleOwners(TenantRef $tenant, ActorRef $actor): ?array;
+
+    /** The host's context of the call (an API token's), handed to host ports such as `CrmTaskPort`; null on the pages. */
+    public function hostContext(): ?object;
 
     /** The token behind the call (null for the CRM's pages). */
     public function origin(): ?AuditOrigin;

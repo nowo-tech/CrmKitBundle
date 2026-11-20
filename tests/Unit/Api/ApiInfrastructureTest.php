@@ -32,6 +32,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmActorResolverInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitAccessCheckerInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmResourceAccessChecker;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
@@ -61,6 +62,10 @@ final class ApiInfrastructureTest extends TestCase
             self::assertTrue($caller->isGranted($permission, $tenant, $subject), $permission->value);
         }
         self::assertFalse($caller->isGranted(CrmPermission::Manage, $tenant), 'the grant is below manage');
+        self::assertSame([], $caller->grantedSubjects(CrmPermission::Export, $tenant, [$subject]), 'never through the API');
+        self::assertSame([$subject->key() => true], $caller->grantedSubjects(CrmPermission::View, $tenant, [$subject]));
+        $session = new SecurityCrmAccessChecker($areas, new CrmResourceAccessChecker(), new TokenStorage());
+        self::assertSame([], $session->grantedSubjects(CrmPermission::View, $tenant, [$subject]), 'nobody signed in');
         self::assertFalse($caller->isGranted(CrmPermission::Export, $tenant), 'never through the API');
         self::assertFalse($caller->isGranted(CrmPermission::View, new TenantRef('beta')), 'another tenant than the call\'s');
         self::assertNull($caller->selfOwners($tenant));

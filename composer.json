@@ -47,7 +47,7 @@
         "doctrine/persistence": "^3.4 || ^4.0",
         "nowo-tech/form-kit-bundle": "^2.23",
         "nowo-tech/transaction-contract": "^1.0",
-        "nowo-tech/transaction-doctrine": "^1.6",
+        "nowo-tech/transaction-doctrine": "^1.8",
         "nowo-tech/ui-kit-bundle": "^2.55",
         "psr/clock": "^1.0",
         "psr/log": "^2.0 || ^3.0",

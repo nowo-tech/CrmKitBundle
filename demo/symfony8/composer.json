@@ -11,7 +11,7 @@
         "nowo-tech/crm-kit-bundle": "@dev",
         "nowo-tech/form-kit-bundle": "^2.23",
         "nowo-tech/search-kit-bundle": "^1.7",
-        "nowo-tech/transaction-doctrine": "^1.6",
+        "nowo-tech/transaction-doctrine": "^1.8",
         "nowo-tech/ui-kit-bundle": "^2.55",
         "symfony/asset": "8.1.*",
         "symfony/console": "8.1.*",

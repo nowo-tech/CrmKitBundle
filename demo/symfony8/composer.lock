@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "79d4aacf3defbf96ec9ae0601b133c84",
+    "content-hash": "376961aaadfba09703a782377ad706e0",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -951,16 +951,17 @@
             "dist": {
                 "type": "path",
                 "url": "/var/crm-kit-bundle",
-                "reference": "9f57b1abacd0d0f63007cb930772b0ba6fbe80da"
+                "reference": "54da0e08dd259d7a6b833b10efccd7a1f232cb40"
             },
             "require": {
                 "doctrine/dbal": "^3.8.2 || ^4.0",
                 "doctrine/doctrine-bundle": "^2.8 || ^3.0",
                 "doctrine/orm": "^3.7",
                 "doctrine/persistence": "^3.4 || ^4.0",
+                "ext-sodium": "*",
                 "nowo-tech/form-kit-bundle": "^2.23",
                 "nowo-tech/transaction-contract": "^1.0",
-                "nowo-tech/transaction-doctrine": "^1.6",
+                "nowo-tech/transaction-doctrine": "^1.8",
                 "nowo-tech/ui-kit-bundle": "^2.55",
                 "php": ">=8.2 <8.6",
                 "psr/clock": "^1.0",
@@ -1006,7 +1007,7 @@
                 "symfony/yaml": "^7.4 || ^8.0"
             },
             "suggest": {
-                "nowo-tech/search-kit-bundle": "Header search provider for companies and contacts (SearchKit >= 1.7, PHP >= 8.3)",
+                "nowo-tech/search-kit-bundle": "^1.9 — header search groups for companies, contacts and deals (needs PHP >= 8.3)",
                 "symfony/flex": "Automatic recipe installation (declares the private entity manager)",
                 "symfony/security-bundle": "Default role-map access checker and actor directory"
             },
@@ -1045,18 +1046,24 @@
                     "/docs/images",
                     "/igor.json",
                     "/phpstan.neon.dist",
+                    "/phpstan-search-kit.php",
                     "/phpunit.xml.dist",
                     "/rector.php",
                     "/specs",
-                    "/tests"
+                    "/tests/Architecture",
+                    "/tests/Fixtures",
+                    "/tests/Integration",
+                    "/tests/Stubs",
+                    "/tests/Unit",
+                    "/tests/bootstrap.php"
                 ]
             },
             "scripts": {
                 "test": [
-                    "@php -d memory_limit=512M vendor/bin/phpunit --color=always"
+                    "@php -d memory_limit=1G vendor/bin/phpunit --color=always"
                 ],
                 "test-coverage": [
-                    "@php -d memory_limit=512M vendor/bin/phpunit --color=always --coverage-html coverage --coverage-clover coverage.xml --coverage-text"
+                    "@php -d memory_limit=1G vendor/bin/phpunit --color=always --coverage-html coverage --coverage-clover coverage.xml --coverage-text"
                 ],
                 "test-coverage-100": [
                     "@test-coverage",
@@ -1439,16 +1446,16 @@
         },
         {
             "name": "nowo-tech/transaction-doctrine",
-            "version": "v1.6.0",
+            "version": "v1.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/transaction-doctrine.git",
-                "reference": "707309320afbe69add2450ed31f67d32f888fe93"
+                "reference": "887fc325ef20787bc108cbfea6a267dfd4e938fe"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/transaction-doctrine/zipball/707309320afbe69add2450ed31f67d32f888fe93",
-                "reference": "707309320afbe69add2450ed31f67d32f888fe93",
+                "url": "https://api.github.com/repos/nowo-tech/transaction-doctrine/zipball/887fc325ef20787bc108cbfea6a267dfd4e938fe",
+                "reference": "887fc325ef20787bc108cbfea6a267dfd4e938fe",
                 "shasum": ""
             },
             "require": {
@@ -1506,7 +1513,8 @@
             },
             "autoload": {
                 "psr-4": {
-                    "Nowo\\TransactionDoctrine\\": "src/"
+                    "Nowo\\TransactionDoctrine\\": "src/",
+                    "Nowo\\TransactionDoctrine\\WriteUnit\\Dbal\\Dbal3\\": "compat/dbal3/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -1544,8 +1552,8 @@
                 "issues": "https://github.com/nowo-tech/transaction-doctrine/issues",
                 "source": "https://github.com/nowo-tech/transaction-doctrine"
             },
-            "time": "2026-11-18T15:30:13+00:00",
-            "published-time": "2026-11-18T15:33:30+00:00"
+            "time": "2026-11-20T06:09:11+00:00",
+            "published-time": "2026-11-20T06:14:34+00:00"
         },
         {
             "name": "nowo-tech/ui-kit-bundle",

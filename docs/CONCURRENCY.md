@@ -16,7 +16,7 @@ REQ-RUNTIME-003; design in [CONTRACT.md](CONTRACT.md) section 15.
 
 ## Write units
 
-Every write is one **write unit** of `nowo-tech/transaction-doctrine` ^1.6 (`WriteUnitInterface`) around one
+Every write is one **write unit** of `nowo-tech/transaction-doctrine` ^1.8 (`WriteUnitInterface`) around one
 transaction on the bundle's entity manager (`DoctrineTransactionRunner`):
 
 - flushed before the commit; replayed after a deadlock, a lock-wait timeout or a serialization failure (MySQL 1213 /
@@ -38,11 +38,13 @@ transaction on the bundle's entity manager (`DoctrineTransactionRunner`):
 - a unique-key refusal inside the unit becomes `DuplicateRowException`, an optimistic-lock failure at flush
   `StaleRowException`; the services decide what each means (below);
 - no HTTP, mail or file I/O inside a transaction (an import file is parsed before the unit that stores its rows);
-- **a replay clears the host's entity manager too** (UD2-L-2, inherited from transaction-doctrine 1.6): before the
-  next attempt, its `WriteUnit` clears every open entity manager, the host's default one included, in private and in
-  shared mode. A host that holds managed entities while it calls a CRM write must re-read them after the call (or call
-  the CRM first). A refused write without a replay leaves the host's manager as it was. A write unit scoped to the
-  bundle's own manager is a platform item of transaction-doctrine.
+- **a replay keeps the host's entity manager** (0.3.0 requires transaction-doctrine ^1.8, which fixes
+  GHSA-9wh3-m3m5-jffx and GHSA-65w2-9r4h-848g; this replaces the risk UD2-L-2 accepted up to 0.2.x): before the next
+  attempt, the `WriteUnit` no longer clears an open manager that managed entities before the first attempt; it puts it
+  back to what the database holds (the attempt's unflushed work dropped, what the attempt brought in detached, the host
+  entities it touched reloaded). When a host entity cannot be brought back, the unit gives up with `CONFLICT_001` and
+  the manager stays open, so the host's next flush writes nothing of the attempt. A manager that managed nothing before
+  the call is cleared as before. The bundle's private manager is still cleared after every unit.
 
 The bundle's write controllers also carry `#[AsWriteUnit]`, so with the transaction bundle's controller attribute
 switched on the whole action is replayed (that attribute opens no transaction, so the services' units still run on

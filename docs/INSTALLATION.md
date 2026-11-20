@@ -24,7 +24,7 @@ With Symfony Flex the recipe registers `Nowo\CrmKitBundle\NowoCrmKitBundle` and 
 `config/bundles.php` (both bundles) and write both files yourself.
 
 Requirements: PHP >= 8.2 < 8.6, Symfony 7.4 / 8.x, Doctrine DBAL 3.8+ / 4, ORM 3.7+ with DoctrineBundle,
-`nowo-tech/ui-kit-bundle` ^2.55, `nowo-tech/form-kit-bundle` ^2.23, `nowo-tech/transaction-doctrine` ^1.6.
+`nowo-tech/ui-kit-bundle` ^2.55, `nowo-tech/form-kit-bundle` ^2.23, `nowo-tech/transaction-doctrine` ^1.8.
 
 ## Private entity manager
 

@@ -66,6 +66,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed (0.3.0: audit VS)
 
+- **Behaviour change for hosts:** the 0.2.x web lists showed records a `nowo_crm_kit.record_access_check` listener
+  denied (only `security.resource_scoping` filtered them); 0.3.0 hides them in every list, export, label and
+  timeline. Totals become the SQL count minus the page's denied rows (see UPGRADING).
+
 - **Every list hides records a listener denies** (owner decision Q2): the 0.2 web lists, the CSV export, related labels
   (a company's contacts, a contact's companies), the company timeline, duplicate hints, the merge preview, the API
   search, affiliations and timelines pass each row through `nowo_crm_kit.record_access_check`, one batch per page

@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Database\Api;
 
 use Nowo\CrmKitBundle\Api\CrmApiCode;
 use Nowo\CrmKitBundle\Api\CrmApiOperation;
+use Nowo\CrmKitBundle\Api\Input\CrmApiCompanyLink;
 use Nowo\CrmKitBundle\Api\Input\CrmApiRecordChanges;
 use Nowo\CrmKitBundle\Api\Input\CrmApiRecordDraft;
 use Nowo\CrmKitBundle\Api\Input\IdempotencyKey;
@@ -147,6 +148,32 @@ final class ApiRaceTest extends ApiTestCase
         self::assertInstanceOf(CrmApiItem::class, $mail->result);
         self::assertTrue($mail->result->fact('duplicate'));
         self::assertSame([2, 1], [$this->int("SELECT COUNT(*) FROM nowo_crm_company WHERE tax_id_key IS NOT NULL OR name_key = 'seed'"), $this->int('SELECT COUNT(*) FROM nowo_crm_contact')]);
+    }
+
+    public function testAContactCreateLocksItsCompanyBeforeTheCounter(): void
+    {
+        if (!$this->servers()) {
+            return;
+        }
+        $acme  = $this->company('Acme');
+        $other = $this->second();
+        $ops   = self::svc($other, CrmApiRecordOperations::class);
+        $draft = new CrmApiRecordDraft(SubjectType::Contact, ['last_name' => 'Ada'], company: new CrmApiCompanyLink(new RecordId($acme), 'CEO'));
+        // Company X held by the first connection (as an import or a contact merge holds it before the counter): the
+        // create waits on the company, before the counter, and gives up without writing.
+        $this->hold('SELECT id FROM nowo_crm_company WHERE id = ? FOR UPDATE', [$acme], function () use ($ops, $draft): void {
+            try {
+                $ops->createContact($this->principal(), $this->acme(), new IdempotencyKey('aff-lock'), $draft);
+                self::fail('no lock conflict');
+            } catch (ConcurrencyConflict $e) {
+                self::assertFalse($e->committed);
+            }
+            // The counter row was never taken by the waiting create: this connection can still take it.
+            $this->connection()->fetchAllAssociative("SELECT value FROM nowo_crm_counter WHERE tenant_id = 'acme' AND resource = 'contacts' FOR UPDATE");
+        });
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_contact'));
+        self::assertFalse($ops->createContact($this->principal(), $this->acme(), new IdempotencyKey('aff-lock'), $draft)->replayed);
+        self::assertSame([1, 1], [$this->int('SELECT COUNT(*) FROM nowo_crm_contact'), $this->int('SELECT COUNT(*) FROM nowo_crm_affiliation')]);
     }
 
     private function servers(): bool

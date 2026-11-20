@@ -69,7 +69,9 @@ CREATE INDEX nowo_crm_note_keyset            ON nowo_crm_note (tenant_id, subjec
   not only through the SQL visibility of `security.resource_scoping`. A record a host listener denies `view` no longer
   appears in the 0.2 web lists, the CSV export of a list, a company's contacts, a contact's companies, the company
   timeline (its contacts' entries), the duplicate hints or the merge preview. A list page can then be shorter than the
-  page size, and its total is the SQL count less the denied rows of that page. Funnel statistics are aggregated in SQL
+  page size (a denied row still takes its slot), a page can be empty while the pager offers more, and its total is the
+  SQL count less the denied rows of that page, so it can differ from page to page: it reveals where denied rows sit in
+  the order, never their content. Funnel statistics are aggregated in SQL
   and still count deals that only a listener denies (their visibility is the owner scoping); they never show such a
   deal itself.
 - **Header search by tax id.** The groups match the stored tax id key (upper case, without separators) as typed: a

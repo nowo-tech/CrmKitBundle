@@ -203,8 +203,10 @@ then all its companies) follow it; a survivor before its tombstones; the import
 row before its rows), so the paths cannot deadlock against themselves. Records come before the plan counter
 everywhere (trash, restore, merge, erasure, import); the API's duplicate check of a create (0.3.0) keeps that order:
 it locks the matching records before the counter row, and checks again once the counter serialises the creates of
-the type, when it can only meet rows it already holds or rows a concurrent create has just committed. A contact create
-with a company affiliates in the same unit (contact, then company); a deadlock with another path is replayed by
+the type, when it can only meet rows it already holds or rows a concurrent create has just committed. The post-counter
+re-check can lock a row a concurrent create has just committed; a concurrent trash of that row (record, then counter)
+can then deadlock with it, which the write unit replays. A contact create with a company locks the company before the
+counter and affiliates in the same unit (contact, company, counter, as imports and contact merges do); a deadlock with another path is replayed by
 the write unit. SQLite has one writer and no `FOR UPDATE` (the clause is left out there). No lock,
 transaction or entity survives the call (FrankenPHP worker mode, kernel reset false).
 

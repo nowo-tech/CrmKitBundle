@@ -49,10 +49,10 @@ final readonly class DealReader
     /** Open next actions in one deal. */
     public const NEXT_ACTIONS = 10;
 
-    /** Largest page. */
     /** Most keyset batches one page scans past deals a record listener denies (0.3.0). */
     public const MAX_SCAN_ROUNDS = 10;
 
+    /** Largest page. */
     public const MAX_PAGE = 100;
 
     /**

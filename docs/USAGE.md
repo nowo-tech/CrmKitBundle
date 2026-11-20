@@ -747,7 +747,9 @@ while its record is still visible. `crm_contacts` is a sensitive group (contact 
 runs it only while recents are revalidated or off, so contact names are never kept in the browser unchecked.
 `crm_companies` and `crm_deals` are not sensitive. A host's `nowo_crm_kit.record_access_check` deny is decided after
 the SQL filter, so a denied row can take a place in the candidate window: it is never shown or counted, but the total
-is then marked inexact.
+is then marked inexact. Web-list totals are the SQL count minus the current page's denied rows: a denied row still takes its slot of the
+page (the page is shorter), a page can be empty while the pager offers more, and the total can differ from page to
+page. That reveals where denied rows sit in the order, never their content.
 
 Switch one group off, or reorder the groups, with SearchKit's own `nowo_search_kit.groups.<key>` (`enabled`,
 `priority`); `search.enabled: false` registers none.

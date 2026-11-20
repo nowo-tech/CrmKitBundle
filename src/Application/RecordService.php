@@ -126,6 +126,11 @@ final readonly class RecordService implements RecordServiceInterface
                 if ($check !== null) {
                     $check($record);
                 }
+                if ($affiliation !== null) {
+                    // The affiliation's company is locked (and checked: active, viewable) before the counter too
+                    // (audit VS2-1): contact → company → counter, the order of imports and contact merges.
+                    $this->support->load($context, SubjectType::Company, $affiliation[0], CrmPermission::View, lock: true);
+                }
                 $this->counter->take($context->tenant, $input->type);
                 if ($check !== null) {
                     $check($record);

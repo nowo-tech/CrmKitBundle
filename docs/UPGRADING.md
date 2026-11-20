@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.3.0](#to-030)
 - [To 0.2.1](#to-021)
 - [To 0.2.0](#to-020)
 - [To 0.2.0](#to-020-1)
@@ -10,6 +11,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.3.0
+
+From **0.2.1**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 **Funnels (0.3.0, `pipeline.enabled`).** Nothing changes while the funnels stay off: no table is mapped and no route
 is added. To turn them on, set `nowo_crm_kit.pipeline.enabled: true` and create the tables (`doctrine:migrations:diff
@@ -37,7 +46,6 @@ instants, `TIMESTAMP(6) WITHOUT TIME ZONE` for `updated_at`, `stage_entered_at`,
 `CREATE INDEX` / `CREATE UNIQUE INDEX` statements for the keys. SQLite: `TEXT` / `INTEGER` / `NUMERIC` columns with the
 same keys. No column of an earlier table changes and no backfill is needed; the `deals` row of `crm_counter` is created
 on the first deal.
-
 
 **The API (0.3.0, `api.enabled`, `api.http.enabled`).** Nothing changes while both stay off. No table is mapped and
 no route is added.

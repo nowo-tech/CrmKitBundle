@@ -687,7 +687,7 @@ template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the bra
 
 0.4.0: the lists open the import in a **modal** from their page action **Import** (shown only to someone who may
 import; its href is the import page, which stays the no-JS fallback). The modal is UiKit's `confirm_dialog` with its
-anatomy at the wide size; the steps below run inside it (file → mapping → preview → result), errors show in place, and
+anatomy at the wide size (0.4.1: a full-screen sheet on phones, the steps in its header); the steps below run inside it (file → mapping → preview → result), errors show in place, and
 an expired session shows a reload notice instead of the login page. An unfinished import (still running after
 `import.sync_rows`, waiting for a person, or stopped by a conflict) stays reachable: the result step and the conflict /
 expired notices link its page, and the lists show the person a notice linking their unfinished imports
@@ -695,7 +695,8 @@ expired notices link its page, and the lists show the person a notice linking th
 (`asset(…, 'nowo_crm_kit')`; run `assets:install`). Wire protocol, for a host that drives the modal itself:
 
 - request header `X-Nowo-Crm-Dialog: import` on the import routes ⇒ the step fragment (`import/dialog.html.twig`,
-  response header `X-Nowo-Crm-Fragment: import-step`, `[data-part="body"]` and `[data-part="footer"]`) instead of the
+  response header `X-Nowo-Crm-Fragment: import-step`, `[data-part="steps"]` (0.4.1, the header's steps),
+  `[data-part="body"]` and `[data-part="footer"]`) instead of the
   page; 422 / 409 answer the fragment with the errors;
 - a step that would redirect answers 204 + `X-Nowo-Crm-Dialog-Location: <next step>`;
 - nobody signed in ⇒ 401 `{"error": "session_expired", "reload": true}`; lock conflicts ⇒ 409 JSON with

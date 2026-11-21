@@ -45,10 +45,12 @@ final class ImportDialogTest extends CrmTestCase
         $dialog = $page->filter('dialog[data-crm-import-dialog]');
         self::assertCount(1, $dialog);
         self::assertSame('/crm/import?subject=contact', $dialog->attr('data-crm-import-dialog'));
-        foreach (['nowo-ui-confirm-dialog--anatomy', 'nowo-ui-confirm-dialog--wide'] as $class) {
+        foreach (['nowo-ui-confirm-dialog--anatomy', 'nowo-ui-confirm-dialog--wide', 'nowo-ui-confirm-dialog--sheet'] as $class) {
             self::assertStringContainsString($class, (string) $dialog->attr('class'));
         }
         self::assertSame('crm-import-dialog-title', $dialog->attr('aria-labelledby'));
+        // 0.4.1 (UiKit 2.63): the steps in the header, the first one current.
+        self::assertSame(['current', 'upcoming', 'upcoming', 'upcoming'], $dialog->filter('.nowo-ui-dialog__header .nowo-ui-dialog__steps .nowo-ui-steps__item')->each(static fn (Crawler $li): string => $li->attr('aria-current') === 'step' ? 'current' : 'upcoming'));
         self::assertCount(1, $dialog->filter('.nowo-ui-dialog__header #crm-import-dialog-title'));
         self::assertCount(1, $dialog->filter('.nowo-ui-dialog__footer [data-crm-import-close]'));
         self::assertNotSame('', (string) $dialog->attr('data-expired'));
@@ -76,7 +78,8 @@ final class ImportDialogTest extends CrmTestCase
         self::assertSame('contact', $file->filter('select[name="crm_import[subject]"] option[selected]')->attr('value'));
         self::assertCount(1, $file->filter('[data-part="body"] form#crm-import-dialog-form[enctype="multipart/form-data"]'));
         self::assertCount(0, $file->filter('[data-part="body"] .nowo-ui-card'), 'no cards inside the modal');
-        self::assertCount(1, $file->filter('[data-part="body"] .nowo-ui-steps [aria-current="step"]'));
+        self::assertCount(1, $file->filter('[data-part="steps"] .nowo-ui-steps.nowo-ui-steps--compact [aria-current="step"]'));
+        self::assertCount(0, $file->filter('[data-part="body"] .nowo-ui-steps'), 'the steps are in the header, not the body');
         $footer = $file->filter('[data-part="footer"] button');
         self::assertSame('crm-import-dialog-cancel', $footer->eq(0)->attr('data-testid'), 'Cancel first');
         self::assertCount(1, $file->filter('[data-part="footer"] .nowo-ui-btn--primary'), 'one primary');
@@ -365,6 +368,7 @@ final class ImportDialogTest extends CrmTestCase
             self::assertStringNotContainsString($tag, (string) $response->getContent(), 'a fragment, not a page');
         }
         self::assertCount(1, $fragment->filter('[data-part="body"]'));
+        self::assertCount(1, $fragment->filter('[data-part="steps"] [aria-current="step"]'));
         self::assertCount(1, $fragment->filter('[data-part="footer"]'));
         self::assertLessThanOrEqual(1, $fragment->filter('[data-part="footer"] .nowo-ui-btn--primary')->count());
     }

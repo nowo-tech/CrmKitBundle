@@ -1,7 +1,8 @@
 {#
-  A step of the import modal (0.4.0; answered to js/nowo-crm-import.js, see ImportDialog): the body and the footer of
-  the modal's UiKit confirm_dialog anatomy. The script puts [data-part="body"] in the dialog body and
-  [data-part="footer"] in the dialog footer: Cancel / Close first, then at most one primary, bound to the step's form
+  A step of the import modal (0.4.0; answered to js/nowo-crm-import.js, see ImportDialog): the header steps, the body
+  and the footer of the modal's UiKit confirm_dialog anatomy. The script puts [data-part="steps"] in the header's
+  steps (UiKit 2.63 `nowo-ui-dialog__steps`, 0.4.1), [data-part="body"] in the dialog body and [data-part="footer"] in
+  the dialog footer: Cancel / Close first, then at most one primary, bound to the step's form
   with form="…". Sections without cards; errors in place (form errors, `alert`).
 
   Variables:
@@ -22,10 +23,9 @@
 {%- set _finished = import is not null and import.status.value in ['done', 'cancelled', 'failed'] -%}
 {%- set _form_id = 'crm-import-dialog-form' -%}
 <div data-crm-import-step="{{ step }}" data-testid="crm-import-step" data-step="{{ step }}"{% if import is not null %} data-status="{{ import.status.value }}" data-crm-import-page="{{ path('nowo_crm_kit_import_show', {id: import.id}) }}"{% endif %}{% if _finished %} data-crm-import-finished{% endif %}>
+    {#- 0.4.1: the steps go to the dialog header (UiKit 2.63 `nowo-ui-dialog__steps`, compact on phones) -#}
+    <div data-part="steps">{{ include(nowo_ui_partial('steps', _b), {items: _steps, label: 'import.steps'|trans({}, _d), attr: {class: 'nowo-ui-steps--compact'}}, false) }}</div>
     <div data-part="body">
-        <div class="{{ nowo_ui_class('section', _b) }}">
-            {{ include(nowo_ui_partial('steps', _b), {items: _steps, label: 'import.steps'|trans({}, _d)}, false) }}
-        </div>
         {% if alert %}
             <div class="{{ nowo_ui_class('flash_error', _b) }}" role="alert" data-testid="crm-import-alert">{{ alert }}</div>
         {% endif %}

@@ -18,7 +18,7 @@ function shell(): string {
     <dialog class="nowo-ui-confirm-dialog nowo-ui-confirm-dialog--anatomy" data-crm-import-dialog="/crm/import"
       data-loading="Loading" data-failed="Failed" data-expired="Expired" data-reload="Reload" data-denied="Denied"
       data-conflict-retry="Retry" data-conflict-reload="Reload first" data-notice-class="nowo-ui-flash nowo-ui-flash--error" data-reload-class="nowo-ui-btn">
-      <header class="nowo-ui-dialog__header"><h2 class="nowo-ui-dialog__title" id="t">Import</h2><button type="button" class="nowo-ui-dialog__close" data-confirm-dialog-close>×</button></header>
+      <header class="nowo-ui-dialog__header"><h2 class="nowo-ui-dialog__title" id="t">Import</h2><button type="button" class="nowo-ui-dialog__close" data-confirm-dialog-close>×</button><div class="nowo-ui-dialog__steps"><ol data-testid="steps-initial"></ol></div></header>
       <div class="nowo-ui-dialog__body"><p data-part="status">Loading</p></div>
       <footer class="nowo-ui-dialog__footer"><button type="button" data-crm-import-close>Cancel</button></footer>
     </dialog>`;
@@ -27,6 +27,7 @@ function shell(): string {
 /** A step fragment (import/dialog.html.twig). */
 function step(name: string, extra = '', finished = false): string {
   return `<div data-crm-import-step="${name}"${finished ? ' data-crm-import-finished' : ''}>
+    <div data-part="steps"><ol data-testid="steps-${name}"></ol></div>
     <div data-part="body">${extra}<form id="f" action="/crm/import" method="post"><input name="crm_import[subject]" value="contact"><input type="hidden" name="crm_import[_token]" value="tok"></form></div>
     <div data-part="footer"><button type="button" data-crm-import-close>Cancel</button><button type="submit" form="f" name="do" value="${name}" data-testid="submit">Next</button></div>
   </div>`;
@@ -474,5 +475,32 @@ describe('start and the steps', () => {
     const box = notice(document.createElement('div'), 'x', 'expired', null, 'https://evil.test/crm/import/1');
     expect(box.querySelector('a')).toBeNull();
     expect(notice(document.createElement('div'), 'x', 'expired', null, '/crm/import/1').querySelector('a')?.textContent).toBe('');
+  });
+
+  it('puts the steps of each step in the header and restores them on close (0.4.1)', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(fragment(step('file')))
+      .mockResolvedValueOnce(fragment(step('mapping')))
+      .mockResolvedValueOnce(fragment('<div data-crm-import-step="result"><div data-part="body"><p>x</p></div></div>'));
+    const modal = openImportDialog({ dialog: dialogElement(), returnTo: null, fetcher });
+    const header = (): string | null | undefined => dialogElement().querySelector('.nowo-ui-dialog__steps ol')?.getAttribute('data-testid');
+    await modal.load('/crm/import');
+    expect(header()).toBe('steps-file');
+    await modal.load('/crm/import/1');
+    expect(header()).toBe('steps-mapping');
+    await modal.load('/crm/import/1');
+    expect(header()).toBe('steps-mapping');
+    modal.close();
+    expect(header()).toBe('steps-initial');
+  });
+
+  it('works with a header without steps (UiKit before 2.63)', async () => {
+    dialogElement().querySelector('.nowo-ui-dialog__steps')?.remove();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(fragment(step('file')));
+    const modal = openImportDialog({ dialog: dialogElement(), returnTo: null, fetcher });
+    await modal.load('/crm/import');
+    expect(dialogElement().dataset.crmImportStep).toBe('file');
+    modal.close();
+    expect(dialogElement().querySelector('.nowo-ui-dialog__steps')).toBeNull();
   });
 });

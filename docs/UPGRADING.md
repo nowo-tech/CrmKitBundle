@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.4.1](#to-041)
 - [To 0.4.0](#to-040)
 - [To 0.3.0](#to-030)
 - [To 0.2.1](#to-021)
@@ -11,6 +12,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.4.1
+
+From **0.4.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 From **0.4.0** (next patch 0.4.1):
 

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.4.1] - 2026-11-21](#041---2026-11-21)
 - [[0.4.0] - 2026-11-21](#040---2026-11-21)
 - [[0.3.0] - 2026-11-20](#030---2026-11-20)
 - [[0.2.1] - 2026-11-19](#021---2026-11-19)
@@ -15,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - [[0.1.0] - 2026-11-19](#010---2026-11-19)
 
 ## [Unreleased]
+
+## [0.4.1] - 2026-11-21
 
 ### Changed (0.4.1: import modal on UiKit 2.63)
 

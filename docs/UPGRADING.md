@@ -13,6 +13,13 @@
 
 ## Unreleased
 
+```bash
+composer update nowo-tech/crm-kit-bundle nowo-tech/ui-kit-bundle
+```
+
+`nowo-tech/ui-kit-bundle` ^2.63.1 is required (the contrast fix for the import modal's upcoming step labels). Nothing else
+changes for a host; a host pinned to UiKit 2.63.0 must update it.
+
 ## To 0.4.1
 
 From **0.4.0**:

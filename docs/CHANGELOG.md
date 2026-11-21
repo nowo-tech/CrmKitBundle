@@ -17,6 +17,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `nowo-tech/ui-kit-bundle` ^2.63.1 is required (was ^2.63): UiKit 2.63.1 fixes the contrast of the upcoming step labels in
+  the import modal's header steps (4.39:1 on the tinted header). The demo e2e axe check no longer leaves those labels out;
+  both demo locks resolve UiKit 2.63.1.
+
 ## [0.4.1] - 2026-11-21
 
 ### Changed (0.4.1: import modal on UiKit 2.63)

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bbe9d589baf5757584680d6175c20c94",
+    "content-hash": "50d4321dfd058a20402b08e83a46adc1",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -947,11 +947,11 @@
         },
         {
             "name": "nowo-tech/crm-kit-bundle",
-            "version": "dev-feat/import-modal-uikit-263",
+            "version": "dev-chore/uikit-2.63.1",
             "dist": {
                 "type": "path",
                 "url": "/var/crm-kit-bundle",
-                "reference": "d0b8018ee259a85c443b816cb61c758a869142bb"
+                "reference": "1310c858098455f8ddb007126f665f83ed843576"
             },
             "require": {
                 "doctrine/dbal": "^3.8.2 || ^4.0",
@@ -962,7 +962,7 @@
                 "nowo-tech/form-kit-bundle": "^2.23",
                 "nowo-tech/transaction-contract": "^1.0",
                 "nowo-tech/transaction-doctrine": "^1.8.1",
-                "nowo-tech/ui-kit-bundle": "^2.63",
+                "nowo-tech/ui-kit-bundle": "^2.63.1",
                 "php": ">=8.2 <8.6",
                 "psr/clock": "^1.0",
                 "psr/log": "^2.0 || ^3.0",
@@ -1566,16 +1566,16 @@
         },
         {
             "name": "nowo-tech/ui-kit-bundle",
-            "version": "v2.63.0",
+            "version": "v2.63.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/UiKitBundle.git",
-                "reference": "9bf9e7f9d22405fc6981fc4c800e15ba3db42e9a"
+                "reference": "aab3426b7c7862384c7bf17733e32ba8981a4567"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/9bf9e7f9d22405fc6981fc4c800e15ba3db42e9a",
-                "reference": "9bf9e7f9d22405fc6981fc4c800e15ba3db42e9a",
+                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/aab3426b7c7862384c7bf17733e32ba8981a4567",
+                "reference": "aab3426b7c7862384c7bf17733e32ba8981a4567",
                 "shasum": ""
             },
             "require": {
@@ -1665,8 +1665,8 @@
                 "issues": "https://github.com/nowo-tech/UiKitBundle/issues",
                 "source": "https://github.com/nowo-tech/UiKitBundle"
             },
-            "time": "2026-11-21T09:07:10+00:00",
-            "published-time": "2026-11-21T09:09:29+00:00"
+            "time": "2026-11-21T12:27:49+00:00",
+            "published-time": "2026-11-21T12:30:42+00:00"
         },
         {
             "name": "psr/cache",

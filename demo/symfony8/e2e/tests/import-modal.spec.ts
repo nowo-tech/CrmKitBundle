@@ -32,12 +32,8 @@ async function settled(page: Page): Promise<void> {
 
 async function axe(page: Page): Promise<void> {
   await settled(page);
-  // UiKit 2.63 defect, reported upstream: the upcoming step labels of the header steps use the muted colour on the
-  // tinted header (4.39:1, under 4.5:1). On phones those labels are hidden (compact steps), so the phone checks see
-  // every node; on desktop only those labels are left out until UiKit fixes the colour.
   const results = await new AxeBuilder({ page })
     .include('[data-testid="crm-import-dialog"]')
-    .exclude('.nowo-ui-dialog__steps .nowo-ui-steps__item--upcoming .nowo-ui-steps__label')
     .analyze();
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => `${n.target.join(' ')} (${n.any.map((check) => check.message).join('; ')})`).join(', ')}`)).toEqual([]);
 }

@@ -1,0 +1,22 @@
+{#
+  The fields of a form of the import modal: labels above full-width controls (UiKit `nowo-ui-input--full`), the column
+  mapping (`col_*`) in UiKit's two-column grid (`nowo-ui-form__columns`, one column on phones), hidden fields as they
+  are. Variables: form (FormView).
+#}
+{%- set _columns = [] -%}
+{%- for _child in form -%}{%- if _child.vars.name starts with 'col_' -%}{%- set _columns = _columns|merge([_child]) -%}{%- endif -%}{%- endfor -%}
+{%- macro row(child) -%}
+    {%- if 'hidden' in child.vars.block_prefixes -%}
+        {{- form_row(child) -}}
+    {%- else -%}
+        {{- form_row(child, {attr: child.vars.attr|merge({class: ((child.vars.attr.class ?? '') ~ ' nowo-ui-input--full')|trim})}) -}}
+    {%- endif -%}
+{%- endmacro -%}
+{% if _columns is not empty %}
+    <div class="nowo-ui-form__columns">
+        {% for _child in _columns %}{{ _self.row(_child) }}{% endfor %}
+    </div>
+{% endif %}
+{% for _child in form %}
+    {% if not _child.rendered %}{{ _self.row(_child) }}{% endif %}
+{% endfor %}

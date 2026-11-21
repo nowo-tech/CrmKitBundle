@@ -242,6 +242,7 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Infrastructure/Symfony/Http/CrmConflictFormatter.php` | FR-CONC-001 |
 | `src/Infrastructure/Symfony/Http/DomainExceptionListener.php` | FR-GATE-001, FR-CONC-001 |
 | `src/Infrastructure/Symfony/Http/EntityManagerHygieneListener.php` | FR-WORKER-001 |
+| `src/Infrastructure/Symfony/Http/ImportDialog.php` (0.4.0) | FR-UI-002 |
 
 ### Infrastructure: console (3)
 
@@ -316,6 +317,10 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/views/admin/settings.html.twig` | FR-UI-001 |
 | `src/Resources/views/admin/tag.html.twig` | FR-UI-001 |
 | `src/Resources/views/admin/tags.html.twig` | FR-UI-001 |
+| `src/Resources/views/import/_dialog_fields.html.twig` (0.4.0) | FR-UI-002 |
+| `src/Resources/views/import/_dialog_shell.html.twig` (0.4.0) | FR-UI-002 |
+| `src/Resources/views/import/_rows.html.twig` (0.4.0) | FR-UI-001, FR-UI-002 |
+| `src/Resources/views/import/dialog.html.twig` (0.4.0) | FR-UI-002 |
 | `src/Resources/views/import/show.html.twig` | FR-UI-001 |
 | `src/Resources/views/import/upload.html.twig` | FR-UI-001 |
 | `src/Resources/views/record/form.html.twig` | FR-UI-001 |
@@ -323,6 +328,16 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/views/record/merge.html.twig` | FR-UI-001 |
 | `src/Resources/views/record/merge_pick.html.twig` | FR-UI-001 |
 | `src/Resources/views/record/show.html.twig` | FR-UI-001 |
+
+### Resources: browser assets (0.4.0)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Resources/assets/README.md` | FR-UI-002 |
+| `src/Resources/assets/src/iife.ts` | FR-UI-002 |
+| `src/Resources/assets/src/import-dialog.ts` | FR-UI-002 |
+| `src/Resources/assets/tests/import-dialog.test.ts` | FR-UI-002 |
+| `src/Resources/public/js/nowo-crm-import.js` (Vite build of the two sources above) | FR-UI-002 |
 
 ### Resources: translations (7)
 

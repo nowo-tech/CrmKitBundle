@@ -25,6 +25,22 @@ interface ImportServiceInterface
     public function preview(string $id, int $rows = 20): ImportView;
 
     /**
+     * The import with its first rows validated against another mapping, stored nowhere (0.4.0: the preview step of the
+     * import modal). An invalid mapping is an input error on `mapping`.
+     *
+     * @param array<string, string> $mapping column => field, as for {@see self::confirm()}
+     */
+    public function previewMapping(string $id, array $mapping, int $rows = 20): ImportView;
+
+    /**
+     * 0.4.0: the acting person's unfinished imports in the tenant (running: paused after `import.sync_rows`, waiting
+     * for a person, or stopped by a conflict), newest first: how many, and the first `$limit` (id, file name). `import`.
+     *
+     * @return array{total: int, imports: list<array{id: string, file: string}>}
+     */
+    public function unfinished(int $limit = 5): array;
+
+    /**
      * Claims the import for running with the chosen mapping (one confirm wins; a second answers 409).
      *
      * @param array<string, string> $mapping column => field (`first_name`, `custom.<key>`, `tags`, or '' to skip)

@@ -5,7 +5,6 @@ nav:
     label: CRM
     companies: Companies
     contacts: Contacts
-    import: Import
     tags: Tags
     fields: Custom fields
     settings: Settings
@@ -32,6 +31,7 @@ list:
         contact: No contacts yet.
     empty_hint: Create one, or import a CSV or vCard file.
     export: Export CSV
+    import: 'Import'
     col:
         updated: Updated
     filter:
@@ -294,6 +294,31 @@ merge:
         other: Other record id
         other_help: The id in the address of its page.
 import:
+    steps: 'Import steps'
+    step:
+        file: 'File'
+        mapping: 'Columns'
+        preview: 'Preview'
+        result: 'Result'
+    unfinished: '{1} You have one unfinished import.|]1,Inf[ You have %count% unfinished imports.'
+    dialog:
+        open_page: 'Open the import page'
+        loading: 'Loading…'
+        failed: 'Something went wrong. Try again.'
+        expired: 'Your session has expired. Reload the page to sign in again; nothing was imported in this step.'
+        reload: 'Reload the page'
+        denied: 'You may not import into the CRM.'
+        conflict_retry: 'Someone changed this import at the same moment. Try again.'
+        conflict_reload: 'Part of this step was already saved. Reload the page before trying again.'
+        cancel: 'Cancel'
+        close: 'Close'
+        next: 'Next'
+        preview: 'Preview'
+        refresh: 'Update the preview'
+        mapping_title: 'Columns of %file%'
+        mapping_intro: '%rows% rows. Choose the field each column fills.'
+        mapping_fold: 'Column mapping'
+        preview_intro: 'The first %shown% of %rows% rows, checked with this mapping.'
     title: Import
     intro: 'A CSV file (header row, "," or ";", UTF-8) or a vCard file of contacts.'
     upload: Upload and preview

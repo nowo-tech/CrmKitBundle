@@ -5,7 +5,6 @@ nav:
     label: CRM
     companies: Sociétés
     contacts: Contacts
-    import: Importer
     tags: Étiquettes
     fields: Champs personnalisés
     settings: Paramètres
@@ -32,6 +31,7 @@ list:
         contact: Aucun contact pour le moment.
     empty_hint: Créez-en un ou importez un fichier CSV ou vCard.
     export: Exporter en CSV
+    import: 'Importer'
     col:
         updated: Mis à jour
     filter:
@@ -294,6 +294,31 @@ merge:
         other: Id de l'autre fiche
         other_help: L'id figurant dans l'adresse de sa page.
 import:
+    steps: 'Étapes de l''import'
+    step:
+        file: 'Fichier'
+        mapping: 'Colonnes'
+        preview: 'Aperçu'
+        result: 'Résultat'
+    unfinished: '{1} Vous avez un import inachevé.|]1,Inf[ Vous avez %count% imports inachevés.'
+    dialog:
+        open_page: 'Ouvrir la page de l''import'
+        loading: 'Chargement…'
+        failed: 'Une erreur s''est produite. Réessayez.'
+        expired: 'Votre session a expiré. Rechargez la page pour vous reconnecter ; rien n''a été importé à cette étape.'
+        reload: 'Recharger la page'
+        denied: 'Vous ne pouvez pas importer dans le CRM.'
+        conflict_retry: 'Quelqu''un a modifié cet import au même moment. Réessayez.'
+        conflict_reload: 'Une partie de cette étape a déjà été enregistrée. Rechargez la page avant de réessayer.'
+        cancel: 'Annuler'
+        close: 'Fermer'
+        next: 'Suivant'
+        preview: 'Aperçu'
+        refresh: 'Mettre à jour l''aperçu'
+        mapping_title: 'Colonnes de %file%'
+        mapping_intro: '%rows% lignes. Choisissez le champ que remplit chaque colonne.'
+        mapping_fold: 'Correspondance des colonnes'
+        preview_intro: 'Les %shown% premières lignes sur %rows%, vérifiées avec cette correspondance.'
     title: Importer
     intro: 'Un fichier CSV (ligne d''en-tête, "," ou ";", UTF-8) ou un fichier vCard de contacts.'
     upload: Téléverser et prévisualiser

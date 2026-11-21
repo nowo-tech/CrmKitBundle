@@ -71,6 +71,10 @@ tables on a private entity manager and never flushes the host's work.
   `crm_import_running`; no row is stored twice.
 - **Given** an import larger than `import.sync_rows`, **then** the page offers "Continue"; **given** a stopped worker,
   **then** `nowo:crm-kit:import:resume` finishes it after `import.stale_claim_seconds`.
+- **(0.4.0) Given** someone who may import, **when** they choose **Import** in a list's page actions, **then** the import
+  opens in a modal (file → mapping → preview → result) with errors in place; **given** an expired session, **then** the
+  modal shows a reload notice, never the login page; **given** no JavaScript, **then** the action opens the import page.
+  Someone who may not import sees no action and gets 403 from the modal's calls.
 - **Given** two records of one type, **when** a user merges one into the other choosing fields, **then** every child
   row moves to the survivor, the other becomes a tombstone and a snapshot is kept; two crossed merges never both
   succeed.
@@ -129,6 +133,10 @@ tables on a private entity manager and never flushes the host's work.
 - **FR-WORKER-001**: worker mode with kernel reset false: stateless services, per-call buffers, entity manager cleared
   (REQ-RUNTIME-002).
 - **FR-UI-001**: opt-in UiKit + FormKit pages, route loader `nowo_crm_kit_ui`, CSRF on every POST.
+- **FR-UI-002** (0.4.0): the import modal of the lists: UiKit `confirm_dialog` anatomy (wide), step fragments from the
+  import routes (`ImportDialog`: `X-Nowo-Crm-Dialog`, 204 + next step, 401 `session_expired`), same access checks and
+  CSRF tokens as the pages, the import page as the no-JS fallback, unfinished imports linked from the modal and the lists, the script `js/nowo-crm-import.js` (asset package
+  `nowo_crm_kit`).
 - **FR-SEARCH-001**: SearchKit providers for companies and contacts (bridge).
 - **FR-I18N-001**: translations in en, es, it, fr, pt, de, nl (REQ-I18N-002).
 

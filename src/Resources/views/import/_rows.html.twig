@@ -1,0 +1,24 @@
+{#
+  The rows of an import with their check or outcome (the import page and the import modal's preview and result
+  steps). Variables: import (ImportView), bundle.
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+<div class="nowo-ui-table-scroll" tabindex="0" role="region" aria-label="{{ 'import.preview'|trans({}, _d) }}">
+<table class="{{ nowo_ui_class('table', bundle) }}">
+    <thead><tr><th scope="col">#</th>{% for column in import.columns %}<th scope="col">{{ column }}</th>{% endfor %}<th scope="col">{{ 'import.col.check'|trans({}, _d) }}</th></tr></thead>
+    <tbody>
+    {% for row in import.rows %}
+        <tr data-testid="crm-import-row" data-outcome="{{ row.outcome.value }}">
+            <th scope="row">{{ row.rowNo }}</th>
+            {% for column in import.columns %}<td>{{ row.data[column] ?? '' }}</td>{% endfor %}
+            <td>
+                {% if row.outcome.value != 'pending' %}{{ ('import.outcome.' ~ row.outcome.value)|trans({}, _d) }}{% if row.message %} · {{ row.message|trans({}, _d) }}{% endif %}
+                {% elseif row.errors is not empty %}{% for field, error in row.errors %}{{ field }}: {{ error|trans({}, _d) }}{% if not loop.last %}; {% endif %}{% endfor %}
+                {% elseif row.duplicates is not empty %}{{ 'import.duplicate_of'|trans({'%name%': row.duplicates|join(', ')}, _d) }}
+                {% else %}{{ 'import.ok'|trans({}, _d) }}{% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>

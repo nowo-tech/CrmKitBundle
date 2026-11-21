@@ -52,7 +52,10 @@ final class RaceInjector
 
             throw new LockWaitTimeoutException(new class('Lock wait timeout exceeded.') extends AbstractException {}, null);
         }
-        if ($object instanceof CrmRecord && ($this->context->races['Deadlock'] ?? 0) > 0) {
+        if ($object instanceof CrmRecord && ($this->context->races['DeadlockSkip'] ?? 0) > 0) {
+            // Audit XU-L2: let this many records through first (a chunk that commits), then deadlock.
+            --$this->context->races['DeadlockSkip'];
+        } elseif ($object instanceof CrmRecord && ($this->context->races['Deadlock'] ?? 0) > 0) {
             --$this->context->races['Deadlock'];
 
             throw new DeadlockException(new class('Deadlock found when trying to get lock.') extends AbstractException {}, null);

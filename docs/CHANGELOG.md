@@ -15,6 +15,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (0.4.0: import modal)
+
+- **Import modal** on the companies and contacts lists (the kit dialog rule of UiKit's PAGE_CONTRACT, "Dialog sizes and anatomy"): the page action **Import** opens UiKit's
+  `confirm_dialog` with its anatomy (`anatomy: true`, wide size `--nowo-dialog-width-wide`, the content's height up to
+  the viewport, UiKit's tinted header and footer). The steps run inside it (file → mapping → preview → result) with
+  Cancel / Close first and one primary per step (Next, Preview, **Import**, Continue for a running import); no cards in
+  the body; errors in place (form errors, conflicts); closing aborts the pending request and wipes the step; focus
+  stays in the modal and returns to the opener; a finished import reloads the list when the modal closes.
+- The import routes answer the modal's calls (`X-Nowo-Crm-Dialog: import`, `Infrastructure\Symfony\Http\ImportDialog`)
+  with step fragments (`X-Nowo-Crm-Fragment: import-step`), and with 204 + `X-Nowo-Crm-Dialog-Location` instead of a
+  redirect. Same routes, access checks (`import`, the area check, `nowo_crm_kit` access events) and CSRF tokens as the
+  pages; lock conflicts keep REQ-RUNTIME-003 rule 6 (409, `CONFLICT_001` + `Retry-After` / `CONFLICT_002`,
+  `X-Conflict-Code`), shown in place.
+- Nobody signed in on a modal call: 401 `{"error": "session_expired"}` instead of the firewall's entry point; the modal
+  shows a reload notice (also for a redirect to a login page) and never the login page.
+- The page action is part of the bundle's list header (`View\Action` kind `import`, `data-crm-import-open`), shown only
+  to someone who may import; its href is the import page, the no-JS fallback (`/crm/import?subject=contact|company`
+  preselects what to import).
+- `ImportServiceInterface::previewMapping(id, mapping, rows = 20)`: the first rows checked against another mapping,
+  stored nowhere (the modal's preview step; also `do=preview` on the import page).
+- Unfinished imports stay reachable once the modal is closed (audit XU-M1): the result step of a running import and the
+  `CONFLICT_002` / session-expired notices link the import page, and the lists show someone who may import a UiKit
+  notice linking their running imports in the tenant (`ImportServiceInterface::unfinished(limit = 5)`,
+  `CrmStoreInterface::unfinishedImports()`).
+- Browser asset `js/nowo-crm-import.js` (TypeScript in `src/Resources/assets`, Vite IIFE, Vitest) under the new
+  `nowo_crm_kit` asset package (`/bundles/nowocrmkit`, REQ-ASSETS-004); the list loads it itself. No inline style, no
+  inline script, no CDN.
+
+### Changed (0.4.0: import modal)
+
+- The area navigation no longer has an **Import** tab (the list's page action opens the modal; the import page stays
+  as the no-JS fallback). The `nav.import` translation is removed.
+- Requires `nowo-tech/ui-kit-bundle` ^2.62 (steps partial, dialog anatomy) and `symfony/asset`.
+
 ## [0.3.0] - 2026-11-20
 
 ### Added (0.3.0: funnels)

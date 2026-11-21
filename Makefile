@@ -9,7 +9,7 @@ COMPOSE_BIN := $(shell $(DOCKER_BIN) compose version >/dev/null 2>&1 && echo "$(
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down down-dev build shell install ensure-up test test-coverage test-coverage-100 coverage-check validate-phpdoc coverage-php-percent cs-check cs-fix qa clean release-check release-check-demos demo-smoke test-e2e demo-screenshots composer-sync rector rector-dry phpstan igor update validate assets setup-hooks check-no-cursor-coauthor check-open-prs check-no-raw-html-form check-twig-extra validate-translations db-up test-with-db test-coverage-with-db update-deps strip-cursor-coauthor-from-history
+.PHONY: help up down down-dev build shell install ensure-up test test-ts test-coverage test-coverage-100 coverage-check validate-phpdoc coverage-php-percent cs-check cs-fix qa clean release-check release-check-demos demo-smoke test-e2e demo-screenshots composer-sync rector rector-dry phpstan igor update validate assets setup-hooks check-no-cursor-coauthor check-open-prs check-no-raw-html-form check-twig-extra validate-translations db-up test-with-db test-coverage-with-db update-deps strip-cursor-coauthor-from-history
 
 help:
 	@echo "CRM Kit Bundle - Development Commands"
@@ -24,7 +24,8 @@ help:
 	@echo "Dependencies:"
 	@echo "  install       Install Composer dependencies"
 	@echo "Assets:"
-	@echo "  assets        No-op (no frontend assets in this bundle)"
+	@echo "  assets        Build the import modal's script (src/Resources/public/js/nowo-crm-import.js)"
+	@echo "  test-ts       Vitest with coverage (>= 90%), lint and type check of the TypeScript"
 	@echo "Tests:"
 	@echo "  test          Run PHPUnit tests (starts container if needed)"
 	@echo "  test-coverage Run tests with code coverage (starts container if needed)"
@@ -158,6 +159,8 @@ release-check:
 	@$(MAKE) validate-phpdoc
 	@$(MAKE) igor
 	@$(MAKE) validate-translations
+	@$(MAKE) assets
+	@$(MAKE) test-ts
 	@$(MAKE) test-coverage
 	@$(MAKE) coverage-check
 	@$(MAKE) release-check-demos
@@ -218,10 +221,20 @@ composer-sync: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer install --no-interaction --prefer-dist
 
 clean: ensure-up
-	$(COMPOSE) exec -T $(SERVICE_PHP) sh -c "rm -rf vendor .phpunit.cache coverage coverage.xml .php-cs-fixer.cache"
+	$(COMPOSE) exec -T $(SERVICE_PHP) sh -c "rm -rf vendor node_modules .pnpm-store .phpunit.cache coverage coverage-ts coverage.xml coverage-ts.txt .php-cs-fixer.cache"
 
-assets:
-	@echo "No frontend assets in this bundle (pages use UiKit assets)."
+# REQ-ASSETS-001 (0.4.0): the import modal's script, src/Resources/public/js/nowo-crm-import.js (committed).
+assets: ensure-up
+	@$(COMPOSE) exec -T -e CI=true $(SERVICE_PHP) pnpm install
+	@$(COMPOSE) exec -T $(SERVICE_PHP) pnpm run build
+
+# Vitest with coverage (>= 90%), lint and type check of the TypeScript (REQ-TEST-003).
+test-ts: ensure-up
+	@$(COMPOSE) exec -T -e CI=true $(SERVICE_PHP) sh -lc 'test -d node_modules || pnpm install'
+	@$(COMPOSE) exec -T $(SERVICE_PHP) pnpm run lint
+	@$(COMPOSE) exec -T $(SERVICE_PHP) pnpm run typecheck
+	@$(COMPOSE) exec -T $(SERVICE_PHP) sh -lc 'set -o pipefail; pnpm run test:coverage | tee coverage-ts.txt'
+	@sh .scripts/ts-coverage-percent.sh coverage-ts.txt
 
 
 

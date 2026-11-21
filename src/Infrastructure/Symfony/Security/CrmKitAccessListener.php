@@ -8,9 +8,11 @@ use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ImportDialog;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Routing\UiRouteLoader;
 use Symfony\Bundle\SecurityBundle\Security\FirewallConfig;
 use Symfony\Bundle\SecurityBundle\Security\FirewallMap;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
@@ -19,7 +21,8 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
  * any action, so a new action cannot forget it; the action itself asks its own permission. Nobody signed in on a route
  * behind a firewall ⇒ Security's access-denied exception, which the firewall turns into its entry point (login redirect
  * or 401); else no tenant, CRM off or nobody acting ⇒ 404 and refused ⇒ 403 (through the bundle's exception listener).
- * Stateless.
+ * 0.4.0: a call of the import modal ({@see ImportDialog}) with nobody signed in answers 401 `session_expired` instead of
+ * the entry point, so the modal shows its reload notice and never a login page. Stateless.
  */
 final readonly class CrmKitAccessListener
 {
@@ -46,6 +49,12 @@ final readonly class CrmKitAccessListener
             $this->guard->requireGranted(CrmPermission::View);
         } catch (NotAvailableException $e) {
             if (!$this->checker->currentActor() instanceof ActorRef && $this->firewalls?->getFirewallConfig($request) instanceof FirewallConfig) {
+                if (ImportDialog::requested($request)) {
+                    $event->setController(static fn (): Response => ImportDialog::expired());
+
+                    return;
+                }
+
                 throw new AccessDeniedException('Sign in to use the CRM.', $e);
             }
 

@@ -463,3 +463,51 @@ jobs:
 
       - name: Run demo smoke
         run: make demo-smoke
+
+  # 0.4.0: the import modal's TypeScript (REQ-ASSETS-001, REQ-TEST-003): lint, type check, Vitest >= 90% and the
+  # committed build matches the source.
+  typescript:
+    name: TypeScript tests
+    runs-on: ubuntu-latest
+    needs: changes
+    # Light mode: skipped (a skipped non-matrix job reports its own name as skipped, accepted by branch protection).
+    if: ${{ !cancelled() && needs.changes.outputs.mode != 'light' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint and type check
+        run: |
+          pnpm run lint
+          pnpm run typecheck
+
+      # REQ-TEST-003: Vitest thresholds + min(statements/branches/functions/lines) >= 90% gate.
+      - name: Run TypeScript tests with coverage
+        run: |
+          set -o pipefail
+          pnpm run test:coverage | tee coverage-ts.txt
+
+      - name: Enforce TS coverage gate (>= 90%)
+        env:
+          TS_COVERAGE_MIN: '90'
+        run: |
+          chmod +x .scripts/ts-coverage-percent.sh
+          ./.scripts/ts-coverage-percent.sh coverage-ts.txt
+
+      # The committed script (src/Resources/public/js) must be the build of the TypeScript source.
+      - name: Check the committed assets match the build
+        run: |
+          pnpm run build
+          git diff --exit-code -- src/Resources/public/js

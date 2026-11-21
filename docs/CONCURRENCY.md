@@ -181,6 +181,13 @@ resume    UPDATE crm_import SET claim_token=?, claimed_at=now, version=version+1
           WHERE id=? AND tenant_id=? AND status='running' AND claimed_at < now - stale_claim_seconds
 ```
 
+**(0.4.0) The import modal** posts to the same routes and runs the same units, so nothing above changes. Its answers
+differ only in shape: a lock conflict is 409 JSON (`{"error": "concurrency_conflict", "code": "CONFLICT_001"}` with
+`Retry-After`, or `concurrency_conflict_partial` / `CONFLICT_002` when the claim of the same request already
+committed) plus `X-Conflict-Code`, shown in the modal as "try again" or "reload first"; a domain conflict
+(`crm_import_running`) is the step fragment with status 409 and the message above the import as it is now. The
+preview step (`previewMapping`) only reads.
+
 The confirm request runs `import.sync_rows` rows (`sync_rows / chunk_rows` chunks); the page's "Continue" runs the same
 amount again, the rows attributed to the person who clicked (the resume command attributes them to the uploader); `nowo:crm-kit:import:resume` takes over a claim that made no progress for `stale_claim_seconds` (a
 killed worker) and finishes it. A double confirm, a double "Continue" or two runners never store a row twice: the

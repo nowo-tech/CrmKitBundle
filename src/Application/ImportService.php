@@ -115,16 +115,49 @@ final readonly class ImportService implements ImportServiceInterface
      */
     public function preview(string $id, int $rows = 20): ImportView
     {
+        return $this->checked($id, null, $rows);
+    }
+
+    /**
+     * The import with its first rows checked against another mapping (0.4.0, the import modal's preview step); nothing
+     * is stored.
+     */
+    public function previewMapping(string $id, array $mapping, int $rows = 20): ImportView
+    {
+        return $this->checked($id, $mapping, $rows);
+    }
+
+    /**
+     * The acting person's unfinished imports.
+     */
+    public function unfinished(int $limit = 5): array
+    {
         $context = $this->support->access->context(CrmPermission::Import);
 
-        return $this->support->read(function () use ($context, $id, $rows): ImportView { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $import = $this->import($context->tenant, $id);
-            $fields = $this->activeFields($context->tenant, $import->getSubjectType());
-            $views  = [];
+        return $this->support->read(fn (): array => $this->support->store->unfinishedImports($context->tenant, $context->actor->value, max(1, $limit)));
+    }
+
+    /**
+     * The import with its first rows checked against the given mapping (null: the stored one).
+     *
+     * @param array<string, string>|null $with
+     */
+    private function checked(string $id, ?array $with, int $rows): ImportView
+    {
+        $context = $this->support->access->context(CrmPermission::Import);
+
+        return $this->support->read(function () use ($context, $id, $with, $rows): ImportView { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $import  = $this->import($context->tenant, $id);
+            $fields  = $this->activeFields($context->tenant, $import->getSubjectType());
+            $mapping = $with ?? $import->getMapping();
+            if ($with !== null && !ImportMapping::valid($with, $import->getColumns(), ImportMapping::targets($import->getSubjectType(), $fields))) {
+                throw InvalidInputException::field('mapping', 'import.error.mapping');
+            }
+            $views = [];
             foreach ($this->support->store->importRows($id, max(1, min(100, $rows)), false) as $row) {
                 $errors                           = [];
                 $duplicates                       = [];
-                [$input, , , $purposes, $primary] = ImportMapping::input($import->getSubjectType(), $row->getData(), $import->getMapping());
+                [$input, , , $purposes, $primary] = ImportMapping::input($import->getSubjectType(), $row->getData(), $mapping);
                 try {
                     $this->extras($input->roles, $purposes, $primary);
                     $values = RecordValidator::values($import->getSubjectType(), $input->values, $import->getSubjectType() === SubjectType::Company);
@@ -151,7 +184,7 @@ final readonly class ImportService implements ImportServiceInterface
                 $import->getStatus(),
                 $import->getFileName(),
                 $import->getColumns(),
-                $import->getMapping(),
+                $mapping,
                 $import->getDuplicatePolicy(),
                 $import->getRowsTotal(),
                 $import->getRowsDone(),

@@ -433,7 +433,7 @@ resolves the tenant and the actor and checks the permission itself (404 / 403); 
 | `HostLinkServiceInterface` | `link(SubjectType, subjectId, HostObjectRef, ?label): string` (idempotent), `unlink(linkId)`, `subjectsLinkedTo(HostObjectRef): list<SubjectRef>` ("companies of project 42") |
 | `TimelineInterface` | `record(SubjectType, subjectId, labelKey, params, ?url)`: a host entry (`labelKey` of the host's `messages` domain, `^[a-z0-9_.-]{1,120}$`; ≤ 20 scalar params with keys `^[a-z][a-z0-9_]{0,39}$`, strings ≤ 200; `url` a local path) |
 | `ConsentServiceInterface` | `record(contactId, purpose, bool $granted, ConsentSource, ?evidence): string`, `current(contactId): array<purpose, bool>` |
-| `ImportServiceInterface` | `upload(SubjectType, ImportFormat, fileName, bytes): string`, `preview(id, rows = 20): ImportView`, `confirm(id, mapping, DuplicatePolicy, int $v)`, `run(id, ?int $maxChunks): bool`, `cancel(id)` |
+| `ImportServiceInterface` | `upload(SubjectType, ImportFormat, fileName, bytes): string`, `preview(id, rows = 20): ImportView`, `previewMapping(id, mapping, rows = 20): ImportView` (0.4.0, stored nowhere), `unfinished(limit = 5): array{total, imports}` (0.4.0), `confirm(id, mapping, DuplicatePolicy, int $v)`, `run(id, ?int $maxChunks): bool`, `cancel(id)` |
 | `MergeServiceInterface` | `preview(SubjectType, survivorId, otherId): MergePreview`, `merge(SubjectType, survivorId, otherId, list<field> $takeFromOther, int $survivorVersion, int $otherVersion)` |
 | `CrmExporterInterface` | `csv(ListQuery): iterable<string>` (`manage`), `vcard(contactId): string` (`view`) |
 | `CrmPersonalDataInterface` | `export(contactId): array`, `erase(contactId)` (`manage`, idempotent) |
@@ -675,7 +675,7 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 | `consent` | `/contacts/{id}/consent` | POST | edit |
 | `vcard` | `/contacts/{id}/vcard` | GET | view |
 | `gdpr_export`, `erase` | `/contacts/{id}/gdpr-export` (JSON download), `/contacts/{id}/erase` | POST (both with the action token `crm_action[_token]`) | manage |
-| `import`, `import_show` | `/import`, `/import/{id}` (preview, confirm; `do=run` continue, `do=cancel`) | GET, POST | edit |
+| `import`, `import_show` | `/import` (`?subject=contact\|company`), `/import/{id}` (preview, confirm; `do=preview` re-checks the rows with the posted mapping, `do=run` continue, `do=cancel`); 0.4.0: also the import modal's steps | GET, POST | import |
 | `tags`, `tag_edit` | `/admin/tags`, `/admin/tags/{id}` (rename, recolour, delete) | GET, POST | manage |
 | `fields`, `field_edit` | `/admin/fields`, `/admin/fields/{id}` (change, archive) | GET, POST | manage |
 | `settings` | `/admin/settings` | GET, POST | manage |
@@ -685,7 +685,23 @@ template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the bra
 
 ## Imports
 
-1. **Upload** (`edit`): a CSV (UTF-8, BOM stripped, `,` or `;`, header row, unique non-empty column names) or a vCard
+0.4.0: the lists open the import in a **modal** from their page action **Import** (shown only to someone who may
+import; its href is the import page, which stays the no-JS fallback). The modal is UiKit's `confirm_dialog` with its
+anatomy at the wide size; the steps below run inside it (file → mapping → preview → result), errors show in place, and
+an expired session shows a reload notice instead of the login page. An unfinished import (still running after
+`import.sync_rows`, waiting for a person, or stopped by a conflict) stays reachable: the result step and the conflict /
+expired notices link its page, and the lists show the person a notice linking their unfinished imports
+(`ImportServiceInterface::unfinished()`, the acting person's running imports in the tenant). The lists load `js/nowo-crm-import.js` themselves
+(`asset(…, 'nowo_crm_kit')`; run `assets:install`). Wire protocol, for a host that drives the modal itself:
+
+- request header `X-Nowo-Crm-Dialog: import` on the import routes ⇒ the step fragment (`import/dialog.html.twig`,
+  response header `X-Nowo-Crm-Fragment: import-step`, `[data-part="body"]` and `[data-part="footer"]`) instead of the
+  page; 422 / 409 answer the fragment with the errors;
+- a step that would redirect answers 204 + `X-Nowo-Crm-Dialog-Location: <next step>`;
+- nobody signed in ⇒ 401 `{"error": "session_expired", "reload": true}`; lock conflicts ⇒ 409 JSON with
+  `CONFLICT_001` / `CONFLICT_002` and `X-Conflict-Code` ([CONCURRENCY.md](CONCURRENCY.md)).
+
+1. **Upload** (`import`): a CSV (UTF-8, BOM stripped, `,` or `;`, header row, unique non-empty column names) or a vCard
    3.0 / 4.0 file (contacts only; `N`, `FN`, `EMAIL`, `TEL` (`CELL` ⇒ mobile), `TITLE`, `ORG`, `ADR`, first value of
    each). At most `import.max_rows` rows and `import.max_bytes` bytes. Cells are text; nothing is evaluated.
 2. **Preview**: the first 20 rows checked against the detected mapping (field names and common aliases such as

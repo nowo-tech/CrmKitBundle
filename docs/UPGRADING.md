@@ -6,11 +6,41 @@
 - [To 0.3.0](#to-030)
 - [To 0.2.1](#to-021)
 - [To 0.2.0](#to-020)
-- [To 0.2.0](#to-020-1)
 - [To 0.1.0](#to-010)
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+From **0.3.0** (next minor 0.4.0):
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+php bin/console assets:install
+```
+
+**Import modal.** The companies and contacts lists now open the import in a modal from their page action **Import**,
+which the bundle adds to the list header for anyone who may import; no override is needed.
+
+- **Drop your direct links to the import page** (`nowo_crm_kit_import`, `/crm/import`, or your prefix's `…/import`):
+  menu entries, buttons, dashboard shortcuts. The list's page action replaces them. The route stays, as the no-JS
+  fallback, so an old bookmark still works. The bundle's own area tab **Import** is gone, and so is the `nav.import`
+  translation key; if you translated it in your app, remove that override.
+- Run `assets:install` (the modal's script is `public/bundles/nowocrmkit/js/nowo-crm-import.js`, served through the new
+  `nowo_crm_kit` asset package). A host with its own `framework.assets.packages.nowo_crm_kit` keeps its value.
+- A strict Content-Security-Policy needs nothing new: the script is a same-origin file, and there is no inline style or
+  script.
+- If your firewall answers the modal's `fetch` with a login redirect, the modal shows its "session expired" notice with
+  a reload button. With nobody signed in on a route the bundle checks itself, the modal's calls get 401
+  `{"error": "session_expired"}` instead of your entry point; normal page requests are unchanged.
+- An override of `@NowoCrmKit/record/list.html.twig` that replaces `nowo_ui_content` without `parent()` must include
+  `@NowoCrmKit/import/_dialog_shell.html.twig` (with `dialog: crm_import_dialog`) when `crm_import_dialog` is set.
+- A custom implementation of `ImportServiceInterface` must add `previewMapping(string $id, array $mapping, int $rows =
+  20): ImportView` and `unfinished(int $limit = 5): array`; one of `CrmStoreInterface` must add
+  `unfinishedImports(TenantRef $tenant, string $actor, int $limit): array`.
+- The lists show a person who may import a notice linking their unfinished imports; an override of
+  `@NowoCrmKit/record/list.html.twig` that drops `parent()` should render it from `crm_import_dialog.unfinished`.
+- `framework.assets` must stay enabled (the `asset()` function renders the modal's script).
+- `nowo-tech/ui-kit-bundle` ^2.62 and `symfony/asset` are now required.
 
 ## To 0.3.0
 
@@ -226,8 +256,6 @@ From **0.1.0**:
 ```bash
 composer update nowo-tech/crm-kit-bundle
 ```
-
-## To 0.2.0
 
 Party roles, the company's primary contact and affiliation purposes; the UD-2 concurrency follow-ups.
 

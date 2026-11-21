@@ -14,6 +14,7 @@ use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
 use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
+use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
@@ -65,6 +66,7 @@ final readonly class RecordController
         private CrmExporterInterface $exporter,
         private RecordForms $forms,
         private RecordPage $page,
+        private ?ImportServiceInterface $imports = null,
     ) {
     }
 
@@ -105,6 +107,15 @@ final readonly class RecordController
             if ($this->ui->can(CrmPermission::Export)) {
                 $actions[] = new Action('export', UiSupport::label('list.export'), $this->ui->url('nowo_crm_kit_export', ['type' => $type] + $request->query->all()), icon: 'download');
             }
+            // 0.4.0: "Import" opens the import modal (js/nowo-crm-import.js); its href, the import page, is the no-JS
+            // fallback. Only for someone who may import, like the page itself.
+            $importDialog = null;
+            if ($this->ui->can(CrmPermission::Import)) {
+                $importDialog = ['url' => $this->ui->url('nowo_crm_kit_import', ['subject' => $subject->value])];
+                $actions[]    = new Action('import', UiSupport::label('list.import'), $importDialog['url'], attributes: ['data-crm-import-open' => true, 'aria-haspopup' => 'dialog', 'data-testid' => 'crm-import-open']);
+                // Audit XU-M1: the person's unfinished imports stay reachable once the modal is closed.
+                $importDialog['unfinished'] = $this->imports?->unfinished() ?? ['total' => 0, 'imports' => []];
+            }
             $columns = $subject === SubjectType::Company
                 ? [new Column('label', UiSupport::label('field.name'), true, required: true, sortKey: 'name'), new Column('city', UiSupport::label('field.city'), priority: 2), new Column('email', UiSupport::label('field.email'), priority: 3), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('roles', UiSupport::label('field.roles'), priority: 2), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')]
                 : [new Column('label', UiSupport::label('field.contact_name'), true, required: true, sortKey: 'name'), new Column('email', UiSupport::label('field.email')), new Column('phone', UiSupport::label('field.phone'), priority: 2), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('roles', UiSupport::label('field.roles'), priority: 2), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')];
@@ -140,6 +151,7 @@ final readonly class RecordController
                     attributes: ['data-testid' => 'crm-list-' . $subject->value],
                     responsive: 'cards',
                 ),
+                'crm_import_dialog' => $importDialog,
             ]);
         });
     }

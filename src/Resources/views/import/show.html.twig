@@ -19,25 +19,7 @@
     <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-import-rows">
         <div class="{{ nowo_ui_class('card_body', _b) }}">
             <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'import.preview'|trans({}, _d) }}</h2>
-            <div class="nowo-ui-table-scroll" tabindex="0">
-            <table class="{{ nowo_ui_class('table', _b) }}">
-                <thead><tr><th scope="col">#</th>{% for column in import.columns %}<th scope="col">{{ column }}</th>{% endfor %}<th scope="col">{{ 'import.col.check'|trans({}, _d) }}</th></tr></thead>
-                <tbody>
-                {% for row in import.rows %}
-                    <tr data-testid="crm-import-row" data-outcome="{{ row.outcome.value }}">
-                        <th scope="row">{{ row.rowNo }}</th>
-                        {% for column in import.columns %}<td>{{ row.data[column] ?? '' }}</td>{% endfor %}
-                        <td>
-                            {% if row.outcome.value != 'pending' %}{{ ('import.outcome.' ~ row.outcome.value)|trans({}, _d) }}{% if row.message %} · {{ row.message|trans({}, _d) }}{% endif %}
-                            {% elseif row.errors is not empty %}{% for field, error in row.errors %}{{ field }}: {{ error|trans({}, _d) }}{% if not loop.last %}; {% endif %}{% endfor %}
-                            {% elseif row.duplicates is not empty %}{{ 'import.duplicate_of'|trans({'%name%': row.duplicates|join(', ')}, _d) }}
-                            {% else %}{{ 'import.ok'|trans({}, _d) }}{% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            </div>
+            {{ include('@NowoCrmKit/import/_rows.html.twig', {import: import, bundle: _b}, false) }}
         </div>
     </section>
     {% if import.status.value == 'running' %}

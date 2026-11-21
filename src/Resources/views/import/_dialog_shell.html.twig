@@ -1,0 +1,42 @@
+{#
+  The import modal of the lists (0.4.0, UiKit PAGE_CONTRACT "Dialog sizes and anatomy"): UiKit's confirm_dialog with its anatomy (`anatomy: true`), the
+  wide size (`--nowo-dialog-width-wide`) and the content's height up to the viewport; the tinted header and footer are
+  UiKit's. js/nowo-crm-import.js opens it from any [data-crm-import-open] link (the page action "Import", whose href is
+  the import page: the no-JS fallback) and loads the steps from the import routes (import/dialog.html.twig); the texts
+  of the notices it builds itself are data attributes of the dialog. Rendered only for someone who may import.
+
+  Variables: dialog ({url: the import page of this list}).
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{% embed nowo_ui_partial('confirm_dialog', 'NowoCrmKitBundle') with {
+    only_dialog: true,
+    anatomy: true,
+    size: 'wide',
+    title: 'import.title'|trans({}, 'NowoCrmKitBundle'),
+    title_id: 'crm-import-dialog-title',
+    close_label: 'import.dialog.close'|trans({}, 'NowoCrmKitBundle'),
+    dialog_testid: 'crm-import-dialog',
+    dialog_modifier: 'crm-kit-import-dialog',
+    dialog_attr: {
+        'data-crm-import-dialog': dialog.url,
+        'data-loading': 'import.dialog.loading'|trans({}, 'NowoCrmKitBundle'),
+        'data-failed': 'import.dialog.failed'|trans({}, 'NowoCrmKitBundle'),
+        'data-expired': 'import.dialog.expired'|trans({}, 'NowoCrmKitBundle'),
+        'data-reload': 'import.dialog.reload'|trans({}, 'NowoCrmKitBundle'),
+        'data-denied': 'import.dialog.denied'|trans({}, 'NowoCrmKitBundle'),
+        'data-conflict-retry': 'import.dialog.conflict_retry'|trans({}, 'NowoCrmKitBundle'),
+        'data-conflict-reload': 'import.dialog.conflict_reload'|trans({}, 'NowoCrmKitBundle'),
+        'data-open-page': 'import.dialog.open_page'|trans({}, 'NowoCrmKitBundle'),
+        'data-notice-class': nowo_ui_class('flash_error', 'NowoCrmKitBundle'),
+        'data-reload-class': nowo_ui_class('btn_secondary', 'NowoCrmKitBundle'),
+    },
+    bundle: 'NowoCrmKitBundle',
+} only %}
+    {% block body %}
+        <p class="{{ nowo_ui_class('muted', 'NowoCrmKitBundle') }}" role="status" data-part="status">{{ 'import.dialog.loading'|trans({}, 'NowoCrmKitBundle') }}</p>
+    {% endblock %}
+    {% block footer %}
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', 'NowoCrmKitBundle') }}" data-crm-import-close data-testid="crm-import-dialog-cancel">{{ 'import.dialog.cancel'|trans({}, 'NowoCrmKitBundle') }}</button>
+    {% endblock %}
+{% endembed %}
+<script src="{{ asset('js/nowo-crm-import.js', 'nowo_crm_kit') }}" defer></script>

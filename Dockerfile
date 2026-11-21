@@ -6,7 +6,12 @@ RUN apk add --no-cache \
     unzip \
     bash \
     libzip-dev \
-    postgresql-dev
+    postgresql-dev \
+    nodejs \
+    npm
+
+# 0.4.0: pnpm for the import modal's TypeScript (make assets / make test-ts, REQ-ASSETS-001)
+RUN npm install -g pnpm@10
 
 # pdo_mysql / pdo_pgsql: Database suite on MySQL, MariaDB and PostgreSQL (make test-with-db, REQ-TEST-005)
 RUN docker-php-ext-install -j2 zip pdo_mysql pdo_pgsql

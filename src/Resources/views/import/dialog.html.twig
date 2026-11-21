@@ -1,0 +1,107 @@
+{#
+  A step of the import modal (0.4.0; answered to js/nowo-crm-import.js, see ImportDialog): the body and the footer of
+  the modal's UiKit confirm_dialog anatomy. The script puts [data-part="body"] in the dialog body and
+  [data-part="footer"] in the dialog footer: Cancel / Close first, then at most one primary, bound to the step's form
+  with form="…". Sections without cards; errors in place (form errors, `alert`).
+
+  Variables:
+    - step: file | mapping | preview | result
+    - form: FormView (file: the upload form; mapping / preview: the confirm form; null otherwise)
+    - action: FormView of the CSRF-only ActionType (result of a running import) or null
+    - import: ImportView (every step but file) or null
+    - alert: an error shown above the step (a conflict, a refused CSRF token) or null
+    - subject: contact | company | null (file: the list the modal was opened from)
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{%- set _b = 'NowoCrmKitBundle' -%}
+{%- set _index = {file: 0, mapping: 1, preview: 2, result: 3}[step] -%}
+{%- set _steps = [] -%}
+{%- for _name in ['file', 'mapping', 'preview', 'result'] -%}
+    {%- set _steps = _steps|merge([{label: ('import.step.' ~ _name)|trans({}, _d), status: loop.index0 < _index ? 'done' : (loop.index0 == _index ? 'current' : 'upcoming')}]) -%}
+{%- endfor -%}
+{%- set _finished = import is not null and import.status.value in ['done', 'cancelled', 'failed'] -%}
+{%- set _form_id = 'crm-import-dialog-form' -%}
+<div data-crm-import-step="{{ step }}" data-testid="crm-import-step" data-step="{{ step }}"{% if import is not null %} data-status="{{ import.status.value }}" data-crm-import-page="{{ path('nowo_crm_kit_import_show', {id: import.id}) }}"{% endif %}{% if _finished %} data-crm-import-finished{% endif %}>
+    <div data-part="body">
+        <div class="{{ nowo_ui_class('section', _b) }}">
+            {{ include(nowo_ui_partial('steps', _b), {items: _steps, label: 'import.steps'|trans({}, _d)}, false) }}
+        </div>
+        {% if alert %}
+            <div class="{{ nowo_ui_class('flash_error', _b) }}" role="alert" data-testid="crm-import-alert">{{ alert }}</div>
+        {% endif %}
+
+        {% if step == 'file' %}
+            <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-import-file">
+                <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'import.intro'|trans({}, _d) }}</p>
+                {{ form_start(form, {action: path('nowo_crm_kit_import', subject ? {subject: subject} : {}), attr: {id: _form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
+                {{ include('@NowoCrmKit/import/_dialog_fields.html.twig', {form: form}, false) }}
+                {{ form_end(form) }}
+            </div>
+        {% elseif step == 'mapping' %}
+            <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-import-mapping">
+                <h3>{{ 'import.dialog.mapping_title'|trans({'%file%': import.fileName}, _d) }}</h3>
+                <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'import.dialog.mapping_intro'|trans({'%rows%': import.rowsTotal}, _d) }}</p>
+                {{ form_start(form, {action: path('nowo_crm_kit_import_show', {id: import.id}), attr: {id: _form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
+                {{ include('@NowoCrmKit/import/_dialog_fields.html.twig', {form: form}, false) }}
+                {{ form_end(form) }}
+            </div>
+        {% elseif step == 'preview' %}
+            <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-import-preview">
+                <h3>{{ 'import.preview'|trans({}, _d) }}</h3>
+                <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'import.dialog.preview_intro'|trans({'%shown%': import.rows|length, '%rows%': import.rowsTotal}, _d) }}</p>
+                {{ include('@NowoCrmKit/import/_rows.html.twig', {import: import, bundle: _b}, false) }}
+            </div>
+            <div class="{{ nowo_ui_class('section', _b) }}">
+                <details data-testid="crm-import-mapping-fold"{% if not form.vars.valid %} open{% endif %}>
+                    <summary>{{ 'import.dialog.mapping_fold'|trans({}, _d) }}</summary>
+                    {{ form_start(form, {action: path('nowo_crm_kit_import_show', {id: import.id}), attr: {id: _form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
+                    {{ include('@NowoCrmKit/import/_dialog_fields.html.twig', {form: form}, false) }}
+                    <button type="submit" name="do" value="preview" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-testid="crm-import-refresh">{{ 'import.dialog.refresh'|trans({}, _d) }}</button>
+                    {{ form_end(form) }}
+                </details>
+            </div>
+        {% else %}
+            <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-import-result" data-status="{{ import.status.value }}">
+                <h3>{{ ('import.status.' ~ import.status.value)|trans({}, _d) }}</h3>
+                <p data-testid="crm-import-summary-text">{{ 'import.summary'|trans({'%done%': import.rowsDone, '%total%': import.rowsTotal}, _d) }}</p>
+                <ul>
+                    {% for outcome, count in import.counts %}<li data-testid="crm-import-count" data-outcome="{{ outcome }}">{{ ('import.outcome.' ~ outcome)|trans({}, _d) }}: {{ count }}</li>{% endfor %}
+                </ul>
+                {% if import.status.value == 'running' %}
+                    {#- audit XU-M1: an unfinished import stays reachable after the modal closes -#}
+                    <p><a href="{{ path('nowo_crm_kit_import_show', {id: import.id}) }}" data-testid="crm-import-open-page">{{ 'import.dialog.open_page'|trans({}, _d) }}</a></p>
+                {% endif %}
+                {% if import.status.value == 'running' and action is not null %}
+                    <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'import.running'|trans({}, _d) }}</p>
+                    {{ form_start(action, {action: path('nowo_crm_kit_import_show', {id: import.id}), attr: {id: _form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
+                    {{ form_widget(action) }}
+                    <button type="submit" name="do" value="cancel" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-testid="crm-import-cancel">{{ 'import.cancel'|trans({}, _d) }}</button>
+                    {{ form_end(action) }}
+                {% endif %}
+            </div>
+            {% if import.rows is not empty %}
+                <div class="{{ nowo_ui_class('section', _b) }}">
+                    <h3>{{ 'import.preview'|trans({}, _d) }}</h3>
+                    {{ include('@NowoCrmKit/import/_rows.html.twig', {import: import, bundle: _b}, false) }}
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+    <div data-part="footer">
+        {% if step == 'result' %}
+            <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-close data-testid="crm-import-dialog-close">{{ 'import.dialog.close'|trans({}, _d) }}</button>
+            {% if import.status.value == 'running' and action is not null %}
+                <button type="submit" form="{{ _form_id }}" name="do" value="run" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ 'import.continue'|trans({}, _d) }}</button>
+            {% endif %}
+        {% else %}
+            <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-close data-testid="crm-import-dialog-cancel">{{ 'import.dialog.cancel'|trans({}, _d) }}</button>
+            {% if step == 'file' %}
+                <button type="submit" form="{{ _form_id }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ 'import.dialog.next'|trans({}, _d) }}</button>
+            {% elseif step == 'mapping' %}
+                <button type="submit" form="{{ _form_id }}" name="do" value="preview" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ 'import.dialog.preview'|trans({}, _d) }}</button>
+            {% else %}
+                <button type="submit" form="{{ _form_id }}" name="do" value="confirm" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ 'import.confirm'|trans({}, _d) }}</button>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>

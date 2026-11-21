@@ -1,7 +1,8 @@
 {#
   The import modal of the lists (0.4.0, UiKit PAGE_CONTRACT "Dialog sizes and anatomy"): UiKit's confirm_dialog with its anatomy (`anatomy: true`), the
   wide size (`--nowo-dialog-width-wide`) and the content's height up to the viewport; the tinted header and footer are
-  UiKit's. js/nowo-crm-import.js opens it from any [data-crm-import-open] link (the page action "Import", whose href is
+  UiKit's. 0.4.1 (UiKit 2.63): a full-screen sheet on phones (`phone: 'sheet'`: header and footer stay, the body
+  scrolls) and the steps in the header (`header_steps`, replaced by each step). js/nowo-crm-import.js opens it from any [data-crm-import-open] link (the page action "Import", whose href is
   the import page: the no-JS fallback) and loads the steps from the import routes (import/dialog.html.twig); the texts
   of the notices it builds itself are data attributes of the dialog. Rendered only for someone who may import.
 
@@ -12,6 +13,9 @@
     only_dialog: true,
     anatomy: true,
     size: 'wide',
+    phone: 'sheet',
+    header_steps: ['file', 'mapping', 'preview', 'result']|map((name, i) => {label: ('import.step.' ~ name)|trans({}, 'NowoCrmKitBundle'), status: i == 0 ? 'current' : 'upcoming'}),
+    header_steps_label: 'import.steps'|trans({}, 'NowoCrmKitBundle'),
     title: 'import.title'|trans({}, 'NowoCrmKitBundle'),
     title_id: 'crm-import-dialog-title',
     close_label: 'import.dialog.close'|trans({}, 'NowoCrmKitBundle'),

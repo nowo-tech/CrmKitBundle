@@ -16,6 +16,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (0.4.1: import modal on UiKit 2.63)
+
+- The import modal fills the screen on phones (UiKit 2.63 `phone: 'sheet'`): the header and the footer stay in view and
+  only the body scrolls; desktop keeps the wide size.
+- The steps (file, columns, preview, result) move from the top of the body into the dialog header (`header_steps`,
+  compact on phones: only the current step shows its label); each step's fragment carries them in
+  `[data-part="steps"]`.
+- The body's sections are separated by UiKit's `nowo-ui-section` dividers.
+- Requires `nowo-tech/ui-kit-bundle` ^2.63.
+
 ## [0.4.0] - 2026-11-21
 
 ### Added (0.4.0: import modal)

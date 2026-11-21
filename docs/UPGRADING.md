@@ -12,6 +12,17 @@
 
 ## Unreleased
 
+From **0.4.0** (next patch 0.4.1):
+
+```bash
+composer update nowo-tech/crm-kit-bundle nowo-tech/ui-kit-bundle
+php bin/console assets:install
+```
+
+`nowo-tech/ui-kit-bundle` ^2.63 is required (the import modal's phone sheet and header steps). Nothing else changes for
+a host. An override of `@NowoCrmKit/import/_dialog_shell.html.twig` should pass `phone: 'sheet'` and `header_steps`
+like the bundle's; a host that drives the modal itself finds each step's steps in `[data-part="steps"]`.
+
 ## To 0.4.0
 
 From **0.3.0**:

@@ -1,7 +1,8 @@
 /**
  * 0.4.0: the import modal of the CRM lists (UiKit PAGE_CONTRACT "Dialog sizes and anatomy"). The markup is the Twig template
  * `import/_dialog_shell.html.twig`: UiKit's confirm_dialog anatomy (header with the title and ×, a body that alone
- * scrolls, a footer with Cancel then the one primary). Any `[data-crm-import-open]` link opens it (the page action
+ * scrolls, a footer with Cancel then the one primary; 0.4.1, UiKit 2.63: the steps in the header and a full-screen sheet
+ * on phones). Any `[data-crm-import-open]` link opens it (the page action
  * "Import"; its href is the import page, the no-JS fallback). Each step (file → mapping → preview → result) is a
  * fragment the import routes answer to `X-Nowo-Crm-Dialog: import` (same access checks and CSRF tokens as the pages):
  * its `[data-part="body"]` goes to the dialog body and its `[data-part="footer"]` to the dialog footer. A form of the
@@ -83,6 +84,8 @@ export interface StepParts {
   body: Node[];
   /** Nodes of the dialog footer. */
   footer: Node[];
+  /** Nodes of the header's steps (0.4.1, UiKit 2.63 `nowo-ui-dialog__steps`). */
+  steps: Node[];
 }
 
 /**
@@ -114,6 +117,7 @@ export function parseStep(html: string): StepParts {
     root: root === null ? null : (document.importNode(root, false) as HTMLElement),
     body: nodes('[data-part="body"]'),
     footer: nodes('[data-part="footer"]'),
+    steps: nodes('[data-part="steps"]'),
   };
 }
 
@@ -179,6 +183,8 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
   const body = dialog.querySelector<HTMLElement>('.nowo-ui-dialog__body');
   const footer = dialog.querySelector<HTMLElement>('.nowo-ui-dialog__footer');
   const title = dialog.querySelector<HTMLElement>('.nowo-ui-dialog__title');
+  // 0.4.1: the steps live in the header (UiKit 2.63); each step replaces them.
+  const headerSteps = dialog.querySelector<HTMLElement>('.nowo-ui-dialog__steps');
   if (body === null || footer === null || title === null) {
     throw new Error('NowoCrmImport: the import dialog needs the UiKit anatomy (header title, body, footer).');
   }
@@ -186,6 +192,7 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
   const reload = options.reload ?? ((): void => window.location.reload());
   const initialBody = [...body.childNodes].map((node) => node.cloneNode(true));
   const initialFooter = [...footer.childNodes].map((node) => node.cloneNode(true));
+  const initialSteps = [...(headerSteps?.childNodes ?? [])].map((node) => node.cloneNode(true));
   let controller: AbortController | null = null;
   let finished = false;
   /** The page of the import the modal works on, once a step named it (audit XU-M1). */
@@ -224,6 +231,9 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
     const step = parseStep(html);
     body.replaceChildren(...step.body);
     footer.replaceChildren(...step.footer);
+    if (headerSteps !== null && step.steps.length > 0) {
+      headerSteps.replaceChildren(...step.steps);
+    }
     finished = finished || (step.root?.hasAttribute('data-crm-import-finished') ?? false);
     importPage = step.root?.dataset.crmImportPage ?? importPage;
     dialog.dataset.crmImportStep = step.root?.dataset.crmImportStep ?? '';
@@ -325,6 +335,7 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
   const wipe = (): void => {
     body.replaceChildren(...initialBody.map((node) => node.cloneNode(true)));
     footer.replaceChildren(...initialFooter.map((node) => node.cloneNode(true)));
+    headerSteps?.replaceChildren(...initialSteps.map((node) => node.cloneNode(true)));
     delete dialog.dataset.crmImportStep;
     importPage = null;
   };

@@ -134,6 +134,7 @@ final class ImportDialogTest extends CrmTestCase
         self::assertSame('done', $result->filter('[data-crm-import-step]')->attr('data-status'));
         self::assertNotNull($result->filter('[data-crm-import-step]')->attr('data-crm-import-finished'));
         self::assertCount(0, $result->filter('[data-part="footer"] .nowo-ui-btn--primary'), 'a result: Close only');
+        self::assertCount(0, $result->filter('[data-testid="crm-import-open-page"]'), 'a finished import needs no link');
         self::assertSame(3, $this->int('SELECT COUNT(*) FROM nowo_crm_contact'), 'both rows created (no e-mail column mapped)');
 
         // A second confirm: the domain conflict in place (409, the result as it is now).
@@ -163,6 +164,9 @@ final class ImportDialogTest extends CrmTestCase
         self::assertSame('running', $result->filter('[data-crm-import-step]')->attr('data-status'));
         self::assertSame('run', $result->filter('[data-part="footer"] .nowo-ui-btn--primary')->attr('value'), 'Continue is the primary');
         self::assertCount(1, $result->filter('[data-part="body"] button[value="cancel"].nowo-ui-btn--secondary'));
+        // Audit XU-M1: the import page stays reachable from the modal.
+        self::assertSame('/crm/import/' . $id, $result->filter('[data-testid="crm-import-open-page"]')->attr('href'));
+        self::assertSame('/crm/import/' . $id, $result->filter('[data-crm-import-step]')->attr('data-crm-import-page'));
         $values = $result->filter('#crm-import-dialog-form')->form()->getPhpValues();
 
         // Continue without the CSRF token: 422, the error in place.
@@ -215,6 +219,84 @@ final class ImportDialogTest extends CrmTestCase
         self::assertSame('CONFLICT_002', $response->headers->get('X-Conflict-Code'));
         self::assertNull($response->headers->get('Retry-After'));
         $this->ctx()->races['Deadlock'] = 0;
+    }
+
+    public function testAContinueOfSeveralChunksWhoseSecondDeadlocksAnswersConflict002(): void
+    {
+        // Audit XU-L2: "Continue" runs two chunks; the first commits, the second keeps deadlocking.
+        $this->boot(['import' => ['sync_rows' => 20, 'chunk_rows' => 10]]);
+        $this->admin();
+        $imports = $this->service(ImportServiceInterface::class);
+        $id      = $imports->upload(SubjectType::Company, ImportFormat::Csv, 'big.csv', "name\n" . $this->rows(50));
+        $imports->confirm($id, ['name' => 'name'], DuplicatePolicy::Skip, 1);
+        $imports->run($id, 1);
+        self::assertSame(10, $this->int('SELECT COUNT(*) FROM nowo_crm_company'));
+        $values = $this->dialog('GET', '/crm/import/' . $id)->filter('#crm-import-dialog-form')->form()->getPhpValues();
+
+        $this->ctx()->races['DeadlockSkip'] = 10;
+        $this->ctx()->races['Deadlock']     = 1000;
+        $this->dialog('POST', '/crm/import/' . $id, $values + ['do' => 'run']);
+        $response = $this->client->getResponse();
+        self::assertSame(409, $response->getStatusCode());
+        self::assertSame('CONFLICT_002', $response->headers->get('X-Conflict-Code'));
+        self::assertNull($response->headers->get('Retry-After'));
+        $body = json_decode((string) $response->getContent(), true);
+        self::assertIsArray($body);
+        self::assertSame('CONFLICT_002', $body['code'] ?? null);
+        self::assertSame(20, $this->int('SELECT COUNT(*) FROM nowo_crm_company'), 'the first chunk stays committed');
+        $this->ctx()->races['Deadlock'] = 0;
+
+        // The import is still running and reachable: from its page, and from the list's notice.
+        $view = $imports->preview($id);
+        self::assertSame('running', $view->status->value);
+        self::assertSame(20, $view->rowsDone);
+    }
+
+    public function testTheListLinksThePersonsUnfinishedImports(): void
+    {
+        // Audit XU-M1: an import left running (after sync_rows, waiting for a person, or after a conflict) stays
+        // reachable once the modal is closed.
+        $this->boot(['import' => ['sync_rows' => 10, 'chunk_rows' => 10]]);
+        $this->admin();
+        $imports = $this->service(ImportServiceInterface::class);
+        $running = $imports->upload(SubjectType::Company, ImportFormat::Csv, 'running.csv', "name\n" . $this->rows(30));
+        $imports->confirm($running, ['name' => 'name'], DuplicatePolicy::Skip, 1);
+        $imports->run($running, 1);
+        $done = $imports->upload(SubjectType::Company, ImportFormat::Csv, 'done.csv', "name\nSolo\n");
+        $imports->confirm($done, ['name' => 'name'], DuplicatePolicy::Skip, 1);
+        $imports->run($done);
+        $imports->upload(SubjectType::Company, ImportFormat::Csv, 'preview.csv', "name\nLater\n");
+
+        $page   = $this->client->request('GET', '/crm/contacts');
+        $notice = $page->filter('[data-testid="crm-import-unfinished"]');
+        self::assertCount(1, $notice);
+        self::assertStringContainsString('nowo-ui-flash--info', (string) $notice->attr('class'));
+        self::assertStringContainsString('one unfinished import', $notice->text());
+        self::assertSame(['/crm/import/' . $running], $notice->filter('a')->each(static fn (Crawler $a): string => (string) $a->attr('href')));
+        self::assertSame('running.csv', $notice->filter('a')->text());
+        $this->client->click($notice->filter('a')->link());
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertSame('running', $this->client->getCrawler()->filter('[data-testid="crm-import-summary"]')->attr('data-status'));
+
+        $second = $imports->upload(SubjectType::Company, ImportFormat::Csv, 'second.csv', "name\n" . $this->rows(30));
+        $imports->confirm($second, ['name' => 'name'], DuplicatePolicy::Skip, 1);
+        $imports->run($second, 1);
+        self::assertStringContainsString('2 unfinished imports', $this->client->request('GET', '/crm/companies')->filter('[data-testid="crm-import-unfinished"]')->text());
+
+        // Another importer of the tenant: none of theirs. Someone who may not import: no notice.
+        $this->actAs('leo', 'view', 'edit');
+        self::assertCount(0, $this->client->request('GET', '/crm/contacts')->filter('[data-testid="crm-import-unfinished"]'));
+        $this->actAs('zoe', 'view');
+        self::assertCount(0, $this->client->request('GET', '/crm/contacts')->filter('[data-testid="crm-import-unfinished"]'));
+        // Another tenant: none.
+        $this->ctx()->tenant = 'beta';
+        $this->ctx()->grant('beta', 'ana', 'view', 'edit');
+        $this->ctx()->actor = 'ana';
+        self::assertCount(0, $this->client->request('GET', '/crm/contacts')->filter('[data-testid="crm-import-unfinished"]'));
+        self::assertSame(['total' => 0, 'imports' => []], $imports->unfinished());
+        $this->ctx()->tenant = 'acme';
+        self::assertSame(2, $imports->unfinished(1)['total']);
+        self::assertCount(1, $imports->unfinished(1)['imports']);
     }
 
     public function testAccessAndAnExpiredSession(): void

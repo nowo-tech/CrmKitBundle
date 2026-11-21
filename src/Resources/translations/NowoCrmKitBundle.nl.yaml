@@ -300,7 +300,9 @@ import:
         mapping: 'Kolommen'
         preview: 'Voorbeeld'
         result: 'Resultaat'
+    unfinished: '{1} Je hebt één onvoltooide import.|]1,Inf[ Je hebt %count% onvoltooide imports.'
     dialog:
+        open_page: 'Importpagina openen'
         loading: 'Laden…'
         failed: 'Er ging iets mis. Probeer het opnieuw.'
         expired: 'Je sessie is verlopen. Laad de pagina opnieuw om weer in te loggen; in deze stap is niets geïmporteerd.'

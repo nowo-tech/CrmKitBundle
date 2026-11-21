@@ -128,6 +128,16 @@ final readonly class ImportService implements ImportServiceInterface
     }
 
     /**
+     * The acting person's unfinished imports.
+     */
+    public function unfinished(int $limit = 5): array
+    {
+        $context = $this->support->access->context(CrmPermission::Import);
+
+        return $this->support->read(fn (): array => $this->support->store->unfinishedImports($context->tenant, $context->actor->value, max(1, $limit)));
+    }
+
+    /**
      * The import with its first rows checked against the given mapping (null: the stored one).
      *
      * @param array<string, string>|null $with

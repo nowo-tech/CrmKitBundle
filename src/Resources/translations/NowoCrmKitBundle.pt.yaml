@@ -300,7 +300,9 @@ import:
         mapping: 'Colunas'
         preview: 'Pré-visualização'
         result: 'Resultado'
+    unfinished: '{1} Tem uma importação por terminar.|]1,Inf[ Tem %count% importações por terminar.'
     dialog:
+        open_page: 'Abrir a página da importação'
         loading: 'A carregar…'
         failed: 'Algo correu mal. Tente novamente.'
         expired: 'A sua sessão expirou. Recarregue a página para voltar a entrar; neste passo nada foi importado.'

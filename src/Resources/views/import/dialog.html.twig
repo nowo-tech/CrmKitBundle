@@ -21,7 +21,7 @@
 {%- endfor -%}
 {%- set _finished = import is not null and import.status.value in ['done', 'cancelled', 'failed'] -%}
 {%- set _form_id = 'crm-import-dialog-form' -%}
-<div data-crm-import-step="{{ step }}" data-testid="crm-import-step" data-step="{{ step }}"{% if import is not null %} data-status="{{ import.status.value }}"{% endif %}{% if _finished %} data-crm-import-finished{% endif %}>
+<div data-crm-import-step="{{ step }}" data-testid="crm-import-step" data-step="{{ step }}"{% if import is not null %} data-status="{{ import.status.value }}" data-crm-import-page="{{ path('nowo_crm_kit_import_show', {id: import.id}) }}"{% endif %}{% if _finished %} data-crm-import-finished{% endif %}>
     <div data-part="body">
         <div class="{{ nowo_ui_class('section', _b) }}">
             {{ include(nowo_ui_partial('steps', _b), {items: _steps, label: 'import.steps'|trans({}, _d)}, false) }}
@@ -67,6 +67,10 @@
                 <ul>
                     {% for outcome, count in import.counts %}<li data-testid="crm-import-count" data-outcome="{{ outcome }}">{{ ('import.outcome.' ~ outcome)|trans({}, _d) }}: {{ count }}</li>{% endfor %}
                 </ul>
+                {% if import.status.value == 'running' %}
+                    {#- audit XU-M1: an unfinished import stays reachable after the modal closes -#}
+                    <p><a href="{{ path('nowo_crm_kit_import_show', {id: import.id}) }}" data-testid="crm-import-open-page">{{ 'import.dialog.open_page'|trans({}, _d) }}</a></p>
+                {% endif %}
                 {% if import.status.value == 'running' and action is not null %}
                     <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'import.running'|trans({}, _d) }}</p>
                     {{ form_start(action, {action: path('nowo_crm_kit_import_show', {id: import.id}), attr: {id: _form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}

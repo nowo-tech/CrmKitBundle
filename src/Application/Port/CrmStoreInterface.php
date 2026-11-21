@@ -332,6 +332,14 @@ interface CrmStoreInterface
     public function staleImports(DateTimeImmutable $before, int $limit): array;
 
     /**
+     * 0.4.0: the running imports (paused, waiting for a person, or stopped after a conflict) a person uploaded in the
+     * tenant, newest first: how many, and the first `$limit` (tenant and person compared byte-exact).
+     *
+     * @return array{total: int, imports: list<array{id: string, file: string}>}
+     */
+    public function unfinishedImports(TenantRef $tenant, string $actor, int $limit): array;
+
+    /**
      * Takes one unit of a counter (atomic UPDATE; the row is created from `$current()` on first use); false at the
      * limit.
      *

@@ -441,4 +441,38 @@ describe('start and the steps', () => {
     document.body.click();
     stop();
   });
+
+  it('links the import page from the expired and CONFLICT_002 notices once a step named it (XU-M1)', async () => {
+    const dialog = dialogElement();
+    dialog.dataset.openPage = 'Open the import page';
+    const named = '<div data-crm-import-step="preview" data-crm-import-page="/crm/import/abc"><div data-part="body"><p>x</p></div><div data-part="footer"></div></div>';
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(answer('{}', 401))
+      .mockResolvedValueOnce(fragment(named))
+      .mockResolvedValueOnce(answer('{}', 409, { 'X-Conflict-Code': 'CONFLICT_002' }))
+      .mockResolvedValueOnce(answer('{}', 401))
+      .mockResolvedValueOnce(answer('{}', 409, { 'X-Conflict-Code': 'CONFLICT_001' }));
+    const modal = openImportDialog({ dialog, returnTo: null, fetcher, reload: vi.fn() });
+    await modal.load('/crm/import');
+    expect(dialog.querySelector('[data-crm-import-notice] a')).toBeNull();
+    await modal.load('/crm/import/abc');
+    await modal.load('/crm/import/abc');
+    const link = dialog.querySelector<HTMLAnchorElement>('[data-crm-import-notice="conflict"] a[data-testid="crm-import-open-page"]');
+    expect(link?.getAttribute('href')).toBe('/crm/import/abc');
+    expect(link?.textContent).toBe('Open the import page');
+    await modal.load('/crm/import/abc');
+    expect(dialog.querySelector('[data-crm-import-notice="expired"] a')?.getAttribute('href')).toBe('/crm/import/abc');
+    await modal.load('/crm/import/abc');
+    expect(dialog.querySelector('[data-crm-import-notice="conflict"] a')).toBeNull();
+    modal.close();
+    const again = openImportDialog({ dialog, returnTo: null, fetcher: vi.fn<typeof fetch>().mockResolvedValue(answer('{}', 401)), reload: vi.fn() });
+    await again.load('/crm/import');
+    expect(dialog.querySelector('[data-crm-import-notice] a')).toBeNull();
+  });
+
+  it('never links a page of another site, and falls back to an empty link text', () => {
+    const box = notice(document.createElement('div'), 'x', 'expired', null, 'https://evil.test/crm/import/1');
+    expect(box.querySelector('a')).toBeNull();
+    expect(notice(document.createElement('div'), 'x', 'expired', null, '/crm/import/1').querySelector('a')?.textContent).toBe('');
+  });
 });

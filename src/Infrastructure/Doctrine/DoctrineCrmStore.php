@@ -720,6 +720,31 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * {@inheritDoc}
      */
+    public function unfinishedImports(TenantRef $tenant, string $actor, int $limit): array
+    {
+        $rows = $this->connection()->fetchAllAssociative(
+            'SELECT id, tenant_id, created_by_id, file_name FROM ' . $this->table(Import::class) . ' WHERE tenant_id = ? AND created_by_id = ? AND status = ? ORDER BY created_at DESC, id DESC',
+            [$tenant->value, $actor, ImportStatus::Running->value],
+        );
+        $total   = 0;
+        $imports = [];
+        foreach ($rows as $row) {
+            // LQ rule: the columns may compare case-insensitively; keep only the exact tenant and person.
+            if ($row['tenant_id'] !== $tenant->value || $row['created_by_id'] !== $actor || !is_string($row['id']) || !is_string($row['file_name'])) {
+                continue;
+            }
+            ++$total;
+            if (count($imports) < $limit) {
+                $imports[] = ['id' => $row['id'], 'file' => $row['file_name']];
+            }
+        }
+
+        return ['total' => $total, 'imports' => $imports];
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function takeCounter(TenantRef $tenant, string $resource, ?int $limit, callable $current): bool
     {
         $table = $this->table(Counter::class);

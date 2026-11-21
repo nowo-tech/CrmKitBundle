@@ -135,7 +135,7 @@ tables on a private entity manager and never flushes the host's work.
 - **FR-UI-001**: opt-in UiKit + FormKit pages, route loader `nowo_crm_kit_ui`, CSRF on every POST.
 - **FR-UI-002** (0.4.0): the import modal of the lists: UiKit `confirm_dialog` anatomy (wide), step fragments from the
   import routes (`ImportDialog`: `X-Nowo-Crm-Dialog`, 204 + next step, 401 `session_expired`), same access checks and
-  CSRF tokens as the pages, the import page as the no-JS fallback, the script `js/nowo-crm-import.js` (asset package
+  CSRF tokens as the pages, the import page as the no-JS fallback, unfinished imports linked from the modal and the lists, the script `js/nowo-crm-import.js` (asset package
   `nowo_crm_kit`).
 - **FR-SEARCH-001**: SearchKit providers for companies and contacts (bridge).
 - **FR-I18N-001**: translations in en, es, it, fr, pt, de, nl (REQ-I18N-002).

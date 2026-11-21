@@ -35,6 +35,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   preselects what to import).
 - `ImportServiceInterface::previewMapping(id, mapping, rows = 20)`: the first rows checked against another mapping,
   stored nowhere (the modal's preview step; also `do=preview` on the import page).
+- Unfinished imports stay reachable once the modal is closed (audit XU-M1): the result step of a running import and the
+  `CONFLICT_002` / session-expired notices link the import page, and the lists show someone who may import a UiKit
+  notice linking their running imports in the tenant (`ImportServiceInterface::unfinished(limit = 5)`,
+  `CrmStoreInterface::unfinishedImports()`).
 - Browser asset `js/nowo-crm-import.js` (TypeScript in `src/Resources/assets`, Vite IIFE, Vitest) under the new
   `nowo_crm_kit` asset package (`/bundles/nowocrmkit`, REQ-ASSETS-004); the list loads it itself. No inline style, no
   inline script, no CDN.

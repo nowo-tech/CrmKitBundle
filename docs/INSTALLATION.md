@@ -133,7 +133,8 @@ and for the focus-mode toggle `nowo_ui_kit.theme.focus_mode.enabled: true`, in t
 0.4.0: the lists open the import in a modal (the page action **Import**). Its script is a bundle asset: run
 `php bin/console assets:install` after installing or updating (it lands in `public/bundles/nowocrmkit/js/` and is served
 through the `nowo_crm_kit` asset package the bundle registers). Without the script the action is a link to the import
-page.
+page. The package needs `framework.assets` enabled (the default once `symfony/asset` is installed; a host that sets
+`framework.assets.enabled: false` has no `asset()` function and the lists fail to render).
 
 ## Schema and migrations
 

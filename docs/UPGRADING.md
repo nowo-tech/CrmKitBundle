@@ -36,7 +36,11 @@ which the bundle adds to the list header for anyone who may import; no override 
 - An override of `@NowoCrmKit/record/list.html.twig` that replaces `nowo_ui_content` without `parent()` must include
   `@NowoCrmKit/import/_dialog_shell.html.twig` (with `dialog: crm_import_dialog`) when `crm_import_dialog` is set.
 - A custom implementation of `ImportServiceInterface` must add `previewMapping(string $id, array $mapping, int $rows =
-  20): ImportView`.
+  20): ImportView` and `unfinished(int $limit = 5): array`; one of `CrmStoreInterface` must add
+  `unfinishedImports(TenantRef $tenant, string $actor, int $limit): array`.
+- The lists show a person who may import a notice linking their unfinished imports; an override of
+  `@NowoCrmKit/record/list.html.twig` that drops `parent()` should render it from `crm_import_dialog.unfinished`.
+- `framework.assets` must stay enabled (the `asset()` function renders the modal's script).
 - `nowo-tech/ui-kit-bundle` ^2.62 and `symfony/asset` are now required.
 
 ## To 0.3.0

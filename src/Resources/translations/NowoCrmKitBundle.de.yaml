@@ -300,7 +300,9 @@ import:
         mapping: 'Spalten'
         preview: 'Vorschau'
         result: 'Ergebnis'
+    unfinished: '{1} Du hast einen unvollständigen Import.|]1,Inf[ Du hast %count% unvollständige Importe.'
     dialog:
+        open_page: 'Importseite öffnen'
         loading: 'Wird geladen…'
         failed: 'Etwas ist schiefgelaufen. Bitte erneut versuchen.'
         expired: 'Deine Sitzung ist abgelaufen. Lade die Seite neu, um dich wieder anzumelden; in diesem Schritt wurde nichts importiert.'

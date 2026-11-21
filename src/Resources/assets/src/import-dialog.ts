@@ -125,9 +125,10 @@ export function parseStep(html: string): StepParts {
  * @param text The text.
  * @param kind Its `data-crm-import-notice` value (tests, e2e).
  * @param reload Called by the reload button; null for no button.
+ * @param page The import page (same origin) to link to, so an unfinished import stays reachable; null for no link.
  * @returns The notice.
  */
-export function notice(dialog: HTMLElement, text: string, kind: string, reload: (() => void) | null): HTMLElement {
+export function notice(dialog: HTMLElement, text: string, kind: string, reload: (() => void) | null, page: string | null = null): HTMLElement {
   const box = document.createElement('div');
   box.className = dialog.dataset.noticeClass ?? '';
   box.setAttribute('role', 'alert');
@@ -144,6 +145,15 @@ export function notice(dialog: HTMLElement, text: string, kind: string, reload: 
     button.textContent = dialog.dataset.reload ?? '';
     button.addEventListener('click', () => reload());
     box.append(button);
+  }
+  if (page !== null && sameOriginUrl(page)) {
+    const link = document.createElement('a');
+    link.href = page;
+    link.dataset.testid = 'crm-import-open-page';
+    link.textContent = dialog.dataset.openPage ?? '';
+    const line = document.createElement('p');
+    line.append(link);
+    box.append(line);
   }
   return box;
 }
@@ -178,6 +188,8 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
   const initialFooter = [...footer.childNodes].map((node) => node.cloneNode(true));
   let controller: AbortController | null = null;
   let finished = false;
+  /** The page of the import the modal works on, once a step named it (audit XU-M1). */
+  let importPage: string | null = null;
 
   const setBusy = (busy: boolean): void => {
     body.setAttribute('aria-busy', busy ? 'true' : 'false');
@@ -187,9 +199,9 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
   };
 
   /** Puts a notice at the top of the body (the step stays, so the person can try again). */
-  const showNotice = (text: string, kind: string, withReload: boolean): void => {
+  const showNotice = (text: string, kind: string, withReload: boolean, withPage = false): void => {
     body.querySelectorAll('[data-crm-import-notice]').forEach((node) => node.remove());
-    body.prepend(notice(dialog, text, kind, withReload ? reload : null));
+    body.prepend(notice(dialog, text, kind, withReload ? reload : null, withPage ? importPage : null));
   };
 
   const focusStep = (): void => {
@@ -213,6 +225,7 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
     body.replaceChildren(...step.body);
     footer.replaceChildren(...step.footer);
     finished = finished || (step.root?.hasAttribute('data-crm-import-finished') ?? false);
+    importPage = step.root?.dataset.crmImportPage ?? importPage;
     dialog.dataset.crmImportStep = step.root?.dataset.crmImportStep ?? '';
     focusStep();
   };
@@ -223,7 +236,7 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
     // Signed out (401, a redirect to the login page, or a page without the fragment header): never show that page in
     // the modal; say the session expired and offer a reload.
     if (response.status === 401 || response.redirected || (response.ok && response.status !== 204 && !isStep)) {
-      showNotice(dialog.dataset.expired ?? '', 'expired', true);
+      showNotice(dialog.dataset.expired ?? '', 'expired', true, true);
       focusStep();
       return;
     }
@@ -243,7 +256,7 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
       // REQ-RUNTIME-003 rule 6: CONFLICT_001 = nothing was saved, try again; CONFLICT_002 = part was saved, reload.
       const code = response.headers.get('X-Conflict-Code');
       if (code === 'CONFLICT_002') {
-        showNotice(dialog.dataset.conflictReload ?? '', 'conflict', true);
+        showNotice(dialog.dataset.conflictReload ?? '', 'conflict', true, true);
       } else {
         showNotice(dialog.dataset.conflictRetry ?? '', 'conflict', false);
       }
@@ -313,6 +326,7 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
     body.replaceChildren(...initialBody.map((node) => node.cloneNode(true)));
     footer.replaceChildren(...initialFooter.map((node) => node.cloneNode(true)));
     delete dialog.dataset.crmImportStep;
+    importPage = null;
   };
 
   const onClick = (event: Event): void => {

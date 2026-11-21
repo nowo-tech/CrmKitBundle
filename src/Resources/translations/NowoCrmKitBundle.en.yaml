@@ -300,7 +300,9 @@ import:
         mapping: 'Columns'
         preview: 'Preview'
         result: 'Result'
+    unfinished: '{1} You have one unfinished import.|]1,Inf[ You have %count% unfinished imports.'
     dialog:
+        open_page: 'Open the import page'
         loading: 'Loading…'
         failed: 'Something went wrong. Try again.'
         expired: 'Your session has expired. Reload the page to sign in again; nothing was imported in this step.'

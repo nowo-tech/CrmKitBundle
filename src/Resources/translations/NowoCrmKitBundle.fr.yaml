@@ -300,7 +300,9 @@ import:
         mapping: 'Colonnes'
         preview: 'Aperçu'
         result: 'Résultat'
+    unfinished: '{1} Vous avez un import inachevé.|]1,Inf[ Vous avez %count% imports inachevés.'
     dialog:
+        open_page: 'Ouvrir la page de l''import'
         loading: 'Chargement…'
         failed: 'Une erreur s''est produite. Réessayez.'
         expired: 'Votre session a expiré. Rechargez la page pour vous reconnecter ; rien n''a été importé à cette étape.'

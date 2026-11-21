@@ -1,12 +1,22 @@
 {#
   A list of companies or contacts (contract section 11.1): UiKit list scaffold (filters, server sort, pages, row
   actions, phone cards) and the focus-mode toggle; 0.4.0: the import modal, for someone who may import (opened by the
-  page action "Import"). Variables: page (ListPage), crm_import_dialog ({url} or null).
+  page action "Import") and a notice linking the person's unfinished imports. Variables: page (ListPage),
+  crm_import_dialog ({url, unfinished: {total, imports: [{id, file}]}} or null).
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
 
 {% block nowo_ui_content %}
     <div class="crm-kit-toolbar" data-testid="crm-focus">{{ include(nowo_ui_partial('focus_mode_toggle', page.bundle), {area: 'crm', bundle: page.bundle}) }}</div>
+    {%- set _unfinished = (crm_import_dialog|default(null)).unfinished ?? null -%}
+    {% if _unfinished is not null and _unfinished.total > 0 %}
+        <div class="{{ nowo_ui_class('flash_info', page.bundle) }}" role="status" data-testid="crm-import-unfinished">
+            <p>{{ 'import.unfinished'|trans({'%count%': _unfinished.total}, 'NowoCrmKitBundle') }}</p>
+            <ul>
+                {% for _import in _unfinished.imports %}<li><a href="{{ path('nowo_crm_kit_import_show', {id: _import.id}) }}" data-testid="crm-import-unfinished-link">{{ _import.file }}</a></li>{% endfor %}
+            </ul>
+        </div>
+    {% endif %}
     {{ parent() }}
     {% if crm_import_dialog|default(null) is not null %}{{ include('@NowoCrmKit/import/_dialog_shell.html.twig', {dialog: crm_import_dialog}, false) }}{% endif %}
 {% endblock %}

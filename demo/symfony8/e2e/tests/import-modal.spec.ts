@@ -160,6 +160,48 @@ for (const size of [
   });
 }
 
+test.describe('an unfinished import stays reachable (audit XU-M1)', () => {
+  test('a paused import is linked from the result step and from the list once the modal is closed', async ({ page }) => {
+    await login(page, 'mia');
+    await page.goto('/crm/companies');
+    // More rows than import.sync_rows (500): the confirm runs 500, the rest waits for "Continue".
+    const stamp = Date.now();
+    let rows = 'name\n';
+    for (let i = 0; i < 520; i++) {
+      rows += `Paused ${stamp} ${i}\n`;
+    }
+    await page.getByTestId('crm-import-open').click();
+    await dialog(page).locator('input[type="file"]').setInputFiles({ name: `paused-${stamp}.csv`, mimeType: 'text/csv', buffer: Buffer.from(rows) });
+    await dialog(page).getByTestId('crm-import-dialog-submit').click();
+    await expect(dialog(page).getByTestId('crm-import-mapping')).toBeVisible();
+    await dialog(page).getByTestId('crm-import-dialog-submit').click();
+    await expect(dialog(page).getByTestId('crm-import-preview')).toBeVisible();
+    await dialog(page).getByTestId('crm-import-dialog-submit').click();
+    const result = dialog(page).getByTestId('crm-import-result');
+    await expect(result).toHaveAttribute('data-status', 'running', { timeout: 60_000 });
+    const link = dialog(page).getByTestId('crm-import-open-page');
+    await expect(link).toBeVisible();
+    const href = await link.getAttribute('href');
+    expect(href).toMatch(/^\/crm\/import\/[0-9a-f-]{36}$/);
+    await shot(page, 'import-modal-paused');
+
+    // Closed: the list still leads to it.
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toBeHidden();
+    await page.reload();
+    const notice = page.getByTestId('crm-import-unfinished');
+    await expect(notice).toBeVisible();
+    await expect(notice.locator(`a[href="${href}"]`)).toHaveText(`paused-${stamp}.csv`);
+    await shot(page, 'import-unfinished-notice');
+    await notice.locator(`a[href="${href}"]`).click();
+    await expect(page.getByTestId('crm-import-summary')).toHaveAttribute('data-status', 'running');
+    await page.getByTestId('crm-import-continue').click();
+    await expect(page.getByTestId('crm-import-summary')).toHaveAttribute('data-status', 'done', { timeout: 60_000 });
+    await page.goto('/crm/companies');
+    await expect(page.locator(`[data-testid="crm-import-unfinished"] a[href="${href}"]`)).toHaveCount(0);
+  });
+});
+
 test.describe('import page without JavaScript (no-JS fallback)', () => {
   test.use({ javaScriptEnabled: false });
 

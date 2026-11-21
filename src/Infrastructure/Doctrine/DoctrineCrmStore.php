@@ -49,6 +49,7 @@ use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType
 use function array_filter;
 use function array_keys;
 use function array_map;
+use function array_slice;
 use function array_values;
 use function count;
 use function implode;
@@ -726,18 +727,10 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             'SELECT id, tenant_id, created_by_id, file_name FROM ' . $this->table(Import::class) . ' WHERE tenant_id = ? AND created_by_id = ? AND status = ? ORDER BY created_at DESC, id DESC',
             [$tenant->value, $actor, ImportStatus::Running->value],
         );
-        $total   = 0;
-        $imports = [];
-        foreach ($rows as $row) {
-            // LQ rule: the columns may compare case-insensitively; keep only the exact tenant and person.
-            if ($row['tenant_id'] !== $tenant->value || $row['created_by_id'] !== $actor || !is_string($row['id']) || !is_string($row['file_name'])) {
-                continue;
-            }
-            ++$total;
-            if (count($imports) < $limit) {
-                $imports[] = ['id' => $row['id'], 'file' => $row['file_name']];
-            }
-        }
+        // LQ rule: the columns may compare case-insensitively; keep only the exact tenant and person.
+        $exact   = array_values(array_filter($rows, static fn (array $row): bool => $row['tenant_id'] === $tenant->value && $row['created_by_id'] === $actor && is_string($row['id']) && is_string($row['file_name'])));
+        $total   = count($exact);
+        $imports = array_map(static fn (array $row): array => ['id' => (string) $row['id'], 'file' => (string) $row['file_name']], array_slice($exact, 0, $limit));
 
         return ['total' => $total, 'imports' => $imports];
     }

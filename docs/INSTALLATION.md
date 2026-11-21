@@ -130,6 +130,11 @@ The pages use UiKit's page templates and FormKit forms under the `crm_kit` profi
 FormKit is registered. For right-click / long-press menus on row actions set `nowo_ui_kit.theme.context_menus: true`,
 and for the focus-mode toggle `nowo_ui_kit.theme.focus_mode.enabled: true`, in the host's UiKit configuration.
 
+0.4.0: the lists open the import in a modal (the page action **Import**). Its script is a bundle asset: run
+`php bin/console assets:install` after installing or updating (it lands in `public/bundles/nowocrmkit/js/` and is served
+through the `nowo_crm_kit` asset package the bundle registers). Without the script the action is a link to the import
+page.
+
 ## Schema and migrations
 
 No migration classes are shipped: the tables carry your prefix and live on your connection. Generate them on the

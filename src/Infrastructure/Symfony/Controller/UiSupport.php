@@ -267,9 +267,6 @@ final readonly class UiSupport
         if ($this->pipeline) {
             $items[] = new AreaNavItem(self::label('nav.deals'), $this->url('nowo_crm_kit_deals'), $current === 'deals');
         }
-        if ($this->can(CrmPermission::Import)) {
-            $items[] = new AreaNavItem(self::label('nav.import'), $this->url('nowo_crm_kit_import'), $current === 'import');
-        }
         if ($this->can(CrmPermission::Manage)) {
             $items[] = new AreaNavItem(self::label('nav.tags'), $this->url('nowo_crm_kit_tags'), $current === 'tags');
             $items[] = new AreaNavItem(self::label('nav.fields'), $this->url('nowo_crm_kit_fields'), $current === 'fields');

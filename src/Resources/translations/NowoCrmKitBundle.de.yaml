@@ -5,7 +5,6 @@ nav:
     label: CRM
     companies: Unternehmen
     contacts: Kontakte
-    import: Import
     tags: Tags
     fields: Benutzerdefinierte Felder
     settings: Einstellungen
@@ -32,6 +31,7 @@ list:
         contact: Noch keine Kontakte.
     empty_hint: Legen Sie einen an oder importieren Sie eine CSV- oder vCard-Datei.
     export: CSV exportieren
+    import: 'Importieren'
     col:
         updated: Aktualisiert
     filter:
@@ -294,6 +294,29 @@ merge:
         other: ID des anderen Datensatzes
         other_help: Die ID in der Adresse seiner Seite.
 import:
+    steps: 'Importschritte'
+    step:
+        file: 'Datei'
+        mapping: 'Spalten'
+        preview: 'Vorschau'
+        result: 'Ergebnis'
+    dialog:
+        loading: 'Wird geladen…'
+        failed: 'Etwas ist schiefgelaufen. Bitte erneut versuchen.'
+        expired: 'Deine Sitzung ist abgelaufen. Lade die Seite neu, um dich wieder anzumelden; in diesem Schritt wurde nichts importiert.'
+        reload: 'Seite neu laden'
+        denied: 'Du darfst nicht in das CRM importieren.'
+        conflict_retry: 'Jemand hat diesen Import im selben Moment geändert. Bitte erneut versuchen.'
+        conflict_reload: 'Ein Teil dieses Schritts wurde bereits gespeichert. Lade die Seite neu, bevor du es erneut versuchst.'
+        cancel: 'Abbrechen'
+        close: 'Schließen'
+        next: 'Weiter'
+        preview: 'Vorschau'
+        refresh: 'Vorschau aktualisieren'
+        mapping_title: 'Spalten von %file%'
+        mapping_intro: '%rows% Zeilen. Wähle das Feld, das jede Spalte füllt.'
+        mapping_fold: 'Spaltenzuordnung'
+        preview_intro: 'Die ersten %shown% von %rows% Zeilen, mit dieser Zuordnung geprüft.'
     title: Import
     intro: 'Eine CSV-Datei (Kopfzeile, "," oder ";", UTF-8) oder eine vCard-Datei mit Kontakten.'
     upload: Hochladen und Vorschau

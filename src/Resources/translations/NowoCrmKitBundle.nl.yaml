@@ -5,7 +5,6 @@ nav:
     label: CRM
     companies: Bedrijven
     contacts: Contacten
-    import: Importeren
     tags: Tags
     fields: Aangepaste velden
     settings: Instellingen
@@ -32,6 +31,7 @@ list:
         contact: Nog geen contacten.
     empty_hint: Maak er een aan of importeer een CSV- of vCard-bestand.
     export: CSV exporteren
+    import: 'Importeren'
     col:
         updated: Bijgewerkt
     filter:
@@ -294,6 +294,29 @@ merge:
         other: Id van het andere record
         other_help: Het id in het adres van de pagina.
 import:
+    steps: 'Importstappen'
+    step:
+        file: 'Bestand'
+        mapping: 'Kolommen'
+        preview: 'Voorbeeld'
+        result: 'Resultaat'
+    dialog:
+        loading: 'Laden…'
+        failed: 'Er ging iets mis. Probeer het opnieuw.'
+        expired: 'Je sessie is verlopen. Laad de pagina opnieuw om weer in te loggen; in deze stap is niets geïmporteerd.'
+        reload: 'Pagina opnieuw laden'
+        denied: 'Je mag niet in het CRM importeren.'
+        conflict_retry: 'Iemand heeft deze import op hetzelfde moment gewijzigd. Probeer het opnieuw.'
+        conflict_reload: 'Een deel van deze stap is al opgeslagen. Laad de pagina opnieuw voordat je het nog eens probeert.'
+        cancel: 'Annuleren'
+        close: 'Sluiten'
+        next: 'Volgende'
+        preview: 'Voorbeeld'
+        refresh: 'Voorbeeld bijwerken'
+        mapping_title: 'Kolommen van %file%'
+        mapping_intro: '%rows% rijen. Kies het veld dat elke kolom vult.'
+        mapping_fold: 'Kolomtoewijzing'
+        preview_intro: 'De eerste %shown% van %rows% rijen, gecontroleerd met deze toewijzing.'
     title: Importeren
     intro: 'Een CSV-bestand (koprij, "," of ";", UTF-8) of een vCard-bestand met contacten.'
     upload: Uploaden en voorvertoning

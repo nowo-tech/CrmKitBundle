@@ -5,7 +5,6 @@ nav:
     label: CRM
     companies: Empresas
     contacts: Contactos
-    import: Importar
     tags: Etiquetas
     fields: Campos personalizados
     settings: Ajustes
@@ -32,6 +31,7 @@ list:
         contact: Aún no hay contactos.
     empty_hint: Crea una o importa un archivo CSV o vCard.
     export: Exportar CSV
+    import: 'Importar'
     col:
         updated: Actualizado
     filter:
@@ -294,6 +294,29 @@ merge:
         other: Id del otro registro
         other_help: El id que aparece en la dirección de su página.
 import:
+    steps: 'Pasos de la importación'
+    step:
+        file: 'Archivo'
+        mapping: 'Columnas'
+        preview: 'Vista previa'
+        result: 'Resultado'
+    dialog:
+        loading: 'Cargando…'
+        failed: 'Algo ha fallado. Inténtalo de nuevo.'
+        expired: 'Tu sesión ha caducado. Recarga la página para volver a entrar; en este paso no se ha importado nada.'
+        reload: 'Recargar la página'
+        denied: 'No puedes importar en el CRM.'
+        conflict_retry: 'Alguien ha cambiado esta importación en el mismo momento. Inténtalo de nuevo.'
+        conflict_reload: 'Parte de este paso ya se ha guardado. Recarga la página antes de volver a intentarlo.'
+        cancel: 'Cancelar'
+        close: 'Cerrar'
+        next: 'Siguiente'
+        preview: 'Vista previa'
+        refresh: 'Actualizar la vista previa'
+        mapping_title: 'Columnas de %file%'
+        mapping_intro: '%rows% filas. Elige el campo que rellena cada columna.'
+        mapping_fold: 'Asignación de columnas'
+        preview_intro: 'Las primeras %shown% de %rows% filas, comprobadas con esta asignación.'
     title: Importar
     intro: 'Un archivo CSV (fila de encabezado, "," o ";", UTF-8) o un archivo vCard de contactos.'
     upload: Subir y previsualizar

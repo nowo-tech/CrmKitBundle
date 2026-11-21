@@ -52,6 +52,9 @@ final class NowoCrmKitBundle extends AbstractBundle
     /** Doctrine mapping name of the funnels (0.3.0; only with `pipeline.enabled`). */
     public const PIPELINE_MAPPING_NAME = 'NowoCrmKitBundlePipeline';
 
+    /** Public path of the bundle's assets after `assets:install` (REQ-ASSETS-004, the `nowo_crm_kit` asset package). */
+    public const ASSETS_PATH = '/bundles/nowocrmkit';
+
     protected string $extensionAlias = self::ALIAS;
 
     /**
@@ -84,10 +87,15 @@ final class NowoCrmKitBundle extends AbstractBundle
     }
 
     /**
-     * Registers the XML mapping on the bundle's entity manager, the UTC type and the FormKit profile.
+     * Registers the `nowo_crm_kit` asset package, the XML mapping on the bundle's entity manager, the UTC type and the
+     * FormKit profile.
      */
     public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        if ($builder->hasExtension('framework')) {
+            // REQ-ASSETS-004 (0.4.0): the import modal's script, `asset('js/nowo-crm-import.js', 'nowo_crm_kit')`.
+            $builder->prependExtensionConfig('framework', ['assets' => ['packages' => [self::ALIAS => ['base_path' => self::ASSETS_PATH]]]]);
+        }
         if ($builder->hasExtension('nowo_form_kit')) {
             $declared = false;
             foreach ($builder->getExtensionConfig('nowo_form_kit') as $config) {

@@ -1,10 +1,12 @@
 {#
   A list of companies or contacts (contract section 11.1): UiKit list scaffold (filters, server sort, pages, row
-  actions, phone cards) and the focus-mode toggle. Variables: page (ListPage).
+  actions, phone cards) and the focus-mode toggle; 0.4.0: the import modal, for someone who may import (opened by the
+  page action "Import"). Variables: page (ListPage), crm_import_dialog ({url} or null).
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
 
 {% block nowo_ui_content %}
     <div class="crm-kit-toolbar" data-testid="crm-focus">{{ include(nowo_ui_partial('focus_mode_toggle', page.bundle), {area: 'crm', bundle: page.bundle}) }}</div>
     {{ parent() }}
+    {% if crm_import_dialog|default(null) is not null %}{{ include('@NowoCrmKit/import/_dialog_shell.html.twig', {dialog: crm_import_dialog}, false) }}{% endif %}
 {% endblock %}

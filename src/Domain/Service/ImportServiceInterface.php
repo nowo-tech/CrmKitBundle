@@ -25,6 +25,14 @@ interface ImportServiceInterface
     public function preview(string $id, int $rows = 20): ImportView;
 
     /**
+     * The import with its first rows validated against another mapping, stored nowhere (0.4.0: the preview step of the
+     * import modal). An invalid mapping is an input error on `mapping`.
+     *
+     * @param array<string, string> $mapping column => field, as for {@see self::confirm()}
+     */
+    public function previewMapping(string $id, array $mapping, int $rows = 20): ImportView;
+
+    /**
      * Claims the import for running with the chosen mapping (one confirm wins; a second answers 409).
      *
      * @param array<string, string> $mapping column => field (`first_name`, `custom.<key>`, `tags`, or '' to skip)

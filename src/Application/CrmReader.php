@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Application;
 
 use Nowo\CrmKitBundle\Application\Access\CrmCallerInterface;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
+use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
@@ -23,6 +24,7 @@ use Nowo\CrmKitBundle\Domain\Read\ConsentView;
 use Nowo\CrmKitBundle\Domain\Read\FieldView;
 use Nowo\CrmKitBundle\Domain\Read\LinkView;
 use Nowo\CrmKitBundle\Domain\Read\ListResult;
+use Nowo\CrmKitBundle\Domain\Read\NoteHit;
 use Nowo\CrmKitBundle\Domain\Read\NoteView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
@@ -38,13 +40,21 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Throwable;
 
+use function array_chunk;
+use function array_key_last;
 use function array_map;
 use function array_slice;
 use function array_values;
 use function count;
+use function in_array;
 use function is_a;
 use function max;
+use function mb_stripos;
+use function mb_strlen;
+use function mb_substr;
+use function min;
 use function preg_match;
+use function trim;
 
 /**
  * The CRM's reads (contract section 7): every call resolves the tenant and checks `view` (on the record when there is
@@ -54,6 +64,26 @@ final readonly class CrmReader implements CrmReaderInterface
 {
     /** Contacts of a company whose timeline entries the company page includes. */
     private const TIMELINE_CONTACTS = 200;
+
+    /** Most hits of a note search. */
+    public const NOTE_SEARCH_LIMIT = 50;
+
+    /** Longest note search text (longer text is cut). */
+    public const NOTE_QUERY_LENGTH = 200;
+
+    /** Shortest note search text. */
+    public const NOTE_QUERY_MIN = 2;
+
+    /** Matching notes read per round of a note search, and most rounds (at most 500 notes are looked at). */
+    private const NOTE_SEARCH_BATCH = 50;
+
+    private const NOTE_SEARCH_ROUNDS = 10;
+
+    /** Most notes per record of {@see self::notesOf()}. */
+    public const NOTES_PER_SUBJECT = 50;
+
+    /** Records per round of {@see self::notesOf()}. */
+    private const NOTES_OF_CHUNK = 100;
 
     private LoggerInterface $logger;
 
@@ -166,15 +196,90 @@ final readonly class CrmReader implements CrmReaderInterface
     {
         return $this->support->read(function () use ($type, $id): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$context] = $this->load($type, $id);
-            $rows      = $this->support->store->notes($context->tenant, $type, $id);
-            $names     = $this->views->actorNames($context->tenant, array_map(static fn (Note $n): ?string => $n->getAuthorId(), $rows));
-            $notes     = [];
-            foreach ($rows as $note) {
-                $author  = $note->getAuthorId();
-                $notes[] = new NoteView($note->getId(), $note->getBody(), $note->isPinned(), $author, $author === null ? null : ($names[$author] ?? null), $note->getVersion(), $note->getCreatedAt(), $note->getUpdatedAt());
+
+            return $this->noteViews($context, $this->support->store->notes($context->tenant, $type, $id));
+        });
+    }
+
+    /**
+     * Note search (0.5.0): matching notes are read newest first in rounds; each round's records are checked (active,
+     * owner scoping, the per-record view decision) before any of its notes is kept, until the limit is filled or
+     * {@see self::NOTE_SEARCH_ROUNDS} rounds were read.
+     */
+    public function searchNotes(string $query, int $limit = 20): array
+    {
+        $context = $this->support->access->context(CrmPermission::View);
+        $text    = mb_substr(trim($query), 0, self::NOTE_QUERY_LENGTH);
+        $limit   = max(1, min(self::NOTE_SEARCH_LIMIT, $limit));
+        if (mb_strlen($text) < self::NOTE_QUERY_MIN) {
+            return [];
+        }
+
+        return $this->support->read(function () use ($context, $text, $limit): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $owners = $this->support->access->visibleOwners($context);
+            $kept   = [];
+            $before = null;
+            for ($round = 0; $round < self::NOTE_SEARCH_ROUNDS && count($kept) < $limit; ++$round) {
+                $rows    = $this->support->store->searchNotes($context->tenant, $text, self::NOTE_SEARCH_BATCH, $before, $owners);
+                $granted = $this->viewableSubjects($context, $rows, [RecordStatus::Active], $owners);
+                foreach ($rows as $note) {
+                    if (count($kept) < $limit && isset($granted[$note->getSubjectType()->value . ':' . $note->getSubjectId()])) {
+                        $kept[] = $note;
+                    }
+                }
+                if (count($rows) < self::NOTE_SEARCH_BATCH) {
+                    break;
+                }
+                $before = $rows[array_key_last($rows)]->getId();
+            }
+            $views = $this->noteViews($context, $kept);
+            $hits  = [];
+            foreach ($kept as $i => $note) {
+                $hits[] = new NoteHit($note->getSubjectType(), $note->getSubjectId(), $views[$i], self::excerpt($note->getBody(), $text));
             }
 
-            return $notes;
+            return $hits;
+        });
+    }
+
+    /**
+     * Notes of several records (0.5.0), in chunks of {@see self::NOTES_OF_CHUNK} records: per chunk the records (one
+     * query per type), the view decision for the chunk at once, the note ids (one query) and the notes (one query).
+     */
+    public function notesOf(array $subjects, int $perSubject = 5): array
+    {
+        $context    = $this->support->access->context(CrmPermission::View);
+        $perSubject = max(1, min(self::NOTES_PER_SUBJECT, $perSubject));
+        $wanted     = [];
+        foreach ($subjects as $subject) {
+            if ($subject instanceof SubjectRef && $subject->type !== SubjectType::Deal) {
+                $wanted[$subject->key()] = $subject;
+            }
+        }
+
+        return $this->support->read(function () use ($context, $wanted, $perSubject): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $owners = $this->support->access->visibleOwners($context);
+            $result = [];
+            foreach (array_chunk($wanted, self::NOTES_OF_CHUNK, true) as $chunk) {
+                $granted   = $this->viewableSubjects($context, array_values($chunk), [RecordStatus::Active, RecordStatus::Trashed], $owners);
+                $idsByType = [];
+                foreach ($chunk as $key => $subject) {
+                    if (isset($granted[$key])) {
+                        $result[$key]                       = [];
+                        $idsByType[$subject->type->value][] = $subject->id->value;
+                    }
+                }
+                if ($idsByType === []) {
+                    continue;
+                }
+                $rows  = $this->support->store->notesOfMany($context->tenant, $idsByType, $perSubject);
+                $views = $this->noteViews($context, $rows);
+                foreach ($rows as $i => $note) {
+                    $result[$note->getSubjectType()->value . ':' . $note->getSubjectId()][] = $views[$i];
+                }
+            }
+
+            return $result;
         });
     }
 
@@ -315,6 +420,75 @@ final readonly class CrmReader implements CrmReaderInterface
 
             return [$this->views->many($context->tenant, $type, $visible), max(0, $total - (count($records) - count($visible)))];
         });
+    }
+
+    /**
+     * The views of notes, in their order, with the authors' names (one lookup); an anonymised author shows as the
+     * record's notes always show it.
+     *
+     * @param list<Note> $rows
+     *
+     * @return list<NoteView>
+     */
+    private function noteViews(CrmContext $context, array $rows): array
+    {
+        $names = $this->views->actorNames($context->tenant, array_map(static fn (Note $n): ?string => $n->getAuthorId(), $rows));
+        $notes = [];
+        foreach ($rows as $note) {
+            $author  = $note->getAuthorId();
+            $notes[] = new NoteView($note->getId(), $note->getBody(), $note->isPinned(), $author, $author === null ? null : ($names[$author] ?? null), $note->getVersion(), $note->getCreatedAt(), $note->getUpdatedAt());
+        }
+
+        return $notes;
+    }
+
+    /**
+     * The keys (`<type>:<id>`) of the records of `$items` (notes or subject references) the actor may view: the
+     * record exists in the tenant (exact ids), has one of `$statuses`, passes the owner scoping, and the per-record
+     * view decision grants it (the same check as a single record, decided for the batch at once).
+     *
+     * @param list<Note|SubjectRef> $items
+     * @param list<RecordStatus> $statuses
+     * @param list<string>|null $owners
+     *
+     * @return array<string, true>
+     */
+    private function viewableSubjects(CrmContext $context, array $items, array $statuses, ?array $owners): array
+    {
+        $idsByType = [];
+        foreach ($items as $item) {
+            [$type, $id]                  = $item instanceof Note ? [$item->getSubjectType(), $item->getSubjectId()] : [$item->type, $item->id->value];
+            $idsByType[$type->value][$id] = $id;
+        }
+        $records = [];
+        foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
+            $ids = array_values($idsByType[$type->value] ?? []);
+            foreach ($ids === [] ? [] : $this->support->store->records($type, $context->tenant, $ids) as $record) {
+                if (in_array($record->getStatus(), $statuses, true) && CrmAccess::visible($owners, $record->getOwnerId())) {
+                    $records[] = $record;
+                }
+            }
+        }
+        $granted = [];
+        foreach ($this->support->access->viewableRecords($context, $records) as $record) {
+            $granted[$record::type()->value . ':' . $record->getId()] = true;
+        }
+
+        return $granted;
+    }
+
+    /**
+     * Up to {@see NoteHit::EXCERPT_LENGTH} characters of the body around the first match of the text (the start of
+     * the body when the database matched in a way PHP does not, e.g. accent-insensitively), with an ellipsis on each
+     * cut side.
+     */
+    private static function excerpt(string $body, string $text): string
+    {
+        $at    = mb_stripos($body, $text, 0, 'UTF-8');
+        $start = max(0, ($at === false ? 0 : $at) - (int) ((NoteHit::EXCERPT_LENGTH - mb_strlen($text)) / 2));
+        $start = max(0, min($start, mb_strlen($body) - NoteHit::EXCERPT_LENGTH));
+
+        return ($start > 0 ? '…' : '') . mb_substr($body, $start, NoteHit::EXCERPT_LENGTH) . ($start + NoteHit::EXCERPT_LENGTH < mb_strlen($body) ? '…' : '');
     }
 
     /**

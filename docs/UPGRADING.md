@@ -14,6 +14,9 @@
 
 ## Unreleased
 
+`CrmReaderInterface` gains `searchNotes()` and `notesOf()` (see USAGE, *Searching notes*). Nothing changes for a host
+that only calls the reader; a host or test double that **implements** `CrmReaderInterface` must add both methods.
+
 ## To 0.4.2
 
 From **0.4.1**:

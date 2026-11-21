@@ -18,6 +18,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `CrmReaderInterface::searchNotes(string $query, int $limit = 20)` (Beacon spec 251): notes of the tenant's active
+  companies and contacts that contain the text (case-insensitive portable `LIKE`, `%` `_` `\` literal), newest first,
+  as `NoteHit` (the record's type and id, the `NoteView`, an excerpt around the match). Each record passes the same
+  per-record view check as `notes()` and the lists' owner scoping before a row counts towards the limit; the text is
+  cut to 200 characters (under 2: no search) and the limit clamped to 1–50.
+- `CrmReaderInterface::notesOf(list<SubjectRef>, int $perSubject = 5)`: the latest notes of several records keyed by
+  `SubjectRef::key()`, in a fixed number of queries per 100 records (no query per record); unknown, erased, merged,
+  hidden or other-tenant records get no key.
+- `CrmStoreInterface::searchNotes()` and `notesOfMany()` (internal port) behind them.
+
 ## [0.4.2] - 2026-11-21
 
 ### Changed

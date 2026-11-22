@@ -235,7 +235,7 @@ final readonly class CrmReader implements CrmReaderInterface
             $views = $this->noteViews($context, $kept);
             $hits  = [];
             foreach ($kept as $i => $note) {
-                $hits[] = new NoteHit($note->getSubjectType(), $note->getSubjectId(), $views[$i], self::excerpt($note->getBody(), $text));
+                $hits[] = new NoteHit($note->getSubjectType(), $note->getSubjectId(), $views[$i], $this->excerpt($note->getBody(), $text));
             }
 
             return $hits;
@@ -482,7 +482,7 @@ final readonly class CrmReader implements CrmReaderInterface
      * the body when the database matched in a way PHP does not, e.g. accent-insensitively), with an ellipsis on each
      * cut side.
      */
-    private static function excerpt(string $body, string $text): string
+    private function excerpt(string $body, string $text): string
     {
         $at    = mb_stripos($body, $text, 0, 'UTF-8');
         $start = max(0, ($at === false ? 0 : $at) - (int) ((NoteHit::EXCERPT_LENGTH - mb_strlen($text)) / 2));

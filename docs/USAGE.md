@@ -15,6 +15,7 @@
   - [Panel providers](#panel-providers)
   - [Host object resolvers](#host-object-resolvers)
 - [Services a host calls](#services-a-host-calls)
+  - [Searching notes (0.5.0)](#searching-notes-050)
 - [Events](#events)
 - [A person's references (export and anonymisation)](#a-persons-references-export-and-anonymisation)
 - [Batch lookups for host jobs](#batch-lookups-for-host-jobs)
@@ -426,7 +427,7 @@ resolves the tenant and the actor and checks the permission itself (404 / 403); 
 | --- | --- |
 | `RecordServiceInterface` | `create(RecordInput): string`, `update(string $id, RecordInput, int $expectedVersion): int`, `trash(SubjectType, string $id, int $expectedVersion)`, `restore(SubjectType, string $id)`, `purge(SubjectType, string $id)` (`manage`), `affiliate(string $contactId, string $companyId, ?string $role, bool $primary, ?bool $primaryContact = null, ?list $purposes = null): string`, `unaffiliate(string $affiliationId)`, `setPrimaryContact(string $companyId, ?string $contactId)`, `setRoles(SubjectType, string $id, list<string> $roles)` |
 | `CrmCatalogueInterface` | `roles(): list<string>`, `purposes(): list<string>` (the configured keys) |
-| `CrmReaderInterface` | `record(SubjectType, id): RecordView`, `list(ListQuery): ListResult`, `timeline(SubjectType, id, int $limit = 50, ?string $before)`, `duplicates`, `notes`, `links`, `panels`, `consents(contactId)`, `tags()`, `fields(SubjectType, bool $withArchived)`, `owners()` |
+| `CrmReaderInterface` | `record(SubjectType, id): RecordView`, `list(ListQuery): ListResult`, `timeline(SubjectType, id, int $limit = 50, ?string $before)`, `duplicates`, `notes`, `searchNotes(string $query, int $limit = 20): list<NoteHit>` (0.5.0), `notesOf(list<SubjectRef>, int $perSubject = 5): array<key, list<NoteView>>` (0.5.0), `links`, `panels`, `consents(contactId)`, `tags()`, `fields(SubjectType, bool $withArchived)`, `owners()`; see [Searching notes](#searching-notes-050) |
 | `TagServiceInterface` | `create(name, colour): string`, `change(id, name, colour, int $v)`, `delete(id)` (`manage`); `assign(SubjectType, id, list<tagId>)` (`edit`, set semantics) |
 | `FieldServiceInterface` | `define(SubjectType, key, label, FieldType, choices, required, position): string`, `change(id, label, choices, required, position, int $v)`, `archive(id, bool $archived, int $v)` (`manage`) |
 | `NoteServiceInterface` | `add(SubjectType, subjectId, body, pinned): string`, `edit(id, body, pinned, int $v)`, `delete(id)` |
@@ -440,6 +441,50 @@ resolves the tenant and the actor and checks the permission itself (404 / 403); 
 | `CrmSettingsInterface` | `get(): array{trash_days, timeline_years, import_keep_days, merge_keep_days, version}`, `update(int ×4, int $expectedVersion)` (`manage`) |
 | `CrmBatchLookupInterface` (0.2.1) | a **system API without access checks** for the host's backend jobs: see [Batch lookups for host jobs](#batch-lookups-for-host-jobs) |
 | `CrmActorPersonalDataInterface` (0.2.1) | a **system API without tenant scope or access checks**: `exportActor()`, `anonymiseActor()`; see [A person's references](#a-persons-references-export-and-anonymisation) |
+
+### Searching notes (0.5.0)
+
+For a host feature that reads across records (Beacon's *Ask AI* over the CRM, a global search), `CrmReaderInterface`
+has two reads of notes beside `notes(SubjectType, id)`:
+
+```php
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
+
+// Notes of the tenant's active companies and contacts that contain the text, newest first.
+foreach ($reader->searchNotes('renewal budget', 20) as $hit) {
+    $hit->subjectType;   // SubjectType::Company or SubjectType::Contact
+    $hit->subjectId;     // the record's id (ids, never entities)
+    $hit->excerpt;       // up to 200 characters around the first match, '…' on each cut side
+    $hit->note;          // NoteView: id, body, pinned, author id and name, version, createdAt, updatedAt
+}
+
+// The latest notes of several records at once (pinned first, then newest), keyed by SubjectRef::key().
+$notes = $reader->notesOf([
+    SubjectRef::of(SubjectType::Company, $companyId),
+    SubjectRef::of(SubjectType::Contact, $contactId),
+], perSubject: 5);
+$notes['company:' . $companyId]; // list<NoteView>, or no key at all
+```
+
+- **Access.** Both need `view` in the tenant (`AccessDeniedException` / `NotAvailableException` otherwise, as `list()`).
+  Every record a note is on goes through the same per-record check as `notes()` (the access checker, so every
+  `nowo_crm_kit.record_access_check` listener) and through the owner scoping of the lists
+  (`nowo_crm_kit.record_visibility`), decided for each batch of rows **before** a row counts towards the limit: a
+  hidden record shows nowhere, not in the hits, their number or an excerpt.
+- **Which records.** `searchNotes()` reads active records only (not trashed, merged or erased ones, as the lists).
+  `notesOf()` answers active and trashed records (as their page does); an unknown, erased, merged or hidden record, a
+  deal reference or another tenant's id gets no key, with no hint which. An erased contact has no notes left (erasure
+  deletes them); a note whose author was anonymised shows the placeholder author id and no name, as on the record's
+  page.
+- **Search.** A case-insensitive portable `LIKE` on the note text: `%`, `_`, `\` and the escape character are literal.
+  The text is trimmed and cut to 200 characters; under 2 characters nothing is searched (`[]`). `$limit` is clamped to
+  1–50. Matching notes are read in rounds of 50, at most 10 rounds (500 matches looked at): a search whose first 500
+  matches are all on hidden records returns fewer hits than the limit.
+- **Cost.** `searchNotes()`: per round one note query and one record query per type. `notesOf()`: per 100 records one
+  record query per type, one query for the note ids (`ROW_NUMBER()`, MySQL 8 / MariaDB 10.2 / PostgreSQL / SQLite
+  3.25) and one for the notes, plus one author-name lookup; `$perSubject` is clamped to 1–50. Nothing is kept between
+  calls (FrankenPHP worker mode).
 
 ### Creating and editing a record
 

@@ -225,6 +225,27 @@ interface CrmStoreInterface
     public function note(TenantRef $tenant, string $id): ?Note;
 
     /**
+     * Notes on active companies and contacts of the tenant whose body contains the text, case-insensitively (LIKE
+     * wildcards are literal), newest first (id descending), before `$beforeId` when given (0.5.0). Only notes whose
+     * record passes `$visibleOwners` (null: every record) are read.
+     *
+     * @param list<string>|null $visibleOwners
+     *
+     * @return list<Note>
+     */
+    public function searchNotes(TenantRef $tenant, string $text, int $limit, ?string $beforeId = null, ?array $visibleOwners = null): array;
+
+    /**
+     * At most `$perSubject` notes of each record, pinned first, then newest first (0.5.0): one query for the ids, one
+     * for the rows, whatever the number of records.
+     *
+     * @param array<string, list<string>> $idsByType record ids keyed by `SubjectType` value (company, contact)
+     *
+     * @return list<Note>
+     */
+    public function notesOfMany(TenantRef $tenant, array $idsByType, int $perSubject): array;
+
+    /**
      * Timeline entries of records, newest first, before an entry id (keyset).
      *
      * @param list<array{SubjectType, string}> $subjects

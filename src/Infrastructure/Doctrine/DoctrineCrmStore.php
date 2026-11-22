@@ -474,6 +474,79 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     /**
      * {@inheritDoc}
      */
+    public function searchNotes(TenantRef $tenant, string $text, int $limit, ?string $beforeId = null, ?array $visibleOwners = null): array
+    {
+        $qb = $this->em()->createQueryBuilder()->select('n')->from(Note::class, 'n')
+            ->where('n.tenantId = :tenant')->andWhere("LOWER(n.body) LIKE :q ESCAPE '!'")
+            ->setParameter('tenant', $tenant->value)->setParameter('q', '%' . $this->escapeLike(mb_strtolower($text, 'UTF-8')) . '%')
+            ->setParameter('active', RecordStatus::Active->value)
+            ->orderBy('n.id', 'DESC')->setMaxResults($limit);
+        $exists = [];
+        foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
+            $alias      = 's_' . $type->value;
+            $conditions = [$alias . '.id = n.subjectId', $alias . '.tenantId = :tenant', $alias . '.status = :active'];
+            $owners     = $this->ownerScope($qb, $visibleOwners, $alias);
+            if ($owners !== null) {
+                $conditions[] = '(' . $owners . ')';
+            }
+            $exists[] = '(n.subjectType = :type_' . $type->value . ' AND EXISTS (SELECT 1 FROM ' . $this->class($type) . ' ' . $alias . ' WHERE ' . implode(' AND ', $conditions) . '))';
+            $qb->setParameter('type_' . $type->value, $type);
+        }
+        $qb->andWhere(implode(' OR ', $exists));
+        if ($beforeId !== null) {
+            $qb->andWhere('n.id < :before')->setParameter('before', $beforeId); // @igor-ignore - a query builder local to this call
+        }
+
+        return $this->exact($qb->getQuery()->getResult(), Note::class, $tenant);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function notesOfMany(TenantRef $tenant, array $idsByType, int $perSubject): array
+    {
+        $or     = [];
+        $params = [$tenant->value];
+        $types  = [ParameterType::STRING];
+        foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
+            $ids = $idsByType[$type->value] ?? [];
+            if ($ids === []) {
+                continue;
+            }
+            $or[]     = '(subject_type = ? AND subject_id IN (?))';
+            $params[] = $type->value;
+            $params[] = $ids;
+            $types[]  = ParameterType::STRING;
+            $types[]  = ArrayParameterType::STRING;
+        }
+        if ($or === []) {
+            return [];
+        }
+        $params[] = $perSubject;
+        $types[]  = ParameterType::INTEGER;
+        // ROW_NUMBER (MySQL 8, MariaDB 10.2, PostgreSQL, SQLite 3.25) keeps the newest notes of each record in SQL.
+        $ids = $this->connection()->fetchFirstColumn(
+            'SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY subject_type, subject_id ORDER BY pinned DESC, created_at DESC, id DESC) AS crm_rank FROM '
+            . $this->table(Note::class) . ' WHERE tenant_id = ? AND (' . implode(' OR ', $or) . ')) crm_ranked WHERE crm_rank <= ?',
+            $params,
+            $types,
+        );
+        $ids = array_values(array_filter($ids, is_string(...)));
+        if ($ids === []) {
+            return [];
+        }
+        $rows = $this->em()->createQueryBuilder()->select('n')->from(Note::class, 'n')
+            ->where('n.id IN (:ids)')->andWhere('n.tenantId = :tenant')
+            ->setParameter('ids', $ids, ArrayParameterType::STRING)->setParameter('tenant', $tenant->value)
+            ->orderBy('n.pinned', 'DESC')->addOrderBy('n.createdAt', 'DESC')->addOrderBy('n.id', 'DESC')
+            ->getQuery()->getResult();
+
+        return array_values(array_filter($this->exact($rows, Note::class, $tenant), static fn (Note $n): bool => in_array($n->getSubjectId(), $idsByType[$n->getSubjectType()->value] ?? [], true)));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function activities(TenantRef $tenant, array $subjects, int $limit, ?string $beforeId): array
     {
         if ($subjects === []) {
@@ -1017,18 +1090,31 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
      */
     private function restrict(QueryBuilder $qb, ?array $visibleOwners): void
     {
+        $condition = $this->ownerScope($qb, $visibleOwners, 'r');
+        if ($condition !== null) {
+            $qb->andWhere($condition);
+        }
+    }
+
+    /**
+     * The owner condition of `$alias` under `$visibleOwners` (null: none), binding `:visibleOwners` on `$qb`.
+     *
+     * @param list<string>|null $visibleOwners
+     */
+    private function ownerScope(QueryBuilder $qb, ?array $visibleOwners, string $alias): ?string
+    {
         if ($visibleOwners === null) {
-            return;
+            return null;
         }
         if ($visibleOwners === []) {
-            $qb->andWhere('r.ownerId IS NULL');
-
-            return;
+            return $alias . '.ownerId IS NULL';
         }
         if (count($visibleOwners) > self::MAX_VISIBLE_OWNERS) {
             throw new LogicException('nowo_crm_kit: a nowo_crm_kit.record_visibility listener made more than ' . self::MAX_VISIBLE_OWNERS . ' owners visible. Call RecordVisibilityEvent::allowAll() for such a person and decide single records with nowo_crm_kit.record_access_check listeners instead.');
         }
-        $qb->andWhere('r.ownerId IS NULL OR r.ownerId IN (:visibleOwners)')->setParameter('visibleOwners', $visibleOwners, ArrayParameterType::STRING);
+        $qb->setParameter('visibleOwners', $visibleOwners, ArrayParameterType::STRING);
+
+        return $alias . '.ownerId IS NULL OR ' . $alias . '.ownerId IN (:visibleOwners)';
     }
 
     /**

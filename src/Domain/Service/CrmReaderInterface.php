@@ -10,11 +10,13 @@ use Nowo\CrmKitBundle\Domain\Read\ConsentView;
 use Nowo\CrmKitBundle\Domain\Read\FieldView;
 use Nowo\CrmKitBundle\Domain\Read\LinkView;
 use Nowo\CrmKitBundle\Domain\Read\ListResult;
+use Nowo\CrmKitBundle\Domain\Read\NoteHit;
 use Nowo\CrmKitBundle\Domain\Read\NoteView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
 use Nowo\CrmKitBundle\Domain\Value\ActorProfile;
 use Nowo\CrmKitBundle\Domain\Value\Panel;
+use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 
 /**
  * Reads of the CRM (contract section 7), all checked against `view` in the current tenant.
@@ -51,6 +53,28 @@ interface CrmReaderInterface
      * @return list<NoteView>
      */
     public function notes(SubjectType $type, string $id): array;
+
+    /**
+     * Notes of the tenant's active companies and contacts that contain the text, case-insensitively, newest first
+     * (0.5.0). Every note's record passes the same view check as {@see self::notes()} (and the owner scoping of the
+     * lists) before it counts towards `$limit`, so a hidden record shows nowhere. The text is trimmed and cut to
+     * 200 characters; under 2 characters nothing is searched. `$limit` is clamped to 1–50.
+     *
+     * @return list<NoteHit>
+     */
+    public function searchNotes(string $query, int $limit = 20): array;
+
+    /**
+     * The notes of several records at once, pinned first, then newest first, at most `$perSubject` each (clamped to
+     * 1–50) (0.5.0): a fixed number of queries per 100 records, never one per record. Keyed by
+     * {@see SubjectRef::key()}; a record that is unknown, erased, merged or that the actor may not view (the same
+     * check as {@see self::notes()}, plus the owner scoping of the lists) is left out, with no hint either way.
+     *
+     * @param list<SubjectRef> $subjects companies and contacts (anything else is ignored)
+     *
+     * @return array<string, list<NoteView>>
+     */
+    public function notesOf(array $subjects, int $perSubject = 5): array;
 
     /**
      * Host links of a record, resolved by the host (unresolved links are hidden).

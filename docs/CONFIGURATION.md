@@ -77,6 +77,9 @@ nowo_crm_kit:
         record_tabs: true          # 0.6.0: false hides the list tabs on record pages
         filters_fold: false        # 0.6.0: UiKit fold toggle on the filters card
         filters_slot: null         # 0.6.0: host Twig template wrapping the filters (page, form, filters); see USAGE
+        list_tabs: true            # 0.6.1: false hides the area tabs on list, admin and form pages (record: record_tabs)
+        admin_create: inline       # 0.6.1: inline | dialog (Tags / Custom fields create from a header action + dialog)
+        settings_width: form       # 0.6.1: form (UiKit form panel) | full (bundle card, full content width)
     pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
     api:                           # 0.3.0: see API.md
         enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)

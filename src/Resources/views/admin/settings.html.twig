@@ -1,4 +1,17 @@
 {#
-  Per-tenant settings (manage): retention periods. Variables: page (FormPage).
+  Per-tenant settings (manage): retention periods. Variables: page (FormPage), crm_settings_full (bool).
+  0.6.1, `ui.settings_width: full`: the form renders in the bundle's card at the full content width, like the lists
+  and the other CRM forms, instead of the UiKit form panel (whose width is the host's form column). Same form, fields,
+  submit and data-testid.
 #}
 {% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {% if crm_settings_full|default(false) %}
+        <div class="nowo-ui-form-page crm-kit-form-page--full" data-nowo-ui-page="form"{{ nowo_ui_html_attrs(nowo_ui_attrs_without_class(page.attributes)) }}>
+            {{ include('@NowoCrmKit/_form.html.twig', {form: page.form, title: null, submit: 'form.save', action: null, testid: 'crm-settings-form'}) }}
+        </div>
+    {% else %}
+        {{ parent() }}
+    {% endif %}
+{% endblock %}

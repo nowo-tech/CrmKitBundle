@@ -118,6 +118,9 @@ final class ConfigurationTree
             ->booleanNode('record_tabs')->defaultTrue()->info('0.6.0: show the list tabs (Companies, Contacts, Tags...) under the record page header; false hides them on record pages.')->end()
             ->booleanNode('filters_fold')->defaultFalse()->info('0.6.0: fold toggle on the filters card of the lists (UiKit ListPage filtersFold).')->end()
             ->scalarNode('filters_slot')->defaultNull()->info('0.6.0: Twig template of the host that wraps the filters region (e.g. a bottom sheet on phones). It receives page, form (the filter FormView) and filters (the rendered UiKit filters markup). null = no wrapper.')->end()
+            ->booleanNode('list_tabs')->defaultTrue()->info('0.6.1: show the area tabs (Companies, Contacts, Tags, Custom fields, Settings...) on the list, admin and form pages; false hides them there. The company / contact record page follows record_tabs.')->end()
+            ->enumNode('admin_create')->values(['inline', 'dialog'])->defaultValue('inline')->info('0.6.1: how Tags and Custom fields offer create. inline = the create form in a card under the list (as before); dialog = a View\\Action in page.header.actions (New tag, New field for companies, New field for contacts) that opens a UiKit confirm_dialog; ?new=1 is the no-JS fallback and an invalid submission answers 422 with the dialog open.')->end()
+            ->enumNode('settings_width')->values(['form', 'full'])->defaultValue('form')->info('0.6.1: the Settings form. form = the UiKit form panel (the host form column width, as before); full = the bundle card at the full content width, like the lists.')->end()
         ->end()->end();
         self::pipeline($children);
         self::api($children);

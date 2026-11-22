@@ -16,6 +16,16 @@
 
 ## Unreleased
 
+No schema change, no BC break in the public PHP API, no route change. What you may notice:
+
+- Tags and Custom fields: the empty state prints one sentence (no second "No items found."); the create card renders
+  after the list section instead of inside it, and the Custom fields subject switch is a secondary tab bar inside that
+  card (`data-testid="crm-fields-for"` is now on the `<nav>`). Adjust CSS or e2e tests that relied on the old markup.
+- New opt-in options: `ui.list_tabs: false`, `ui.admin_create: dialog`, `ui.settings_width: full` (see USAGE, "Page
+  layout options"). With `admin_create: dialog`, e2e tests open the dialog first (`crm-tag-new`,
+  `crm-field-new-company`, `crm-field-new-contact`) and fill the form inside `crm-tag-form-dialog` /
+  `crm-field-form-<subject>-dialog`.
+
 ## To 0.6.0
 
 From **0.5.0**:

@@ -1,13 +1,29 @@
 {#
   Custom fields (manage): every definition and the define form for companies or contacts (?for=company|contact).
-  Variables: page (ListPage), form (FormView), subject (company | contact).
+  Variables: page (ListPage), form (FormView of the define form for `subject`), subject (company | contact),
+  crm_create (null, or the create dialogs: see admin/_create.html.twig).
+  0.6.1: the define form renders after the list section (the list page's bottom margin is the gap between the two
+  cards) and switches between companies and contacts with secondary tabs inside its card; with
+  `ui.admin_create: dialog` the header actions "New field for companies" / "New field for contacts" open a dialog
+  each instead, so there is no switch.
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
 
-{% block nowo_ui_list_after %}
+{% block nowo_ui_content %}
     {%- set _d = 'NowoCrmKitBundle' -%}
-    <p data-testid="crm-fields-for">{{ 'fields.define_for'|trans({}, _d) }}
-        <a href="{{ path('nowo_crm_kit_fields', {for: 'company'}) }}"{% if subject == 'company' %} aria-current="page"{% endif %}>{{ 'type.company'|trans({}, _d) }}</a> ·
-        <a href="{{ path('nowo_crm_kit_fields', {for: 'contact'}) }}"{% if subject == 'contact' %} aria-current="page"{% endif %}>{{ 'type.contact'|trans({}, _d) }}</a></p>
-    {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'field.add.' ~ subject, submit: 'field.save', action: path('nowo_crm_kit_fields', {for: subject}), testid: 'crm-field-form'}) }}
+    {{ parent() }}
+    {% if crm_create|default(null) is not null %}
+        {{ include('@NowoCrmKit/admin/_create.html.twig', {create: crm_create}, false) }}
+    {% else %}
+        {%- set _switch -%}
+            {{ include(nowo_ui_partial('tabs', _d), {
+                items: ['company', 'contact']|map(type => {label: ('type.' ~ type)|trans({}, _d), href: path('nowo_crm_kit_fields', {for: type}), current: subject == type}),
+                aria_label: 'fields.define_for'|trans({}, _d),
+                level: 'secondary',
+                attr: {'data-testid': 'crm-fields-for'},
+                bundle: _d,
+            }, false) }}
+        {%- endset -%}
+        {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'field.add.' ~ subject, submit: 'field.save', action: path('nowo_crm_kit_fields', {for: subject}), testid: 'crm-field-form', before: _switch}) }}
+    {% endif %}
 {% endblock %}

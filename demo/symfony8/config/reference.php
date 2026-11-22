@@ -1809,20 +1809,23 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  * }
  * @psalm-type NowoCrmKitConfig = array{
  *     tenant_resolver?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
- *     access_checker?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
  *     feature_gate?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
  *     plan_limits?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
  *     actor_directory?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
  *     audit_sink?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
  *     clock?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
- *     access?: array{
- *         roles?: array{ // RoleMapAccessChecker only: permission => roles; every list empty = denied.
- *             view?: list<scalar|Param|null>,
- *             edit?: list<scalar|Param|null>,
- *             manage?: list<scalar|Param|null>,
- *             amounts_view?: list<scalar|Param|null>,
- *             campaigns_send?: list<scalar|Param|null>,
- *         },
+ *     security?: array{ // REQ-UI-002: who may use the CRM. Each *_roles list grants its area to any of its roles; an empty list (access, manage, amounts, campaigns only) means any authenticated user.
+ *         access_roles?: list<scalar|Param|null>,
+ *         access_checker?: scalar|Param|null, // Service id of a host CrmKitAccessCheckerInterface; null = ConfigurableCrmKitAccessChecker (these role lists). // Default: null
+ *         actor_resolver?: scalar|Param|null, // Service id of a host CrmActorResolverInterface (the stable actor id of a signed-in person, e.g. a user UUID, and names per page); null = IdentifierActorResolver (getUserIdentifier()). // Default: null
+ *         allow_unauthenticated?: bool|Param, // DEV/DEMO only: the pages without SecurityBundle or without signing in (one shared actor "anonymous"; resource_scoping is then off). Refused when kernel.environment is prod. // Default: false
+ *         manage_roles?: list<scalar|Param|null>,
+ *         settings_roles?: list<scalar|Param|null>,
+ *         export_roles?: list<scalar|Param|null>,
+ *         erase_roles?: list<scalar|Param|null>,
+ *         amounts_roles?: list<scalar|Param|null>,
+ *         campaigns_roles?: list<scalar|Param|null>,
+ *         resource_scoping?: bool|Param, // true: a record is open by default only to its owner (or when it has none) and to settings_roles; nowo_crm_kit.record_access_check listeners decide the rest. // Default: false
  *     },
  *     feature?: array{
  *         default_enabled?: bool|Param, // ConfiguredFeatureGate: the CRM is on for every tenant. // Default: true
@@ -1830,6 +1833,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     limits?: array{ // ConfiguredPlanLimits: maximum active records per tenant; null = unlimited.
  *         companies?: int|Param, // Default: null
  *         contacts?: int|Param, // Default: null
+ *         deals?: int|Param, // 0.3.0: deals not in the trash. // Default: null
  *     },
  *     doctrine?: array{
  *         entity_manager?: scalar|Param|null, // The private entity manager (the Flex recipe declares it); null = the default entity manager with explicit transactions. // Default: "nowo_crm_kit"
@@ -1848,17 +1852,55 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     gdpr?: array{
  *         purposes?: list<scalar|Param|null>,
  *     },
+ *     roles?: array{
+ *         catalogue?: list<scalar|Param|null>,
+ *     },
+ *     affiliations?: array{
+ *         purposes?: list<scalar|Param|null>,
+ *     },
  *     search?: array{
- *         enabled?: bool|Param, // SearchKit providers when SearchKit is installed (and the UI is on). // Default: true
+ *         enabled?: bool|Param, // SearchKit groups crm_companies, crm_contacts and (with pipeline.enabled) crm_deals, when SearchKit >= 1.9 (PHP >= 8.3) is installed and the UI is on; switch one group off with nowo_search_kit.groups.<key>. // Default: true
  *     },
  *     ui?: array{
  *         enabled?: bool|Param, // Routes are opt-in (REQ-UI-001). // Default: false
  *         path?: scalar|Param|null, // Default: "/crm"
  *         page_size?: int|Param, // Default: 25
  *         layout?: scalar|Param|null, // Twig layout of the pages; null = UiKit admin layout. // Default: null
+ *         row_actions?: "buttons"|"menu"|Param, // 0.6.0: buttons = every row action as a button (as before); menu = Open and Edit stay as icon buttons, the others (Restore, Move to trash) go into the UiKit row-actions menu, Delete last. // Default: "buttons"
+ *         header_actions?: "toolbar"|"split"|Param, // 0.6.0: how the list header actions (New, Export CSV, Import) render when the host does not read page.header.actions itself: toolbar (as before) or split (UiKit View\HeaderActions: one primary button, the rest in the more menu). Always View\Action objects in page.header.actions; never a second page-actions menu. // Default: "toolbar"
+ *         record_actions?: "split"|"toolbar"|Param, // 0.6.0: record page header: split = Edit as an icon button and Merge, vCard, Export, Trash and Erase in the more menu (destructive last); toolbar = every action as a button (as before). // Default: "split"
+ *         record_tabs?: bool|Param, // 0.6.0: show the list tabs (Companies, Contacts, Tags...) under the record page header; false hides them on record pages. // Default: true
+ *         filters_fold?: bool|Param, // 0.6.0: fold toggle on the filters card of the lists (UiKit ListPage filtersFold). // Default: false
+ *         filters_slot?: scalar|Param|null, // 0.6.0: Twig template of the host that wraps the filters region (e.g. a bottom sheet on phones). It receives page, form (the filter FormView) and filters (the rendered UiKit filters markup). null = no wrapper. // Default: null
+ *         list_tabs?: bool|Param, // 0.6.1: show the area tabs (Companies, Contacts, Tags, Custom fields, Settings...) on the list, admin and form pages; false hides them there. The company / contact record page follows record_tabs. // Default: true
+ *         admin_create?: "inline"|"dialog"|Param, // 0.6.1: how Tags and Custom fields offer create. inline = the create form in a card under the list (as before); dialog = a View\Action in page.header.actions (New tag, New field for companies, New field for contacts) that opens a UiKit confirm_dialog; ?new=1 is the no-JS fallback and an invalid submission answers 422 with the dialog open. // Default: "inline"
+ *         settings_width?: "form"|"full"|Param, // 0.6.1: the Settings form. form = the UiKit form panel (the host form column width, as before); full = the bundle card at the full content width, like the lists. // Default: "form"
  *     },
- *     pipeline?: array{
+ *     pipeline?: array{ // 0.3.0: funnels with per-stage statistics, deals and next actions (tables and routes only while enabled).
  *         enabled?: bool|Param, // Default: false
+ *         lost_reasons?: list<scalar|Param|null>,
+ *         task_port?: scalar|Param|null, // Service id of a host CrmTaskPort for next actions; null = the TaskBoard bridge when taskboard.board_id is set, else the built-in list. // Default: null
+ *         taskboard?: array{ // TaskBoard bridge (nowo-tech/task-board-bundle installed): next actions become tasks on this board.
+ *             board_id?: scalar|Param|null, // The board new tasks go to; null = no bridge. // Default: null
+ *             column?: scalar|Param|null, // The column (TaskBoard status name) new tasks go to; null = the board's first. // Default: null
+ *         },
+ *     },
+ *     api?: array{ // 0.3.0: the Api\Operation layer (an MCP host needs only this) and the /crm/v1 JSON API.
+ *         enabled?: bool|Param, // The operations, the principal and the idempotency table. // Default: false
+ *         page_size?: int|Param, // Default page size of the keyset lists (at most 100). // Default: 25
+ *         idempotency_ttl_seconds?: int|Param, // How long an Idempotency-Key is kept. // Default: 86400
+ *         http?: array{
+ *             enabled?: bool|Param, // The /crm/v1 routes (route type nowo_crm_kit_api). // Default: false
+ *             prefix?: scalar|Param|null, // Default: "/api"
+ *             authenticator?: scalar|Param|null, // Service id of a CrmApiAuthenticatorInterface; null = SecurityUserCrmApiAuthenticator (the firewall user + default_grant). // Default: null
+ *             tenant_resolver?: scalar|Param|null, // Service id of a CrmApiTenantResolverInterface; null = the configured tenant resolver. // Default: null
+ *             default_grant?: array{ // What SecurityUserCrmApiAuthenticator grants a firewall user.
+ *                 level?: "view"|"edit"|"manage"|Param, // Default: "view"
+ *                 amounts?: bool|Param, // Default: false
+ *                 consents?: bool|Param, // Default: false
+ *                 destructive?: bool|Param, // Default: false
+ *             },
+ *         },
  *     },
  *     quotes?: array{
  *         enabled?: bool|Param, // Default: false
@@ -1866,10 +1908,10 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     invoices?: array{
  *         enabled?: bool|Param, // Default: false
  *     },
- *     campaigns?: array{
+ *     portal?: array{
  *         enabled?: bool|Param, // Default: false
  *     },
- *     portal?: array{
+ *     campaigns?: array{
  *         enabled?: bool|Param, // Default: false
  *     },
  *     reports?: array{

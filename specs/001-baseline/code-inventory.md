@@ -2,10 +2,11 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/crm-kit-bundle`  
-**Last audited**: 2026-11-18 (phase A, 0.1.0 not tagged)
+**Last audited**: 2026-11-22 (0.6.0 tagged; API, pipeline, access and bridge files mapped)
 
-Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **217** (181 PHP files, 16 Doctrine XML
-mappings, 13 Twig views, 7 translation files).
+Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **418** (355 PHP files, 24 Doctrine XML
+mappings, 26 Twig views, 7 translation files, assets and CSS). Sections headed `0.3.0-0.6.0` were added by the
+2026-11-22 refresh (194 files).
 
 Requirement ids are those of [`spec.md`](spec.md#requirements).
 
@@ -351,4 +352,253 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/translations/NowoCrmKitBundle.nl.yaml` | FR-I18N-001 |
 | `src/Resources/translations/NowoCrmKitBundle.pt.yaml` | FR-I18N-001 |
 
-**Total production sources**: 217
+### 0.3.0-0.6.0: API operations and inputs (52)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Api/CrmApiCapability.php` | FR-API-001 |
+| `src/Api/CrmApiCode.php` | FR-API-001 |
+| `src/Api/CrmApiGrant.php` | FR-API-001 |
+| `src/Api/CrmApiLevel.php` | FR-API-001 |
+| `src/Api/CrmApiOperation.php` | FR-API-001 |
+| `src/Api/CrmApiPrincipal.php` | FR-API-001 |
+| `src/Api/CrmApiReach.php` | FR-API-001 |
+| `src/Api/CrmApiRefusal.php` | FR-API-001 |
+| `src/Api/Input/CrmApiAffiliationSpec.php` | FR-API-001 |
+| `src/Api/Input/CrmApiCompanyLink.php` | FR-API-001 |
+| `src/Api/Input/CrmApiCursor.php` | FR-API-001 |
+| `src/Api/Input/CrmApiCustom.php` | FR-API-001 |
+| `src/Api/Input/CrmApiDealChanges.php` | FR-API-001 |
+| `src/Api/Input/CrmApiDealDraft.php` | FR-API-001 |
+| `src/Api/Input/CrmApiDealFields.php` | FR-API-001 |
+| `src/Api/Input/CrmApiDealQuery.php` | FR-API-001 |
+| `src/Api/Input/CrmApiFields.php` | FR-API-001 |
+| `src/Api/Input/CrmApiFunnelStatsQuery.php` | FR-API-001 |
+| `src/Api/Input/CrmApiInput.php` | FR-API-001 |
+| `src/Api/Input/CrmApiNextActionDraft.php` | FR-API-001 |
+| `src/Api/Input/CrmApiNoteDraft.php` | FR-API-001 |
+| `src/Api/Input/CrmApiOwner.php` | FR-API-001 |
+| `src/Api/Input/CrmApiPageRequest.php` | FR-API-001 |
+| `src/Api/Input/CrmApiRecordChanges.php` | FR-API-001 |
+| `src/Api/Input/CrmApiRecordDraft.php` | FR-API-001 |
+| `src/Api/Input/CrmApiSearchQuery.php` | FR-API-001 |
+| `src/Api/Input/CrmApiSort.php` | FR-API-001 |
+| `src/Api/Input/CrmApiStageFilter.php` | FR-API-001 |
+| `src/Api/Input/CrmApiStageMove.php` | FR-API-001 |
+| `src/Api/Input/CrmApiTagRef.php` | FR-API-001 |
+| `src/Api/Input/RecordVersion.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiCall.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiCursorCodec.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiDealOperations.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiDuplicate.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiErrors.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiGuard.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiNextActionOperations.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiOperations.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiPipeline.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiReadOperations.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiRecordOperations.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiRecords.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiRelationOperations.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiUnitHooks.php` | FR-API-001 |
+| `src/Api/Operation/CrmApiWriter.php` | FR-API-001 |
+| `src/Api/Read/CrmApiItem.php` | FR-API-001 |
+| `src/Api/Read/CrmApiList.php` | FR-API-001 |
+| `src/Api/Read/CrmApiPage.php` | FR-API-001 |
+| `src/Api/Read/CrmApiPresenter.php` | FR-API-001 |
+| `src/Api/Read/CrmApiTime.php` | FR-API-001 |
+| `src/Api/Read/CrmApiWritten.php` | FR-API-001 |
+
+### 0.3.0-0.6.0: API idempotency (11)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Api/Input/IdempotencyKey.php` | FR-API-002 |
+| `src/Api/Operation/CrmApiIdempotency.php` | FR-API-002 |
+| `src/Api/Operation/CrmApiReplay.php` | FR-API-002 |
+| `src/Api/Port/CrmApiCallerFactoryInterface.php` | FR-API-002 |
+| `src/Api/Port/CrmApiIdempotencyClaim.php` | FR-API-002 |
+| `src/Api/Port/CrmApiIdempotencyRecord.php` | FR-API-002 |
+| `src/Api/Port/CrmApiIdempotencyStoreInterface.php` | FR-API-002 |
+| `src/Domain/Model/Api/ApiIdempotency.php` | FR-API-002 |
+| `src/Infrastructure/Doctrine/Api/DoctrineCrmApiIdempotencyStore.php` | FR-API-002 |
+| `src/Infrastructure/Symfony/Command/ApiPurgeIdempotencyCommand.php` | FR-API-002 |
+| `src/Resources/config/doctrine-api/ApiIdempotency.orm.xml` | FR-API-002 |
+
+### 0.3.0-0.6.0: Access control, roles and events (23)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/Access/CrmCallerInterface.php` | FR-ACCESS-001 |
+| `src/Application/Access/SessionCaller.php` | FR-ACCESS-001 |
+| `src/Application/Roles.php` | FR-ACCESS-001 |
+| `src/Domain/Event/RolesChanged.php` | FR-ACCESS-001 |
+| `src/Domain/Model/RoleAssignment.php` | FR-ACCESS-001 |
+| `src/Domain/Port/CrmBatchAccessCheckerInterface.php` | FR-ACCESS-001 |
+| `src/Domain/Port/CrmRecordVisibilityInterface.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/DependencyInjection/Compiler/CrmKitWebUiSecurityPass.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Event/CrmKitEvents.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Event/RecordAccessCheckEvent.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Event/RecordVisibilityEvent.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/AllowAllCrmKitAccessChecker.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/ConfigurableCrmKitAccessChecker.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/CrmActorResolverInterface.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/CrmKitAccessCheckerInterface.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/CrmKitAccessListener.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/CrmKitGuard.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/CrmResourceAccessChecker.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/IdentifierActorResolver.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/ScopedRecordVisibility.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/SecurityCrmAccessChecker.php` | FR-ACCESS-001 |
+| `src/Infrastructure/Symfony/Security/TenantAwareCrmKitAccessCheckerInterface.php` | FR-ACCESS-001 |
+| `src/Resources/config/doctrine/RoleAssignment.orm.xml` | FR-ACCESS-001 |
+
+### 0.3.0-0.6.0: Actor personal data and purge claim (9)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/ActorPersonalData.php` | FR-GDPR-004 |
+| `src/Application/Port/CrmActorDataStoreInterface.php` | FR-GDPR-004 |
+| `src/Application/PurgeClaim.php` | FR-GDPR-004 |
+| `src/Application/PurgeClaimLostException.php` | FR-GDPR-004 |
+| `src/Domain/Event/ActorAnonymised.php` | FR-GDPR-004 |
+| `src/Domain/Event/RecordsPurged.php` | FR-GDPR-004 |
+| `src/Domain/Port/CrmActorProfilesInterface.php` | FR-GDPR-004 |
+| `src/Domain/Service/CrmActorPersonalDataInterface.php` | FR-GDPR-004 |
+| `src/Infrastructure/Doctrine/DoctrineCrmActorDataStore.php` | FR-GDPR-004 |
+
+### 0.3.0-0.6.0: Batch lookup and catalogue reads (7)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/CrmBatchLookup.php` | FR-READ-002 |
+| `src/Application/PartyCatalogue.php` | FR-READ-002 |
+| `src/Application/Port/CrmBatchLookupStoreInterface.php` | FR-READ-002 |
+| `src/Domain/Read/RolesAndTags.php` | FR-READ-002 |
+| `src/Domain/Service/CrmBatchLookupInterface.php` | FR-READ-002 |
+| `src/Domain/Service/CrmCatalogueInterface.php` | FR-READ-002 |
+| `src/Infrastructure/Doctrine/DoctrineCrmBatchLookupStore.php` | FR-READ-002 |
+
+### 0.3.0-0.6.0: Task bridge (8)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/Pipeline/BuiltInCrmTaskPort.php` | FR-PIPE-002 |
+| `src/Bridge/TaskBoard/CrmTaskBoardUserResolverInterface.php` | FR-PIPE-002 |
+| `src/Bridge/TaskBoard/TaskBoardCrmTaskPort.php` | FR-PIPE-002 |
+| `src/Domain/Exception/CrmTaskRefusedException.php` | FR-PIPE-002 |
+| `src/Domain/Port/CrmTaskPort.php` | FR-PIPE-002 |
+| `src/Domain/Value/CrmTaskRef.php` | FR-PIPE-002 |
+| `src/Domain/Value/CrmTaskRequest.php` | FR-PIPE-002 |
+| `src/Domain/Value/CrmTaskState.php` | FR-PIPE-002 |
+
+### 0.3.0-0.6.0: Pipeline: deals, funnels, next actions (42)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/Pipeline/DealInput.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/DealQuery.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/DealReader.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/DealService.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/Decimal.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/FunnelReader.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/FunnelService.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/FunnelStatistics.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/NextActionService.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/NextActionViews.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/PartyStageService.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/PipelineHousekeeping.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/PipelineSupport.php` | FR-PIPE-001 |
+| `src/Application/Pipeline/Port/PipelineStoreInterface.php` | FR-PIPE-001 |
+| `src/Domain/Enum/DealStatus.php` | FR-PIPE-001 |
+| `src/Domain/Enum/FunnelKind.php` | FR-PIPE-001 |
+| `src/Domain/Enum/NextActionStatus.php` | FR-PIPE-001 |
+| `src/Domain/Enum/StageKind.php` | FR-PIPE-001 |
+| `src/Domain/Model/Pipeline/Deal.php` | FR-PIPE-001 |
+| `src/Domain/Model/Pipeline/Funnel.php` | FR-PIPE-001 |
+| `src/Domain/Model/Pipeline/NextAction.php` | FR-PIPE-001 |
+| `src/Domain/Model/Pipeline/PartyStage.php` | FR-PIPE-001 |
+| `src/Domain/Model/Pipeline/Stage.php` | FR-PIPE-001 |
+| `src/Domain/Model/Pipeline/StageChange.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/DealPage.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/DealView.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/FunnelStats.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/FunnelView.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/NextActionView.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/PartyStageView.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/StageChangeView.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/StageStats.php` | FR-PIPE-001 |
+| `src/Domain/Read/Pipeline/StageView.php` | FR-PIPE-001 |
+| `src/Domain/Value/LostReasonKey.php` | FR-PIPE-001 |
+| `src/Domain/Value/Money.php` | FR-PIPE-001 |
+| `src/Infrastructure/Doctrine/DoctrinePipelineStore.php` | FR-PIPE-001 |
+| `src/Resources/config/doctrine-pipeline/Deal.orm.xml` | FR-PIPE-001 |
+| `src/Resources/config/doctrine-pipeline/Funnel.orm.xml` | FR-PIPE-001 |
+| `src/Resources/config/doctrine-pipeline/NextAction.orm.xml` | FR-PIPE-001 |
+| `src/Resources/config/doctrine-pipeline/PartyStage.orm.xml` | FR-PIPE-001 |
+| `src/Resources/config/doctrine-pipeline/Stage.orm.xml` | FR-PIPE-001 |
+| `src/Resources/config/doctrine-pipeline/StageChange.orm.xml` | FR-PIPE-001 |
+
+### 0.3.0-0.6.0: SearchKit bridge (4)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Bridge/SearchKit/CrmDealSearchDefinition.php` | FR-SEARCH-002 |
+| `src/Bridge/SearchKit/CrmRecordSearchDefinition.php` | FR-SEARCH-002 |
+| `src/Bridge/SearchKit/CrmSearchDefinition.php` | FR-SEARCH-002 |
+| `src/Domain/Read/NoteHit.php` | FR-SEARCH-002 |
+
+### 0.3.0-0.6.0: Exact-identifier value objects and types (6)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Domain/Value/AffiliationPurpose.php` | FR-SEC-006 |
+| `src/Domain/Value/AuditOrigin.php` | FR-SEC-006 |
+| `src/Domain/Value/CompanyDomain.php` | FR-SEC-006 |
+| `src/Domain/Value/DateImmutable.php` | FR-SEC-006 |
+| `src/Domain/Value/RoleKey.php` | FR-SEC-006 |
+| `src/Infrastructure/Doctrine/Type/UtcMicroDateTimeImmutableType.php` | FR-SEC-006 |
+
+### 0.3.0-0.6.0: API HTTP edge (9)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Infrastructure/Symfony/Api/ConfiguredCrmApiTenantResolver.php` | FR-API-003 |
+| `src/Infrastructure/Symfony/Api/Controller/CrmApiController.php` | FR-API-003 |
+| `src/Infrastructure/Symfony/Api/CrmApiAuthenticatorInterface.php` | FR-API-003 |
+| `src/Infrastructure/Symfony/Api/CrmApiExceptionListener.php` | FR-API-003 |
+| `src/Infrastructure/Symfony/Api/CrmApiRouteLoader.php` | FR-API-003 |
+| `src/Infrastructure/Symfony/Api/CrmApiTenantResolverInterface.php` | FR-API-003 |
+| `src/Infrastructure/Symfony/Api/PrincipalCaller.php` | FR-API-003 |
+| `src/Infrastructure/Symfony/Api/PrincipalCallerFactory.php` | FR-API-003 |
+| `src/Infrastructure/Symfony/Api/SecurityUserCrmApiAuthenticator.php` | FR-API-003 |
+
+### 0.3.0-0.6.0: Pipeline UI (23)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Infrastructure/Symfony/Controller/PipelineAdminController.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Controller/PipelineController.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Controller/PipelineForms.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Controller/PipelineRecordBlock.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Controller/UiOptions.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Form/DealFilterType.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Form/DealType.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Form/FunnelType.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Form/LifecycleType.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Form/NextActionType.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Form/StageMoveType.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Form/StageType.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Form/StatsFilterType.php` | FR-UI-003 |
+| `src/Resources/public/css/nowo-crm-kit.css` | FR-UI-003 |
+| `src/Resources/views/partials/_row_actions.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/_next_actions.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/_record.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/board.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/deal.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/deals.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/funnel.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/funnels.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/stats.html.twig` | FR-UI-003 |
+
+**Total production sources**: 418 (224 from the phase-A sections, 194 from the `0.3.0-0.6.0` sections)

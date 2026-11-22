@@ -138,6 +138,23 @@ tables on a private entity manager and never flushes the host's work.
   CSRF tokens as the pages, the import page as the no-JS fallback, unfinished imports linked from the modal and the lists, the script `js/nowo-crm-import.js` (asset package
   `nowo_crm_kit`).
 - **FR-SEARCH-001**: SearchKit providers for companies and contacts (bridge).
+- **FR-API-001** (0.3.0): the `Api\Operation` layer: one operation catalogue (`CrmApiOperation`), typed inputs
+  (`Api/Input/*`), read models (`Api/Read/*`), cursor paging, guard order tenant -> grant -> record, error codes
+  (`CrmApiCode`, `CrmApiRefusal`); write units through the same services as the pages.
+- **FR-API-002** (0.3.0): idempotent writes: `Idempotency-Key`, stored claim and replay (`ApiIdempotency`, store port,
+  Doctrine store), `RecordVersion` checks, purge command `ApiPurgeIdempotencyCommand`.
+- **FR-API-003** (0.3.0): the opt-in HTTP edge: attribute-free route loader, controller, authenticator and tenant
+  resolver ports, exception listener mapping refusals to HTTP status and `CONFLICT_001` / `CONFLICT_002`.
+- **FR-PIPE-001** (0.5.0): pipeline: funnels, stages, deals (decimal `Money`, lost reasons), party stages, next actions,
+  stage history, funnel statistics, housekeeping; entities `Funnel`, `Stage`, `Deal`, `PartyStage`, `NextAction`,
+  `StageChange` (`doctrine-pipeline` mappings).
+- **FR-PIPE-002** (0.5.0): next actions as tasks through `CrmTaskPort`: built-in port, optional TaskBoard bridge.
+- **FR-ACCESS-001**: house access pattern (REQ-UI-002): security keys, `CrmKitAccessChecker` implementations,
+  `*_ACCESS_CHECK` / visibility events, `CrmKitGuard`, roles (`RoleAssignment`), web UI security pass.
+- **FR-GDPR-004**: actor personal data (anonymise / export of actor ids) and the purge claim.
+- **FR-READ-002**: batch lookups and catalogue reads for host panels (parties, roles and tags).
+- **FR-UI-003** (0.5.0): pipeline pages, forms, row actions, stylesheet `nowo-crm-kit.css`.
+- **FR-SEARCH-002** (0.6.0): SearchKit providers for deals and note hits (bridge).
 - **FR-I18N-001**: translations in en, es, it, fr, pt, de, nl (REQ-I18N-002).
 
 ## Success criteria

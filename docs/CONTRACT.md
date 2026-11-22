@@ -45,6 +45,36 @@ Read for this contract (2026-11-18):
 | NotifyKitBundle | 0.1.1 | `Contract\NotifierInterface`, `NotificationRequest`, `RecipientRef`, `ContextRef`, access checker SPI |
 | Earlier contracts (style) | — | WorkingTimeBundle `CONTRACT.md` v0.1, TaskBoard questions contract |
 
+## Table of contents
+
+- [0. Findings that shaped the contract](#0-findings-that-shaped-the-contract)
+- [1. Scope and non-goals](#1-scope-and-non-goals)
+- [2. Package](#2-package)
+- [3. Shape](#3-shape)
+- [4. Layout and architecture rules](#4-layout-and-architecture-rules)
+- [5. Public API: value objects and enums](#5-public-api-value-objects-and-enums)
+- [6. Domain model and tables](#6-domain-model-and-tables)
+- [7. Public services (what a host calls)](#7-public-services-what-a-host-calls)
+- [8. Ports and SPIs (host-implemented; each has a safe default)](#8-ports-and-spis-host-implemented-each-has-a-safe-default)
+- [9. Behaviour of phase A](#9-behaviour-of-phase-a)
+- [10. Configuration (strict tree, REQ-SF-006; defaults shown)](#10-configuration-strict-tree-req-sf-006-defaults-shown)
+- [11. Routes, UI and API](#11-routes-ui-and-api)
+- [12. SearchKit provider (bridge)](#12-searchkit-provider-bridge)
+- [13. Permission matrix (deny by default)](#13-permission-matrix-deny-by-default)
+- [14. Events (dispatched after commit, ids and VOs only; REQ-ARCH-001 rules 4 / 7)](#14-events-dispatched-after-commit-ids-and-vos-only-req-arch-001-rules-4--7)
+- [15. Concurrency design per write path (REQ-RUNTIME-003)](#15-concurrency-design-per-write-path-req-runtime-003)
+- [16. GDPR](#16-gdpr)
+- [17. Migrations](#17-migrations)
+- [18. Worker mode (FrankenPHP, kernel reset false; REQ-RUNTIME-002)](#18-worker-mode-frankenphp-kernel-reset-false-req-runtime-002)
+- [19. Integration points](#19-integration-points)
+- [20. Standard vs DDD host (REQ-ARCH-001)](#20-standard-vs-ddd-host-req-arch-001)
+- [21. Test plan (100 % PHP coverage, REQ-TEST-003)](#21-test-plan-100--php-coverage-req-test-003)
+- [22. Questions for the owner (Q-O)](#22-questions-for-the-owner-q-o)
+- [23. Questions for Beacon (Q-B) — confirmed by Beacon 2026-11-19 (B1–B15)](#23-questions-for-beacon-q-b--confirmed-by-beacon-2026-11-19-b1b15)
+- [24. Answers](#24-answers)
+- [Q-B answers from Beacon (2026-11-19): B1–B15 confirmed as implemented](#q-b-answers-from-beacon-2026-11-19-b1b15-confirmed-as-implemented)
+- [25. Phase plan (owner, 2026-11-19)](#25-phase-plan-owner-2026-11-19)
+
 ## 0. Findings that shaped the contract
 
 | # | Finding | Effect |

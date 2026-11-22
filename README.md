@@ -63,6 +63,16 @@ composer require nowo-tech/crm-kit-bundle
 
 See [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
+## Requirements
+
+- PHP >= 8.2, < 8.6 (Symfony 8.x needs PHP 8.4+)
+- Symfony 7.4, 8.0 or 8.1
+- Doctrine DBAL 3.8+ / 4 and ORM 3.7+ with DoctrineBundle
+- `nowo-tech/ui-kit-bundle` ^2.55, `nowo-tech/form-kit-bundle` ^2.23, `nowo-tech/transaction-doctrine` ^1.6,
+  `nowo-tech/transaction-contract` ^1.0
+- Optional: `nowo-tech/search-kit-bundle` ^1.9 (header search; SearchKit needs PHP >= 8.3), `symfony/security-bundle`
+  (default access checker and actor directory)
+
 ## Configuration
 
 ```yaml
@@ -89,16 +99,6 @@ nowo_crm_kit:
 ```
 
 Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-
-## Requirements
-
-- PHP >= 8.2, < 8.6 (Symfony 8.x needs PHP 8.4+)
-- Symfony 7.4, 8.0 or 8.1
-- Doctrine DBAL 3.8+ / 4 and ORM 3.7+ with DoctrineBundle
-- `nowo-tech/ui-kit-bundle` ^2.55, `nowo-tech/form-kit-bundle` ^2.23, `nowo-tech/transaction-doctrine` ^1.6,
-  `nowo-tech/transaction-contract` ^1.0
-- Optional: `nowo-tech/search-kit-bundle` ^1.9 (header search; SearchKit needs PHP >= 8.3), `symfony/security-bundle`
-  (default access checker and actor directory)
 
 ## Demo
 

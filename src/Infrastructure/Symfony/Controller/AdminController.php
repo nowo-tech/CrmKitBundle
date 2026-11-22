@@ -30,6 +30,7 @@ use Nowo\UiKitBundle\View\FormPage;
 use Nowo\UiKitBundle\View\ListPage;
 use Nowo\UiKitBundle\View\PageHeader;
 use Symfony\Component\Form\FormInterface;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -50,6 +51,9 @@ use function trim;
  */
 final readonly class AdminController
 {
+    /** Id of the "New tag" dialog (0.6.1, `ui.admin_create: dialog`). */
+    public const TAG_DIALOG = 'crm-tag-dialog';
+
     /**
      * Wires the collaborators.
      */
@@ -87,21 +91,28 @@ final readonly class AdminController
                     }
                 }
             }
-            $rows = array_map(static fn (TagView $t): array => ['id' => $t->id, 'name' => $t->name, 'colour' => $t->colour], $this->reader->tags());
+            $rows   = array_map(static fn (TagView $t): array => ['id' => $t->id, 'name' => $t->name, 'colour' => $t->colour], $this->reader->tags());
+            $create = null;
+            if ($this->ui->options->createDialog()) {
+                // 0.6.1: "New tag" is a header action opening the dialog; ?new=1 (its href) is the no-JS fallback.
+                $create = $this->create($request, $status, [['form' => $form, 'id' => self::TAG_DIALOG, 'title' => 'tag.add', 'submit' => 'tag.save', 'action' => $this->ui->url('nowo_crm_kit_tags'), 'testid' => 'crm-tag-form', 'open' => true]]);
+            }
 
             return $this->ui->render('@NowoCrmKit/admin/tags.html.twig', [
                 'page' => new ListPage(
-                    new PageHeader(UiSupport::label('tags.title'), UiSupport::label('tags.intro'), [], tabs: $this->ui->tabs('tags')),
+                    new PageHeader(UiSupport::label('tags.title'), UiSupport::label('tags.intro'), $create === null ? [] : [$this->createAction('tag.add', $this->ui->url('nowo_crm_kit_tags', ['new' => 1]), self::TAG_DIALOG, 'crm-tag-new', 'primary')], tabs: $this->ui->tabs('tags')),
                     [new Column('name', UiSupport::label('tag.form.name'), required: true), new Column('colour', UiSupport::label('tag.form.colour'))],
                     $rows,
                     rowActions: fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_tag_edit', ['id' => $row['id']]), UiSupport::label('tag.edit'))] : [],
-                    empty: new EmptyState(UiSupport::label('tags.empty')),
+                    // 0.6.1 (UX-005): one sentence, the UiKit `empty` message (no title, so no second "No items found.").
+                    empty: new EmptyState(null, UiSupport::label('tags.empty')),
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-tags'],
                     responsive: 'cards',
                 ),
-                'form' => $form->createView(),
+                'form'       => $create === null ? $form->createView() : $create['dialogs'][0]['form'],
+                'crm_create' => $create,
             ], $status);
         });
     }
@@ -166,7 +177,7 @@ final readonly class AdminController
         return $this->ui->guard(function () use ($request): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->access->context(CrmPermission::Manage);
             $subject = SubjectType::tryFrom((string) $request->query->get('for', 'company')) ?? SubjectType::Company;
-            $form    = $this->ui->form(FieldDefinitionType::class, ['type' => 'text', 'position' => 0], ['types' => $this->types()], 'crm_field');
+            $form    = $this->fieldForm();
             $form->handleRequest($request);
             $status = Response::HTTP_OK;
             if ($form->isSubmitted()) {
@@ -187,20 +198,37 @@ final readonly class AdminController
                 $rows = array_merge($rows, array_map(fn (FieldView $f): array => ['id' => $f->id, 'subject' => $this->ui->trans('type.' . $f->subjectType->value), 'key' => $f->key, 'label' => $f->label, 'type' => $this->ui->trans('field_type.' . $f->type->value), 'state' => $this->ui->trans($f->archived ? 'field.archived' : 'field.active')], $this->reader->fields($type, true)));
             }
 
+            $create  = null;
+            $actions = [];
+            $view    = null;
+            if ($this->ui->options->createDialog()) {
+                // 0.6.1: one header action and one dialog per subject; the submitted (or ?new=1) one opens.
+                $dialogs = [];
+                foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
+                    $id        = 'crm-field-dialog-' . $type->value;
+                    $dialogs[] = ['form' => $type === $subject ? $form : $this->fieldForm(), 'id' => $id, 'title' => 'field.add.' . $type->value, 'submit' => 'field.save', 'action' => $this->ui->url('nowo_crm_kit_fields', ['for' => $type->value]), 'testid' => 'crm-field-form-' . $type->value, 'open' => $type === $subject];
+                    $actions[] = $this->createAction('field.add.' . $type->value, $this->ui->url('nowo_crm_kit_fields', ['for' => $type->value, 'new' => 1]), $id, 'crm-field-new-' . $type->value, $type === SubjectType::Company ? 'primary' : null);
+                }
+                $create = $this->create($request, $status, $dialogs);
+                $view   = $create['dialogs'][$subject === SubjectType::Company ? 0 : 1]['form'] ?? null;
+            }
+
             return $this->ui->render('@NowoCrmKit/admin/fields.html.twig', [
                 'page' => new ListPage(
-                    new PageHeader(UiSupport::label('fields.title'), UiSupport::label('fields.intro'), [], tabs: $this->ui->tabs('fields')),
+                    new PageHeader(UiSupport::label('fields.title'), UiSupport::label('fields.intro'), $actions, tabs: $this->ui->tabs('fields')),
                     [new Column('subject', UiSupport::label('fields.col.subject')), new Column('label', UiSupport::label('field.form.label'), required: true), new Column('key', UiSupport::label('field.form.key'), priority: 2), new Column('type', UiSupport::label('field.form.type'), priority: 2), new Column('state', UiSupport::label('fields.col.state'), priority: 3)],
                     $rows,
                     rowActions: fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_field_edit', ['id' => $row['id']]), UiSupport::label('field.edit'))] : [],
-                    empty: new EmptyState(UiSupport::label('fields.empty')),
+                    // 0.6.1 (UX-005): one sentence, the UiKit `empty` message.
+                    empty: new EmptyState(null, UiSupport::label('fields.empty')),
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-fields'],
                     responsive: 'cards',
                 ),
-                'form'    => $form->createView(),
-                'subject' => $subject->value,
+                'form'       => $view ?? $form->createView(),
+                'subject'    => $subject->value,
+                'crm_create' => $create,
             ], $status);
         });
     }
@@ -290,9 +318,57 @@ final readonly class AdminController
             }
 
             return $this->ui->render('@NowoCrmKit/admin/settings.html.twig', [
-                'page' => new FormPage(new PageHeader(UiSupport::label('settings.title'), UiSupport::label('settings.intro'), [], tabs: $this->ui->tabs('settings')), $form->createView(), UiSupport::label('form.save'), bundle: UiSupport::DOMAIN, layout: $this->ui->layout(), attributes: ['data-testid' => 'crm-settings']),
+                'page'              => new FormPage(new PageHeader(UiSupport::label('settings.title'), UiSupport::label('settings.intro'), [], tabs: $this->ui->tabs('settings')), $form->createView(), UiSupport::label('form.save'), bundle: UiSupport::DOMAIN, layout: $this->ui->layout(), attributes: ['data-testid' => 'crm-settings']),
+                'crm_settings_full' => $this->ui->options->settingsFull(),
             ], $status);
         });
+    }
+
+    /**
+     * The create dialogs of an admin list (0.6.1, `ui.admin_create: dialog`): each dialog's form view (ids
+     * `<dialog id>-…` so two dialogs never share an id), the dialog that opens on load (an invalid submission, 422, or
+     * the `?new=1` deep link, which is also the no-JS fallback) and that form once more for the `<noscript>` fallback
+     * card (ids `<dialog id>-page-…`).
+     *
+     * @param list<array{form: FormInterface<mixed>, id: string, title: string, submit: string, action: string, testid: string, open: bool}> $dialogs
+     *
+     * @return array{dialogs: list<array{form: FormView, id: string, title: string, submit: string, action: string, testid: string}>, open: string|null, clear: false|string, fallback: array{form: FormView, title: string, submit: string, action: string, testid: string}|null}
+     */
+    private function create(Request $request, int $status, array $dialogs): array
+    {
+        $invalid  = $status === Response::HTTP_UNPROCESSABLE_ENTITY;
+        $deepLink = $request->isMethod('GET') && $request->query->getBoolean('new');
+        $views    = [];
+        $open     = null;
+        $fallback = null;
+        foreach ($dialogs as $dialog) {
+            $views[] = ['form' => $this->ui->view($dialog['form'], $dialog['id']), 'id' => $dialog['id'], 'title' => $dialog['title'], 'submit' => $dialog['submit'], 'action' => $dialog['action'], 'testid' => $dialog['testid']];
+            if ($dialog['open'] && ($invalid || $deepLink)) {
+                $open     = $dialog['id'];
+                $fallback = ['form' => $this->ui->view($dialog['form'], $dialog['id'] . '-page'), 'title' => $dialog['title'], 'submit' => $dialog['submit'], 'action' => $dialog['action'], 'testid' => $dialog['testid'] . '-page'];
+            }
+        }
+
+        return ['dialogs' => $views, 'open' => $open, 'clear' => $invalid ? false : 'new', 'fallback' => $fallback];
+    }
+
+    /**
+     * A header action that opens a create dialog (UiKit `js/nowo-ui-confirm.js`: data-nowo-confirm-open / -target);
+     * its href, the page with `?new=1`, is the no-JS fallback.
+     */
+    private function createAction(string $label, string $href, string $dialog, string $testid, ?string $variant): Action
+    {
+        return new Action('create', UiSupport::label($label), $href, variant: $variant, attributes: ['data-nowo-confirm-open' => true, 'data-nowo-confirm-target' => $dialog, 'aria-haspopup' => 'dialog', 'aria-controls' => $dialog, 'data-testid' => $testid]);
+    }
+
+    /**
+     * The define form of a custom field.
+     *
+     * @return FormInterface<mixed>
+     */
+    private function fieldForm(): FormInterface
+    {
+        return $this->ui->form(FieldDefinitionType::class, ['type' => 'text', 'position' => 0], ['types' => $this->types()], 'crm_field');
     }
 
     /**

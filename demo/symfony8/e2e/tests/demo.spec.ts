@@ -4,7 +4,7 @@ import { expectNoHorizontalScroll, login, logout } from './helpers';
 /**
  * The CRM end to end against the running demo (one serial flow on a fresh stack): mia creates a company with two
  * party roles and a contact, links them (purpose, primary contact), adds a note and imports contacts from a CSV file;
- * ana only reads and filters by role; admin adds a custom field.
+ * ana only reads and filters by role; admin adds a tag and a custom field through their dialogs (0.6.1).
  */
 test.describe.configure({ mode: 'serial' });
 
@@ -91,13 +91,36 @@ test.describe('CRM Kit demo', () => {
     await logout(page);
   });
 
-  test('admin defines a custom field', async ({ page }) => {
+  test('admin creates a tag and a custom field in their dialogs', async ({ page }) => {
     await login(page, 'admin');
-    await page.goto('/crm/admin/fields?for=company');
-    await page.locator('input[name="crm_field[key]"]').fill(`tier_${Date.now() % 100000}`);
-    await page.locator('input[name="crm_field[label]"]').fill('Tier');
-    await page.getByTestId('crm-field-form').locator('button[type="submit"]').click();
+    await page.goto('/crm/admin/tags');
+    await page.getByTestId('crm-tag-new').click();
+    const tagDialog = page.getByTestId('crm-tag-form-dialog');
+    await expect(tagDialog).toBeVisible();
+    const tag = `Key ${Date.now() % 100000}`;
+    await tagDialog.locator('input[name="crm_tag[name]"]').fill(tag);
+    await page.getByTestId('crm-tag-form-submit').click();
+    await expect(page.getByTestId('crm-tags')).toContainText(tag);
+    await expect(tagDialog).toBeHidden();
+
+    await page.goto('/crm/admin/fields');
+    await page.getByTestId('crm-field-new-company').click();
+    const dialog = page.getByTestId('crm-field-form-company-dialog');
+    await expect(dialog).toBeVisible();
+    // An invalid key answers 422 and the dialog opens again with the error.
+    await dialog.locator('input[name="crm_field[key]"]').fill('Bad Key');
+    await dialog.locator('input[name="crm_field[label]"]').fill('Tier');
+    await page.getByTestId('crm-field-form-company-submit').click();
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="crm_field[key]"]').fill(`tier_${Date.now() % 100000}`);
+    await page.getByTestId('crm-field-form-company-submit').click();
     await expect(page.getByTestId('crm-fields')).toContainText('Tier');
+
+    // ?new=1 opens the dialog on load and drops the parameter.
+    await page.goto('/crm/admin/fields?for=contact&new=1');
+    await expect(page.getByTestId('crm-field-form-contact-dialog')).toBeVisible();
+    await expect(page).not.toHaveURL(/new=1/);
+    await page.keyboard.press('Escape');
     await logout(page);
   });
 });

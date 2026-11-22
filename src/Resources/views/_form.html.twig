@@ -1,12 +1,14 @@
 {#
   One CRM form in a UiKit card: title, form errors, the fields not rendered yet, the submit button.
   Variables: form (FormView), title (translation key or null), submit (translation key), action (URL or null),
-  testid, multipart (bool), variant (btn_primary | btn_secondary | btn_danger), hidden (map of extra hidden values).
+  testid, multipart (bool), variant (btn_primary | btn_secondary | btn_danger), hidden (map of extra hidden values),
+  before (0.6.1: markup rendered between the title and the form, e.g. a tab switch; build it with {% set %}).
 #}
 {%- set _b = 'NowoCrmKitBundle' -%}
 <section class="{{ nowo_ui_class('card', _b) }}" data-testid="{{ testid }}">
     <div class="{{ nowo_ui_class('card_body', _b) }}">
         {% if title %}<h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ title|trans({}, _b) }}</h2>{% endif %}
+        {{ before|default('') }}
         {{ form_start(form, {action: action ?? '', multipart: multipart ?? false}) }}
         {% if form.vars.errors|length > 0 %}<div class="{{ nowo_ui_class('flash_error', _b) }}" role="alert">{{ form_errors(form) }}</div>{% endif %}
         {% for child in form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}

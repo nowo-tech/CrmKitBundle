@@ -1,7 +1,9 @@
 {#
-  Tags of the tenant (manage): the list and the create form. Variables: page (ListPage), form (FormView).
+  Tags of the tenant (manage): the list and create. Variables: page (ListPage), form (FormView: the inline create form,
+  or the dialog's with `ui.admin_create: dialog`), crm_create (null, or the create dialogs: see admin/_create.html.twig).
   0.6.0: the colour column shows a swatch (class crm-kit-swatch + crm-kit-tag--<colour>, see css/nowo-crm-kit.css) and the
-  colour name.
+  colour name. 0.6.1: the create form renders after the list section (the list page's bottom margin is the gap between
+  the two cards); with `ui.admin_create: dialog` it is a dialog opened by the header action "New tag" instead.
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
 
@@ -19,6 +21,11 @@
     {% endfor %}
 {% endblock %}
 
-{% block nowo_ui_list_after %}
-    {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'tag.add', submit: 'tag.save', action: null, testid: 'crm-tag-form'}) }}
+{% block nowo_ui_content %}
+    {{ parent() }}
+    {% if crm_create|default(null) is not null %}
+        {{ include('@NowoCrmKit/admin/_create.html.twig', {create: crm_create}, false) }}
+    {% else %}
+        {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'tag.add', submit: 'tag.save', action: null, testid: 'crm-tag-form'}) }}
+    {% endif %}
 {% endblock %}

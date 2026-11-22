@@ -21,6 +21,7 @@ use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\Form\FormTypeInterface;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,7 +33,9 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Twig\Environment;
 
+use function is_string;
 use function str_starts_with;
+use function strlen;
 use function substr;
 
 /**
@@ -217,6 +220,35 @@ final readonly class UiSupport
     }
 
     /**
+     * The view of a form whose element ids start with `$idPrefix` instead of the form name (0.6.1): two renderings of
+     * the same form on one page (a dialog and its no-JS fallback, one dialog per subject) keep unique ids, while the
+     * field names (`crm_tag[name]`…) and so the POST contract stay the same.
+     *
+     * @param FormInterface<mixed> $form
+     */
+    public function view(FormInterface $form, string $idPrefix): FormView
+    {
+        $view = $form->createView();
+        self::prefixIds($view, $form->getName(), $idPrefix);
+
+        return $view;
+    }
+
+    /**
+     * Rewrites the ids of a view tree that start with `$from`.
+     */
+    private static function prefixIds(FormView $view, string $from, string $to): void
+    {
+        $id = $view->vars['id'] ?? null;
+        if (is_string($id) && str_starts_with($id, $from)) {
+            $view->vars['id'] = $to . substr($id, strlen($from));
+        }
+        foreach ($view->children as $child) {
+            self::prefixIds($child, $from, $to);
+        }
+    }
+
+    /**
      * The CSRF token of the action buttons (`crm_action[_token]`).
      */
     public function actionToken(): string
@@ -257,9 +289,17 @@ final readonly class UiSupport
     }
 
     /**
+     * The area tabs of a list, admin or form page: the area navigation, or null with `ui.list_tabs: false` (0.6.1).
+     */
+    public function tabs(string $current): ?AreaNav
+    {
+        return $this->options->listTabs ? $this->areaNav($current) : null;
+    }
+
+    /**
      * The CRM's area navigation, with the entries the actor may open.
      */
-    public function tabs(string $current): AreaNav
+    public function areaNav(string $current): AreaNav
     {
         $items = [
             new AreaNavItem(self::label('nav.companies'), $this->url('nowo_crm_kit_list', ['type' => 'companies']), $current === 'companies'),

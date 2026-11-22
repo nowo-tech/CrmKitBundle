@@ -8,9 +8,11 @@ use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\AdminController;
 
 use function basename;
 use function str_contains;
+use function trim;
 
 /**
  * UX review 1.171 (0.6.0): row actions in the UiKit menu, split headers, the record page without list tabs, the filter
@@ -166,5 +168,123 @@ final class UiPresentationTest extends CrmTestCase
         $button = $remove->filter('button')->first();
         self::assertFalse(str_contains((string) $button->attr('class'), 'danger'), 'not the red trash');
         self::assertNotSame('', basename((string) $remove->first()->attr('action')));
+    }
+
+    public function testListTabsCanBeHiddenOnListAndAdminPages(): void
+    {
+        $this->boot();
+        $this->admin();
+        foreach (['/crm/companies', '/crm/admin/tags', '/crm/admin/fields', '/crm/admin/settings', '/crm/companies/new'] as $path) {
+            self::assertGreaterThan(0, $this->client->request('GET', $path)->filter('nav[aria-label="CRM"]')->count(), 'tabs by default: ' . $path);
+        }
+
+        $this->boot(['ui' => ['list_tabs' => false]]);
+        $this->admin();
+        $id = $this->company('Acme');
+        foreach (['/crm/companies', '/crm/contacts', '/crm/admin/tags', '/crm/admin/fields', '/crm/admin/settings', '/crm/companies/new', '/crm/companies/' . $id . '/edit'] as $path) {
+            self::assertCount(0, $this->client->request('GET', $path)->filter('nav[aria-label="CRM"]'), 'no tabs: ' . $path);
+        }
+        self::assertGreaterThan(0, $this->client->request('GET', '/crm/companies/' . $id)->filter('nav[aria-label="CRM"]')->count(), 'the record page follows record_tabs');
+    }
+
+    public function testAdminEmptyStatesSayOneSentenceAndTheInlineFormsFollowTheList(): void
+    {
+        $this->boot();
+        $this->admin();
+        $tags  = $this->client->request('GET', '/crm/admin/tags');
+        $empty = $tags->filter('[data-testid="crm-tags"] [data-nowo-ui-region="empty"]');
+        self::assertCount(1, $empty);
+        self::assertSame('No tags yet.', trim($empty->text()));
+        self::assertCount(0, $tags->filter('[data-testid="crm-tags"] [data-testid="crm-tag-form"]'), 'the form is after the list section');
+        self::assertCount(1, $tags->filter('[data-testid="crm-tag-form"] form'), 'inline by default');
+        self::assertCount(0, $tags->filter('dialog'));
+
+        $fields = $this->client->request('GET', '/crm/admin/fields?for=contact');
+        self::assertSame('No custom fields yet.', trim($fields->filter('[data-testid="crm-fields"] [data-nowo-ui-region="empty"]')->text()));
+        $switch = $fields->filter('[data-testid="crm-field-form"] nav[data-testid="crm-fields-for"]');
+        self::assertCount(1, $switch, 'the subject switch sits inside the form card');
+        self::assertCount(2, $switch->filter('a'));
+        self::assertStringContainsString('for=contact', (string) $switch->filter('[aria-current="page"]')->attr('href'));
+        self::assertStringContainsString('New field for contacts', $fields->filter('[data-testid="crm-field-form"]')->text());
+    }
+
+    public function testCreateDialogsOnTagsAndFields(): void
+    {
+        $this->boot(['ui' => ['admin_create' => 'dialog']]);
+        $this->admin();
+        $tags = $this->client->request('GET', '/crm/admin/tags');
+        $new  = $tags->filter('[data-testid="crm-tag-new"]');
+        self::assertCount(1, $new, 'New tag is a header action');
+        self::assertSame(AdminController::TAG_DIALOG, $new->attr('data-nowo-confirm-target'));
+        self::assertStringEndsWith('/crm/admin/tags?new=1', (string) $new->attr('href'), 'the no-JS fallback');
+        $dialog = $tags->filter('dialog#crm-tag-dialog');
+        self::assertCount(1, $dialog);
+        self::assertCount(1, $dialog->filter('.nowo-ui-dialog__body form[name="crm_tag"]'));
+        self::assertSame('crm-tag-dialog-form', $dialog->filter('form')->attr('id'));
+        self::assertCount(1, $dialog->filter('footer button[type="submit"][form="crm-tag-dialog-form"]'));
+        self::assertCount(0, $tags->filter('#nowo-ui-open-modal-on-load'), 'closed on a plain visit');
+        self::assertCount(0, $tags->filter('noscript'));
+        self::assertStringNotContainsString('No items found', $tags->filter('[data-testid="crm-tags"]')->text());
+
+        $deep = $this->client->request('GET', '/crm/admin/tags?new=1');
+        self::assertSame('{"modal":"crm-tag-dialog","clearParam":"new"}', $deep->filter('#nowo-ui-open-modal-on-load')->text());
+        self::assertStringContainsString('crm-tag-dialog-page_name', $deep->filter('noscript')->html(), 'the no-JS form, own ids');
+
+        $form = $dialog->filter('form')->form();
+        $this->client->submit($form, ['crm_tag[name]' => 'VIP', 'crm_tag[colour]' => 'red']);
+        self::assertSame(303, $this->client->getResponse()->getStatusCode());
+        $again = $this->client->submit($form, ['crm_tag[name]' => 'vip', 'crm_tag[colour]' => 'red']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertSame('{"modal":"crm-tag-dialog"}', $again->filter('#nowo-ui-open-modal-on-load')->text(), 'the dialog opens with the errors');
+        self::assertGreaterThan(0, $again->filter('dialog#crm-tag-dialog .nowo-ui-dialog__body')->filter('[role="alert"], .nowo-ui-field-error, ul li')->count());
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_tag'));
+
+        $fields = $this->client->request('GET', '/crm/admin/fields');
+        self::assertCount(1, $fields->filter('[data-testid="crm-field-new-company"][data-nowo-confirm-target="crm-field-dialog-company"]'));
+        self::assertCount(1, $fields->filter('[data-testid="crm-field-new-contact"][data-nowo-confirm-target="crm-field-dialog-contact"]'));
+        self::assertCount(0, $fields->filter('[data-testid="crm-fields-for"]'), 'no subject switch: one action per subject');
+        self::assertSame('crm-field-dialog-contact_key', $fields->filter('dialog#crm-field-dialog-contact input[name="crm_field[key]"]')->attr('id'), 'unique ids per dialog');
+        $contact = $fields->filter('dialog#crm-field-dialog-contact form')->form();
+        self::assertStringEndsWith('for=contact', $contact->getUri());
+        $bad = $this->client->submit($contact, ['crm_field[key]' => 'Bad Key', 'crm_field[label]' => 'X']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertSame('{"modal":"crm-field-dialog-contact"}', $bad->filter('#nowo-ui-open-modal-on-load')->text());
+        $this->client->submit($contact, ['crm_field[key]' => 'tier', 'crm_field[label]' => 'Tier']);
+        self::assertSame(303, $this->client->getResponse()->getStatusCode());
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_field WHERE subject_type = ?', ['contact']));
+        $deep = $this->client->request('GET', '/crm/admin/fields?for=company&new=1');
+        self::assertStringContainsString('"modal":"crm-field-dialog-company"', $deep->filter('#nowo-ui-open-modal-on-load')->text());
+    }
+
+    public function testCreateDialogKeepsTheGateAndTheCsrfToken(): void
+    {
+        $this->boot(['ui' => ['admin_create' => 'dialog']]);
+        $this->admin();
+        $form = $this->client->request('GET', '/crm/admin/tags')->filter('dialog#crm-tag-dialog form')->form();
+        $this->client->submit($form, ['crm_tag[name]' => 'VIP', 'crm_tag[_token]' => 'forged']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_tag'));
+        $this->actAs('zoe', 'view', 'edit');
+        self::assertSame(403, $this->httpStatus('GET', '/crm/admin/tags?new=1'));
+        self::assertSame(403, $this->httpStatus('GET', '/crm/admin/fields?for=contact&new=1'));
+    }
+
+    public function testSettingsCanTakeTheFullWidth(): void
+    {
+        $this->boot();
+        $this->admin();
+        $page = $this->client->request('GET', '/crm/admin/settings');
+        self::assertCount(1, $page->filter('[data-testid="crm-settings"] .nowo-ui-form-panel form'), 'the UiKit form panel by default');
+
+        $this->boot(['ui' => ['settings_width' => 'full']]);
+        $this->admin();
+        $page = $this->client->request('GET', '/crm/admin/settings');
+        self::assertCount(0, $page->filter('.nowo-ui-form-panel'));
+        $form = $page->filter('[data-testid="crm-settings"] [data-testid="crm-settings-form"] form');
+        self::assertCount(1, $form, 'the bundle card');
+        $this->client->submit($form->form(), ['crm_settings[trashDays]' => '3']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $this->client->submit($form->form(), ['crm_settings[trashDays]' => '60']);
+        self::assertSame(303, $this->client->getResponse()->getStatusCode());
     }
 }

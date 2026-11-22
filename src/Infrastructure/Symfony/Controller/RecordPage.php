@@ -181,7 +181,7 @@ final readonly class RecordPage
 
         return $this->ui->render('@NowoCrmKit/record/show.html.twig', [
             'page' => new ShowPage(
-                new PageHeader($view->label, UiSupport::label('type.' . $type->value), $actions, tabs: $this->ui->options->recordTabs ? $this->ui->tabs($seg) : null, status: $status, actionsLayout: $split ? 'split' : 'toolbar'),
+                new PageHeader($view->label, UiSupport::label('type.' . $type->value), $actions, tabs: $this->ui->options->recordTabs ? $this->ui->areaNav($seg) : null, status: $status, actionsLayout: $split ? 'split' : 'toolbar'),
                 $sections,
                 bundle: UiSupport::DOMAIN,
                 layout: $this->ui->layout(),

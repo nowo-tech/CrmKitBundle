@@ -20,6 +20,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Beacon UX request after the 1.171 review of Companies, Contacts, Tags, Custom fields and Settings. New `ui` options
+  (see USAGE "Page layout options"), the defaults keep 0.6.0:
+  - `list_tabs` (default `true`): `false` hides the area tabs (Companies, Contacts, Tags, Custom fields, Settings…) on
+    the list, admin and form pages. The company / contact record page keeps following `record_tabs`.
+  - `admin_create: dialog` (default `inline`): on Tags and Custom fields, create is a `View\Action` in
+    `page.header.actions` (*New tag*, *New field for companies*, *New field for contacts*) that opens a UiKit
+    `confirm_dialog` with its anatomy (form in the body, *Cancel* and the primary in the footer, a sheet on phones).
+    Its href, the page with `?new=1`, is the no-JS fallback (the form in a `<noscript>` card) and opens the dialog on
+    load with JavaScript; an invalid submission answers 422 with the dialog open. Same routes, form names, CSRF tokens
+    and access checks.
+  - `settings_width: full` (default `form`): the Settings form in the bundle's card at the full content width, like
+    the lists, instead of the UiKit form panel (whose width is the host's form column).
+
+### Fixed
+
+- Tags and Custom fields with no rows printed two sentences ("No tags yet." and UiKit's "No items found."): the empty
+  state is now one sentence through UiKit's `empty` partial (UX-005).
+- The create card of Tags and Custom fields touched the list card above it: it renders after the list section, whose
+  bottom margin is the gap. The bare "Define a field for: Company · Contact" line is replaced by secondary UiKit tabs
+  inside the create card (with `admin_create: dialog` there is one header action per subject instead).
+
 ## [0.6.0] - 2026-11-22
 
 ### Added

@@ -15,6 +15,10 @@ nowo_crm_kit:
     ui:
         enabled: true
         path: /crm
+        # 0.6.1: Tags and Custom fields create in a UiKit dialog from the header actions (?new=1 without JavaScript);
+        # the Settings form takes the full content width. The Symfony 7 demo keeps the defaults (inline, form panel).
+        admin_create: dialog
+        settings_width: full
     roles:
         catalogue: [customer, supplier, partner, distributor]
     affiliations:

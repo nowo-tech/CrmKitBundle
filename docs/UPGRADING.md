@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.5.0](#to-050)
 - [To 0.4.2](#to-042)
 - [To 0.4.1](#to-041)
 - [To 0.4.0](#to-040)
@@ -13,6 +14,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.5.0
+
+From **0.4.2**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 `CrmReaderInterface` gains `searchNotes()` and `notesOf()` (see USAGE, *Searching notes*). Nothing changes for a host
 that only calls the reader; a host or test double that **implements** `CrmReaderInterface` must add both methods.

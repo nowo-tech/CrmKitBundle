@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.6.1](#to-061)
 - [To 0.6.0](#to-060)
 - [To 0.5.0](#to-050)
 - [To 0.4.2](#to-042)
@@ -15,6 +16,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.6.1
+
+From **0.6.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 No schema change, no BC break in the public PHP API, no route change. What you may notice:
 

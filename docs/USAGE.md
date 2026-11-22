@@ -22,6 +22,7 @@
 - [Errors](#errors)
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Pages and routes](#pages-and-routes)
+  - [Page layout options (0.6.0)](#page-layout-options-060)
 - [Imports](#imports)
 - [SearchKit](#searchkit)
 - [UiKit context menus and focus mode](#uikit-context-menus-and-focus-mode)
@@ -727,6 +728,29 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 
 Templates live under `@NowoCrmKit/` and extend UiKit's page templates; a host overrides one through Symfony's bundle
 template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the brand comes from UiKit tokens.
+
+### Page layout options (0.6.0)
+
+Beacon's UX review 1.171 (UX-002, 003, 005, 006, 010, 026 – 031). Every option lives under `nowo_crm_kit.ui` and keeps
+the 0.5.0 behaviour unless it says otherwise:
+
+| Option | Values (default) | Effect |
+| --- | --- | --- |
+| `row_actions` | `buttons` (default) \| `menu` | `menu`: *Open* and *Edit* stay icon buttons; *Restore* and *Move to trash* go into the UiKit row-actions menu (the kebab), *Delete* last. The bundle registers its own `row_actions` partial for `NowoCrmKitBundle` in the UiKit theme (`theme.bundles.NowoCrmKitBundle.partials.row_actions`); a host entry of the same name wins. |
+| `header_actions` | `toolbar` (default) \| `split` | The list header actions (*New*, *Export CSV*, *Import*) are always `View\Action` objects in `page.header.actions` of the UiKit `ListPage`, passed to the template as `page`: a host with the UiKit compact header (`header.compact_actions: bar`) reads them from there and shows its own page-actions menu, so **the bundle never renders a second menu** under the header. `split` uses UiKit's split layout (one primary button, the rest in the more menu) for hosts without the compact header. |
+| `record_actions` | `split` (default) \| `toolbar` | Record page header. `split`: *Edit* is an icon button, *Merge*, *vCard*, *Export personal data*, *Move to trash* and *Erase personal data* are in the more menu, destructive last (with their confirmation). `toolbar`: every action is a button, as in 0.5.0. |
+| `record_tabs` | `true` (default) \| `false` | `false` hides the list tabs (Companies, Contacts, Tags…) on record pages. |
+| `filters_fold` | `false` (default) \| `true` | The UiKit fold toggle on the filters card of the lists. |
+| `filters_slot` | `null` (default) \| a Twig template | A host template that wraps the filters region, e.g. Beacon's `shared/_filters_collapse` bottom sheet for phones. It receives `page`, `form` (the filter `FormView`) and `filters` (the rendered UiKit filters, print it with `{{ filters }}`). |
+
+Always on (visual fixes): every filter field has a label, a placeholder or an empty option that names it (*Any tag*,
+*Any role*, *Any owner*…), the search field has a label and a placeholder; checkboxes no longer take the text input
+class, so the host form theme draws them (they were a tall empty box); *Remove* (unlink a company, remove a host
+link) is a secondary icon `×` (UiKit kind `close`), not a red trash; the tag colour is a swatch in the tag list and a
+swatch radio in the tag form (markup `crm-kit-swatch`, `crm-kit-tag--<colour>`; the optional stylesheet
+`asset('css/nowo-crm-kit.css', 'nowo_crm_kit')` draws them and reads `--crm-kit-colour-<name>` tokens); the empty
+blocks of the record page (contacts, notes, consent, timeline, panels, deals, next actions) render through UiKit's
+`empty` partial.
 
 ## Imports
 

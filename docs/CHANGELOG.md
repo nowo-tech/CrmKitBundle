@@ -19,6 +19,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Beacon UX review 1.171, item 1 (UX-002, 003, 005, 006, 010, 026 – 031). New `ui` options (see USAGE "Page layout
+  options"): `row_actions: menu` (*Restore* and *Move to trash* in the UiKit row-actions menu, *Delete* last, through a
+  bundle `row_actions` partial registered in the UiKit theme only with that option), `header_actions: split`,
+  `record_actions: toolbar` (opt out of the split record header), `record_tabs: false` (no list tabs on record pages),
+  `filters_fold` and `filters_slot` (a host template that wraps the filters region: `page`, `form`, `filters`). The
+  header actions stay `View\Action` objects in `page.header.actions`; the bundle never renders a second page-actions
+  menu.
+- `css/nowo-crm-kit.css` (optional): tag swatches and the row-actions cluster, re-skinnable with
+  `--crm-kit-colour-<name>`.
+- `TranslationCatalogueTest`: no untranslated English value in any locale (loanwords and codes are allow-listed); new
+  strings are translated in en, es, fr, de, pt, it and nl.
+
+### Changed
+
+- Record page header: *Edit* is an icon button and *Merge*, *vCard*, *Export personal data*, *Move to trash* and *Erase
+  personal data* sit in the more menu, destructive last (`ui.record_actions: toolbar` keeps 0.5.0).
+- Filters: every field has a label, a placeholder or an empty option that names it (*Any tag*, *Any role*, *Any
+  purpose*, *Any owner*; search placeholder and `aria-label`).
+- *Remove* (unlink a company, remove a host link) is a secondary icon `×`, not a red trash button; the tag colour is a
+  swatch (list and form); the empty blocks of the record page use UiKit's `empty` partial.
+
+### Fixed
+
+- Checkboxes of the CRM forms rendered as a tall empty box: the text input class from the FormKit profile is no longer
+  applied to them (UX-030).
+- Audit YN-L1: the text searches (records, notes, deals, the actor-reference scan) lower the column and the parameter
+  in SQL, `LOWER(col) LIKE LOWER(:q) ESCAPE '!'`, so a search with a capital outside ASCII ("ÉCOLE" for "École") finds
+  the text on MySQL, MariaDB and PostgreSQL; the precomputed `*Key` columns keep the PHP-lowered text. SQLite's
+  `LOWER()` folds ASCII only, so there a lower-case "é" still does not meet a stored "É" in the free-text columns (as
+  before).
+- DoctrineBundle 3.4: the bundle's ORM mappings never use the deprecated `alias` key and no class name uses the
+  `Alias:Entity` shorthand (a test guards both).
+
 ## [0.5.0] - 2026-11-22
 
 ### Added

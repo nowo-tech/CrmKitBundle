@@ -34,11 +34,11 @@ final class AffiliationType extends AbstractType
         $this->withBuilder($builder, function () use ($options): void {
             $this->addTypedField('company', ChoiceType::class, ['label' => 'affiliation.form.company', 'choices' => $options['companies'], 'choice_translation_domain' => false]);
             $this->addTypedField('role', TextType::class, ['label' => 'affiliation.form.role', 'required' => false, 'attr' => ['maxlength' => 120]]);
-            $this->addTypedField('primary', CheckboxType::class, ['label' => 'affiliation.form.primary', 'required' => false]);
+            $this->addTypedField('primary', CheckboxType::class, ['attr' => ['class' => ''], 'label' => 'affiliation.form.primary', 'required' => false]);
             if ($options['purposes'] !== []) {
                 $this->addTypedField('purposes', ChoiceType::class, ['label' => 'affiliation.form.purposes', 'choices' => $options['purposes'], 'multiple' => true, 'expanded' => true, 'required' => false]);
             }
-            $this->addTypedField('primary_contact', CheckboxType::class, ['label' => 'affiliation.form.primary_contact', 'required' => false]);
+            $this->addTypedField('primary_contact', CheckboxType::class, ['attr' => ['class' => ''], 'label' => 'affiliation.form.primary_contact', 'required' => false]);
         });
     }
 

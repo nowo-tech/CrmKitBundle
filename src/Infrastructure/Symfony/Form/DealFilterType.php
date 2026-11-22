@@ -35,7 +35,7 @@ final class DealFilterType extends AbstractType
             $this->addTypedField('funnel', ChoiceType::class, ['label' => 'deal.funnel', 'choices' => $options['funnels'], 'required' => false, 'placeholder' => 'list.filter.any', 'choice_translation_domain' => false]);
             $this->addTypedField('status', ChoiceType::class, ['label' => 'deal.status_label', 'choices' => ['deal.status.open' => 'open', 'deal.status.won' => 'won', 'deal.status.lost' => 'lost', 'deal.status.trashed' => 'trashed'], 'required' => false, 'placeholder' => 'deal.status.any']);
             $this->addTypedField('q', SearchType::class, ['label' => 'list.filter.q', 'required' => false, 'attr' => ['maxlength' => 100]]);
-            $this->addTypedField('stale', CheckboxType::class, ['label' => 'deal.stale_only', 'required' => false]);
+            $this->addTypedField('stale', CheckboxType::class, ['attr' => ['class' => ''], 'label' => 'deal.stale_only', 'required' => false]);
             $this->addTypedField('sort', ChoiceType::class, ['label' => 'deal.sort_label', 'choices' => $options['sorts'], 'required' => false, 'placeholder' => false]);
         });
     }

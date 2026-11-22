@@ -477,8 +477,8 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     public function searchNotes(TenantRef $tenant, string $text, int $limit, ?string $beforeId = null, ?array $visibleOwners = null): array
     {
         $qb = $this->em()->createQueryBuilder()->select('n')->from(Note::class, 'n')
-            ->where('n.tenantId = :tenant')->andWhere("LOWER(n.body) LIKE :q ESCAPE '!'")
-            ->setParameter('tenant', $tenant->value)->setParameter('q', '%' . $this->escapeLike(mb_strtolower($text, 'UTF-8')) . '%')
+            ->where('n.tenantId = :tenant')->andWhere("LOWER(n.body) LIKE LOWER(:q) ESCAPE '!'")
+            ->setParameter('tenant', $tenant->value)->setParameter('q', '%' . $this->escapeLike($text) . '%')
             ->setParameter('active', RecordStatus::Active->value)
             ->orderBy('n.id', 'DESC')->setMaxResults($limit);
         $exists = [];
@@ -1040,13 +1040,17 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             ->setParameter('tenant', $tenant->value)->setParameter('status', $query->status);
         $text = $query->text === null ? '' : trim($query->text);
         if ($text !== '') {
+            // Audit YN-L1: the columns that hold the text as typed are lowered in SQL on both sides (LOWER(col) LIKE LOWER(:q)),
+            // so a search with capitals finds them whatever the database's own case rules; the precomputed *Key columns were
+            // lowered when written, so they take the PHP-lowered text.
+            $raw   = '%' . $this->escapeLike($text) . '%';
             $like  = '%' . $this->escapeLike(mb_strtolower($text, 'UTF-8')) . '%';
             $upper = '%' . $this->escapeLike(strtoupper((string) preg_replace('/[\s.\-\/]+/u', '', $text))) . '%';
-            $qb->setParameter('q', $like);
+            $qb->setParameter('q', $like)->setParameter('raw', $raw);
             if ($query->type === SubjectType::Company) {
-                $qb->andWhere("r.nameKey LIKE :q ESCAPE '!' OR LOWER(r.legalName) LIKE :q ESCAPE '!' OR r.domainKey LIKE :q ESCAPE '!' OR LOWER(r.email) LIKE :q ESCAPE '!' OR r.taxIdKey LIKE :upper ESCAPE '!'")->setParameter('upper', $upper);
+                $qb->andWhere("r.nameKey LIKE :q ESCAPE '!' OR LOWER(r.legalName) LIKE LOWER(:raw) ESCAPE '!' OR r.domainKey LIKE :q ESCAPE '!' OR LOWER(r.email) LIKE LOWER(:raw) ESCAPE '!' OR r.taxIdKey LIKE :upper ESCAPE '!'")->setParameter('upper', $upper);
             } else {
-                $qb->andWhere("r.sortKey LIKE :q ESCAPE '!' OR LOWER(r.displayName) LIKE :q ESCAPE '!' OR r.emailKey LIKE :q ESCAPE '!' OR r.phone LIKE :q ESCAPE '!' OR r.mobile LIKE :q ESCAPE '!'");
+                $qb->andWhere("r.sortKey LIKE :q ESCAPE '!' OR LOWER(r.displayName) LIKE LOWER(:raw) ESCAPE '!' OR r.emailKey LIKE :q ESCAPE '!' OR r.phone LIKE :q ESCAPE '!' OR r.mobile LIKE :q ESCAPE '!'");
             }
         }
         if ($query->tagId !== null) {

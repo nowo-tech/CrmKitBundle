@@ -45,6 +45,12 @@ list:
         owner: Responsabile
         status: Mostra
         any: Qualsiasi
+        q_placeholder: 'Cerca per nome, e-mail o città'
+        any_tag: 'Qualsiasi etichetta'
+        any_role: 'Qualsiasi ruolo'
+        any_purpose: 'Qualsiasi finalità'
+        any_primary_contact: 'Qualsiasi impostazione di contatto principale'
+        any_owner: 'Qualsiasi responsabile'
     status:
         active: Attivi
         trashed: Cestino

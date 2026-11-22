@@ -32,15 +32,15 @@ final class FilterType extends AbstractType
     {
         $this->withBuilder($builder, function () use ($options): void {
             $this->addTypedField('q', SearchType::class, ['label' => 'list.filter.q', 'required' => false, 'attr' => ['maxlength' => 100]]);
-            $this->addTypedField('tag', ChoiceType::class, ['label' => 'list.filter.tag', 'choices' => $options['tags'], 'required' => false, 'placeholder' => 'list.filter.any', 'choice_translation_domain' => false]);
+            $this->addTypedField('tag', ChoiceType::class, ['label' => 'list.filter.tag', 'choices' => $options['tags'], 'required' => false, 'placeholder' => 'list.filter.any_tag', 'choice_translation_domain' => false]);
             if ($options['roles'] !== []) {
-                $this->addTypedField('role', ChoiceType::class, ['label' => 'list.filter.role', 'choices' => $options['roles'], 'required' => false, 'placeholder' => 'list.filter.any']);
+                $this->addTypedField('role', ChoiceType::class, ['label' => 'list.filter.role', 'choices' => $options['roles'], 'required' => false, 'placeholder' => 'list.filter.any_role']);
             }
             if ($options['purposes'] !== []) {
-                $this->addTypedField('purpose', ChoiceType::class, ['label' => 'list.filter.purpose', 'choices' => $options['purposes'], 'required' => false, 'placeholder' => 'list.filter.any']);
-                $this->addTypedField('primary_contact', ChoiceType::class, ['label' => 'list.filter.primary_contact', 'choices' => ['list.filter.primary_contact_only' => '1'], 'required' => false, 'placeholder' => 'list.filter.any']);
+                $this->addTypedField('purpose', ChoiceType::class, ['label' => 'list.filter.purpose', 'choices' => $options['purposes'], 'required' => false, 'placeholder' => 'list.filter.any_purpose']);
+                $this->addTypedField('primary_contact', ChoiceType::class, ['label' => 'list.filter.primary_contact', 'choices' => ['list.filter.primary_contact_only' => '1'], 'required' => false, 'placeholder' => 'list.filter.any_primary_contact']);
             }
-            $this->addTypedField('owner', ChoiceType::class, ['label' => 'list.filter.owner', 'choices' => $options['owners'], 'required' => false, 'placeholder' => 'list.filter.any', 'choice_translation_domain' => false]);
+            $this->addTypedField('owner', ChoiceType::class, ['label' => 'list.filter.owner', 'choices' => $options['owners'], 'required' => false, 'placeholder' => 'list.filter.any_owner', 'choice_translation_domain' => false]);
             $this->addTypedField('status', ChoiceType::class, ['label' => 'list.filter.status', 'choices' => ['list.status.active' => 'active', 'list.status.trashed' => 'trashed'], 'required' => false, 'placeholder' => false]);
         });
     }

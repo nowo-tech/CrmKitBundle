@@ -45,6 +45,12 @@ list:
         owner: Responsable
         status: Afficher
         any: Tous
+        q_placeholder: 'Rechercher par nom, e-mail ou ville'
+        any_tag: 'Toute étiquette'
+        any_role: 'Tout rôle'
+        any_purpose: 'Toute finalité'
+        any_primary_contact: 'Tout réglage de contact principal'
+        any_owner: 'Tout responsable'
     status:
         active: Actifs
         trashed: Corbeille

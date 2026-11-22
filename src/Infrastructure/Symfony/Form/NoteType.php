@@ -33,7 +33,7 @@ final class NoteType extends AbstractType
     {
         $this->withBuilder($builder, function () use ($options): void {
             $this->addTypedField('body', TextareaType::class, ['label' => 'note.form.body', 'attr' => ['maxlength' => 10000, 'rows' => 4]]);
-            $this->addTypedField('pinned', CheckboxType::class, ['label' => 'note.form.pinned', 'required' => false]);
+            $this->addTypedField('pinned', CheckboxType::class, ['attr' => ['class' => ''], 'label' => 'note.form.pinned', 'required' => false]);
             if ($options['versioned'] === true) {
                 $this->addTypedField('version', HiddenType::class, []);
             }

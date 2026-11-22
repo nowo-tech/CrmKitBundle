@@ -73,7 +73,7 @@ final class RecordType extends AbstractType
                     FieldType::Textarea => [TextareaType::class, ['attr' => ['maxlength' => 5000]]],
                     FieldType::Number   => [TextType::class, ['attr' => ['inputmode' => 'decimal', 'maxlength' => 30]]],
                     FieldType::Date     => [DateType::class, ['widget' => 'single_text', 'input' => 'string']],
-                    FieldType::Boolean  => [CheckboxType::class, []],
+                    FieldType::Boolean  => [CheckboxType::class, ['attr' => ['class' => '']]],
                     FieldType::Choice   => [ChoiceType::class, ['choices' => array_combine($field->choices, $field->choices), 'placeholder' => '', 'choice_translation_domain' => false]],
                     FieldType::Url      => [UrlType::class, ['default_protocol' => null, 'attr' => ['maxlength' => 255]]],
                     FieldType::Email    => [EmailType::class, ['attr' => ['maxlength' => 254]]],

@@ -41,7 +41,7 @@ final class StageType extends AbstractType
             $this->addTypedField('probability', IntegerType::class, ['label' => 'stage.form.probability', 'attr' => ['min' => 0, 'max' => 100]]);
             $this->addTypedField('rot_days', IntegerType::class, ['label' => 'stage.form.rot_days', 'required' => false, 'attr' => ['min' => 1, 'max' => 3650]]);
             if ($options['versioned'] === true) {
-                $this->addTypedField('archived', CheckboxType::class, ['label' => 'stage.form.archived', 'required' => false]);
+                $this->addTypedField('archived', CheckboxType::class, ['attr' => ['class' => ''], 'label' => 'stage.form.archived', 'required' => false]);
                 $this->addTypedField('version', HiddenType::class, []);
             }
         });

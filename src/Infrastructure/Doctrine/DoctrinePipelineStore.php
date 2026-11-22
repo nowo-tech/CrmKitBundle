@@ -39,7 +39,6 @@ use function in_array;
 use function is_array;
 use function is_numeric;
 use function is_string;
-use function mb_strtolower;
 use function method_exists;
 use function str_replace;
 
@@ -143,9 +142,9 @@ final readonly class DoctrinePipelineStore implements PipelineStoreInterface
         if ($query->stageIds !== null) {
             $qb->andWhere('d.stageId IN (:stages)')->setParameter('stages', $query->stageIds === [] ? [''] : $query->stageIds, ArrayParameterType::STRING); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
-        $text = $query->text === null ? '' : mb_strtolower($query->text, 'UTF-8');
+        $text = $query->text ?? '';
         if ($text !== '') {
-            $qb->andWhere("LOWER(d.title) LIKE :q ESCAPE '!'")->setParameter('q', '%' . $this->escapeLike($text) . '%'); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+            $qb->andWhere("LOWER(d.title) LIKE LOWER(:q) ESCAPE '!'")->setParameter('q', '%' . $this->escapeLike($text) . '%'); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
         if ($query->staleOnly) {
             $qb->andWhere('d.status = :open')->andWhere($this->staleDql($qb, $staleCutoffs, $now))->setParameter('open', DealStatus::Open); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service

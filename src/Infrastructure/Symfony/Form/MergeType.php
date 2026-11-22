@@ -34,7 +34,7 @@ final class MergeType extends AbstractType
             /** @var list<string> $list */
             $list = $options['fields'];
             foreach ($list as $i => $label) {
-                $this->addTypedField('take_' . $i, CheckboxType::class, ['label' => $label, 'translation_domain' => false, 'required' => false]);
+                $this->addTypedField('take_' . $i, CheckboxType::class, ['attr' => ['class' => ''], 'label' => $label, 'translation_domain' => false, 'required' => false]);
             }
             $this->addTypedField('other', HiddenType::class, []);
             $this->addTypedField('survivorVersion', HiddenType::class, []);

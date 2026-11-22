@@ -45,6 +45,12 @@ list:
         owner: Verantwoordelijke
         status: Tonen
         any: Alle
+        q_placeholder: 'Zoeken op naam, e-mail of plaats'
+        any_tag: 'Elk label'
+        any_role: 'Elke rol'
+        any_purpose: 'Elk doel'
+        any_primary_contact: 'Elke instelling hoofdcontact'
+        any_owner: 'Elke eigenaar'
     status:
         active: Actief
         trashed: Prullenbak

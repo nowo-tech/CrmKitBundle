@@ -139,7 +139,7 @@ final class TestKernel extends Kernel
             'router'                => ['utf8' => true],
             'translator'            => ['fallbacks' => ['en']],
         ]);
-        $container->extension('twig', ['strict_variables' => true]);
+        $container->extension('twig', ['strict_variables' => true, 'paths' => [dirname(__DIR__, 2) . '/Fixtures/templates' => 'CrmTest']]);
         if ($this->full) {
             $container->extension('framework', [
                 'csrf_protection' => true,

@@ -45,6 +45,12 @@ list:
         owner: Responsável
         status: Mostrar
         any: Qualquer
+        q_placeholder: 'Pesquisar por nome, e-mail ou cidade'
+        any_tag: 'Qualquer etiqueta'
+        any_role: 'Qualquer função'
+        any_purpose: 'Qualquer finalidade'
+        any_primary_contact: 'Qualquer definição de contacto principal'
+        any_owner: 'Qualquer responsável'
     status:
         active: Ativos
         trashed: Lixo

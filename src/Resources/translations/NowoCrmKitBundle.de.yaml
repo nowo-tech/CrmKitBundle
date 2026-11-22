@@ -45,6 +45,12 @@ list:
         owner: Verantwortlich
         status: Anzeigen
         any: Alle
+        q_placeholder: 'Nach Name, E-Mail oder Stadt suchen'
+        any_tag: 'Beliebiges Etikett'
+        any_role: 'Beliebige Rolle'
+        any_purpose: 'Beliebiger Zweck'
+        any_primary_contact: 'Beliebige Einstellung Hauptkontakt'
+        any_owner: 'Beliebiger Verantwortlicher'
     status:
         active: Aktiv
         trashed: Papierkorb

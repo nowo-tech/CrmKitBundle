@@ -112,6 +112,12 @@ final class ConfigurationTree
             ->end()
             ->integerNode('page_size')->defaultValue(25)->min(10)->max(100)->end()
             ->scalarNode('layout')->defaultNull()->info('Twig layout of the pages; null = UiKit admin layout.')->end()
+            ->enumNode('row_actions')->values(['buttons', 'menu'])->defaultValue('buttons')->info('0.6.0: buttons = every row action as a button (as before); menu = Open and Edit stay as icon buttons, the others (Restore, Move to trash) go into the UiKit row-actions menu, Delete last.')->end()
+            ->enumNode('header_actions')->values(['toolbar', 'split'])->defaultValue('toolbar')->info('0.6.0: how the list header actions (New, Export CSV, Import) render when the host does not read page.header.actions itself: toolbar (as before) or split (UiKit View\\HeaderActions: one primary button, the rest in the more menu). Always View\\Action objects in page.header.actions; never a second page-actions menu.')->end()
+            ->enumNode('record_actions')->values(['split', 'toolbar'])->defaultValue('split')->info('0.6.0: record page header: split = Edit as an icon button and Merge, vCard, Export, Trash and Erase in the more menu (destructive last); toolbar = every action as a button (as before).')->end()
+            ->booleanNode('record_tabs')->defaultTrue()->info('0.6.0: show the list tabs (Companies, Contacts, Tags...) under the record page header; false hides them on record pages.')->end()
+            ->booleanNode('filters_fold')->defaultFalse()->info('0.6.0: fold toggle on the filters card of the lists (UiKit ListPage filtersFold).')->end()
+            ->scalarNode('filters_slot')->defaultNull()->info('0.6.0: Twig template of the host that wraps the filters region (e.g. a bottom sheet on phones). It receives page, form (the filter FormView) and filters (the rendered UiKit filters markup). null = no wrapper.')->end()
         ->end()->end();
         self::pipeline($children);
         self::api($children);

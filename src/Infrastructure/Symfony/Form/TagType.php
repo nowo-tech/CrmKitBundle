@@ -14,6 +14,8 @@ use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
+use function is_string;
+
 /**
  * A tag: name and UiKit palette colour.
  *
@@ -33,7 +35,7 @@ final class TagType extends AbstractType
     {
         $this->withBuilder($builder, function () use ($options): void {
             $this->addTypedField('name', TextType::class, ['label' => 'tag.form.name', 'attr' => ['maxlength' => 60]]);
-            $this->addTypedField('colour', ChoiceType::class, ['label' => 'tag.form.colour', 'choices' => $options['colours'], 'choice_translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN]);
+            $this->addTypedField('colour', ChoiceType::class, ['label' => 'tag.form.colour', 'choices' => $options['colours'], 'choice_translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN, 'expanded' => true, 'row_attr' => ['class' => 'crm-kit-swatches'], 'choice_attr' => static fn (mixed $colour): array => ['class' => 'crm-kit-swatch-input crm-kit-tag--' . (is_string($colour) ? $colour : 'neutral'), 'data-colour' => is_string($colour) ? $colour : 'neutral']]);
             if ($options['versioned'] === true) {
                 $this->addTypedField('version', HiddenType::class, []);
             }

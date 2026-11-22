@@ -39,7 +39,7 @@ final class FieldDefinitionType extends AbstractType
             $this->addTypedField('label', TextType::class, ['label' => 'field.form.label', 'attr' => ['maxlength' => 80]]);
             $this->addTypedField('type', ChoiceType::class, ['label' => 'field.form.type', 'disabled' => $options['versioned'] === true, 'choices' => $options['types']]);
             $this->addTypedField('choices', TextareaType::class, ['label' => 'field.form.choices', 'required' => false, 'help' => 'field.form.choices_help', 'attr' => ['rows' => 4]]);
-            $this->addTypedField('required', CheckboxType::class, ['label' => 'field.form.required', 'required' => false]);
+            $this->addTypedField('required', CheckboxType::class, ['attr' => ['class' => ''], 'label' => 'field.form.required', 'required' => false]);
             $this->addTypedField('position', IntegerType::class, ['label' => 'field.form.position', 'attr' => ['min' => 0, 'max' => 1000]]);
             if ($options['versioned'] === true) {
                 $this->addTypedField('version', HiddenType::class, []);

@@ -33,11 +33,11 @@ final class StatsFilterType extends AbstractType
     {
         $this->withBuilder($builder, function () use ($options): void {
             $this->addTypedField('at', DateTimeType::class, ['label' => 'stats.filter.at', 'required' => false, 'widget' => 'single_text', 'input' => 'datetime_immutable', 'model_timezone' => 'UTC']);
-            $this->addTypedField('owner', ChoiceType::class, ['label' => 'list.filter.owner', 'choices' => $options['owners'], 'required' => false, 'placeholder' => 'list.filter.any', 'choice_translation_domain' => false]);
+            $this->addTypedField('owner', ChoiceType::class, ['label' => 'list.filter.owner', 'choices' => $options['owners'], 'required' => false, 'placeholder' => 'list.filter.any_owner', 'choice_translation_domain' => false]);
             if ($options['roles'] !== []) {
-                $this->addTypedField('role', ChoiceType::class, ['label' => 'list.filter.role', 'choices' => $options['roles'], 'required' => false, 'placeholder' => 'list.filter.any']);
+                $this->addTypedField('role', ChoiceType::class, ['label' => 'list.filter.role', 'choices' => $options['roles'], 'required' => false, 'placeholder' => 'list.filter.any_role']);
             }
-            $this->addTypedField('tag', ChoiceType::class, ['label' => 'list.filter.tag', 'choices' => $options['tags'], 'required' => false, 'placeholder' => 'list.filter.any', 'choice_translation_domain' => false]);
+            $this->addTypedField('tag', ChoiceType::class, ['label' => 'list.filter.tag', 'choices' => $options['tags'], 'required' => false, 'placeholder' => 'list.filter.any_tag', 'choice_translation_domain' => false]);
             $this->addTypedField('from', DateType::class, ['label' => 'stats.filter.from', 'required' => false, 'widget' => 'single_text', 'input' => 'datetime_immutable']);
             $this->addTypedField('to', DateType::class, ['label' => 'stats.filter.to', 'required' => false, 'widget' => 'single_text', 'input' => 'datetime_immutable']);
         });

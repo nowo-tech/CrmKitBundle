@@ -65,9 +65,12 @@ final readonly class RecordPage
         $export  = $this->access->can(CrmPermission::Export, $subject);
         $erase   = $this->access->can(CrmPermission::Erase, $subject);
         $token   = $this->ui->actionToken();
+        $split   = $this->ui->options->recordSplit();
         $actions = [];
         if ($edit) {
-            $actions[] = Action::edit($this->ui->url('nowo_crm_kit_edit', ['type' => $seg, 'id' => $view->id]), UiSupport::label('record.edit'));
+            // 0.6.0 (UX-029): Edit is an icon button of the split header; the rest sits in the more menu, destructive last.
+            $editAction = Action::edit($this->ui->url('nowo_crm_kit_edit', ['type' => $seg, 'id' => $view->id]), UiSupport::label('record.edit'));
+            $actions[]  = $split ? $editAction->asIcon() : $editAction;
         }
         if ($edit && $delete) {
             // A merge turns the other record into a tombstone: it needs delete too.
@@ -164,10 +167,10 @@ final readonly class RecordPage
                 $buttons['notes'][$note->id] = $this->post($token, 'delete', 'note.delete', 'nowo_crm_kit_note_delete', ['id' => $note->id] + $back, 'note.delete_confirm', 'danger');
             }
             foreach ($links as $link) {
-                $buttons['links'][$link->id] = $this->post($token, 'delete', 'link.remove', 'nowo_crm_kit_link_remove', ['id' => $link->id] + $back);
+                $buttons['links'][$link->id] = $this->post($token, 'close', 'link.remove', 'nowo_crm_kit_link_remove', ['id' => $link->id] + $back, null, 'secondary')->asIcon();
             }
             foreach ($view->affiliations as $affiliation) {
-                $buttons['affiliations'][$affiliation->id] = $this->post($token, 'delete', 'affiliation.remove', 'nowo_crm_kit_unaffiliate', ['id' => $affiliation->id] + $back);
+                $buttons['affiliations'][$affiliation->id] = $this->post($token, 'close', 'affiliation.remove', 'nowo_crm_kit_unaffiliate', ['id' => $affiliation->id] + $back, null, 'secondary')->asIcon();
                 if ($type === SubjectType::Company) {
                     $buttons['primary_contact'][$affiliation->id] = $affiliation->primaryContact
                         ? $this->post($token, 'custom', 'affiliation.clear_primary_contact', 'nowo_crm_kit_primary_contact_clear', ['id' => $view->id])
@@ -178,7 +181,7 @@ final readonly class RecordPage
 
         return $this->ui->render('@NowoCrmKit/record/show.html.twig', [
             'page' => new ShowPage(
-                new PageHeader($view->label, UiSupport::label('type.' . $type->value), $actions, tabs: $this->ui->tabs($seg), status: $status),
+                new PageHeader($view->label, UiSupport::label('type.' . $type->value), $actions, tabs: $this->ui->options->recordTabs ? $this->ui->tabs($seg) : null, status: $status, actionsLayout: $split ? 'split' : 'toolbar'),
                 $sections,
                 bundle: UiSupport::DOMAIN,
                 layout: $this->ui->layout(),

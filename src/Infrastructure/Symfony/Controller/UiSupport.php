@@ -59,6 +59,7 @@ final readonly class UiSupport
         private ?string $layout = null,
         public int $pageSize = 25,
         private bool $pipeline = false,
+        public UiOptions $options = new UiOptions(),
     ) {
     }
 
@@ -90,7 +91,7 @@ final readonly class UiSupport
      */
     public function render(string $template, array $context, int $status = Response::HTTP_OK, array $headers = []): Response
     {
-        return new Response($this->twig->render($template, $context + ['crm_layout' => $this->layout]), $status, $headers);
+        return new Response($this->twig->render($template, $context + ['crm_layout' => $this->layout, 'crm_filters_slot' => $this->options->filtersSlot]), $status, $headers);
     }
 
     /**

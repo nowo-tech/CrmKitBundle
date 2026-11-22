@@ -45,6 +45,12 @@ list:
         owner: Owner
         status: Show
         any: Any
+        q_placeholder: 'Search by name, e-mail or city'
+        any_tag: 'Any tag'
+        any_role: 'Any role'
+        any_purpose: 'Any purpose'
+        any_primary_contact: 'Any primary-contact setting'
+        any_owner: 'Any owner'
     status:
         active: Active
         trashed: Trash

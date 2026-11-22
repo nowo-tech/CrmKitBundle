@@ -35,7 +35,7 @@ final class FunnelType extends AbstractType
         $this->withBuilder($builder, function () use ($options): void {
             $this->addTypedField('name', TextType::class, ['label' => 'funnel.form.name', 'attr' => ['maxlength' => 120]]);
             if ($options['versioned'] === true) {
-                $this->addTypedField('archived', CheckboxType::class, ['label' => 'funnel.form.archived', 'required' => false]);
+                $this->addTypedField('archived', CheckboxType::class, ['attr' => ['class' => ''], 'label' => 'funnel.form.archived', 'required' => false]);
                 $this->addTypedField('version', HiddenType::class, []);
             } else {
                 $this->addTypedField('kind', ChoiceType::class, ['label' => 'funnel.form.kind', 'choices' => ['funnel.kind.deal' => 'deal', 'funnel.kind.party_company' => 'party_company', 'funnel.kind.party_contact' => 'party_contact']]);

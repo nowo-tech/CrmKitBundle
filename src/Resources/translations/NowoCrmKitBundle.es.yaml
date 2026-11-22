@@ -45,6 +45,12 @@ list:
         owner: Responsable
         status: Mostrar
         any: Cualquiera
+        q_placeholder: 'Buscar por nombre, correo o ciudad'
+        any_tag: 'Cualquier etiqueta'
+        any_role: 'Cualquier rol'
+        any_purpose: 'Cualquier finalidad'
+        any_primary_contact: 'Cualquier ajuste de contacto principal'
+        any_owner: 'Cualquier responsable'
     status:
         active: Activos
         trashed: Papelera

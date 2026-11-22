@@ -71,6 +71,12 @@ nowo_crm_kit:
         path: /crm                 # starts with "/"; base path of the routes (under the import prefix)
         page_size: 25              # 10..100, default rows per list page
         layout: null               # Twig layout of the pages; null = UiKit's admin layout
+        row_actions: buttons       # 0.6.0: buttons | menu (Restore, Move to trash in the UiKit row-actions menu)
+        header_actions: toolbar    # 0.6.0: toolbar | split (UiKit split header)
+        record_actions: split      # 0.6.0: split (Edit icon, the rest in the more menu) | toolbar
+        record_tabs: true          # 0.6.0: false hides the list tabs on record pages
+        filters_fold: false        # 0.6.0: UiKit fold toggle on the filters card
+        filters_slot: null         # 0.6.0: host Twig template wrapping the filters (page, form, filters); see USAGE
     pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
     api:                           # 0.3.0: see API.md
         enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)

@@ -110,6 +110,7 @@ final class NowoCrmKitBundle extends AbstractBundle
                 ]]]);
             }
         }
+        $this->prependRowActions($builder);
         if (!$builder->hasExtension('doctrine')) {
             return;
         }
@@ -144,6 +145,26 @@ final class NowoCrmKitBundle extends AbstractBundle
             $mappings[self::API_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-api', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Api', 'is_bundle' => false];
         }
         $builder->prependExtensionConfig('doctrine', ['orm' => ['entity_managers' => [$manager => ['mappings' => $mappings]]]]);
+    }
+
+    /**
+     * 0.6.0: with `ui.row_actions: menu`, the UiKit `row_actions` partial of this bundle's pages is the bundle's own
+     * (the rows' secondary and destructive actions go into the row-actions menu). A host's own theme entry wins.
+     */
+    private function prependRowActions(ContainerBuilder $builder): void
+    {
+        if (!$builder->hasExtension('nowo_ui_kit')) {
+            return;
+        }
+        $menu = false;
+        foreach ($builder->getExtensionConfig(self::ALIAS) as $config) {
+            if (is_array($config) && is_array($config['ui'] ?? null) && array_key_exists('row_actions', $config['ui'])) {
+                $menu = $config['ui']['row_actions'] === 'menu';
+            }
+        }
+        if ($menu) {
+            $builder->prependExtensionConfig('nowo_ui_kit', ['theme' => ['bundles' => [self::TRANSLATION_DOMAIN => ['partials' => ['row_actions' => '@NowoCrmKit/partials/_row_actions.html.twig']]]]]);
+        }
     }
 
     /**

@@ -1,0 +1,56 @@
+/*
+ * CRM kit 0.6.0: the few styles of the bundle's own markup (tag colour swatches, the row-actions cluster). Optional:
+ * link it with `asset('css/nowo-crm-kit.css', 'nowo_crm_kit')`, or restyle the classes in the host theme. Colours are
+ * custom properties, so a host re-skins them without touching this file.
+ */
+.crm-kit-swatch,
+.crm-kit-swatch-input {
+    --crm-kit-swatch: var(--crm-kit-colour-neutral, #6b7280);
+}
+
+.crm-kit-tag--neutral { --crm-kit-swatch: var(--crm-kit-colour-neutral, #6b7280); }
+.crm-kit-tag--blue { --crm-kit-swatch: var(--crm-kit-colour-blue, #2563eb); }
+.crm-kit-tag--green { --crm-kit-swatch: var(--crm-kit-colour-green, #16a34a); }
+.crm-kit-tag--yellow { --crm-kit-swatch: var(--crm-kit-colour-yellow, #ca8a04); }
+.crm-kit-tag--orange { --crm-kit-swatch: var(--crm-kit-colour-orange, #ea580c); }
+.crm-kit-tag--red { --crm-kit-swatch: var(--crm-kit-colour-red, #dc2626); }
+.crm-kit-tag--purple { --crm-kit-swatch: var(--crm-kit-colour-purple, #9333ea); }
+.crm-kit-tag--teal { --crm-kit-swatch: var(--crm-kit-colour-teal, #0d9488); }
+
+.crm-kit-swatch {
+    display: inline-block;
+    inline-size: 0.875rem;
+    block-size: 0.875rem;
+    border-radius: 50%;
+    background: var(--crm-kit-swatch);
+    vertical-align: -0.125rem;
+}
+
+/* The colour radios of the tag form: a round swatch each, the colour name stays as the label. */
+.crm-kit-swatches input[type="radio"].crm-kit-swatch-input {
+    appearance: none;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    margin: 0 0.25rem 0 0;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    background: var(--crm-kit-swatch);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 15%);
+    cursor: pointer;
+}
+
+.crm-kit-swatches input[type="radio"].crm-kit-swatch-input:checked {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px var(--crm-kit-swatch);
+}
+
+.crm-kit-swatches input[type="radio"].crm-kit-swatch-input:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 2px;
+}
+
+.crm-kit-row-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}

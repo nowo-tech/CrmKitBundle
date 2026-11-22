@@ -25,7 +25,7 @@
         <div class="{{ nowo_ui_class('card_body', _b) }}">
             <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ (record.type.value == 'company' ? 'record.contacts' : 'record.companies')|trans({}, _d) }}</h2>
             {% if record.affiliations is empty %}
-                <p>{{ 'record.affiliations_empty'|trans({}, _d) }}</p>
+                {{ include(nowo_ui_partial('empty', _b), {message: 'record.affiliations_empty'|trans({}, _d), region: 'empty', bundle: _b}, false) }}
             {% else %}
                 <ul>
                 {% for a in record.affiliations %}
@@ -78,7 +78,7 @@
             <div class="{{ nowo_ui_class('card_body', _b) }}">
                 <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ panel.domain ? panel.title|trans({}, panel.domain) : panel.title }}{% if panel.total is not null %} ({{ panel.total }}){% endif %}</h2>
                 {% if panel.items is empty %}
-                    <p>{{ panel.emptyText ?? 'panel.empty'|trans({}, _d) }}</p>
+                    {{ include(nowo_ui_partial('empty', _b), {message: panel.emptyText ?? 'panel.empty'|trans({}, _d), region: 'empty', bundle: _b}, false) }}
                 {% else %}
                     <ul>
                     {% for row in panel.items %}
@@ -96,7 +96,7 @@
     <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-notes">
         <div class="{{ nowo_ui_class('card_body', _b) }}">
             <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'note.title'|trans({}, _d) }}</h2>
-            {% if notes is empty %}<p>{{ 'note.empty'|trans({}, _d) }}</p>{% endif %}
+            {% if notes is empty %}{{ include(nowo_ui_partial('empty', _b), {message: 'note.empty'|trans({}, _d), region: 'empty', bundle: _b}, false) }}{% endif %}
             {% for note in notes %}
                 <article class="crm-kit-note" data-testid="crm-note"{% if note.pinned %} data-pinned="1"{% endif %}>
                     <p>{{ note.body|nl2br }}</p>
@@ -119,7 +119,7 @@
         <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-consents">
             <div class="{{ nowo_ui_class('card_body', _b) }}">
                 <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'consent.title'|trans({}, _d) }}</h2>
-                {% if consents is empty %}<p>{{ 'consent.empty'|trans({}, _d) }}</p>{% else %}
+                {% if consents is empty %}{{ include(nowo_ui_partial('empty', _b), {message: 'consent.empty'|trans({}, _d), region: 'empty', bundle: _b}, false) }}{% else %}
                     <ul>{% for c in consents %}<li data-testid="crm-consent">{{ ('consent.purpose.' ~ c.purpose)|trans({}, _d) }}: {{ (c.granted ? 'consent.granted' : 'consent.withdrawn')|trans({}, _d) }} · {{ ('consent.source.' ~ c.source.value)|trans({}, _d) }} · {{ c.recordedAt|date('Y-m-d H:i') }}{% if c.evidence %} · {{ c.evidence }}{% endif %}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
@@ -141,7 +141,7 @@
     <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-timeline">
         <div class="{{ nowo_ui_class('card_body', _b) }}">
             <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'timeline.title'|trans({}, _d) }}</h2>
-            {% if timeline is empty %}<p>{{ 'timeline.empty'|trans({}, _d) }}</p>{% else %}
+            {% if timeline is empty %}{{ include(nowo_ui_partial('empty', _b), {message: 'timeline.empty'|trans({}, _d), region: 'empty', bundle: _b}, false) }}{% else %}
                 <ol class="crm-kit-timeline">
                 {% for entry in timeline %}
                     <li data-testid="crm-activity" data-kind="{{ entry.kind.value }}">

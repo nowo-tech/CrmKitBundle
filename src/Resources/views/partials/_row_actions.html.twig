@@ -1,0 +1,23 @@
+{#
+  0.6.0 (ui.row_actions: menu): the row actions of the CRM lists. The UiKit `row_actions` partial takes it over for the
+  NowoCrmKitBundle (theme.bundles.NowoCrmKitBundle.partials.row_actions, prepended by the bundle only with that option):
+  the actions without the `data-crm-menu` attribute stay as the usual icon buttons, the marked ones (Restore, Move to
+  trash; Delete last) go into the UiKit row-actions menu (the kebab). Same variables as the UiKit partial.
+#}
+{%- set _inline = [] -%}
+{%- set _menu = [] -%}
+{%- for _action in actions -%}
+    {%- if _action.view is defined and _action.view is not null and _action.view.attributes['data-crm-menu'] is defined -%}
+        {%- set _menu = _menu|merge([_action]) -%}
+    {%- else -%}
+        {%- set _inline = _inline|merge([_action]) -%}
+    {%- endif -%}
+{%- endfor -%}
+<div class="crm-kit-row-actions" data-testid="crm-row-actions">
+    {%- if _inline is not empty -%}
+        {{ include('@NowoUiKitBundle/partials/_row_actions.html.twig', {actions: _inline, confirm_external: confirm_external|default(false), bundle: bundle|default(null), nowo_ui_page_type: nowo_ui_page_type|default(null)}, false) }}
+    {%- endif -%}
+    {%- if _menu is not empty -%}
+        {{ include('@NowoUiKitBundle/partials/_row_actions.html.twig', {actions: _menu, menu: true, confirm_external: confirm_external|default(false), bundle: bundle|default(null), nowo_ui_page_type: nowo_ui_page_type|default(null)}, false) }}
+    {%- endif -%}
+</div>

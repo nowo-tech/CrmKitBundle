@@ -102,7 +102,7 @@ final readonly class DoctrineCrmActorDataStore implements CrmActorDataStoreInter
             // JSON: a LIKE pre-filter on the id's longest plain run (present verbatim in every JSON encoding), confirmed below.
             $probe = $this->probe($actorId);
             if ($probe !== '') {
-                $where[] = $text . " LIKE ? ESCAPE '!'";
+                $where[] = 'LOWER(' . $text . ") LIKE LOWER(?) ESCAPE '!'";
                 $args[]  = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $probe) . '%';
             }
             if ($class === Activity::class) {

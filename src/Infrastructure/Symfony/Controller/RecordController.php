@@ -29,6 +29,7 @@ use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Column;
 use Nowo\UiKitBundle\View\Confirm;
 use Nowo\UiKitBundle\View\EmptyState;
+use Nowo\UiKitBundle\View\FilterField;
 use Nowo\UiKitBundle\View\FormPage;
 use Nowo\UiKitBundle\View\ListPage;
 use Nowo\UiKitBundle\View\PageHeader;
@@ -122,21 +123,24 @@ final readonly class RecordController
 
             return $this->ui->render('@NowoCrmKit/record/list.html.twig', [
                 'page' => new ListPage(
-                    new PageHeader(UiSupport::label('list.title.' . $subject->value), null, $actions, tabs: $this->ui->tabs($type)),
+                    new PageHeader(UiSupport::label('list.title.' . $subject->value), null, $actions, tabs: $this->ui->tabs($type), actionsLayout: $this->ui->options->headerSplit() ? 'split' : 'toolbar'),
                     $columns,
                     $rows,
                     $filters->createView(),
                     function (mixed $row) use ($type, $canEdit, $canDelete, $token, $query): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
                         $id      = is_array($row) && is_string($row['id'] ?? null) ? $row['id'] : '';
+                        $menu    = $this->ui->options->rowMenu() ? ['data-crm-menu' => true] : [];
                         $actions = [Action::view($this->ui->url('nowo_crm_kit_show', ['type' => $type, 'id' => $id]), UiSupport::label('record.open'))];
                         if ($canEdit && $query->status === RecordStatus::Active) {
                             $actions[] = Action::edit($this->ui->url('nowo_crm_kit_edit', ['type' => $type, 'id' => $id]), UiSupport::label('record.edit'));
                         }
-                        if ($canDelete && $query->status === RecordStatus::Active) {
-                            $actions[] = new Action('delete', UiSupport::label('record.trash'), $this->ui->url('nowo_crm_kit_trash', ['type' => $type, 'id' => $id]), method: 'POST', csrfToken: $token, confirm: new Confirm(UiSupport::label('record.trash_confirm'), null, UiSupport::label('record.trash')), csrfField: 'crm_action[_token]');
-                        }
+                        // 0.6.0 (UX-003, UX-026): with ui.row_actions: menu the secondary and destructive actions go into the
+                        // row-actions menu, Delete last (the row partial reads the marker).
                         if ($canDelete && $query->status === RecordStatus::Trashed) {
-                            $actions[] = new Action('restore', UiSupport::label('record.restore'), $this->ui->url('nowo_crm_kit_restore', ['type' => $type, 'id' => $id]), method: 'POST', csrfToken: $token, csrfField: 'crm_action[_token]');
+                            $actions[] = new Action('restore', UiSupport::label('record.restore'), $this->ui->url('nowo_crm_kit_restore', ['type' => $type, 'id' => $id]), method: 'POST', csrfToken: $token, attributes: $menu, csrfField: 'crm_action[_token]');
+                        }
+                        if ($canDelete && $query->status === RecordStatus::Active) {
+                            $actions[] = new Action('delete', UiSupport::label('record.trash'), $this->ui->url('nowo_crm_kit_trash', ['type' => $type, 'id' => $id]), method: 'POST', csrfToken: $token, confirm: new Confirm(UiSupport::label('record.trash_confirm'), null, UiSupport::label('record.trash')), attributes: $menu, csrfField: 'crm_action[_token]');
                         }
 
                         return $actions;
@@ -149,7 +153,9 @@ final readonly class RecordController
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-list-' . $subject->value],
+                    filterFields: [new FilterField('q', UiSupport::label('list.filter.q_placeholder'), 'lg', attributes: ['aria-label' => $this->ui->trans('list.filter.q')])],
                     responsive: 'cards',
+                    filtersFold: $this->ui->options->filtersFold ? true : null,
                 ),
                 'crm_import_dialog' => $importDialog,
             ]);

@@ -1,7 +1,23 @@
 {#
   Tags of the tenant (manage): the list and the create form. Variables: page (ListPage), form (FormView).
+  0.6.0: the colour column shows a swatch (class crm-kit-swatch + crm-kit-tag--<colour>, see css/nowo-crm-kit.css) and the
+  colour name.
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
+
+{% block nowo_ui_list_row %}
+    {%- set _b = page.bundle -%}
+    {% for column in page.columns %}
+        {%- set _value = row[column.key]|default(null) -%}
+        <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--{{ column.align }}{{ column.class ? ' ' ~ column.class }}" data-label="{{ column.label is null ? column.key : column.label|nowo_ui_trans }}"{% if not column.required and column.priority and column.priority > 1 %} data-nowo-ui-priority="{{ column.priority }}"{% endif %}>
+            {%- if column.key == 'colour' and _value -%}
+                <span class="crm-kit-swatch crm-kit-tag--{{ _value }}" aria-hidden="true" data-testid="crm-tag-swatch"></span> {{ ('colour.' ~ _value)|trans({}, 'NowoCrmKitBundle') }}
+            {%- else -%}
+                {{ _value is null or _value is same as('') ? '—' : _value }}
+            {%- endif -%}
+        </td>
+    {% endfor %}
+{% endblock %}
 
 {% block nowo_ui_list_after %}
     {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'tag.add', submit: 'tag.save', action: null, testid: 'crm-tag-form'}) }}

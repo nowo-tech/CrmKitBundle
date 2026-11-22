@@ -636,6 +636,23 @@ final class PipelineTest extends CrmTestCase
         $this->conflict(static fn () => $deals->create(new DealInput('X', $funnel->id, companyId: $acme)), ConflictException::STAGE_INVALID);
     }
 
+    public function testDealSearchLowersTheTextInSqlWhateverTheCase(): void
+    {
+        $this->boot();
+        $this->admin();
+        $acme   = $this->company('Acme');
+        $funnel = $this->funnel();
+        $deals  = $this->service(DealService::class);
+        $deals->create(new DealInput('Contrato École Primaire', $funnel->id, companyId: $acme));
+        $deals->create(new DealInput('Other deal', $funnel->id, companyId: $acme));
+        $reader = $this->service(DealReader::class);
+        // Audit YN-L1: LOWER(col) LIKE LOWER(:q), so a capital in the search finds the stored text.
+        foreach (['ÉCOLE', 'École', 'CONTRATO', 'contrato'] as $text) {
+            self::assertCount(1, $reader->deals(new DealQuery(text: $text))->deals, $text);
+        }
+        self::assertCount(0, $reader->deals(new DealQuery(text: 'ÉCOLES'))->deals);
+    }
+
     private function funnel(): FunnelView
     {
         $reader = $this->service(FunnelReader::class);

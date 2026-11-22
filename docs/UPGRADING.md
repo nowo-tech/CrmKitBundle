@@ -15,6 +15,28 @@
 
 ## Unreleased
 
+From **0.5.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
+
+No schema change, no BC break in the public PHP API. What you may notice:
+
+- The record page header is split by default: *Edit* is an icon button, the other actions are in the more menu.
+  Set `nowo_crm_kit.ui.record_actions: toolbar` to keep the 0.5.0 buttons. A host that reads `page.header.actions` for
+  its own page-actions menu (UiKit compact header) is not affected.
+- Checkboxes of the CRM forms lose the `nowo-ui-input` class, the tag colour is a swatch radio instead of a select
+  (same field name and values), *Remove* links are a secondary icon button, and the filters show *Any …* placeholders.
+  If your CSS or e2e tests relied on the old markup, adjust them.
+- New opt-in options: `ui.row_actions: menu`, `ui.header_actions: split`, `ui.record_tabs: false`, `ui.filters_fold`,
+  `ui.filters_slot` (see USAGE, "Page layout options").
+- DoctrineBundle 3.4 deprecates the ORM mapping `alias` key: this bundle never set one. If your own mapping of this
+  bundle's entities declares `alias`, drop it and use the entity FQCNs (`Nowo\CrmKitBundle\Domain\Model\Company`,
+  not `NowoCrmKitBundle:Company`).
+- The free-text searches lower the column and the parameter in SQL (audit YN-L1); results with non-ASCII capitals are
+  now complete on MySQL, MariaDB and PostgreSQL.
+
 ## To 0.5.0
 
 From **0.4.2**:

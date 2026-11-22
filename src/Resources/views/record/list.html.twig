@@ -6,6 +6,17 @@
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
 
+{#- 0.6.0: ui.filters_slot, a host template that wraps the filters region (bottom sheet on phones...): it gets page, form
+    (the filter FormView) and filters (the rendered UiKit filters markup) -#}
+{% block nowo_ui_list_filters %}
+    {% if crm_filters_slot|default(null) and page.filters %}
+        {%- set _filters_html -%}{{ parent() }}{%- endset -%}
+        {{ include(crm_filters_slot, {page: page, form: page.filters, filters: _filters_html}, false) }}
+    {% else %}
+        {{ parent() }}
+    {% endif %}
+{% endblock %}
+
 {% block nowo_ui_content %}
     <div class="crm-kit-toolbar" data-testid="crm-focus">{{ include(nowo_ui_partial('focus_mode_toggle', page.bundle), {area: 'crm', bundle: page.bundle}) }}</div>
     {%- set _unfinished = (crm_import_dialog|default(null)).unfinished ?? null -%}

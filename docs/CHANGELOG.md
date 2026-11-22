@@ -21,6 +21,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Beacon request: the area tabs (Companies, Contacts, Deals, Tags, Custom fields, Settings, Funnels) carry an icon,
+  so the host's tab style (`icon-text`, `icon`) has something to show; before, they had none and showed text only in
+  every style. Built-in Tabler set (`tabler:building`, `tabler:users`, `tabler:briefcase`, `tabler:tags`,
+  `tabler:forms`, `tabler:settings`, `tabler:filter`), drawn by UiKit's `tabler-icons` and `ux_icon` icon sets; other
+  sets keep the label only. New optional `ui.tab_icons` (area ⇒ icon name, merged over the defaults; `""` / `null`
+  removes one): see CONFIGURATION, "Area tab icons". The icon is decoration only (`aria-hidden`, the label stays the
+  accessible name); the access checks still decide which tabs show.
+
 ## [0.6.1] - 2026-11-22
 
 ### Added

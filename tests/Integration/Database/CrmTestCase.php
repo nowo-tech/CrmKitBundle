@@ -22,6 +22,7 @@ use Nowo\CrmKitBundle\Tests\Integration\Kernel\TestKernel;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 use function array_replace_recursive;
 use function getenv;
@@ -53,10 +54,29 @@ abstract class CrmTestCase extends KernelTestCase
      */
     protected function boot(array $config = []): void
     {
+        $this->bootWithUiKit($config);
+    }
+
+    /**
+     * {@see self::boot()} with a `nowo_ui_kit` configuration of the host (e.g. its `icon_set`); empty = UiKit defaults.
+     *
+     * @param array<string, mixed> $config
+     * @param array<string, mixed> $uiKit
+     */
+    protected function bootWithUiKit(array $config, array $uiKit = []): void
+    {
         $host = $this->host();
         /** @var array<string, mixed> $merged */
-        $merged       = array_replace_recursive(TestServices::PORTS, ['ui' => ['enabled' => true]], $config);
-        $this->kernel = $this->bootKernel($host->bundleConfig($merged), $host->configure());
+        $merged    = array_replace_recursive(TestServices::PORTS, ['ui' => ['enabled' => true]], $config);
+        $configure = $host->configure();
+        if ($uiKit !== []) {
+            $base      = $configure;
+            $configure = static function (ContainerConfigurator $container, string $url) use ($base, $uiKit): void {
+                $base($container, $url);
+                $container->extension('nowo_ui_kit', $uiKit);
+            };
+        }
+        $this->kernel = $this->bootKernel($host->bundleConfig($merged), $configure);
         $this->schema();
         $client = $this->kernel->getContainer()->get('test.client');
         self::assertInstanceOf(KernelBrowser::class, $client);

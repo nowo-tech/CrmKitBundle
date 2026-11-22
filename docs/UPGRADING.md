@@ -17,6 +17,19 @@
 
 ## Unreleased
 
+No schema change, no BC break, no route change. **Visible change for every host that keeps the area tabs**
+(`ui.list_tabs` / `ui.record_tabs` true, the defaults) **and whose UiKit icon set draws Tabler names**
+(`nowo_ui_kit.icon_set: tabler-icons`, or `ux_icon` with the Tabler set): the tabs gain an icon by default — next to the
+label with the `icon-text` tab style, instead of the label (shown as a tooltip, still the accessible name) with the
+`icon` style. With UiKit's default `bootstrap-icons`, `svg_inline` or `none`, and with the `text` tab style, the tabs
+look as before.
+
+- The new `ui.tab_icons` is optional (default `{}`: the built-in set). Override one area without restating the others,
+  e.g. `ui: { tab_icons: { deals: tabler:currency-euro } }`; `""` or `null` removes an icon. An unknown area or a
+  malformed name fails the container build. See CONFIGURATION, "Area tab icons".
+- E2E tests or CSS that read a tab's text content now find the label inside `.nowo-ui-tabs__label` next to an
+  `aria-hidden` `.nowo-ui-tabs__icon` (UiKit's markup for a tab with an icon); the text content is unchanged.
+
 ## To 0.6.1
 
 From **0.6.0**:

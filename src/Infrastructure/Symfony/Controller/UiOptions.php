@@ -4,16 +4,39 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
+use function array_key_exists;
+
 /**
  * The 0.6.0 presentation options of the pages (`nowo_crm_kit.ui.*`): where the row and header actions go, the record
  * header layout, the list tabs on records and the filters card; 0.6.1: the area tabs of the other pages, create in a
- * dialog on Tags and Custom fields, the Settings width. The defaults keep the previous behaviour except the pure visual
- * fixes. Immutable.
+ * dialog on Tags and Custom fields, the Settings width; 0.7.0: the icon of each area tab. The defaults keep the previous
+ * behaviour except the pure visual fixes. Immutable: the tab icons are resolved from the configured map on every call,
+ * nothing is memoised (FrankenPHP worker, REQ-RUNTIME-002).
  *
  * @internal
  */
 final readonly class UiOptions
 {
+    /**
+     * The built-in icon of each area tab (UiKit `AreaNavItem::$icon`, Tabler names as in the SearchKit groups):
+     * shown when the host's tab style asks for icons and its UiKit `icon_set` draws Tabler names (`tabler-icons`, or
+     * `ux_icon` with the Tabler set); any other set shows the label only.
+     */
+    public const DEFAULT_TAB_ICONS = [
+        'companies' => 'tabler:building',
+        'contacts'  => 'tabler:users',
+        'deals'     => 'tabler:briefcase',
+        'tags'      => 'tabler:tags',
+        'fields'    => 'tabler:forms',
+        'settings'  => 'tabler:settings',
+        'funnels'   => 'tabler:filter',
+    ];
+
+    /**
+     * An icon name `[prefix:]name` as UiKit takes it (lowercase letters, digits and single hyphens).
+     */
+    public const ICON_PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)?$/D';
+
     /**
      * @param string $rowActions `buttons` | `menu`
      * @param string $headerActions `toolbar` | `split`
@@ -22,6 +45,8 @@ final readonly class UiOptions
      * @param bool $listTabs 0.6.1: the area tabs on every page but the company / contact record page
      * @param string $adminCreate 0.6.1: `inline` | `dialog` (create on Tags and Custom fields)
      * @param string $settingsWidth 0.6.1: `form` | `full`
+     * @param array<string, string|null> $tabIcons 0.7.0: host overrides of {@see self::DEFAULT_TAB_ICONS} by area;
+     *                                             `''` or null = no icon (the tab shows its label in every tab style)
      */
     public function __construct(
         public string $rowActions = 'buttons',
@@ -33,7 +58,18 @@ final readonly class UiOptions
         public bool $listTabs = true,
         public string $adminCreate = 'inline',
         public string $settingsWidth = 'form',
+        public array $tabIcons = [],
     ) {
+    }
+
+    /**
+     * The icon of an area tab: the host override when it names the area, else the built-in one; null = no icon.
+     */
+    public function tabIcon(string $area): ?string
+    {
+        $icon = array_key_exists($area, $this->tabIcons) ? $this->tabIcons[$area] : (self::DEFAULT_TAB_ICONS[$area] ?? null);
+
+        return $icon === '' ? null : $icon;
     }
 
     /**

@@ -32,6 +32,13 @@ final class ConfigurationTreeTest extends TestCase
         self::assertSame(['customer', 'distributor', 'r_2'], $this->process(['roles' => ['catalogue' => ['customer', 'distributor', 'r_2']]])['roles']['catalogue'] ?? null);
     }
 
+    public function testTabIconsTakeOnlyTheAreasTheHostNames(): void
+    {
+        self::assertSame([], $this->process([])['ui']['tab_icons'] ?? null, 'the built-in set lives in UiOptions, not in the tree');
+        self::assertSame(['deals' => 'tabler:currency-euro'], $this->process(['ui' => ['tab_icons' => ['deals' => 'tabler:currency-euro']]])['ui']['tab_icons'] ?? null);
+        self::assertSame(['funnels' => '', 'tags' => null, 'contacts' => 'users'], $this->process(['ui' => ['tab_icons' => ['funnels' => '', 'tags' => null, 'contacts' => 'users']]])['ui']['tab_icons'] ?? null);
+    }
+
     /**
      * @return iterable<string, array{array<string, mixed>, string}>
      */
@@ -54,6 +61,10 @@ final class ConfigurationTreeTest extends TestCase
         yield 'no export role' => [['security' => ['export_roles' => []]], 'security.export_roles'];
         yield 'no erase role' => [['security' => ['erase_roles' => []]], 'security.erase_roles'];
         yield 'phase' => [['reports' => ['enabled' => true]], 'phase G'];
+        yield 'tab icon of an unknown area' => [['ui' => ['tab_icons' => ['reports' => 'tabler:chart']]], 'ui.tab_icons'];
+        yield 'tab icon class string' => [['ui' => ['tab_icons' => ['companies' => 'ti ti-building']]], 'ui.tab_icons'];
+        yield 'tab icon uppercase' => [['ui' => ['tab_icons' => ['companies' => 'tabler:Building']]], 'ui.tab_icons'];
+        yield 'tab icon markup' => [['ui' => ['tab_icons' => ['companies' => '"><script>']]], 'ui.tab_icons'];
         yield 'unknown' => [['nope' => true], 'nope'];
     }
 

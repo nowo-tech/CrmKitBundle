@@ -11,6 +11,7 @@
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Search](#search)
 - [UI](#ui)
+  - [Area tab icons](#area-tab-icons)
 - [Later phases](#later-phases)
 - [Per-tenant settings](#per-tenant-settings)
 - [Container parameters](#container-parameters)
@@ -80,6 +81,7 @@ nowo_crm_kit:
         list_tabs: true            # 0.6.1: false hides the area tabs on list, admin and form pages (record: record_tabs)
         admin_create: inline       # 0.6.1: inline | dialog (Tags / Custom fields create from a header action + dialog)
         settings_width: form       # 0.6.1: form (UiKit form panel) | full (bundle card, full content width)
+        tab_icons: {}              # 0.7.0: area => icon name, merged over the built-in Tabler set (see "Area tab icons")
     pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
     api:                           # 0.3.0: see API.md
         enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)
@@ -243,6 +245,50 @@ configuration) switch it off or reorder it; the number of results per page and t
   menus on row actions (`nowo_ui_kit.theme.context_menus: true`) and the focus-mode toggle
   (`nowo_ui_kit.theme.focus_mode.enabled: true`); without them the kebab menus still work and the toggle renders
   nothing.
+
+### Area tab icons
+
+Since 0.7.0 every area tab (the UiKit `AreaNav` of the pages, see `ui.list_tabs` / `ui.record_tabs`) carries an icon
+(UiKit `AreaNavItem::$icon`), so the tab style the user picks on the host — `data-tab-style` `text`, `icon-text` or
+`icon` on an ancestor, usually `<html>` — has something to show. The built-in set uses Tabler names, the scheme of the
+bundle's SearchKit groups and of the other nowo-tech bundles' tab icons:
+
+| Area | Tab | Default icon |
+| --- | --- | --- |
+| `companies` | Companies | `tabler:building` |
+| `contacts` | Contacts | `tabler:users` |
+| `deals` | Deals (with `pipeline.enabled`) | `tabler:briefcase` |
+| `tags` | Tags | `tabler:tags` |
+| `fields` | Custom fields | `tabler:forms` |
+| `settings` | Settings | `tabler:settings` |
+| `funnels` | Funnels (with `pipeline.enabled`) | `tabler:filter` |
+
+UiKit draws a Tabler name with `nowo_ui_kit.icon_set: tabler-icons` (the Tabler webfont the host loads) or `ux_icon`
+(Symfony UX Icons with the Tabler set available, e.g. on-demand Iconify or locally imported icons). Any other icon set
+(`bootstrap-icons`, UiKit's default, `svg_inline`, `none`) cannot draw a `tabler:` name, and UiKit then renders the
+tab's label only — never an empty glyph — so the tabs look as before.
+
+`ui.tab_icons` overrides the icon per area, **merged over the built-in set**: name only the areas you change. The value
+is an icon name `[prefix:]name` as UiKit takes it (lowercase letters, digits and single hyphens, e.g. `tabler:coin`,
+`bi:building`); `""` or `null` removes that tab's icon. An unknown area or a malformed name fails the container build.
+
+```yaml
+nowo_crm_kit:
+    ui:
+        tab_icons:
+            deals: tabler:currency-euro   # Companies, Contacts, Tags… keep their default icon
+```
+
+The icon is decoration only: it is `aria-hidden`, the tab keeps its translated label as its accessible name in every tab
+style (in `icon` mode UiKit clips the label visually instead of removing it and shows it as a tooltip on hover and
+keyboard focus), and which tabs a user sees is still decided by the access checks (`manage` for Tags, Custom fields,
+Settings and Funnels; the access checker and the `*_ACCESS_CHECK` events). A tab without an icon (blanked here, or a
+name the host's icon set cannot draw) always shows its label, also in `icon` mode. A name the icon set accepts but has
+no glyph for (a typo under `tabler-icons`) renders an empty glyph with the label clipped: the tab stays named for
+assistive technology and the tooltip, but check overrides against the icon set the host loads. Under `ux_icon` the
+name goes to `ux_icon()` as written, so a missing icon follows `ux_icons.ignore_not_found` (an exception, or nothing
+drawn): with Iconify `on_demand: false`, import the seven defaults (`bin/console ux:icons:import tabler:building
+tabler:users tabler:briefcase tabler:tags tabler:forms tabler:settings tabler:filter`) and any override.
 
 ## Later phases
 

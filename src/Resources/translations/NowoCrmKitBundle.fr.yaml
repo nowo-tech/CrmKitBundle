@@ -179,7 +179,10 @@ link:
     remove: Retirer
     form:
         type: Type
-        id: Id
+        id: 'Identifiant de l''objet'
+        object: 'Objet'
+        object_help: 'Saisissez un nom et choisissez-le dans la liste, ou saisissez l''identifiant de l''objet.'
+        object_list: 'Objets trouvés'
         label: Libellé
 panel:
     empty: Rien pour le moment.

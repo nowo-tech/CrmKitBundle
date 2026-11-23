@@ -7,6 +7,8 @@ namespace Nowo\CrmKitBundle\Domain\Value;
 use InvalidArgumentException;
 
 use function preg_match;
+use function strpos;
+use function substr;
 
 /**
  * An object of the host (a project, a ticket…), referenced by type and id (contract section 6.5).
@@ -37,5 +39,22 @@ final readonly class HostObjectRef
     public function key(): string
     {
         return $this->type . ':' . $this->id;
+    }
+
+    /**
+     * The object of a {@see self::key()} (0.7.0, the link picker's value), or null when the key is not one. The id is
+     * taken byte for byte after the first `:`.
+     */
+    public static function fromKey(string $key): ?self
+    {
+        $colon = strpos($key, ':');
+        if ($colon === false) {
+            return null;
+        }
+        try {
+            return new self(substr($key, 0, $colon), substr($key, $colon + 1));
+        } catch (InvalidArgumentException) {
+            return null;
+        }
     }
 }

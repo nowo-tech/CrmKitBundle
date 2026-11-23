@@ -31,6 +31,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   removes one): see CONFIGURATION, "Area tab icons". The icon is decoration only (`aria-hidden`, the label stays the
   accessible name); the access checks still decide which tabs show.
 
+- Beacon request (UI review 2026-11-22): the record page's *Link to* form names the types and picks the object.
+  Two **optional** resolver capabilities, separate interfaces a `CrmHostObjectResolverInterface` may also implement
+  (detected with `instanceof` on every call; a resolver with neither behaves exactly as before):
+  - `Domain\Port\CrmHostObjectTypeLabelInterface::typeLabel(): HostTypeLabel` — the type's human name
+    (`HostTypeLabel::trans('crm.host.project', 'messages')` or `HostTypeLabel::text('Project')`); without it the
+    form shows `type()`.
+  - `Domain\Port\CrmHostObjectSearchInterface` — states that the resolver's `search()` really searches. The id field
+    becomes a UiKit combobox (opt-in runtime `combobox`, loaded by the form) that lists the matches grouped by type and
+    submits the picked `<type>:<id>` in the new hidden `crm_link[hostRef]`; without JavaScript, or when nothing is
+    picked, the typed text is the id of the chosen type, as before. A resolver without it is never searched, so the
+    `search()` stubs that return `[]` stay harmless.
+  - New read-only route `nowo_crm_kit_link_search` (`GET <ui.path>/{type}/{id}/links/search?q=`), the combobox's
+    JSON. Same access decision as the link action (`edit` on the active record through the gate, the
+    `nowo_crm_kit.record_access_check` listeners included; 404 / 403 / 409 otherwise, and the host is not asked);
+    the actor's tenant only; the text is trimmed and passed as it is (the resolver owns the comparison,
+    REQ-SEC-006); at most 20 answers per type (`limit` clamped to 1–20), at most 100 characters of text; every
+    answer is confirmed by `resolve()` with its exact id, so the picker never offers an object the link would refuse.
+    `Cache-Control: no-store, private`. A picked value whose type has no picker, or that the resolver does not
+    confirm, is refused like a wrong id (never stored as a free link).
+  - New `Domain\Service\HostObjectPickerInterface` (`searchableTypes()`, `search()`) and the values
+    `HostTypeLabel`, `HostObjectMatch`, `HostObjectRef::fromKey()`.
+  - Field labels: "Id" reads "Object id"; with a picker the field is "Object" with a help line. All seven locales.
+
 ## [0.6.1] - 2026-11-22
 
 ### Added

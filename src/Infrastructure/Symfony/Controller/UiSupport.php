@@ -11,6 +11,7 @@ use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
+use Nowo\CrmKitBundle\Domain\Value\HostTypeLabel;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
@@ -84,6 +85,14 @@ final readonly class UiSupport
     public function trans(string $key, array $params = []): string
     {
         return $this->translator->trans($key, $params, self::DOMAIN);
+    }
+
+    /**
+     * A host label (0.7.0): a key of the host's own domain, or a plain text when `$domain` is null.
+     */
+    public function hostLabel(HostTypeLabel $label): string
+    {
+        return $label->domain === null ? $label->text : $this->translator->trans($label->text, [], $label->domain);
     }
 
     /**

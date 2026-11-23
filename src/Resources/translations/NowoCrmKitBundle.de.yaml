@@ -179,7 +179,10 @@ link:
     remove: Entfernen
     form:
         type: Typ
-        id: ID
+        id: 'Objekt-ID'
+        object: 'Objekt'
+        object_help: 'Namen eingeben und aus der Liste wählen oder die ID des Objekts eingeben.'
+        object_list: 'Passende Objekte'
         label: Bezeichnung
 panel:
     empty: Noch nichts vorhanden.

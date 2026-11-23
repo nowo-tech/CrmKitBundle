@@ -6,18 +6,25 @@ namespace App\Crm;
 
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectSearchInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectTypeLabelInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Domain\Value\HostObjectView;
+use Nowo\CrmKitBundle\Domain\Value\HostTypeLabel;
 use Nowo\CrmKitBundle\Domain\Value\Panel;
 use Nowo\CrmKitBundle\Domain\Value\PanelContext;
 use Nowo\CrmKitBundle\Domain\Value\PanelItem;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 
+use function array_slice;
+use function mb_stripos;
+
 /**
  * The demo's own "projects" module: a host object type the CRM links to by id (P-1 … P-3), and a panel on the 360°
- * page that lists the projects linked to a company. Autoconfigured (tags of the two interfaces). Stateless.
+ * page that lists the projects linked to a company. Since 0.7.0 it also names its type and offers the link picker
+ * (the optional label and search capabilities). Autoconfigured (tags of the two interfaces). Stateless.
  */
-final readonly class DemoProjects implements CrmHostObjectResolverInterface, CrmPanelProviderInterface
+final readonly class DemoProjects implements CrmHostObjectResolverInterface, CrmHostObjectTypeLabelInterface, CrmHostObjectSearchInterface, CrmPanelProviderInterface
 {
     private const PROJECTS = ['P-1' => 'Website relaunch', 'P-2' => 'Mobile app', 'P-3' => 'Support contract'];
 
@@ -38,9 +45,21 @@ final readonly class DemoProjects implements CrmHostObjectResolverInterface, Crm
         return $found;
     }
 
+    public function typeLabel(): HostTypeLabel
+    {
+        return HostTypeLabel::text('Project');
+    }
+
     public function search(TenantRef $tenant, string $text, int $limit): array
     {
-        return [];
+        $found = [];
+        foreach (self::PROJECTS as $id => $name) {
+            if (mb_stripos($id . ' ' . $name, $text) !== false) {
+                $found[] = new HostObjectView($id, $id . ' · ' . $name);
+            }
+        }
+
+        return array_slice($found, 0, $limit);
     }
 
     public function key(): string

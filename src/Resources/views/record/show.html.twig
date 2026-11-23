@@ -64,7 +64,7 @@
             </div>
         </section>
         {% if forms.link is defined %}
-            {{ include('@NowoCrmKit/_form.html.twig', {form: forms.link, title: 'link.add', submit: 'link.save', action: path('nowo_crm_kit_link_add', {type: segment, id: record.id}), testid: 'crm-link-form', variant: 'btn_secondary'}) }}
+            {{ include('@NowoCrmKit/record/_link_form.html.twig', {form: forms.link, action: path('nowo_crm_kit_link_add', {type: segment, id: record.id}), search_url: forms.link.hostRef is defined ? path('nowo_crm_kit_link_search', {type: segment, id: record.id}) : null}) }}
         {% endif %}
     {% endif %}
 

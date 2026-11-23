@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
+use Closure;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
@@ -23,6 +24,7 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 
 use function array_replace_recursive;
 use function getenv;
@@ -62,18 +64,24 @@ abstract class CrmTestCase extends KernelTestCase
      *
      * @param array<string, mixed> $config
      * @param array<string, mixed> $uiKit
+     * @param (Closure(ServicesConfigurator): void)|null $services extra test services of the host
      */
-    protected function bootWithUiKit(array $config, array $uiKit = []): void
+    protected function bootWithUiKit(array $config, array $uiKit = [], ?Closure $services = null): void
     {
         $host = $this->host();
         /** @var array<string, mixed> $merged */
         $merged    = array_replace_recursive(TestServices::PORTS, ['ui' => ['enabled' => true]], $config);
         $configure = $host->configure();
-        if ($uiKit !== []) {
+        if ($uiKit !== [] || $services instanceof Closure) {
             $base      = $configure;
-            $configure = static function (ContainerConfigurator $container, string $url) use ($base, $uiKit): void {
+            $configure = static function (ContainerConfigurator $container, string $url) use ($base, $uiKit, $services): void {
                 $base($container, $url);
-                $container->extension('nowo_ui_kit', $uiKit);
+                if ($uiKit !== []) {
+                    $container->extension('nowo_ui_kit', $uiKit);
+                }
+                if ($services instanceof Closure) {
+                    $services($container->services());
+                }
             };
         }
         $this->kernel = $this->bootKernel($host->bundleConfig($merged), $configure);

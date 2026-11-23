@@ -179,7 +179,10 @@ link:
     remove: Remover
     form:
         type: Tipo
-        id: Id
+        id: 'Id do objeto'
+        object: 'Objeto'
+        object_help: 'Escreva um nome e escolha um da lista, ou escreva o id do objeto.'
+        object_list: 'Objetos encontrados'
         label: Rótulo
 panel:
     empty: Ainda não há nada.

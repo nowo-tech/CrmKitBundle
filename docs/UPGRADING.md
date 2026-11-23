@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.10.0](#to-0100)
 - [To 0.9.0](#to-090)
 - [To 0.8.1](#to-081)
 - [To 0.8.0](#to-080)
@@ -20,6 +21,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.10.0
+
+From **0.9.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 Planned as **0.10.0**, from 0.9.x: `composer update nowo-tech/crm-kit-bundle`. No BC break in the public PHP API.
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Form;
 
-use Nowo\CrmKitBundle\NowoCrmKitBundle;
+use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
@@ -21,7 +21,7 @@ use function is_string;
  *
  * @extends AbstractType<mixed>
  */
-#[FormKitConfig(NowoCrmKitBundle::FORM_PROFILE)]
+#[FormKitConfig(FormProfile::NAME)]
 final class TagType extends AbstractType
 {
     use FormOptionsTrait;
@@ -35,7 +35,7 @@ final class TagType extends AbstractType
     {
         $this->withBuilder($builder, function () use ($options): void {
             $this->addTypedField('name', TextType::class, ['label' => 'tag.form.name', 'attr' => ['maxlength' => 60]]);
-            $this->addTypedField('colour', ChoiceType::class, ['label' => 'tag.form.colour', 'choices' => $options['colours'], 'choice_translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN, 'expanded' => true, 'row_attr' => ['class' => 'crm-kit-swatches'], 'choice_attr' => static fn (mixed $colour): array => ['class' => 'crm-kit-swatch-input crm-kit-tag--' . (is_string($colour) ? $colour : 'neutral'), 'data-colour' => is_string($colour) ? $colour : 'neutral']]);
+            $this->addTypedField('colour', ChoiceType::class, ['label' => 'tag.form.colour', 'choices' => $options['colours'], 'choice_translation_domain' => TranslationDomain::NAME, 'expanded' => true, 'row_attr' => ['class' => 'crm-kit-swatches'], 'choice_attr' => static fn (mixed $colour): array => ['class' => 'crm-kit-swatch-input crm-kit-tag--' . (is_string($colour) ? $colour : 'neutral'), 'data-colour' => is_string($colour) ? $colour : 'neutral']]);
             if ($options['versioned'] === true) {
                 $this->addTypedField('version', HiddenType::class, []);
             }
@@ -52,7 +52,7 @@ final class TagType extends AbstractType
             'csrf_protection'    => true,
             'csrf_token_id'      => 'nowo_crm_kit_tag',
             'allow_extra_fields' => false,
-            'translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN,
+            'translation_domain' => TranslationDomain::NAME,
             'versioned'          => false,
             'colours'            => [],
         ]);

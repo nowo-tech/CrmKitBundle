@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Form;
 
-use Nowo\CrmKitBundle\NowoCrmKitBundle;
+use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
@@ -18,7 +18,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  *
  * @extends AbstractType<mixed>
  */
-#[FormKitConfig(NowoCrmKitBundle::FORM_PROFILE)]
+#[FormKitConfig(FormProfile::NAME)]
 final class ImportConfirmType extends AbstractType
 {
     use FormOptionsTrait;
@@ -34,7 +34,7 @@ final class ImportConfirmType extends AbstractType
             /** @var list<string> $list */
             $list = $options['columns'];
             foreach ($list as $i => $column) {
-                $this->addTypedField('col_' . $i, ChoiceType::class, ['label' => $column, 'translation_domain' => false, 'choices' => $options['targets'], 'choice_translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN, 'required' => false, 'placeholder' => false]);
+                $this->addTypedField('col_' . $i, ChoiceType::class, ['label' => $column, 'translation_domain' => false, 'choices' => $options['targets'], 'choice_translation_domain' => TranslationDomain::NAME, 'required' => false, 'placeholder' => false]);
             }
             $this->addTypedField('policy', ChoiceType::class, ['label' => 'import.form.policy', 'choices' => ['import.policy.skip' => 'skip', 'import.policy.update' => 'update']]);
             $this->addTypedField('version', HiddenType::class, []);
@@ -51,7 +51,7 @@ final class ImportConfirmType extends AbstractType
             'csrf_protection'    => true,
             'csrf_token_id'      => 'nowo_crm_kit_import_confirm',
             'allow_extra_fields' => false,
-            'translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN,
+            'translation_domain' => TranslationDomain::NAME,
             'columns'            => [],
             'targets'            => [],
         ]);

@@ -4,6 +4,7 @@
 
 - [Layers](#layers)
 - [Layer rules](#layer-rules)
+- [Architecture checks](#architecture-checks)
 - [Request flow](#request-flow)
 - [Persistence](#persistence)
 - [Host kinds](#host-kinds)
@@ -48,6 +49,27 @@ Enforced by `tests/Architecture/LayerDependencyTest`:
   before it registers the providers.
 - Public ports, events and value objects carry no Symfony, Doctrine or HTTP types (REQ-ARCH-001 rule 3: own VO per
   port).
+
+## Architecture checks
+
+Besides `LayerDependencyTest`, [Deptrac](https://github.com/deptrac/deptrac) checks the dependencies between the
+layers on every CI run (REQ-ARCH-002; `deptrac.yaml`, `composer deptrac` / `make deptrac`, part of
+`make release-check`). A violation, a dependency on an unlisted vendor namespace or a class under `src/` that belongs
+to no layer fails the build.
+
+| Deptrac layer | Namespaces | May depend on |
+| --- | --- | --- |
+| `Domain` | `Domain` | itself, `psr/clock`, `psr/log`, `psr/event-dispatcher`, `nowo-tech/transaction-contract` |
+| `Application` | `Application`, `Api` (operation layer) | `Domain` and the same contract packages |
+| `Infrastructure` | `Infrastructure` except the UI edge and DI below | `Domain`, `Application`, Symfony, Doctrine, Twig, transaction-doctrine, UiKit / FormKit |
+| `UI` | `Infrastructure\Symfony\{Controller, Form, Routing, Command, Http, Security, Api, Event}` and `Symfony\Port\SecurityActorDirectory` (not `Http\EntityManagerHygieneListener`, a Doctrine adapter) | `Domain`, `Application`, Symfony, Twig, transaction-doctrine (write-unit attributes), UiKit / FormKit |
+| `Bridge` | `Bridge` | `Domain`, `Application`, `Infrastructure`, Symfony, Doctrine and the bridged packages (SearchKit, TaskBoard, DoctrineEncrypt, OutboundUrlGuard) |
+| `DependencyInjection` | `Infrastructure\Symfony\DependencyInjection`, the bundle class | every layer (composition root) |
+
+The translation domain and the FormKit profile are read from `Domain\TranslationDomain::NAME` and
+`Infrastructure\Symfony\Form\FormProfile::NAME` (the bundle constants keep the same values), so no layer depends on
+the bundle class. One legacy dependency is listed in `skip_violations` until 1.0.0: `NextActionService::set()`
+re-throws transaction-doctrine's `ConcurrencyConflict` as committed (`CONFLICT_002`). The list may only shrink.
 
 ## Request flow
 

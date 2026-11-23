@@ -22,6 +22,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Demo
+
+- Both demos run in UiKit's demo platform shell (`@NowoUiKit/demo_platform/layout.html.twig`, layouts admin + guest, REQ-DEMO-014); the screenshot spec frames the shell and creates its own readable data, and the README shows the companies list and the 360° page near the top (REQ-DEMO-013).
+
+### Documentation
+
+- Tables of contents of CONTRACT and USAGE list every `###` subsection; SPEC-DRIVEN-DEVELOPMENT gets the "Bundle functional scope" heading its table of contents already linked (REQ-DOCS-005).
+
+### Tests
+
+- `UiRouteLoader` and `CrmApiRouteLoader`: the full generated route lists (names, paths, methods) and no bundle controller carries `#[Route]`, so the host's `routing.controllers` import cannot load them (REQ-SF-004 rule 8).
+
 ## [0.7.0] - 2026-11-23
 
 ### Added

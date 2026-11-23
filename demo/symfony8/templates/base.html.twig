@@ -1,24 +1,41 @@
-{#- REQ-DEMO-014: the demo shell is UiKit's admin layout with UiKit's default theme (nowo-ui.css from the bundle's own
-    asset package, no CSS framework, no CDN). -#}
-{% extends '@NowoUiKit/layout/admin.html.twig' %}
-
+{#- REQ-DEMO-014: the demo runs inside UiKit's shared demo platform shell (UiKit's default theme, no CSS framework, no
+    CDN). This file only declares the demo. The CRM pages render in it too (nowo_ui_kit.layouts.admin). -#}
+{% extends '@NowoUiKit/demo_platform/layout.html.twig' %}
+{% set _nav = [{label: 'Overview', route: 'demo_home', section: 'CRM Kit'}] %}
+{% if is_granted('ROLE_USER') %}
+    {% set _nav = _nav|merge([
+        {label: 'Companies', route: 'nowo_crm_kit_list', params: {type: 'companies'}, section: 'CRM', testid: 'demo-nav-companies'},
+        {label: 'Contacts', route: 'nowo_crm_kit_list', params: {type: 'contacts'}, section: 'CRM', testid: 'demo-nav-contacts'},
+    ]) %}
+    {% if is_granted('ROLE_SALES') %}
+        {% set _nav = _nav|merge([
+            {label: 'Import', route: 'nowo_crm_kit_import', active: ['nowo_crm_kit_import*'], section: 'CRM', testid: 'demo-nav-import'},
+        ]) %}
+    {% endif %}
+    {% if is_granted('ROLE_ADMIN') %}
+        {% set _nav = _nav|merge([
+            {label: 'Tags', route: 'nowo_crm_kit_tags', active: ['nowo_crm_kit_tag*'], section: 'Admin'},
+            {label: 'Custom fields', route: 'nowo_crm_kit_fields', active: ['nowo_crm_kit_field*'], section: 'Admin'},
+            {label: 'Settings', route: 'nowo_crm_kit_settings', section: 'Admin'},
+        ]) %}
+    {% endif %}
+    {% set _nav = _nav|merge([{label: 'Sign out', route: 'demo_logout', active: [], section: 'Account', testid: 'demo-logout'}]) %}
+{% else %}
+    {% set _nav = _nav|merge([{label: 'Sign in', route: 'demo_login', section: 'Account', testid: 'demo-nav-login'}]) %}
+{% endif %}
+{% set nowo_ui_demo_platform = {
+    bundle: 'CRM Kit',
+    home_route: 'demo_home',
+    repository: 'https://github.com/nowo-tech/CrmKitBundle',
+    translation_domain: false,
+    nav: _nav,
+} %}
 {% block nowo_ui_document_title %}{% block title %}CRM Kit Bundle demo{% endblock %} — Symfony 8{% endblock %}
 
-{% block nowo_ui_navigation %}
-    <header class="nowo-ui-header" data-testid="demo-masthead">
-        <a class="nowo-ui-brand" href="{{ path('demo_home') }}">CRM Kit Bundle · Symfony 8</a>
-        <nav class="nowo-ui-menu" aria-label="Demo">
-            <a class="nowo-ui-link" href="{{ path('demo_home') }}" data-testid="demo-nav-demo_home">Overview</a>
-            {% if is_granted('ROLE_USER') %}
-                <a class="nowo-ui-link" href="/crm/companies" data-testid="demo-nav-companies">Companies</a>
-                <a class="nowo-ui-link" href="/crm/contacts" data-testid="demo-nav-contacts">Contacts</a>
-                <span class="nowo-ui-muted" data-testid="demo-user">{{ app.user.userIdentifier }}</span>
-                <a class="nowo-ui-link" href="{{ path('demo_logout') }}" data-testid="demo-logout">Sign out</a>
-            {% else %}
-                <a class="nowo-ui-link" href="{{ path('demo_login') }}" data-testid="demo-nav-login">Sign in</a>
-            {% endif %}
-        </nav>
-    </header>
+{% block nowo_ui_demo_platform_aside_end %}
+    {% if is_granted('ROLE_USER') %}
+        <p class="nowo-ui-muted">Signed in as <span data-testid="demo-user">{{ app.user.userIdentifier }}</span></p>
+    {% endif %}
 {% endblock %}
 
 {% block nowo_ui_content %}{% block body %}{% endblock %}{% endblock %}

@@ -19,6 +19,7 @@
 /coverage.xml
 /coverage-php.txt
 /coverage-ts.txt
+/cov.txt
 
 # PHP tool caches (REQ-GITIGNORE-002)
 .php-cs-fixer.cache

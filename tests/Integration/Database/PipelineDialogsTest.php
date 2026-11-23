@@ -13,6 +13,7 @@ use Nowo\CrmKitBundle\Domain\Enum\DealStatus;
 use Nowo\CrmKitBundle\Domain\Enum\FunnelKind;
 use Nowo\CrmKitBundle\Domain\Enum\StageKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineDialogs;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestTaskPort;
@@ -20,6 +21,7 @@ use Symfony\Component\DomCrawler\Crawler;
 
 use function array_replace_recursive;
 use function basename;
+use function count;
 
 /**
  * 0.9.0 (Beacon request 2026-11-23, owner rule D-20261123-01 "every dialog loads on demand"): with
@@ -175,14 +177,16 @@ final class PipelineDialogsTest extends CrmTestCase
         $this->client->submit($fragment->filter('form')->form(), ['crm_next_action[title]' => 'Visit', 'crm_next_action[due_at]' => '2026-11-21T10:00'], self::DIALOG);
         $this->assertSaved('/crm/companies/' . $acme);
 
-        // The company moved to the trash after the dialog opened: both refusals stay in the dialog (422).
+        // The company moved to the trash after the dialog opened: both submits answer 404, as a trashed deal's (ZAG-1).
         $lifecycle = $this->fragment('/crm/companies/' . $acme . '/lifecycle', 'crm-lifecycle-dialog-form')->filter('form')->form();
         $action    = $this->fragment('/crm/companies/' . $acme . '/next-actions', 'crm-next-action-dialog-form')->filter('form')->form();
+        $tasks     = count($this->port()->tasks);
         $this->records()->trash(SubjectType::Company, $acme, $this->service(CrmReaderInterface::class)->record(SubjectType::Company, $acme)->version);
         $this->client->submit($lifecycle, [], self::DIALOG);
-        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertSame(404, $this->client->getResponse()->getStatusCode());
         $this->client->submit($action, ['crm_next_action[title]' => 'Late', 'crm_next_action[due_at]' => '2026-11-21T10:00'], self::DIALOG);
-        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertSame(404, $this->client->getResponse()->getStatusCode());
+        self::assertCount($tasks, $this->port()->tasks, 'no task created');
 
         // A contact without a lifecycle funnel of its type: no opener, no page.
         $ada  = $this->contact('Ada', 'L');
@@ -278,6 +282,32 @@ final class PipelineDialogsTest extends CrmTestCase
         foreach ([...$edits, '/crm/admin/funnels/' . $funnel . '/stages/new', '/crm/admin/stages/' . $stage . '?funnel=' . $funnel] as $path) {
             self::assertSame(404, $this->dialogStatus('GET', $path), $path);
         }
+    }
+
+    public function testATrashedOrErasedRecordHasNoFormPages(): void
+    {
+        // ZAG-1: the record's page offers no next action / lifecycle form unless it is active; the forms' own pages and
+        // their dialog fragments answer 404 then (GET and POST), like a deal in the trash, never a form that cannot save.
+        $this->boot();
+        $this->admin();
+        $funnels = $this->service(FunnelService::class);
+        foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
+            $funnels->addStage($funnels->create(FunnelKind::Party, $type, 'Life ' . $type->value), 'Customer', StageKind::Open, 50, null);
+        }
+        $acme  = $this->company('Acme');
+        $ada   = $this->contact('Ada', 'L');
+        $forms = static fn (string $path): array => [$path . '/lifecycle', $path . '/next-actions'];
+        foreach ([...$forms('/crm/companies/' . $acme), ...$forms('/crm/contacts/' . $ada)] as $path) {
+            self::assertSame(200, $this->httpStatus('GET', $path), 'active: ' . $path);
+        }
+        $this->records()->trash(SubjectType::Company, $acme, $this->service(CrmReaderInterface::class)->record(SubjectType::Company, $acme)->version);
+        $this->service(CrmPersonalDataInterface::class)->erase($ada);
+        foreach ([...$forms('/crm/companies/' . $acme), ...$forms('/crm/contacts/' . $ada)] as $path) {
+            self::assertSame(404, $this->httpStatus('GET', $path), 'page: ' . $path);
+            self::assertSame(404, $this->dialogStatus('GET', $path), 'dialog: ' . $path);
+            self::assertSame(404, $this->dialogStatus('POST', $path), 'dialog POST: ' . $path);
+        }
+        self::assertSame([], $this->port()->tasks, 'no task created');
     }
 
     /**

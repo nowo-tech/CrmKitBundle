@@ -21,6 +21,7 @@ use Nowo\CrmKitBundle\Application\Pipeline\PartyStageService;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\DealStatus;
 use Nowo\CrmKitBundle\Domain\Enum\FunnelKind;
+use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\CrmTaskRefusedException;
@@ -715,7 +716,8 @@ final readonly class PipelineController
 
     /**
      * The page of a subject the actor may edit (the same checks as the POST: 404 outside the tenant or hidden, 403
-     * without `edit`): its route and parameters.
+     * without `edit`): its route and parameters. A company or contact that is not active (trashed, merged, erased)
+     * answers 404 like a deal in the trash: its page never offers these forms and the write would be refused (ZAG-1).
      *
      * @return array{string, array<string, string>}
      */
@@ -729,6 +731,9 @@ final readonly class PipelineController
         }
         $view = ($this->records ?? throw new NotFoundHttpException())->record($subject, $id);
         $this->ui->requireOn(CrmPermission::Edit, $view);
+        if ($view->status !== RecordStatus::Active) {
+            throw new NotAvailableException();
+        }
 
         return ['nowo_crm_kit_show', ['type' => $subject->segment(), 'id' => $id]];
     }

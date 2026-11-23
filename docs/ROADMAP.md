@@ -62,6 +62,11 @@ Q-O questions) in [CONTRACT.md](CONTRACT.md) before it is built.
   submissions are not imported (FR-101).
 - **Agreed order.** (1) H1 (0.10.0) in Beacon v1.174; (2) Beacon architecture debt in v1.175; (3) spec 254 blocks,
   one or two per Beacon release, starting with A.
+- **Reuse first (owner rule, 2026-11-23).** "If a nowo bundle already does, or nearly does, a CRM capability, use it
+  or extend it." No CRM-only copy: a missing piece is added to that bundle (an option, a port or a slot) and CrmKit
+  consumes it. Every capability below says **reuse X as is**, **extend X with Y** or **new, because Z** (the "new"
+  verdicts were checked against each bundle's code and docs on `main` / `master`, 2026-11-23); the
+  [reuse matrix](#reuse-matrix) lists what changes in each bundle and in which version.
 - **House bars for every slice.** REQ-ARCH-001 (rule 3: every port takes and returns this bundle's own VOs and
   scalars, one VO per concept, no host, Symfony, Doctrine or HTTP types), REQ-RUNTIME-002 (worker mode, kernel not
   reset), REQ-RUNTIME-003 (write units, 409 on stale versions, two-connection race tests), REQ-SEC-006, deny by default
@@ -75,26 +80,78 @@ change. "Kit option" is the configuration switch; off means no tables mapped, no
 | Slice | CrmKit | Content | Kit option | Other bundles (new work in **bold**) | Beacon release (target) |
 | --- | --- | --- | --- | --- | --- |
 | H1 / H2 / H3 | 0.10.0 / 0.11.0 / 0.12.0 | HubSpot import (spec 253) | `import.hubspot.*` | — | v1.174 (H1) |
-| **A-1** activities | 0.13.0 | Kinds `call`, `meeting`, `email`; log dialogs; timeline filter by kind and person; fan-out contact → companies / deals; pinned notes; @mentions; host activity source; meetings on TaskBoard's calendar + ICS; HubSpot notes / calls / meetings / tasks | `activities.enabled` | TaskBoard (event source, exists since 2.24), NotifyKit (mentions), MailKit (ICS invite), SearchKit | v1.176 |
-| **A-2** templates | 0.14.0 | Personal and shared e-mail templates, snippets, closed merge-field resolver, consent purpose per template; *Write e-mail* insert; sent mail logged as `email` | `templates.enabled` | MailKit (send) | v1.176 or v1.177 |
-| **B** mailbox sync + tracking | 0.15.0 | Auto-link by exact contact e-mail, `email` activities from linked messages, open / click signal, reply detection; HubSpot e-mails (metadata; bodies on opt-in) | `mail_link.enabled` | **MailKit B1: Graph delegated personal mailboxes** (spec 236 kit side); **MailKit B2: Gmail provider** (off until Google's review); MailKit tracking (exists, 1.10) | v1.177 (Outlook); Gmail by configuration later |
-| **C-1** catalogue + line items | 0.16.0 | Product catalogue, line items on deals, deal amount from items (per funnel), MRR / ARR; HubSpot products and line items | `catalog.enabled` | — (CurrencyKit not needed, see block C) | v1.178 |
-| **C-2** quotes | 0.17.0 | Quotes with series numbering, versions, branded PDF, signed accept / reject link, immutable acceptance, won / lost on answer; HubSpot quotes | `quotes.enabled` | ReportKit (PDF runner), brand-contracts | v1.178 or v1.179 |
-| **D-1** tickets + SLA | 0.18.0 | `FunnelKind::Ticket`, priority, owner, team, links, board and list, SLA policies on business hours, pause, breach events; teams port; HubSpot tickets and ticket pipelines | `tickets.enabled` | NotifyKit (SLA warnings); WorkingTime holidays through Beacon's adapter | v1.179 |
-| **D-2** e-mail channel + articles | 0.19.0 | Ticket address per organisation, e-mail → ticket, reply threading by token, unknown sender without contact; article suggester port and Wiki bridge | `tickets.inbound.enabled` | **MailKit inbound routing for per-organisation addresses**; Wiki (block H) | v1.180 |
+| **A-1** activities | 0.13.0 | Kinds `call`, `meeting`, `email`; log dialogs; timeline filter by kind and person; fan-out contact → companies / deals; pinned notes; @mentions; host activity source; meetings on TaskBoard's calendar + ICS; HubSpot notes / calls / meetings / tasks | `activities.enabled` | TaskBoard (event source, as is), NotifyKit 0.3 (as is), MilkdownEditor mentions (as is), **MailKit: ICS invites**, SearchKit | v1.176 |
+| **A-2** templates | 0.14.0 | Personal and shared e-mail templates, snippets, closed merge-field resolver, consent purpose per template; *Write e-mail* insert; sent mail logged as `email` | `templates.enabled` | **MailKit: stored templates + placeholder registry** (CrmKit adds the CRM placeholders) | v1.176 or v1.177 |
+| **B** mailbox sync + tracking | 0.15.0 | Auto-link by exact contact e-mail, `email` activities from linked messages, open / click signal, reply detection; HubSpot e-mails (metadata; bodies on opt-in) | `mail_link.enabled` | **MailKit B1: Graph delegated personal mailboxes** (spec 236 kit side); **MailKit B2: Gmail provider** (off until Google's review); **TimeTrack: OAuth helpers with extra scopes** (Q-254-15); MailKit tracking + ShortLink clicks (as is) | v1.177 (Outlook); Gmail by configuration later |
+| **C-1** catalogue + line items | 0.16.0 | Product catalogue, line items on deals, deal amount from items (per funnel), MRR / ARR; HubSpot products and line items | `catalog.enabled` | — (new in CrmKit; CurrencyKit only for an optional reference display) | v1.178 |
+| **C-2** quotes | 0.17.0 | Quotes with series numbering, versions, branded PDF, signed accept / reject link, immutable acceptance, won / lost on answer; HubSpot quotes | `quotes.enabled` | ReportKit PDF runner + brand-contracts (as is); PdfSignable later as a provider (as is) | v1.178 or v1.179 |
+| **D-1** tickets + SLA | 0.18.0 | `FunnelKind::Ticket`, priority, owner, team, links, board and list, SLA policies on business hours, pause, breach events; teams port; HubSpot tickets and ticket pipelines | `tickets.enabled` | **WorkingTime: business-time calculator**; TaskBoard teams (as is); NotifyKit (as is) | v1.179 |
+| **D-2** e-mail channel + articles | 0.19.0 | Ticket address per organisation, e-mail → ticket, reply threading by token, unknown sender without contact; article suggester port and Wiki bridge | `tickets.inbound.enabled` | MailKit Graph inbound + plus addresses (as is); Wiki (block H) | v1.180 |
 | **D-3** chat channel | later | Signed-in customers' chat opens or continues a ticket | `tickets.chat.enabled` | **ChatKit customer-channel option**; needs phase F (portal) | after phase F (Q-254-8) |
-| **E-1** segments (phase E1) | 0.20.0 | Static lists and dynamic segments with live counts, bulk actions; HubSpot lists → lists / segments | `segments.enabled` | — | v1.181 |
-| **E-2** web forms | 0.21.0 | Form builder, field mapping, UTM fields, consent per purpose, embed by script / iframe, allowed origins, signed token, honeypot + Altcha, rate limits, double opt-in; no HubSpot form definitions in v1 (Q-254-3) | `forms.enabled` | AltchaType, LegalKit (privacy link), MailKit (double opt-in, verified domain) | v1.181 or v1.182 |
+| **E-1** segments (phase E1) | 0.20.0 | Static lists and dynamic segments with live counts, bulk actions; HubSpot lists → lists / segments | `segments.enabled` | CrmKit tags as static lists (Q-254-16); **UiKit: rule-builder component** | v1.181 |
+| **E-2** web forms | 0.21.0 | Form builder, field mapping, UTM fields, consent per purpose, embed by script / iframe, allowed origins, signed token, honeypot + Altcha, rate limits, double opt-in; no HubSpot form definitions in v1 (Q-254-3) | `forms.enabled` | **FormKit: honeypot + embed mode**; AltchaType, LegalKit, MailKit (as is) | v1.181 or v1.182 |
 | **F-0** sending domains | — | Per-organisation sending domain, SPF / DKIM / DMARC verification before campaigns and daily for sequences | — | **MailKit `sending_domains`** (Q-254-6) | with F-2 |
 | **F-1** scoring (phase S) | 0.22.0 | Explainable rule scoring, hot / warm / cold bands, breakdown, worker-safe recompute | `scoring.enabled` | — | v1.182 |
 | **F-2** circulars (phase E2) | 0.23.0 | Informative and marketing circulars through MailKit's queue, only from a verified domain | `campaigns.enabled` | MailKit (`sending_domains`, tracking) | v1.183 |
-| **F-3** automation + sequences | 0.24.0 | CRM triggers and actions for AutomationKit; sequences (steps, windows, caps, stop rules) from the person's mailbox | `automation.enabled`, `sequences.enabled` | **new `nowo-tech/automation-kit-bundle`** 0.1.0 (Q-254-7: repo being created, contract first); WorkflowBundle through an AutomationKit action; OutboundUrlGuard (webhooks) | v1.184 |
-| **G** forecast, goals, teams | 0.25.0 | Forecast categories with override history, goals per rep / team and period; HubSpot goals and owners' teams | `forecast.enabled` | ReportKit types in Beacon | v1.185 (may swap with C or E) |
+| **F-3** automation + sequences | 0.24.0 | CRM triggers and actions for AutomationKit; sequences (steps, windows, caps, stop rules) from the person's mailbox | `automation.enabled`, `sequences.enabled` | **new `nowo-tech/automation-kit-bundle`** 0.1.0 (Q-254-7: repo created, contract first; Workflow evaluated first); WorkflowBundle through an AutomationKit action (as is); UiKit rule builder; OutboundUrlGuard (as is) | v1.184 |
+| **G** forecast, goals, teams | 0.25.0 | Forecast categories with override history, goals per rep / team and period; HubSpot goals and owners' teams | `forecast.enabled` | ReportKit (as is; CrmKit ships the report types in `Bridge/ReportKit`); TaskBoard teams (as is) | v1.185 (may swap with C or E) |
 | **H** knowledge base | — (bridge in 0.19.0) | Published spaces; suggestions in ticket replies | — | **WikiBundle `published_spaces`** (next Wiki minor) | with D-2 or alone |
-| **I** booking links | 0.26.0 | Booking pages, availability (free / busy only), signed cancel / reschedule, meeting + ICS, sequence stop | `booking.enabled` | TaskBoard (event source); **MailKit Graph free / busy** (after B1) | v1.186 |
+| **I** booking links | 0.26.0 | Booking pages, availability (free / busy only), signed cancel / reschedule, meeting + ICS, sequence stop | `booking.enabled` | TaskBoard (event source, as is); **TimeTrack: busy-window reader** (Google / Microsoft) | v1.186 |
 
 Spec 254 allows C, E and G to swap with a neighbour when a customer asks. The Beacon release column is a target that
 assumes one kit minor per Beacon release from v1.176; it is not a commitment.
+
+### Reuse matrix
+
+Owner rule of 2026-11-23: reuse or extend a nowo bundle before building anything CRM-only. Bundle versions are the
+latest tags on 2026-11-23. A version for an extension is that bundle's next free minor, planned at the time of writing;
+it moves if that bundle releases something else first. Each extension is noted in that bundle's `docs/ROADMAP.md`.
+
+| Capability | Block | Bundle | Verdict | What changes in that bundle | Version |
+| --- | --- | --- | --- | --- | --- |
+| Meetings on a calendar | A-1, I | TaskBoardBundle 2.31.0 | Reuse as is | Nothing: `CalendarEventSourceInterface` (timed events since 2.24); CrmKit's `Bridge/TaskBoard` adds a source | ≥ 2.24 |
+| Outlook / Google meetings already in a calendar | A-1 | TimeTrackBundle 1.39.0 | Reuse as is | Nothing: read-only calendar readers and the meeting read model, through Beacon's host activity source | ≥ 1.19 |
+| ICS invites | A-1, I | MailKitBundle 2.2.1 | Extend | ICS invite part on outgoing mail (`text/calendar`, `METHOD:REQUEST` / `CANCEL`, UID, SEQUENCE) | 2.3.0 |
+| Call logging | A-1 | SmsKitBundle 2.0.1 | New in CrmKit | Nothing: SmsKit sends text messages only (no voice); reused as is later for the reserved `sms` kind | — |
+| @mentions | A-1 | MilkdownEditorBundle 1.19.0 | Reuse as is | Nothing: `@` suggestion list; CrmKit supplies the candidates | ≥ 1.19 |
+| Notifications (mentions, SLA, reminders) | A-1, D-1 | NotifyKitBundle 0.3.0 | Reuse as is | Nothing (e-mail delivery arrives with NotifyKit S4, 0.4.0) | ≥ 0.3.0 |
+| E-mail templates and snippets | A-2 | MailKitBundle | Extend | Stored templates (personal / shared scope through a host owner port, locale, subject, body, snippets) and a closed placeholder resolver registry by service tag; CrmKit adds the CRM placeholders | 2.4.0 |
+| Sending, sent-mail log | A-2, C-2, D-2, E-2, F | MailKitBundle | Reuse as is | Nothing | — |
+| Personal Outlook mailboxes | B | MailKitBundle | Extend | Graph delegated mode for person mailboxes (read, send, delta sweep) with host-held tokens through a credential port | 2.5.0 |
+| OAuth connect for Microsoft / Google | B | TimeTrackBundle | Extend (Q-254-15) | OAuth helpers accept configurable extra scopes (mail next to calendar), one consent per person | 1.40.0 |
+| Gmail mailboxes | B | MailKitBundle | Extend | Gmail provider behind the same mailbox port, off until Google's review | 2.6.0 |
+| Open tracking | B | MailKitBundle | Reuse as is | Nothing: pixel, `MailOpenedEvent`, `MailMachineOpenedEvent`, `EmailTrackingPolicyInterface`, purge | ≥ 1.10 |
+| Click tracking | B | ShortLinkBundle 1.0.0 | Reuse as is | Nothing: `createMany()` kind `email`, `ShortLinkClickedEvent`, MailKit `link_rewriter` | ≥ 1.0 |
+| Consent per purpose | B, E-2, F | CrmKit (phase A) | Reuse as is | — (CookieConsent covers site visitors' cookie categories, not a contact's purposes) | — |
+| Privacy text and link | B, E-2 | LegalKitBundle 1.15.3 | Reuse as is | Nothing (`upgrade-seed`, current privacy page) | — |
+| Products, line items, MRR | C-1 | — | New in CrmKit | No bundle models products or prices | — |
+| Amounts | C | CurrencyKitBundle 0.1.1 | Not used for totals | Nothing: reference rates only; optional `reference_money` display later | — |
+| Quote PDF and brand | C-2 | ReportKitBundle 0.3.0, brand-contracts | Reuse as is | Nothing: `PdfDocumentRendererInterface`, brand resolver | — |
+| Quote acceptance link and record | C-2 | PdfSignableBundle 3.13.0 | New in CrmKit | Nothing now: PdfSignable has no storage, tokens or public flow; later PAdES / TSA provider through its `PDF_SIGN_REQUEST` event | — |
+| PDF editing | — | PdfEditorBundle 1.8.0 | Not used | Admin editing workspace, not generation | — |
+| Quote numbering | C-2 | SerialNumberBundle 1.2.0 | New in CrmKit | Nothing: formatter without an atomic counter; CrmKit `crm_sequence` (QN-1..10) | — |
+| Tickets and pipeline | D-1 | CrmKit funnels; ChatKitBundle 2.3.0 | Reuse CrmKit's engine | ChatKit support is platform user ↔ operator chat (no company / contact / deal, SLA or e-mail) | — |
+| SLA business-time clock | D-1 | WorkingTimeBundle 0.3.1 | Extend | Business-time calculator: weekly opening hours + holiday calendar; add / count business minutes | 0.4.0 |
+| Teams | D-1, G | TaskBoardBundle | Reuse as is | Nothing: teams with manager / member roles behind `CrmTeamDirectoryInterface` (UserKit / AuthKit have no groups; RbacKit groups are permissions) | — |
+| Ticket e-mail channel | D-2 | MailKitBundle | Reuse as is | Nothing: Graph inbound, plus-address tags, `GraphInboundHandlerInterface` (a tagged handler chain only if two kit handlers must coexist) | ≥ 1.9 |
+| Ticket chat channel | D-3 | ChatKitBundle | Extend (later, Q-254-8) | Customer-channel option for signed-in portal contacts | after phase F |
+| Knowledge base and suggestions | H, D-2 | WikiBundle 1.54.0 | Extend | `published_spaces`: public read-only published pages, search over them, no author names | 1.55.0 |
+| Static lists | E-1 | CrmKit tags | Reuse (Q-254-16) | `list` flag on tags | — |
+| Dynamic segments | E-1 | SearchKitBundle 1.12.0 | New in CrmKit | Nothing: SearchKit is free-text search over provider groups, no structured filters | — |
+| Rule / condition editor | E-1, F-3 | UiKitBundle 2.71.0 | Extend | Rule-builder component (field / operator / value rows on a FormKit collection) | 2.72.0 |
+| Public embeddable forms | E-2 | FormKitBundle 2.25.0 | Reuse + extend | Reuse `buildFormFromArray()` and `stateless_csrf`; add a honeypot field extension and an embed mode (signed form token bound to the form and an allowed-origins list) | 2.26.0 |
+| Anti-spam proof of work | E-2 | AltchaTypeBundle 1.5.0 | Reuse as is | Nothing | — |
+| Double opt-in | E-2 | — | New in CrmKit | UserKit / AuthKit verify account holders, not contacts without an account | — |
+| Rules engine | F-3 | WorkflowBundle 2.3.0 → AutomationKitBundle | New bundle (Q-254-7) | Workflow evaluated first, reused as is as an action; AutomationKit 0.1.0 (repo created, contract first) | AutomationKit 0.1.0 |
+| Failed automation runs | F-3 | MessengerMonitorKitBundle | Reuse as is | Nothing | — |
+| Webhooks | F-3 | OutboundUrlGuardBundle | Reuse as is | Nothing | — |
+| Sending domains (SPF / DKIM / DMARC) | F-0 | MailKitBundle | Extend | `sending_domains` (Resend domains API on Resend, DNS checks otherwise), refused sends with the reason | 2.7.0 |
+| Lead scoring | F-1 | — | New in CrmKit | No bundle scores records | — |
+| Forecast and goals data | G | — | New in CrmKit | No bundle models them | — |
+| Reports, exports, scheduled mail | G | ReportKitBundle | Reuse as is | Nothing: CrmKit ships report types in `Bridge/ReportKit` | — |
+| Owners | all | host port `CrmActorDirectoryInterface` | Reuse as is | — | — |
+| Booking pages | I | — | New in CrmKit | No bundle has public booking | — |
+| Outlook / Google free / busy | I | TimeTrackBundle | Extend | Busy-window reader for future windows (start / end only) | 1.41.0 |
 
 ### Old phases and spec 254
 
@@ -111,6 +168,23 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block A — activities and templates (A-1 0.13.0, A-2 0.14.0)
 
+- **Reuse (owner rule).**
+  - Meetings on a calendar: **reuse TaskBoard as is** (`CalendarEventSourceInterface`, timed events since 2.24;
+    CrmKit's `Bridge/TaskBoard` adds a source). Meetings already in a person's Outlook / Google calendar: **reuse
+    TimeTrack as is** (its read-only calendar readers and meeting read model) through Beacon's host activity source.
+  - ICS invites: **extend MailKit** with an ICS invite part (`text/calendar`, `METHOD:REQUEST` / `CANCEL`, UID,
+    SEQUENCE). No bundle writes invites today (WorkingTime only parses ICS for holiday imports).
+  - Call logging: **new in CrmKit**, because no bundle logs calls: SmsKit sends text messages only (no voice, no CTI)
+    and telephony is out of scope. SmsKit is **reused as is** later for the reserved `sms` kind.
+  - @mentions in notes: **reuse MilkdownEditor as is** (its `@` suggestion list; TiptapEditor has the same); CrmKit
+    supplies the candidates, members who may see the record.
+  - Mention notifications: **reuse NotifyKit 0.3 as is** (in-app rows, bell, read-time visibility); e-mail delivery
+    comes with NotifyKit S4 (0.4.0) without CrmKit changes.
+  - Templates and snippets: **extend MailKit** with stored templates (personal / shared scope, locale, subject, body,
+    snippets) and a closed placeholder resolver registry by service tag. MailKit sends mail today but stores no
+    user-editable templates. CrmKit A-2 only contributes the `contact.*`, `company.*`, `deal.*`, `me.*` placeholder
+    provider, the consent purpose per template and the insert in *Write e-mail*.
+  - Sending, the log and tracking hooks: **reuse MailKit as is**. Search of the new fields: **reuse SearchKit as is**.
 - **Depends on.** Phase B (0.3.0). TaskBoard ≥ 2.24 (`CalendarEventSourceInterface`, timed events) through the existing
   `Bridge/TaskBoard`; NotifyKit for @mentions (recipient access re-checked at write time); MailKit to send ICS invites
   and templated mail; SearchKit for the new searchable fields. Spec 248's *Write e-mail* can ship before or after A-2.
@@ -127,8 +201,9 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
   `MeetingSlot` (start, end, IANA zone; end after start), `MeetingAttendee` (an `ActorRef` or a contact `RecordId`),
   `MeetingPlace` (text ≤ 200 or an https URL), `EmailExcerpt` (≤ 500, plain text), `TimelineFilter` (kinds, person),
   `TimelineWindow`, `HostActivityItem`, `MentionRef`, `CrmNotification`, `CrmOutgoingMail`, `CrmSentMailRef`,
-  `IcsInvite`; A-2: `TemplateKey`, `TemplateBody`, `SnippetKey`, `MergeField` (closed grammar
-  `\A(contact|company|deal|me)\.[a-z_]{1,40}\z` with `/D`), `TemplateScope` (personal / shared).
+  `IcsInvite` (mapped to MailKit's invite part); A-2: `MergeField` (closed grammar
+  `\A(contact|company|deal|me)\.[a-z_]{1,40}\z` with `/D`) and `TemplateRef` (a MailKit template id); the template
+  store, `TemplateScope` and snippets live in MailKit.
 - **Audit before tag (normal REQ-SEC-004).** Template merge fields (closed resolver, never Twig, unknown fields shown
   as text, escaping in HTML bodies); @mentions (only members who may see the record, no leak of the record's title
   in the notification to anyone else); host activity items checked per viewer; fan-out never shows a contact's
@@ -138,9 +213,26 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block B — mailbox sync and tracking (CrmKit 0.15.0)
 
+- **Reuse (owner rule).**
+  - Personal Outlook mailboxes: **extend MailKit** with Graph delegated mode (MailKit 1.8 / 1.9 is app-only on shared
+    mailboxes). Gmail: **extend MailKit** with a Gmail provider behind the same mailbox port.
+  - OAuth connect, refresh and revoke for Microsoft / Google: **extend TimeTrack** (Q-254-15). TimeTrack already has
+    PKCE OAuth helpers for both providers (`CalendarOAuthClients`, runtime OAuth apps, host-held tokens through
+    `CalendarCredentialProviderInterface`); they gain configurable extra scopes so one consent per person covers the
+    calendar and the mailbox. MailKit then reads host-held tokens through a credential port instead of running its
+    own OAuth flow.
+  - Open tracking: **reuse MailKit as is** (1.10+: pixel, `MailOpenedEvent`, `MailMachineOpenedEvent`,
+    `EmailTrackingPolicyInterface`, purge command). Click tracking: **reuse ShortLink as is** (`createMany()` with kind
+    `email`, `ShortLinkClickedEvent`, plugged in as MailKit's `link_rewriter`).
+  - Tracking consent: **reuse CrmKit's consent purposes as is** (`tracking`). CookieConsent is not used: it records a
+    site visitor's cookie categories, not a contact's consent per purpose. Privacy text: **reuse LegalKit as is**
+    (`upgrade-seed`).
+  - Auto-link, `email` activities and reply detection: **new in CrmKit**, because they are CRM record logic on top of
+    MailKit's messages.
 - **Depends on.** **MailKit B1** (new minor): personal Outlook mailboxes through Graph *delegated* permissions (MailKit
-  today reads and sends app-only on shared mailboxes, 1.8 / 1.9): per-person OAuth (state + PKCE), refresh token sealed
-  (DoctrineEncrypt in Beacon), revocation on unlink, delta sweep per mailbox. **MailKit B2** (new minor, off by
+  today reads and sends app-only on shared mailboxes, 1.8 / 1.9), with host-held tokens obtained through TimeTrack's
+  OAuth helpers (state + PKCE; Q-254-15), sealed by the host (DoctrineEncrypt in Beacon), revoked on unlink; delta
+  sweep per mailbox. **MailKit B2** (new minor, off by
   configuration): Gmail provider (OAuth, sealed tokens, revocation, push + history sweep). MailKit tracking (1.10:
   pixel + link rewriting; ShortLink for clicks). Block A (`email` activity kind). Spec 236 / 248 for Beacon wiring.
 - **Prerequisite with lead time (owner / ops, start now, T009).** Google Cloud project and OAuth app, consent screen,
@@ -162,6 +254,20 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block C — products, line items and quotes (C-1 0.16.0, C-2 0.17.0)
 
+- **Reuse (owner rule).**
+  - Catalogue, line items, MRR / ARR: **new in CrmKit**, because no bundle models products or prices.
+  - Amounts: **reuse CrmKit `Money` as is**. CurrencyKit is not used for totals: its rates are reference rates only
+    ("not payment, settlement, trading or accounting rates") and multi-currency conversion is out of scope. An optional
+    `≈ EUR` hint can use CurrencyKit's `reference_money` filter **as is** later.
+  - Quote PDF: **reuse ReportKit as is** (`PdfDocumentRendererInterface`, the closed Dompdf runner, and its brand
+    resolver over brand-contracts). PdfEditor is not used: it is an admin workspace for editing existing PDFs, not a
+    document generator.
+  - Acceptance link and immutable record: **new in CrmKit**, because PdfSignable is a widget for placing signature
+    boxes, with events and audit-metadata keys but no storage, tokens or public answer flow. PdfSignable is **reused as
+    is** later as the PAdES / TSA provider behind `CrmSignatureProviderInterface` (its `PDF_SIGN_REQUEST` event); the
+    acceptance record uses the same evidence fields as its `AuditMetadata` (submitted at, IP, user agent).
+  - Quote numbering: **new in CrmKit** (`crm_sequence`, owner decisions QN-1..10), because SerialNumberBundle formats
+    patterns but keeps no atomic counter.
 - **Depends on.** Phase B. ReportKit's closed PDF runner (Dompdf: no remote, no JS, no PHP) and its brand resolver;
   brand-contracts for the organisation brand. **CurrencyKit is not a dependency:** it gives reference rates only
   ("not payment, settlement or accounting rates") and multi-currency conversion is out of scope; CrmKit keeps its own
@@ -185,13 +291,30 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block D — tickets, SLA and support inbox (D-1 0.18.0, D-2 0.19.0, D-3 later)
 
-- **Depends on.** Block A (timeline). NotifyKit (SLA warnings). **MailKit inbound routing** for per-organisation ticket
+- **Reuse (owner rule).**
+  - Ticket record and pipeline: **reuse CrmKit's own funnel engine** (`FunnelKind::Ticket`). ChatKit's support
+    inbox is not reused for D-1 / D-2: its tickets are chats between platform users and an operator, with no company,
+    contact or deal, no SLA and no e-mail channel.
+  - SLA clock on business hours: **extend WorkingTime** with a business-time calculator (weekly opening hours plus a
+    holiday calendar it already has; add or count business minutes). TaskBoard due dates and Workflow are not used:
+    due dates are calendar dates with no pause or business-minute arithmetic, and Workflow has no timers. TaskBoard can
+    reuse the calculator for due dates in business days later.
+  - SLA warnings: **reuse NotifyKit as is**. Teams: **reuse TaskBoard as is** (teams with manager / member roles)
+    behind `CrmTeamDirectoryInterface` (`Bridge/TaskBoard`; Beacon may plug its own adapter). UserKit and AuthKit have
+    no groups; RbacKit has permission groups, not teams of people.
+  - E-mail channel: **reuse MailKit as is**: Graph inbound with plus-address tags and the host port
+    `GraphInboundHandlerInterface`. Beacon's handler hands `support+<token>` mail to CrmKit's bridge. MailKit is only
+    extended (a tagged handler chain) if two kit handlers must coexist without host code.
+  - Chat channel (D-3): **extend ChatKit** with a customer-channel option, later (Q-254-8).
+  - Article suggestions: **reuse Wiki's search as is** over published pages (block H) through the D-2 bridge.
+- **Depends on.** Block A (timeline). NotifyKit (SLA warnings). MailKit inbound as is for per-organisation ticket
   addresses (MailKit 1.9 already normalises inbound Graph mail, plus-address tags and SPF / DKIM / DMARC verdicts and
-  hands it to a route / quarantine / discard port). ChatKit is **not** reused for D-1 / D-2: its support tickets are
+  hands it to a route / quarantine / discard port). WorkingTime business-time calculator (extension). ChatKit is **not** reused for D-1 / D-2: its support tickets are
   platform support (Beacon users → operator) and its roadmap keeps guest / external accounts out; D-3 needs a new
   ChatKit customer-channel option and phase F (Q-254-8).
-- **New ports.** `CrmBusinessHoursInterface` — `calendarOf(TenantRef, ?TeamRef): BusinessCalendar` (Beacon adapter over
-  the organisation's working calendar and holidays; WorkingTimeBundle's holiday component can back it; default: 24 × 7);
+- **New ports.** `CrmBusinessHoursInterface` — `calendarOf(TenantRef, ?TeamRef): BusinessCalendar` (default adapter
+  over WorkingTime's business-time calculator in `Bridge/WorkingTime`; Beacon maps its organisation's working calendar
+  and holidays; default without WorkingTime: 24 × 7);
   `CrmTeamDirectoryInterface` — `teamsOf(TenantRef, ActorRef): list<TeamRef>`, `membersOf(TenantRef, TeamRef)`
   (needed by FR-044 "agents see their teams' tickets", so it ships in D-1, not G; Q-254-11);
   `CrmArticleSuggesterInterface` — `suggest(TenantRef, string $query, int $limit): list<ArticleSuggestion>` (D-2, Wiki
@@ -209,10 +332,28 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block E — segments and forms (E-1 0.20.0, E-2 0.21.0)
 
-- **Depends on.** Block A (the `form_submitted` activity). E-2: AltchaTypeBundle (proof of work next to the honeypot),
-  LegalKit (privacy link and consent text), Symfony RateLimiter, MailKit for the double opt-in mail from the
+- **Reuse (owner rule).**
+  - Static lists: **reuse CrmKit tags** (Q-254-16). A static list is a tag (H1 already maps HubSpot lists to tags);
+    tags gain a `list` flag so lists can be filtered apart.
+  - Dynamic segments: **new in CrmKit** (rules and live counts), because SearchKit is a free-text header search over
+    provider groups with no structured filter model, and ReportKit's non-goals exclude a query builder.
+  - Rule editor UI: **extend UiKit** with a rule-builder component (field / operator / value rows on a FormKit
+    collection), shared by CrmKit segments and AutomationKit conditions. UiKit has no such component today.
+  - Public forms: **reuse FormKit** (`buildFormFromArray()` for forms defined as data, `stateless_csrf` for anonymous
+    forms) and **extend FormKit** with (1) a honeypot field extension and (2) an embed mode: a signed form token bound
+    to the form and to an allowed-origins list. Stateless CSRF relies on same-origin `Origin` / `Referer`, so it cannot
+    protect a form embedded on the customer's site. The CrmKit engine (Q-254-5) keeps the mapping, consent and double
+    opt-in.
+  - Proof of work: **reuse AltchaType as is** (`AltchaType`, single-use payloads, `invisible` / `contact` profiles).
+    Privacy link: **reuse LegalKit as is**. Rate limits: Symfony RateLimiter.
+  - Double opt-in: **new in CrmKit**, because UserKit and AuthKit verify account holders, not contacts without an
+    account; the confirmation mail goes through MailKit (as is).
+- **Depends on.** Block A (the `form_submitted` activity). E-1: UiKit rule builder (extension). E-2: FormKit honeypot
+  and embed mode (extension), AltchaTypeBundle (proof of work next to the honeypot), LegalKit (privacy link and consent
+  text), Symfony RateLimiter, MailKit for the double opt-in mail from the
   organisation's verified domain once F-0 exists; until then from Beacon's platform domain as a service message (Q-254-6, decided). ContactFormBundle is not reused
-  (Q-254-5, decided): it serves hosted contact forms without embedding, origin checks, field mapping or double opt-in.
+  (Q-254-5, decided): it serves hosted contact forms without embedding, origin checks, field mapping or double opt-in;
+  the CrmKit engine is built on FormKit and AltchaType instead.
 - **New ports.** `CrmCaptchaVerifierInterface` (Altcha adapter; default: honeypot only), `CrmPrivacyLinkInterface`
   (LegalKit adapter: URL of the current privacy page per locale).
 - **New VOs / enums.** `ListId`, `SegmentRule` (closed set of fields and operators: role, tag, purpose, consent, score
@@ -228,7 +369,20 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block F — automation, sequences and lead scoring (F-1 0.22.0, F-2 0.23.0, F-3 0.24.0)
 
-- **Depends on.** **New `nowo-tech/automation-kit-bundle`** (repo being created, contract first; generic: trigger / condition / action registry by service
+- **Reuse (owner rule).**
+  - Rules engine: **WorkflowBundle was evaluated first.** It persists Symfony Workflow state machines bound to a
+    subject's marking property, with guards in host listeners and transitions applied by host code
+    (`WorkflowRuntimeInterface`). It has no event triggers, no delays or timers, no action registry, no per-event
+    idempotency and no run log. Hosting "event → conditions → delay → actions" rules would add a second engine beside
+    the state machine. So the rules run in the **new AutomationKit** (Q-254-7 stands; the repo is created, contract
+    first), and Workflow is **reused as is** through an AutomationKit action that applies one of its transitions.
+    No new owner question.
+  - Delays: Symfony Messenger (`DelayStamp`) and Scheduler. Failed runs: **reuse MessengerMonitorKit as is**.
+    Webhooks: **reuse OutboundUrlGuard as is**. Conditions UI: the UiKit rule builder of block E.
+  - Sending domains: **extend MailKit** with `sending_domains` (F-0).
+  - Sequences send from the person's mailbox: **reuse MailKit as is** after block B.
+  - Scoring: **new in CrmKit**, because no bundle scores records.
+- **Depends on.** **New `nowo-tech/automation-kit-bundle`** (repo created, contract first; generic: trigger / condition / action registry by service
   tag, delays on Messenger, idempotency per event, loop depth, dry run, run log, audit, UiKit pages; no CRM dependency).
   WorkflowBundle stays the state-machine engine and is reached through an AutomationKit action that applies one of its
   transitions; it is not extended into a rule engine (it has no triggers, delays or actions). **MailKit
@@ -250,8 +404,14 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block G — forecast, goals and teams (CrmKit 0.25.0)
 
+- **Reuse (owner rule).**
+  - Forecast categories, overrides and goals: **new in CrmKit**, because no bundle models them.
+  - Report pages, PDF / XLSX / CSV, scheduled mail: **reuse ReportKit as is**; CrmKit ships the forecast, goals,
+    activity and SLA report types in `Bridge/ReportKit` (types are code), and Beacon enables them.
+  - Teams: **reuse TaskBoard teams as is** (block D). Owners: **reuse the host port** `CrmActorDirectoryInterface` as is.
 - **Depends on.** Phase B; `CrmTeamDirectoryInterface` from D-1 (or introduced here if G ships before D); block C for
-  MRR in the forecast (optional). ReportKit report types live in Beacon (spec 252).
+  MRR in the forecast (optional). ReportKit report types ship in CrmKit's `Bridge/ReportKit`; Beacon enables them
+  (spec 252).
 - **New VOs / enums.** `ForecastCategory` (pipeline, best case, commit, closed; default from the stage),
   `ForecastOverride` (with history), `ForecastPeriod` (month / quarter), `GoalMetric` (won amount, deals created,
   activities logged, tickets closed), `GoalTarget`, `GoalProgress`. New permissions `forecast_view`, `goals_manage`.
@@ -260,6 +420,8 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block H — knowledge base (WikiBundle `published_spaces`; CrmKit bridge in 0.19.0)
 
+- **Reuse (owner rule).** Knowledge base: **extend WikiBundle** with `published_spaces` (Wiki's roadmap lists public
+  links as "later"). Suggestions: **reuse Wiki's search as is** through CrmKit's bridge.
 - **Depends on.** **WikiBundle `published_spaces`** (next Wiki minor; Wiki's roadmap lists public links as "later"):
   an organisation publishes a space; only pages marked published are public and read-only, without comments,
   revisions or author names; search over published pages only. CrmKit only adds the suggester (D-2).
@@ -270,8 +432,15 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 ### Block I — meeting scheduling links (CrmKit 0.26.0)
 
-- **Depends on.** Block A (meetings, ICS); TaskBoard event source; **MailKit Graph free / busy** after B1 (Planning
-  alone works before). The Graph permission needed for free / busy is not verified here; it is settled in the MailKit
+- **Reuse (owner rule).**
+  - Booking pages: **new in CrmKit**, because no bundle has public booking.
+  - Availability from Outlook / Google: **extend TimeTrack** with a busy-window reader for future windows (start /
+    end only) next to its read-only past-event readers (Google free/busy, Graph getSchedule; the provider scopes are
+    settled in the TimeTrack contract revision and are not verified here). Planning calendar: TaskBoard event
+    sources through Beacon's adapter (as is).
+  - Meeting, ICS and calendar event: as in block A (TaskBoard as is, MailKit ICS extension).
+- **Depends on.** Block A (meetings, ICS); TaskBoard event source; **TimeTrack busy-window reader** (Planning alone
+  works before). The provider permissions for free / busy are not verified here; they are settled in the TimeTrack
   contract revision.
 - **New ports.** `CrmAvailabilityInterface` — `freeSlots(TenantRef, ActorRef, AvailabilityWindow): list<FreeSlot>`
   (free / busy only, never event details).
@@ -304,8 +473,8 @@ a sunset date (to be re-checked in each block's build task). The H1 read-only ru
 
 ### Owner questions (Q-254)
 
-All fourteen were decided by the owner on 2026-11-23: every recommendation was accepted. The options stay listed for
-the record.
+Q-254-1..14 were decided by the owner on 2026-11-23: every recommendation was accepted. The options stay listed for
+the record. Q-254-15 and Q-254-16 come from the owner's reuse rule of the same day and are **open**.
 
 | # | Question | Options | Recommendation and decision |
 | --- | --- | --- | --- |
@@ -323,12 +492,21 @@ the record.
 | Q-254-12 | Accepted quote moves the deal to won automatically (FR-034): also when the deal has other open quotes? | (a) yes, others become superseded; (b) only when it is the last open quote | Decision 2026-11-23: **(a)**, with the other quotes superseded in the same write unit |
 | Q-254-13 | Lead scoring (F-1) does not need blocks B or E: pull it forward if a release slot is free? | (a) keep the spec order; (b) allow it earlier | Decision 2026-11-23: **(b)**, only when no block of the agreed order is ready |
 | Q-254-14 | When is CrmKit 1.0.0 now that spec 254 adds nine blocks? | (a) after every block and phases D / F / G; (b) after blocks A–D are released and audited, later blocks as additive 1.x minors; (c) unchanged (after phase G) | Decision 2026-11-23: **(b)**: A–D settle the core schema; every later block is opt-in and additive |
+| Q-254-15 | Who runs the OAuth flow for personal mailboxes (block B) now that TimeTrack already connects Google / Microsoft calendars? | (a) MailKit runs its own OAuth flow and stores tokens; (b) extend TimeTrack's OAuth helpers with configurable extra scopes, Beacon keeps one connection per person and provider (host-held, sealed with DoctrineEncrypt), and MailKit reads tokens through a credential port; (c) extract the OAuth helpers into a new shared bundle | **Open.** Recommendation: **(b)**. It reuses tested PKCE code, gives one consent per person instead of two, and needs no new bundle; (c) only if a third bundle needs the helpers |
+| Q-254-16 | Static lists (FR-050): a new list object or CrmKit tags? | (a) a static list is a tag with a `list` flag (H1 already maps HubSpot lists to tags); (b) a separate `crm_list` table | **Open.** Recommendation: **(a)**. It reuses tags, bulk tagging and the tag filters, and needs no second membership model |
 
 ### Sequencing
 
 - **Now, in parallel with H1 / H2 / H3 (docs only, no file overlap with the code PRs):** the contract revision of A-1
   (and A-2) in [CONTRACT.md](CONTRACT.md); the Google OAuth app and assessment (T009, owner / ops, weeks of lead time);
   the MailKit B1 contract revision (Graph delegated mailboxes) in MailKitBundle.
+- **Bundle extensions first (reuse rule).** Each extension in the [reuse matrix](#reuse-matrix) is built in its own
+  repository, in parallel with CrmKit work, and released before the CrmKit slice that consumes it: MailKit ICS
+  invites (2.3.0) before A-1 is tagged, MailKit templates (2.4.0) before A-2; TimeTrack extra OAuth scopes (1.40.0) and
+  MailKit delegated mailboxes (2.5.0) before B; WorkingTime business time (0.4.0) before D-1; Wiki `published_spaces`
+  (1.55.0) before D-2; UiKit rule builder (2.72.0) before E-1; FormKit honeypot and embed mode (2.26.0) before E-2;
+  MailKit `sending_domains` (2.7.0) before F-2; AutomationKit 0.1.0 before F-3; TimeTrack busy reader (1.41.0) before I.
+  A-1 may be built against a MailKit branch, but it is tagged only once MailKit 2.3.0 is out.
 - **Files shared with H2 / H3.** `Infrastructure/Symfony/DependencyInjection` (configuration tree and extension), the
   seven translation files, `Domain/Enum`, the Doctrine mapping registration, CHANGELOG / UPGRADING. This overlap is
   mechanical (one PR rebases on the other). The **HubSpot follow-up of each block** touches `Application/HubSpot`,
@@ -371,7 +549,8 @@ with spec 254, 1.0.0 comes once blocks A–D are released and audited, later blo
 - **HubSpot import (H1–H3)** is designed in [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md): H1 0.10.0 (PR #23),
   H2 0.11.0, H3 0.12.0; numbers move up if another release lands first. Owner questions Q-H1..Q-H13 are listed there.
 - **HubSpot parity (Beacon spec 254)** adds nine blocks A–I after H3 (section below); its owner questions
-  Q-254-1..Q-254-14 were decided on 2026-11-23 (all recommendations accepted).
+  Q-254-1..Q-254-14 were decided on 2026-11-23 (all recommendations accepted). Q-254-15 (mailbox OAuth through TimeTrack) and Q-254-16
+  (static lists as tags) are open.
 - **Phases left:** B2 tasks and agenda, C quotes, D invoices, F customer portal, S scoring, E1 lists and segments,
   E2 informative circulars, G reports; plus the configurable numbering and import key (QN-1..10). Each phase needs its
   own contract revision first. This is the large part of the distance to 1.0.0.

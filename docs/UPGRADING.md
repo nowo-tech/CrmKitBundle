@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.8.0](#to-080)
 - [To 0.7.0](#to-070)
 - [To 0.6.1](#to-061)
 - [To 0.6.0](#to-060)
@@ -17,6 +18,39 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.8.0
+
+From **0.7.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
+
+No schema change, no BC break in the public PHP API, no route change. What you may notice:
+
+- The company and contact lists accept only known rows per page: a `per_page` that is not one of UiKit's values
+  (10, 25, 50, 100) or `ui.page_size` (or, with the new `ui.list_per_page`, not one of its values) now falls back to
+  `page_size`; before, any value from 1 to 100 was used while the pager counted 25. A page past the end shows the last
+  page instead of an empty list.
+- Tags and Custom fields now have a filter card (name search `q`) and the UiKit pager: they show `page_size` rows per
+  page (25 by default) instead of all of them. E2E tests that count every tag or field on one page set `per_page` or
+  search by name.
+- The *New company* / *New contact* actions carry `data-testid="crm-record-new"` (header) and
+  `crm-record-new-empty` (empty state).
+- New opt-in options: `ui.list_per_page` (a *Rows per page* select; `ui.page_size` must be one of its values) and
+  `ui.record_create: dialog` (create in a UiKit remote form dialog loaded on demand). With the dialog, e2e tests click
+  `crm-record-new` and fill the form inside `crm-record-dialog`; the URL `…/new` still answers the full page. See
+  CONFIGURATION, "Rows per page and the create dialog".
+- `ui.admin_create: dialog` now loads the create form on demand: the page has one empty remote form dialog shell
+  (`dialog#crm-tag-dialog`, `dialog#crm-field-dialog`) and no `form[name=crm_tag|crm_field]`; the header actions are
+  links to `?new=1` with `data-nowo-ui-dialog-*` attributes instead of `data-nowo-confirm-open`. E2E tests click
+  `crm-tag-new` / `crm-field-new-<subject>` and fill the form inside `crm-tag-dialog` / `crm-field-dialog` (submit:
+  `crm-tag-form-dialog-form-submit`, `crm-field-form-<subject>-dialog-form-submit`); `?new=1` shows the form card
+  instead of opening the dialog on load. A host that overrides `admin/tags.html.twig` / `admin/fields.html.twig` and
+  includes `admin/_create.html.twig` with `crm_create` either keeps working with the inline form (`crm_create` is null,
+  `form` is set) or sets `ui.admin_create: dialog_inline` (deprecated, removed in 1.0) to keep the 0.7 dialog.
+- Development: the lock moves to UiKit 2.68 and FormKit 2.24 (the constraints are unchanged).
 
 ## To 0.7.0
 

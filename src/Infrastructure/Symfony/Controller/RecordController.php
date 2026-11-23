@@ -25,6 +25,8 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\MergePickType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\MergeType;
 use Nowo\TransactionDoctrine\WriteUnit\AsWriteUnit;
+use Nowo\UiKitBundle\Dialog\RemoteDialogResponder;
+use Nowo\UiKitBundle\Twig\ThemeExtension;
 use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Column;
 use Nowo\UiKitBundle\View\Confirm;
@@ -33,7 +35,7 @@ use Nowo\UiKitBundle\View\FilterField;
 use Nowo\UiKitBundle\View\FormPage;
 use Nowo\UiKitBundle\View\ListPage;
 use Nowo\UiKitBundle\View\PageHeader;
-use Nowo\UiKitBundle\View\Pagination;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -44,6 +46,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use function array_map;
 use function implode;
 use function in_array;
+use function intdiv;
 use function is_array;
 use function is_numeric;
 use function is_string;
@@ -56,6 +59,9 @@ use function substr;
  */
 final readonly class RecordController
 {
+    /** Id of the "New company / New contact" remote form dialog (0.8.0, `ui.record_create: dialog`). */
+    public const RECORD_DIALOG = 'crm-record-dialog';
+
     /**
      * Wires the collaborators.
      */
@@ -68,6 +74,7 @@ final readonly class RecordController
         private RecordForms $forms,
         private RecordPage $page,
         private ?ImportServiceInterface $imports = null,
+        private ?RemoteDialogResponder $dialog = null,
     ) {
     }
 
@@ -90,20 +97,26 @@ final readonly class RecordController
             foreach ($this->reader->tags() as $tag) {
                 $tags[$tag->name] = $tag->id;
             }
-            $filters = $this->ui->form(FilterType::class, null, ['tags' => $tags, 'owners' => $this->forms->owners(), 'roles' => $this->forms->roles(), 'purposes' => $subject === SubjectType::Contact ? $this->forms->affiliationPurposes() : []], '');
+            $filters = $this->ui->form(FilterType::class, null, ['tags' => $tags, 'owners' => $this->forms->owners(), 'roles' => $this->forms->roles(), 'purposes' => $subject === SubjectType::Contact ? $this->forms->affiliationPurposes() : [], 'per_page' => $this->ui->options->listPerPage], '');
             $filters->handleRequest($request);
             $query  = $this->query($request, $subject, $tags);
             $result = $this->reader->list($query);
-            $token  = $this->ui->actionToken();
-            $rows   = [];
+            if ($result->rows === [] && $query->page > 1 && $result->total > 0) {
+                // 0.8.0: a page past the end shows the last page, as the pager does (rows per page changed, rows gone).
+                $query  = $this->query($request, $subject, $tags, null, intdiv($result->total - 1, $query->perPage) + 1);
+                $result = $this->reader->list($query);
+            }
+            $token = $this->ui->actionToken();
+            $rows  = [];
             foreach ($result->rows as $view) {
                 $rows[] = $this->row($view);
             }
             $canEdit   = $this->ui->can(CrmPermission::Edit);
             $canDelete = $this->ui->can(CrmPermission::Delete);
             $actions   = [];
-            if ($this->ui->can(CrmPermission::Create)) {
-                $actions[] = Action::create($this->ui->url('nowo_crm_kit_new', ['type' => $type]), UiSupport::label('record.new.' . $subject->value));
+            $canCreate = $this->ui->can(CrmPermission::Create);
+            if ($canCreate) {
+                $actions[] = $this->createAction($subject, 'crm-record-new');
             }
             if ($this->ui->can(CrmPermission::Export)) {
                 $actions[] = new Action('export', UiSupport::label('list.export'), $this->ui->url('nowo_crm_kit_export', ['type' => $type] + $request->query->all()), icon: 'download');
@@ -126,7 +139,7 @@ final readonly class RecordController
                     new PageHeader(UiSupport::label('list.title.' . $subject->value), null, $actions, tabs: $this->ui->tabs($type), actionsLayout: $this->ui->options->headerSplit() ? 'split' : 'toolbar'),
                     $columns,
                     $rows,
-                    $filters->createView(),
+                    $this->ui->filterView($filters, $query->perPage),
                     function (mixed $row) use ($type, $canEdit, $canDelete, $token, $query): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
                         $id      = is_array($row) && is_string($row['id'] ?? null) ? $row['id'] : '';
                         $menu    = $this->ui->options->rowMenu() ? ['data-crm-menu' => true] : [];
@@ -145,19 +158,20 @@ final readonly class RecordController
 
                         return $actions;
                     },
-                    Pagination::fromTotal($result->total, $query->page, $query->perPage, route: 'nowo_crm_kit_list', query: $request->query->all()),
-                    new EmptyState(UiSupport::label('list.empty.' . $subject->value), UiSupport::label('list.empty_hint'), $this->ui->can(CrmPermission::Create) ? Action::create($this->ui->url('nowo_crm_kit_new', ['type' => $type]), UiSupport::label('record.new.' . $subject->value)) : null),
+                    $this->ui->pagination($result->total, $query->page, $query->perPage, 'nowo_crm_kit_list', $request),
+                    new EmptyState(UiSupport::label('list.empty.' . $subject->value), UiSupport::label('list.empty_hint'), $canCreate ? $this->createAction($subject, 'crm-record-new-empty') : null),
                     $this->ui->url('nowo_crm_kit_list', ['type' => $type]),
                     $query->sort === 'name' ? 'label' : $query->sort,
                     $query->direction,
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-list-' . $subject->value],
-                    filterFields: [new FilterField('q', UiSupport::label('list.filter.q_placeholder'), 'lg', attributes: ['aria-label' => $this->ui->trans('list.filter.q')])],
+                    filterFields: [new FilterField('q', UiSupport::label('list.filter.q_placeholder'), 'lg', attributes: ['aria-label' => $this->ui->trans('list.filter.q')]), ...$this->ui->perPageField()],
                     responsive: 'cards',
                     filtersFold: $this->ui->options->filtersFold ? true : null,
                 ),
                 'crm_import_dialog' => $importDialog,
+                'crm_record_dialog' => $canCreate && $this->recordDialog() ? ['id' => self::RECORD_DIALOG, 'title' => UiSupport::label('record.new.' . $subject->value)] : null,
             ]);
         });
     }
@@ -170,25 +184,40 @@ final readonly class RecordController
     {
         return $this->ui->guard(function () use ($request, $type): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $subject = self::type($type);
+            // The same gate as the page in both modes: X-Nowo-Dialog only picks the fragment and the success answer.
             $this->ui->require(CrmPermission::Create);
-            $form = $this->forms->form($subject, null);
+            $dialog = $this->recordDialog() ? $this->dialog : null;
+            $form   = $this->forms->form($subject, null);
             $form->handleRequest($request);
             if ($form->isSubmitted() && $form->isValid()) {
                 try {
                     $id = $this->records->create($this->forms->input($subject, $form));
                     $this->ui->flash($request, 'success', 'record.created');
 
-                    return $this->ui->toRecord($subject, $id);
+                    // 0.8.0: in the dialog 204 + X-Nowo-Redirect (a route, same origin), else the 303 of the page.
+                    return $dialog instanceof RemoteDialogResponder
+                        ? $dialog->redirectToRoute('nowo_crm_kit_show', ['type' => $subject->segment(), 'id' => $id], Response::HTTP_SEE_OTHER, $request)
+                        : $this->ui->toRecord($subject, $id);
                 } catch (InvalidInputException $e) {
                     $this->ui->errors($form, $e);
                 } catch (ConflictException $e) {
+                    if ($dialog instanceof RemoteDialogResponder && $dialog->isDialog($request)) {
+                        // In the dialog the message stays next to the typed form (a 422 is re-rendered in place).
+                        $form->addError(new FormError($this->ui->trans('flash.conflict.' . $e->errorCode)));
+
+                        return $this->createDialog($subject, $form, $dialog, Response::HTTP_UNPROCESSABLE_ENTITY);
+                    }
                     $this->ui->flash($request, 'error', 'flash.conflict.' . $e->errorCode);
 
-                    return $this->formPage($subject, $form, null, Response::HTTP_CONFLICT);
+                    return $this->vary($dialog, $this->formPage($subject, $form, null, Response::HTTP_CONFLICT));
                 }
             }
+            $status = $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK;
+            if ($dialog instanceof RemoteDialogResponder && $dialog->isDialog($request)) {
+                return $this->createDialog($subject, $form, $dialog, $status);
+            }
 
-            return $this->formPage($subject, $form, null, $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK);
+            return $this->vary($dialog, $this->formPage($subject, $form, null, $status));
         });
     }
 
@@ -459,6 +488,55 @@ final readonly class RecordController
     }
 
     /**
+     * Whether "New company / contact" open in the remote form dialog (0.8.0): `ui.record_create: dialog` and UiKit's
+     * responder.
+     */
+    private function recordDialog(): bool
+    {
+        return $this->ui->options->recordDialog() && $this->dialog instanceof RemoteDialogResponder;
+    }
+
+    /**
+     * The "New company / contact" action: a link to the form page; with `ui.record_create: dialog` it also opens that
+     * page on demand in the remote form dialog (UiKit `js/nowo-ui-dialog.js`; the href stays the no-JS fallback).
+     */
+    private function createAction(SubjectType $type, string $testid): Action
+    {
+        $href  = $this->ui->url('nowo_crm_kit_new', ['type' => $type->segment()]);
+        $label = UiSupport::label('record.new.' . $type->value);
+        if (!$this->recordDialog()) {
+            return new Action('create', $label, $href, variant: 'primary', attributes: ['data-testid' => $testid]);
+        }
+        $attributes = ThemeExtension::remoteFormOpener(self::RECORD_DIALOG, $this->ui->trans('record.new.' . $type->value), false, $href);
+
+        return new Action('create', $label, $href, variant: 'primary', attributes: $attributes + ['aria-haspopup' => 'dialog', 'aria-controls' => self::RECORD_DIALOG, 'data-testid' => $testid]);
+    }
+
+    /**
+     * The fragment of the "New company / contact" dialog (0.8.0): the form, its errors and the Save / Cancel row,
+     * `Vary: X-Nowo-Dialog` (the URL serves the page too).
+     *
+     * @param FormInterface<mixed> $form
+     */
+    private function createDialog(SubjectType $type, FormInterface $form, RemoteDialogResponder $dialog, int $status): Response
+    {
+        return $dialog->fragment($this->ui->render('@NowoCrmKit/_dialog_form.html.twig', [
+            'form'   => $form->createView(),
+            'action' => $this->ui->url('nowo_crm_kit_new', ['type' => $type->segment()]),
+            'dialog' => self::RECORD_DIALOG,
+            'testid' => 'crm-record-dialog-form',
+        ], $status));
+    }
+
+    /**
+     * Adds `Vary: X-Nowo-Dialog` to the page of a URL that also serves the dialog fragment (0.8.0).
+     */
+    private function vary(?RemoteDialogResponder $dialog, Response $response): Response
+    {
+        return $dialog instanceof RemoteDialogResponder ? $dialog->fragment($response) : $response;
+    }
+
+    /**
      * The record form page.
      *
      * @param FormInterface<mixed> $form
@@ -487,7 +565,7 @@ final readonly class RecordController
      *
      * @param array<string, string>|null $tags tag name => id (filter values are checked against them)
      */
-    private function query(Request $request, SubjectType $type, ?array $tags, ?int $perPage = null): ListQuery
+    private function query(Request $request, SubjectType $type, ?array $tags, ?int $perPage = null, ?int $page = null): ListQuery
     {
         $q      = $request->query->all();
         $text   = is_string($q['q'] ?? null) ? $q['q'] : null;
@@ -507,8 +585,8 @@ final readonly class RecordController
             $status,
             $sort,
             is_string($q['direction'] ?? null) ? $q['direction'] : 'asc',
-            is_numeric($q['page'] ?? null) ? (int) $q['page'] : 1,
-            $perPage ?? (is_numeric($q['per_page'] ?? null) ? (int) $q['per_page'] : $this->ui->pageSize),
+            $page ?? (is_numeric($q['page'] ?? null) ? (int) $q['page'] : 1),
+            $perPage ?? $this->ui->options->perPage($q['per_page'] ?? null, $this->ui->pageSize),
             role: $role,
             purpose: $purpose,
             primaryContactOnly: $type === SubjectType::Contact && ($q['primary_contact'] ?? null) === '1',

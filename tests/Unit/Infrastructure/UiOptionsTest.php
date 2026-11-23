@@ -44,4 +44,29 @@ final class UiOptionsTest extends TestCase
         self::assertNull($options->tabIcon('tags'));
         self::assertSame('tabler:building', $options->tabIcon('companies'));
     }
+
+    public function testRowsPerPageFollowTheChoicesElseTheUiKitValuesAndThePageSize(): void
+    {
+        $off = new UiOptions();
+        self::assertFalse($off->perPageSelect());
+        self::assertFalse($off->recordDialog());
+        self::assertSame([10, 15, 25, 50, 100], $off->allowedPerPage(15));
+        self::assertSame([10, 25, 50, 100], $off->allowedPerPage(25));
+        self::assertSame(15, $off->perPage('15', 15));
+        self::assertSame(50, $off->perPage(50, 25));
+        foreach (['7', '1000', '', '1e1', ' 10', null, [10], 10.0] as $bad) {
+            self::assertSame(25, $off->perPage($bad, 25));
+        }
+
+        $on = new UiOptions(listPerPage: [50, 10, 25], recordCreate: 'dialog');
+        self::assertTrue($on->perPageSelect());
+        self::assertTrue($on->recordDialog());
+        self::assertSame([10, 25, 50], $on->allowedPerPage(25));
+        self::assertSame(10, $on->perPage('10', 25));
+        self::assertSame(25, $on->perPage('100', 25), 'not a configured choice');
+        self::assertFalse($on->createRemote());
+        self::assertTrue((new UiOptions(adminCreate: 'dialog'))->createRemote());
+        self::assertFalse((new UiOptions(adminCreate: 'dialog'))->createDialog(), 'dialog is on demand since 0.8.0');
+        self::assertTrue((new UiOptions(adminCreate: 'dialog_inline'))->createDialog());
+    }
 }

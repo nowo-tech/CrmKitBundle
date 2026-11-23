@@ -17,7 +17,9 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\UiKitBundle\View\AreaNav;
 use Nowo\UiKitBundle\View\AreaNavItem;
+use Nowo\UiKitBundle\View\FilterField;
 use Nowo\UiKitBundle\View\Label;
+use Nowo\UiKitBundle\View\Pagination;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
@@ -255,6 +257,46 @@ final readonly class UiSupport
         foreach ($view->children as $child) {
             self::prefixIds($child, $from, $to);
         }
+    }
+
+    /**
+     * The pager of a list (0.8.0): UiKit's {@see Pagination} with the per-page values the list accepts, the page size
+     * as the default and the request query kept across pages (filters, sort). The `_pagination` partial prints the
+     * "Showing x–y of z" line under the table even on a single page, and the page links from two pages on.
+     */
+    public function pagination(int $total, int $page, int $perPage, string $route, Request $request): Pagination
+    {
+        $query = $request->query->all();
+        unset($query['page']);
+
+        return Pagination::fromTotal($total, $page, $perPage, $this->options->allowedPerPage($this->pageSize), $this->pageSize, $route, $query);
+    }
+
+    /**
+     * The view of a list's filter form with the rows per page the list used (0.8.0): a `per_page` outside the
+     * configured choices shows the page size the list fell back to, not the browser's first option.
+     *
+     * @param FormInterface<mixed> $form
+     */
+    public function filterView(FormInterface $form, int $perPage): FormView
+    {
+        $view = $form->createView();
+        if (isset($view->children['per_page'])) {
+            $view->children['per_page']->vars['value'] = (string) $perPage;
+            $view->children['per_page']->vars['data']  = $perPage;
+        }
+
+        return $view;
+    }
+
+    /**
+     * The UiKit options of the "Rows per page" filter (0.8.0): a narrow field, none without `ui.list_per_page`.
+     *
+     * @return list<FilterField>
+     */
+    public function perPageField(): array
+    {
+        return $this->options->perPageSelect() ? [new FilterField('per_page', null, 'sm', rowAttributes: ['data-testid' => 'crm-per-page'])] : [];
     }
 
     /**

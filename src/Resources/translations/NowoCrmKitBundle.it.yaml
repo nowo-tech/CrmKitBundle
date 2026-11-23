@@ -30,6 +30,7 @@ list:
         company: Nessuna azienda per ora.
         contact: Nessun contatto per ora.
     empty_hint: Creane uno oppure importa un file CSV o vCard.
+    no_match: 'Nessun risultato per la ricerca.'
     export: Esporta CSV
     import: 'Importa'
     col:
@@ -51,6 +52,9 @@ list:
         any_purpose: 'Qualsiasi finalità'
         any_primary_contact: 'Qualsiasi impostazione di contatto principale'
         any_owner: 'Qualsiasi responsabile'
+        per_page: 'Righe per pagina'
+        name: 'Nome'
+        name_placeholder: 'Cerca per nome'
     status:
         active: Attivi
         trashed: Cestino

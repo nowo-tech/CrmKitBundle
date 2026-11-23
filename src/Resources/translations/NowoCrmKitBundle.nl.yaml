@@ -30,6 +30,7 @@ list:
         company: Nog geen bedrijven.
         contact: Nog geen contacten.
     empty_hint: Maak er een aan of importeer een CSV- of vCard-bestand.
+    no_match: 'Niets komt overeen met de zoekopdracht.'
     export: CSV exporteren
     import: 'Importeren'
     col:
@@ -51,6 +52,9 @@ list:
         any_purpose: 'Elk doel'
         any_primary_contact: 'Elke instelling hoofdcontact'
         any_owner: 'Elke eigenaar'
+        per_page: 'Rijen per pagina'
+        name: 'Naam'
+        name_placeholder: 'Zoeken op naam'
     status:
         active: Actief
         trashed: Prullenbak

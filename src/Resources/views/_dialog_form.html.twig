@@ -1,0 +1,21 @@
+{#
+  A CRM form as the fragment of the UiKit remote form dialog (0.8.0): "New company / New contact"
+  (`ui.record_create: dialog`), "New tag" and "New field" (`ui.admin_create: dialog`). Answered to the form's own URL
+  with `X-Nowo-Dialog: 1` (200) and to an invalid submission (422, re-rendered in the dialog, focus on the first invalid
+  field). Same route, field names and CSRF token as the page. The Save / Cancel row (`data-nowo-ui-dialog-actions`)
+  moves into the dialog footer; Cancel is a `type="button"` that closes the dialog. The form is named by the dialog
+  title (`<dialog id>-title`).
+  Variables: form (FormView), action (the URL the form posts to), dialog (the dialog id), testid, submit (translation
+  key, default form.save).
+#}
+{%- set _b = 'NowoCrmKitBundle' -%}
+<div data-testid="{{ testid }}">
+    {{ form_start(form, {action: action, attr: {class: nowo_ui_class('form', _b), 'aria-labelledby': dialog ~ '-title', id: dialog ~ '-form'}}) }}
+    {% if form.vars.errors|length > 0 %}<div class="{{ nowo_ui_class('flash_error', _b) }}" role="alert" data-testid="{{ testid }}-errors">{{ form_errors(form) }}</div>{% endif %}
+    {% for child in form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
+    <div class="{{ nowo_ui_class('form_actions', _b) }}" data-nowo-ui-dialog-actions>
+        <button type="submit" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="{{ testid }}-submit">{{ (submit ?? 'form.save')|trans({}, _b) }}</button>
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-nowo-ui-dialog-close data-testid="{{ testid }}-cancel">{{ 'form.cancel'|trans({}, _b) }}</button>
+    </div>
+    {{ form_end(form) }}
+</div>

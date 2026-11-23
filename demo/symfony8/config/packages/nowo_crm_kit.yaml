@@ -19,6 +19,10 @@ nowo_crm_kit:
         # the Settings form takes the full content width. The Symfony 7 demo keeps the defaults (inline, form panel).
         admin_create: dialog
         settings_width: full
+        # 0.8.0: "Rows per page" in the filter card of the lists, Tags and Custom fields; "New company / contact" in a
+        # UiKit remote form dialog loaded on demand (the header link is the page without JavaScript).
+        list_per_page: [10, 25, 50, 100]
+        record_create: dialog
     roles:
         catalogue: [customer, supplier, partner, distributor]
     affiliations:

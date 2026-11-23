@@ -94,33 +94,34 @@ test.describe('CRM Kit demo', () => {
   test('admin creates a tag and a custom field in their dialogs', async ({ page }) => {
     await login(page, 'admin');
     await page.goto('/crm/admin/tags');
+    // 0.8.0: the form is not in the page; the dialog loads it on demand (X-Nowo-Dialog).
+    await expect(page.locator('form[name="crm_tag"]')).toHaveCount(0);
     await page.getByTestId('crm-tag-new').click();
-    const tagDialog = page.getByTestId('crm-tag-form-dialog');
-    await expect(tagDialog).toBeVisible();
+    const tagDialog = page.getByTestId('crm-tag-dialog');
+    await expect(tagDialog.locator('input[name="crm_tag[name]"]')).toBeVisible();
     const tag = `Key ${Date.now() % 100000}`;
     await tagDialog.locator('input[name="crm_tag[name]"]').fill(tag);
-    await page.getByTestId('crm-tag-form-submit').click();
+    await tagDialog.getByTestId('crm-tag-form-dialog-form-submit').click();
     await expect(page.getByTestId('crm-tags')).toContainText(tag);
     await expect(tagDialog).toBeHidden();
 
     await page.goto('/crm/admin/fields');
     await page.getByTestId('crm-field-new-company').click();
-    const dialog = page.getByTestId('crm-field-form-company-dialog');
-    await expect(dialog).toBeVisible();
-    // An invalid key answers 422 and the dialog opens again with the error.
+    const dialog = page.getByTestId('crm-field-dialog');
+    await expect(dialog.locator('input[name="crm_field[key]"]')).toBeVisible();
+    // An invalid key answers 422: the form is re-rendered in the dialog with the error.
     await dialog.locator('input[name="crm_field[key]"]').fill('Bad Key');
     await dialog.locator('input[name="crm_field[label]"]').fill('Tier');
-    await page.getByTestId('crm-field-form-company-submit').click();
-    await expect(dialog).toBeVisible();
+    await dialog.getByTestId('crm-field-form-company-dialog-form-submit').click();
+    await expect(dialog.locator('[aria-invalid="true"]').first()).toBeVisible();
+    await expect(page).toHaveURL(/\/crm\/admin\/fields$/);
     await dialog.locator('input[name="crm_field[key]"]').fill(`tier_${Date.now() % 100000}`);
-    await page.getByTestId('crm-field-form-company-submit').click();
+    await dialog.getByTestId('crm-field-form-company-dialog-form-submit').click();
     await expect(page.getByTestId('crm-fields')).toContainText('Tier');
 
-    // ?new=1 opens the dialog on load and drops the parameter.
+    // ?new=1, the opener's href, is the page with the form card (no JavaScript needed).
     await page.goto('/crm/admin/fields?for=contact&new=1');
-    await expect(page.getByTestId('crm-field-form-contact-dialog')).toBeVisible();
-    await expect(page).not.toHaveURL(/new=1/);
-    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('crm-field-form').locator('form[name="crm_field"]')).toBeVisible();
     await logout(page);
   });
 });

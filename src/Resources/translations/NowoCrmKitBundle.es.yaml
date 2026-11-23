@@ -30,6 +30,7 @@ list:
         company: Aún no hay empresas.
         contact: Aún no hay contactos.
     empty_hint: Crea una o importa un archivo CSV o vCard.
+    no_match: 'Nada coincide con la búsqueda.'
     export: Exportar CSV
     import: 'Importar'
     col:
@@ -51,6 +52,9 @@ list:
         any_purpose: 'Cualquier finalidad'
         any_primary_contact: 'Cualquier ajuste de contacto principal'
         any_owner: 'Cualquier responsable'
+        per_page: 'Filas por página'
+        name: 'Nombre'
+        name_placeholder: 'Buscar por nombre'
     status:
         active: Activos
         trashed: Papelera

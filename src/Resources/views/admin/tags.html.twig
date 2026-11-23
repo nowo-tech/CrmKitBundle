@@ -1,4 +1,6 @@
 {#
+  0.8.0: with `ui.admin_create: dialog` the create form loads on demand into one UiKit remote form dialog
+  (crm_create_remote, see admin/_create_remote.html.twig); crm_create is then null. `form` stays set for host overrides.
   Tags of the tenant (manage): the list and create. Variables: page (ListPage), form (FormView: the inline create form,
   or the dialog's with `ui.admin_create: dialog`), crm_create (null, or the create dialogs: see admin/_create.html.twig).
   0.6.0: the colour column shows a swatch (class crm-kit-swatch + crm-kit-tag--<colour>, see css/nowo-crm-kit.css) and the
@@ -23,7 +25,9 @@
 
 {% block nowo_ui_content %}
     {{ parent() }}
-    {% if crm_create|default(null) is not null %}
+    {% if crm_create_remote|default(null) is not null %}
+        {{ include('@NowoCrmKit/admin/_create_remote.html.twig', {create: crm_create_remote}, false) }}
+    {% elseif crm_create|default(null) is not null %}
         {{ include('@NowoCrmKit/admin/_create.html.twig', {create: crm_create}, false) }}
     {% else %}
         {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'tag.add', submit: 'tag.save', action: null, testid: 'crm-tag-form'}) }}

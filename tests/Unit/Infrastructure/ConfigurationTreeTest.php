@@ -39,11 +39,29 @@ final class ConfigurationTreeTest extends TestCase
         self::assertSame(['funnels' => '', 'tags' => null, 'contacts' => 'users'], $this->process(['ui' => ['tab_icons' => ['funnels' => '', 'tags' => null, 'contacts' => 'users']]])['ui']['tab_icons'] ?? null);
     }
 
+    public function testListPerPageAndRecordCreateAreOptIn(): void
+    {
+        $config = $this->process([]);
+        self::assertSame([], $config['ui']['list_per_page'] ?? null, 'no rows-per-page select by default');
+        self::assertSame('page', $config['ui']['record_create'] ?? null);
+        $config = $this->process(['ui' => ['list_per_page' => [10, 25, 50, 100], 'record_create' => 'dialog']]);
+        self::assertSame([10, 25, 50, 100], $config['ui']['list_per_page'] ?? null);
+        self::assertSame('dialog', $config['ui']['record_create'] ?? null);
+        self::assertSame('dialog_inline', $this->process(['ui' => ['admin_create' => 'dialog_inline']])['ui']['admin_create'] ?? null, 'the deprecated 0.6.1 dialog');
+        self::assertSame([5, 15], $this->process(['ui' => ['page_size' => 15, 'list_per_page' => [5, 15]]])['ui']['list_per_page'] ?? null);
+    }
+
     /**
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function invalid(): iterable
     {
+        yield 'per page below 5' => [['ui' => ['list_per_page' => [4, 25]]], 'ui.list_per_page'];
+        yield 'per page above 100' => [['ui' => ['list_per_page' => [25, 200]]], 'ui.list_per_page'];
+        yield 'per page duplicate' => [['ui' => ['list_per_page' => [25, 25]]], 'ui.list_per_page'];
+        yield 'too many per page' => [['ui' => ['list_per_page' => range(10, 65, 5)]], 'ui.list_per_page'];
+        yield 'per page without the page size' => [['ui' => ['list_per_page' => [10, 50]]], 'ui.page_size must be one of ui.list_per_page'];
+        yield 'record create' => [['ui' => ['record_create' => 'modal']], 'record_create'];
         yield 'prefix' => [['doctrine' => ['table_prefix' => 'Bad-']], 'table_prefix'];
         yield 'path' => [['ui' => ['path' => 'crm']], 'ui.path'];
         yield 'purpose' => [['gdpr' => ['purposes' => ['Marketing']]], 'gdpr.purposes'];

@@ -101,6 +101,30 @@ final class HubSpotAuditTest extends HubSpotTestCase
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_tagging'), 'no edit on the member: no tag');
     }
 
+    public function testUnattendedAffiliationsAndTagsOfRecordsTheRunDoesNotUpdate(): void
+    {
+        $fake = $this->hubspot(self::SCOPED);
+        $fake->seedCompanies(2);
+        $fake->seedContacts(1);
+        $this->connect($fake);
+        self::assertTrue($this->imports()->run($this->startAndConfirm([HubSpotObject::Company])));
+        $leos = $this->text("SELECT target_id FROM nowo_crm_external_ref WHERE external_id = '1001'");
+        $this->connection()->executeStatement("UPDATE nowo_crm_company SET owner_id = 'leo' WHERE id = ?", [$leos]);
+        // 1001 is gone from HubSpot's listing (archived) but still named by an association and a list.
+        unset($fake->companies[1001]);
+        $fake->associations = ['2001' => [['1001', true]]];
+        $id                 = $this->startAndConfirm(properties: ['contacts' => ['email' => 'email', 'lastname' => 'last_name']]);
+        $this->resume($id);
+        self::assertSame(NeedsPersonException::CODE, $this->imports()->preview($id)->errorCode, 'the affiliation\'s company is leo\'s');
+        self::assertTrue($this->imports()->run($id));
+        // A list of companies: 1002 (ownerless) gets its tag unattended, 1001 (leo's) needs a person.
+        $fake->lists = ['78' => ['name' => 'Accounts', 'type' => '0-2', 'members' => ['1002']], '79' => ['name' => 'Key', 'type' => '0-2', 'members' => ['1001']]];
+        $id          = $this->startAndConfirm([HubSpotObject::Company], ['78', '79'], ['78' => 'create', '79' => 'create'], properties: ['companies' => ['name' => 'name']]);
+        $this->resume($id);
+        self::assertSame(NeedsPersonException::CODE, $this->imports()->preview($id)->errorCode);
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_tagging'), 'the ownerless member got its tag');
+    }
+
     public function testTheWriteScopeCheckFailsClosedAndServiceKeysAreNotVerified(): void
     {
         $fake = $this->hubspot();

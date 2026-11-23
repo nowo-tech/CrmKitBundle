@@ -248,6 +248,8 @@ final class HubSpotValuesTest extends TestCase
         $import = new Import('01890000-0000-7000-8000-000000000005', 'acme', SubjectType::Contact, ImportFormat::HubSpot, 'HubSpot', ['contacts'], [], 1, 'ana', $now, 'c1');
         $import->startCursor(['a' => 1]);
         $import->pause($now, 'hubspot_rate_limited');
+        $import->confirmBy('ana');
+        self::assertSame('ana', $import->getConfirmedById());
         self::assertSame(['c1', ['a' => 1], $now, 'hubspot_rate_limited'], [$import->getConnectionId(), $import->getCursor(), $import->getResumeAfter(), $import->getErrorCode()]);
         self::assertFalse(ImportFormat::HubSpot->isFile());
         self::assertSame(SubjectType::Contact, (new ImportRow('r', 'i', 'acme', 1, [], SubjectType::Contact))->getSubjectType());

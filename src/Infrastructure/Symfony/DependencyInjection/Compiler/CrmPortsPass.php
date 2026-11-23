@@ -5,18 +5,25 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler;
 
 use LogicException;
+use Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox;
+use Nowo\CrmKitBundle\Bridge\OutboundUrlGuard\GuardedHubSpotRequestOptions;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\CrmTaskBoardUserResolverInterface;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\TaskBoardCrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmActorEmailLookupInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
+use Nowo\CrmKitBundle\Infrastructure\HubSpot\HttpHubSpotReader;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\ConfiguredCrmApiTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\SecurityUserCrmApiAuthenticator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
+use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
+use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiReadOperations;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiTaskOperations;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponsePolicy;
@@ -26,6 +33,7 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
 use function class_exists;
+use function interface_exists;
 use function is_string;
 
 /**
@@ -80,6 +88,43 @@ final class CrmPortsPass implements CompilerPassInterface
         }
         if ($container->getParameter($p . 'pipeline.enabled') === true) {
             $this->taskPort($container);
+        }
+        $lookup = $container->getParameter($p . 'actor_email_lookup');
+        if (is_string($lookup) && $lookup !== '') {
+            $container->setAlias(CrmActorEmailLookupInterface::class, $lookup);
+        }
+        if ($container->getParameter($p . 'import.hubspot.enabled') === true) {
+            $this->hubspot($container);
+        }
+        if ($container->getParameter($p . 'import.messenger.enabled') === true && !$container->has('messenger.default_bus')) {
+            throw new LogicException('nowo_crm_kit.import.messenger.enabled needs symfony/messenger with a default bus (framework.messenger).');
+        }
+    }
+
+    /**
+     * The HubSpot import (0.10.0): the secret box is `secrets.box` (the
+     * DoctrineEncrypt bridge is defined here when chosen and DoctrineEncrypt is installed) or the sodium default; the
+     * OutboundUrlGuard pin follows `import.hubspot.outbound_url_guard`.
+     */
+    private function hubspot(ContainerBuilder $container): void
+    {
+        $p   = ServiceDefinitions::P;
+        $box = $container->getParameter($p . 'secrets.box');
+        if ($box === DoctrineEncryptCrmSecretBox::class && !$container->has($box)) {
+            if (!interface_exists(EncryptorRegistryInterface::class) || !$container->has(EncryptorRegistryInterface::class)) {
+                throw new LogicException('nowo_crm_kit.secrets.box is the DoctrineEncrypt bridge but nowo-tech/doctrine-encrypt-bundle is not installed and enabled.');
+            }
+            $container->setDefinition($box, (new Definition($box))->setArguments([new Reference(EncryptorRegistryInterface::class)]));
+        }
+        $container->setAlias(CrmSecretBoxInterface::class, is_string($box) && $box !== '' ? $box : $p . 'default.secret_box');
+        $guard = $container->getParameter($p . 'import.hubspot.outbound_url_guard');
+        $has   = class_exists(OutboundUrlGuard::class) && $container->has(OutboundUrlGuard::class);
+        if ($guard === 'required' && !$has) {
+            throw new LogicException('nowo_crm_kit.import.hubspot.outbound_url_guard is "required" but nowo-tech/outbound-url-guard-bundle is not installed and enabled.');
+        }
+        if ($guard !== 'off' && $has) {
+            $container->setDefinition(GuardedHubSpotRequestOptions::class, (new Definition(GuardedHubSpotRequestOptions::class))->setArguments([new Reference(OutboundUrlGuard::class)]));
+            $container->getDefinition(HttpHubSpotReader::class)->replaceArgument(2, new Reference(GuardedHubSpotRequestOptions::class));
         }
     }
 

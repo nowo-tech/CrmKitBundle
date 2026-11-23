@@ -8,6 +8,7 @@
 - [Feature gate and plan limits](#feature-gate-and-plan-limits)
 - [Doctrine](#doctrine)
 - [Fields, import and GDPR](#fields-import-and-gdpr)
+- [HubSpot import (0.10.0)](#hubspot-import-0100)
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Search](#search)
 - [UI](#ui)
@@ -60,6 +61,23 @@ nowo_crm_kit:
         sync_rows: 500             # 10..50000 rows run in the confirm request (then "Continue")
         chunk_rows: 100            # 10..1000 rows per transaction
         stale_claim_seconds: 600   # 60..86400: a running import without progress for this long may be taken over
+        hubspot:                   # 0.10.0
+            enabled: false         # needs a secret box (secrets.*) and symfony/http-client
+            page_size: 100         # 10..100 objects per HubSpot page
+            pages_per_request: 2   # 1..20 pages a web request settles
+            max_records: 50000     # 1..500000 objects per kind per run (beyond: failed, hubspot_too_many)
+            outbound_url_guard: auto   # auto | required | off: pin api.hubapi.com through OutboundUrlGuard
+            http: { timeout: 10, max_duration: 30, max_response_bytes: 8388608 }
+            rate_limit: { max_attempts: 5, max_retry_after: 60 }
+            connect_rate_limit: { limit: 5, interval: 600 }   # credential checks per tenant per window (seconds)
+        messenger:                 # 0.10.0, any format
+            enabled: false         # true: confirm / "Continue" dispatch RunCrmImport (symfony/messenger)
+            units: 20              # 1..1000 chunks or pages per message
+    secrets:                       # 0.10.0
+        box: null                  # service id of CrmSecretBoxInterface; null = SodiumCrmSecretBox with keys below
+        keys: {}                   # key id => '%env(base64:CRM_KIT_SECRET_KEY_2026)%' (32 bytes)
+        current_key: null          # the key id that seals; the others only open
+    actor_email_lookup: null       # 0.10.0: service id of CrmActorEmailLookupInterface (HubSpot owners by e-mail)
     gdpr:
         purposes: [marketing_email, newsletter, tracking]   # distinct keys ^[a-z][a-z0-9_.]{0,63}$
     roles:
@@ -118,6 +136,7 @@ service ever needs to be overridden. What each port does and how to implement it
 | `actor_directory` | `Domain\Port\CrmActorDirectoryInterface` | `SecurityActorDirectory`: the signed-in user only |
 | `audit_sink` | `Domain\Port\CrmAuditSinkInterface` | `PsrLogAuditSink`: one `info` line per entry |
 | `clock` | `Psr\Clock\ClockInterface` | FrameworkBundle's `clock` service |
+| `actor_email_lookup` (0.10.0) | `Domain\Port\CrmActorEmailLookupInterface` | none: the actor directory's owners filtered by e-mail |
 
 Panel providers (`CrmPanelProviderInterface`) and host object resolvers (`CrmHostObjectResolverInterface`) are not
 configured: any service implementing them is autoconfigured with its tag (`nowo_crm_kit.panel`,
@@ -208,6 +227,48 @@ warm-up). See [INSTALLATION.md](INSTALLATION.md#schema-and-migrations).
 - `import.stale_claim_seconds`: when a running import has made no progress for this long, `nowo:crm-kit:import:resume`
   (run it every few minutes) takes it over, and anyone with `edit` may cancel it from its page.
 - `gdpr.purposes`: the consent purposes the UI offers and the service accepts.
+
+## HubSpot import (0.10.0)
+
+`import.hubspot.enabled: true` maps two more tables (`crm_hubspot_connection`, `crm_external_ref`, mapping group
+`NowoCrmKitBundleHubSpot`), registers the HubSpot routes under `ui.path` (`/import/hubspot…`) and the services. The
+container refuses it without a secret box:
+
+```yaml
+nowo_crm_kit:
+    secrets:
+        keys:
+            k2026: '%env(base64:CRM_KIT_SECRET_KEY_2026)%'   # 32 random bytes: php -r "echo base64_encode(random_bytes(32));"
+        current_key: k2026
+    import:
+        hubspot:
+            enabled: true
+```
+
+Or the house option (Beacon), DoctrineEncryptBundle's default profile (or `Halite` / `Defuse`; MysqlAes is refused):
+
+```yaml
+nowo_crm_kit:
+    secrets:
+        box: Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox
+```
+
+Key rotation: add the new key, make it `current_key`, keep the old one listed, run
+`php bin/console nowo:crm-kit:secrets:rotate` (`--dry-run` counts first), then drop the old key. A credential that no
+longer opens marks its connection invalid; a manager pastes a new one. With the DoctrineEncrypt box the key id never
+changes: rotate DoctrineEncrypt's key while the old one can still decrypt, then run
+`nowo:crm-kit:secrets:rotate --all` (re-seals every credential), then retire the old key. The bridge accepts the
+Halite and Defuse encryptors; for another (authenticated) encryptor define your own service
+`new DoctrineEncryptCrmSecretBox($registry, $profile, allowCustom: true)` and name it in `secrets.box`.
+
+Keys come from the environment only (`%env(base64:…)%`): `secrets.keys` is never published as container parameters.
+Never paste a production credential with the Symfony profiler or the debug toolbar on.
+
+There is no base-URL key: the HubSpot host is the constant `https://api.hubapi.com`. In a demo or an end-to-end test,
+decorate the kit's client service `nowo_crm_kit.hubspot.http_client` with a fake (a `MockHttpClient` or a local fake
+server); never use a real credential in tests. `outbound_url_guard: auto` pins the resolved public address of the host
+when nowo-tech/outbound-url-guard-bundle is installed (`required` fails the build without it; `off` never pins).
+`import.messenger.*` and the scopes to tick: [USAGE.md](USAGE.md#hubspot-import-0100).
 
 ## Roles and affiliation purposes
 

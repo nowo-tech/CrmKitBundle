@@ -307,6 +307,68 @@ merge:
         other: ID des anderen Datensatzes
         other_help: Die ID in der Adresse seiner Seite.
 import:
+    hubspot:
+        title: 'Aus HubSpot importieren'
+        source: 'Oder aus HubSpot importieren'
+        step:
+            source: 'Verbindung'
+            connect: 'Service Key'
+            start: 'Was importieren'
+            mapping: 'Zuordnung'
+            result: 'Ergebnis'
+        intro:
+            connect: 'Fügen Sie einen HubSpot-Service-Key (oder ein altes Private-App-Token) nur mit Lese-Scopes ein. Er wird bei HubSpot geprüft, verschlüsselt gespeichert und nie wieder angezeigt.'
+            start: 'Wählen Sie, was aus HubSpot gelesen wird. Kontakte bringen ihre Firmen mit.'
+            mapping: 'Wählen Sie das CRM-Feld jeder HubSpot-Eigenschaft. Leere HubSpot-Werte löschen nie einen CRM-Wert.'
+        submit:
+            connect: 'Prüfen und speichern'
+            start: 'Weiter'
+            mapping: 'Importieren'
+        form:
+            token: 'Service Key (oder Private-App-Token)'
+            token_help: 'In HubSpot: Development → Keys → Service keys. Nur die dokumentierten Lese-Scopes ankreuzen.'
+            label: 'Name (optional)'
+            confirm_account_change: 'Der Schlüssel darf zu einem anderen HubSpot-Konto gehören'
+            objects: 'Objekte'
+            objects_help: 'Deals folgen in einer späteren Version.'
+            lists: 'Listen (ihre Mitglieder bekommen ein Tag)'
+            lists_help: 'Höchstens 50.'
+        object:
+            companies: 'Firmen'
+            contacts: 'Kontakte'
+        list:
+            skip: 'Nicht taggen'
+            create: 'Neues Tag mit dem Namen der Liste'
+            label: 'Liste „%name%“'
+            option: '%name% (%kind%, %size%)'
+        target:
+            owner: 'Verantwortlich (per E-Mail)'
+            domain: 'Website aus der Domain'
+            custom: 'Eigenes Feld %key%'
+        card:
+            write_unverified: 'Schreib-Scopes nicht geprüft'
+            label: 'Name'
+            account: 'HubSpot-Konto'
+            credential: 'Service Key'
+            status: 'Status'
+            scopes: 'Scopes'
+            validated: 'Geprüft'
+        status:
+            active: 'Aktiv'
+            invalid: 'Abgelehnt: neuen Schlüssel einfügen'
+        start: 'Import starten'
+        replace: 'Schlüssel ersetzen'
+        disconnect: 'Trennen'
+        connect: 'HubSpot verbinden'
+        not_connected: 'HubSpot ist noch nicht verbunden.'
+        ask_manager: 'Bitten Sie eine CRM-Verwaltung, HubSpot zu verbinden.'
+        connected: 'HubSpot ist verbunden.'
+        disconnected: 'HubSpot wurde getrennt und der Schlüssel gelöscht.'
+        waiting: 'Wartet bis %time%'
+        col:
+            object: 'Objekt'
+            id: 'HubSpot-ID'
+        country_unknown: 'Land nicht gesetzt (kein Zweibuchstabencode)'
     steps: 'Importschritte'
     step:
         file: 'Datei'
@@ -410,6 +472,7 @@ search:
     see_all: 'Alle %count% anzeigen'
 flash:
     conflict:
+        crm_hubspot_rate_limited: 'Zu viele Schlüsselprüfungen für diese Organisation. Warten Sie einige Minuten.'
         crm_stage_invalid: 'Diese Phase kann nicht verwendet werden: Sie gehört zu einem anderen Trichter, oder die Phase oder der Trichter ist archiviert oder abgeschlossen.'
         crm_record_stale: 'Jemand hat diesen Datensatz gleichzeitig geändert. Das Formular zeigt die aktuellen Werte: Prüfen Sie sie und speichern Sie erneut.'
         crm_record_merged: Dieser Datensatz wurde in einen anderen zusammengeführt.
@@ -420,6 +483,23 @@ flash:
         crm_settings_stale: Jemand hat die Einstellungen gleichzeitig geändert. Prüfen Sie sie und speichern Sie erneut.
         crm_write_conflict: 'Eine andere Änderung derselben Daten kam im selben Moment an. Versuchen Sie es erneut.'
 error:
+    hubspot_needs_person: 'Eine Person muss diesen Import fortsetzen: er hat Datensätze anderer Personen erreicht.'
+    hubspot_token_invalid: 'HubSpot hat diesen Service Key (oder Private-App-Token) abgelehnt, oder er gehört zu einem anderen Konto. Fügen Sie einen gültigen ein.'
+    hubspot_scope_missing: 'Dem Schlüssel fehlt ein Lese-Scope, den der Import braucht. Fügen Sie die dokumentierten Scopes hinzu und versuchen Sie es erneut.'
+    hubspot_scope_not_read_only: 'Der Schlüssel darf auch in HubSpot schreiben. Erstellen Sie einen nur mit Lese-Scopes.'
+    hubspot_unavailable: 'HubSpot hat nicht geantwortet. Versuchen Sie es gleich noch einmal.'
+    hubspot_account_changed: 'Dieser Schlüssel gehört zu einem anderen HubSpot-Konto. Bestätigen Sie den Kontowechsel.'
+    hubspot_not_connected: 'HubSpot ist nicht verbunden.'
+    hubspot_list_unknown: 'Eine der Listen existiert nicht oder enthält weder Firmen noch Kontakte der gewählten Objekte.'
+    hubspot_list_name: 'Ein Listenname taugt nicht als Tag-Name (1 bis 60 Zeichen): wählen Sie ein vorhandenes Tag.'
+    hubspot_rate_limited: 'Das Anfragelimit von HubSpot ist erreicht. Der Import läuft später von selbst weiter.'
+    hubspot_bad_response: 'HubSpot hat etwas geantwortet, das das CRM nicht lesen kann. Der Import pausiert.'
+    hubspot_disconnected: 'HubSpot wurde getrennt: der Import wurde beendet.'
+    hubspot_too_many: 'Das HubSpot-Konto enthält mehr Datensätze als der Import erlaubt: er wurde beendet.'
+    record_erased: 'Die Person wurde gelöscht (DSGVO): kein erneuter Import.'
+    record_trashed: 'Der Datensatz ist im Papierkorb: unverändert.'
+    record_merged: 'Der Datensatz wurde inzwischen zusammengeführt: erneut versuchen.'
+    ambiguous_domain: 'Mehrere Firmen teilen diese Domain: nicht zugeordnet.'
     stage_invalid: 'Die Phase konnte nicht gespeichert werden: Prüfen Sie das Formular.'
     next_action_invalid: 'Die nächste Aktion konnte nicht gespeichert werden: Prüfen Sie das Formular.'
     amount_invalid: 'Geben Sie einen Betrag (höchstens 4 Dezimalstellen) und eine Währung mit 3 Buchstaben ein.'

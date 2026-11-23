@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\HubSpot\ExternalRef" table="crm_external_ref">
+        <unique-constraints>
+            <unique-constraint name="crm_external_ref_key" columns="tenant_id,source,account_id,object_type,external_id"/>
+        </unique-constraints>
+        <indexes>
+            <index name="crm_external_ref_target" columns="tenant_id,target_type,target_id"/>
+        </indexes>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="source" column="source" type="string" length="16"/>
+        <field name="accountId" column="account_id" type="string" length="20"/>
+        <field name="objectType" column="object_type" type="string" length="16"/>
+        <field name="externalId" column="external_id" type="string" length="100"/>
+        <field name="targetType" column="target_type" type="string" length="16"/>
+        <field name="targetId" column="target_id" type="string" length="36"/>
+        <field name="erased" column="erased" type="boolean"/>
+        <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime"/>
+        <field name="updatedAt" column="updated_at" type="nowo_crm_utc_datetime"/>
+    </entity>
+</doctrine-mapping>

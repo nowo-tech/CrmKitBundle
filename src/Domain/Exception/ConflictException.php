@@ -12,7 +12,7 @@ use Throwable;
  * cannot succeed): `crm_record_stale`, `crm_record_merged`, `crm_record_trashed`, `crm_merge_stale`,
  * `crm_import_running`, `crm_limit_reached`, `crm_settings_stale`, `crm_write_conflict` (a unique key refused the
  * write twice: another writer stored the same row at the same moment; a retry from the client is safe),
- * `crm_stage_invalid` (0.3.0).
+ * `crm_stage_invalid` (0.3.0), `crm_hubspot_rate_limited` (0.10.0).
  */
 final class ConflictException extends RuntimeException implements CrmException
 {
@@ -37,6 +37,9 @@ final class ConflictException extends RuntimeException implements CrmException
 
     /** A next action's dedupe key already names another subject (0.3.0). */
     public const DEDUPE_REUSED = 'crm_dedupe_reused';
+
+    /** 0.10.0: too many HubSpot token checks for the tenant (`import.hubspot.connect_rate_limit`). */
+    public const HUBSPOT_RATE_LIMITED = 'crm_hubspot_rate_limited';
 
     /**
      * @param string $errorCode one of the constants

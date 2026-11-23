@@ -11,7 +11,9 @@ use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 
 /**
- * A CSV or vCard import (contract section 15.4). Claimed by a conditional UPDATE; counters move atomically in SQL.
+ * A CSV, vCard or **(0.10.0)** HubSpot import (contract section 15.4). Claimed by a conditional UPDATE; counters move
+ * atomically in SQL. A HubSpot import also keeps its connection, its run cursor (stage, HubSpot paging token, page,
+ * owner map: ids only), when it may run again after a pause (`resume_after`) and why it paused or failed.
  */
 class Import
 {
@@ -42,6 +44,15 @@ class Import
 
     private int $version = 1;
 
+    /** @var array<string, mixed>|null */
+    private ?array $cursor = null;
+
+    private ?DateTimeImmutable $resumeAfter = null;
+
+    private ?string $errorCode = null;
+
+    private ?string $confirmedById = null;
+
     /**
      * @param list<string> $columns the header columns of the file
      * @param array<string, string> $mapping detected column => field
@@ -57,8 +68,79 @@ class Import
         private int $rowsTotal,
         private ?string $createdById,
         private DateTimeImmutable $createdAt,
+        private ?string $connectionId = null,
     ) {
         $this->mapping = $mapping;
+    }
+
+    /**
+     * The first run cursor of a HubSpot import.
+     *
+     * @param array<string, mixed> $cursor
+     */
+    public function startCursor(array $cursor): void
+    {
+        $this->cursor = $cursor;
+    }
+
+    /**
+     * The duplicate policy chosen before the confirm (HubSpot's start step); the confirm sets the final one.
+     */
+    public function choosePolicy(DuplicatePolicy $policy): void
+    {
+        $this->duplicatePolicy = $policy;
+    }
+
+    /**
+     * A pause with its time and reason (the store writes it with one conditional UPDATE; this mirrors it in memory).
+     */
+    public function pause(?DateTimeImmutable $resumeAfter, ?string $errorCode): void
+    {
+        $this->claimToken  = null;
+        $this->resumeAfter = $resumeAfter;
+        $this->errorCode   = $errorCode;
+    }
+
+    /**
+     * Who confirmed a HubSpot import (the store writes it in the claim unit; this mirrors it in memory).
+     */
+    public function confirmBy(string $actor): void
+    {
+        $this->confirmedById = $actor;
+    }
+
+    /** Who confirmed a HubSpot import (unattended pages run as this person, audit ZAM-1), or null. */
+    public function getConfirmedById(): ?string
+    {
+        return $this->confirmedById;
+    }
+
+    /** The HubSpot connection it reads (null: a file import). */
+    public function getConnectionId(): ?string
+    {
+        return $this->connectionId;
+    }
+
+    /**
+     * The run cursor of a HubSpot import.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getCursor(): ?array
+    {
+        return $this->cursor;
+    }
+
+    /** When a paused HubSpot import may run again (null: not waiting for a time). */
+    public function getResumeAfter(): ?DateTimeImmutable
+    {
+        return $this->resumeAfter;
+    }
+
+    /** Why a HubSpot import paused or failed (`hubspot_rate_limited`, `hubspot_token_invalid`, …), or null. */
+    public function getErrorCode(): ?string
+    {
+        return $this->errorCode;
     }
 
     /**

@@ -1,0 +1,11 @@
+{#
+  0.10.0: why a HubSpot import paused or failed, and until when it waits (UTC). Nothing for a file import.
+  Variables: import (ImportView), bundle.
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{% if import.errorCode %}
+    <p class="{{ nowo_ui_class('flash_error', bundle) }}" role="status" data-testid="crm-import-error" data-code="{{ import.errorCode }}">{{ ('error.' ~ import.errorCode)|trans({}, _d) }}</p>
+{% endif %}
+{% if import.resumeAfter and import.status.value == 'running' %}
+    <p class="{{ nowo_ui_class('muted', bundle) }}" data-testid="crm-import-waiting">{{ 'import.hubspot.waiting'|trans({'%time%': import.resumeAfter|date('Y-m-d H:i')}, _d) }} UTC</p>
+{% endif %}

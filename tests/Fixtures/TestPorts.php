@@ -61,7 +61,7 @@ final readonly class TestPorts implements CrmTenantResolverInterface, CrmAccessC
     {
         $owners = [];
         foreach ($this->context->owners[$tenant->value] ?? [] as $id => $name) {
-            $owners[] = new ActorProfile(new ActorRef((string) $id), $name);
+            $owners[] = new ActorProfile(new ActorRef((string) $id), $name, $this->context->emails[$tenant->value][(string) $id] ?? null);
         }
 
         return $owners;

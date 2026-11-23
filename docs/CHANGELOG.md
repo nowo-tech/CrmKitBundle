@@ -25,6 +25,68 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as 0.10.0.
+
+### Added
+
+- **HubSpot import, slice H1** (`import.hubspot.enabled`, off by default; design `docs/design/HUBSPOT_IMPORT.md`, owner
+  answers Q-H1..Q-H13 as recommended, Beacon request 2026-11-23 for service keys). A third import source next to CSV
+  and vCard, on the same queue (claim, counters, unfinished list, resume command, cancel, plan limits, duplicate
+  policy, import modal):
+  - one credential per tenant: a HubSpot **service key (or a legacy private app token)**, no prefix or shape rule. It
+    is checked before it is saved, the same way for both kinds: the account through `account-info`; the scopes from
+    HubSpot's token info when HubSpot knows the credential, else by probing each required read endpoint (`limit=1`,
+    a 403 means the scope is missing). It is refused when a required read scope is missing, when HubSpot lists a
+    write scope, or when it belongs to another account than the connected one (unless confirmed). Connect, replace
+    and disconnect need `import` + `manage`; checks are rate-limited per tenant (`connect_rate_limit`);
+  - the credential is sealed at rest by the new port `CrmSecretBoxInterface`: built-in `SodiumCrmSecretBox`
+    (XChaCha20-Poly1305, keys `secrets.keys` / `secrets.current_key`), or the DoctrineEncrypt bridge
+    (`secrets.box`, the house option); it is shown only as `••••` + the last four characters;
+    `nowo:crm-kit:secrets:rotate` re-seals under the current key;
+  - companies, contacts, contact ↔ company associations (HubSpot's primary company ⇒ primary affiliation when the
+    contact has none), owners ⇒ record owners by e-mail (optional port `CrmActorEmailLookupInterface`), lists ⇒ tags
+    (existing or created on confirm); property mapping with custom fields; HubSpot ids kept in the new table
+    `crm_external_ref`, so a re-run updates instead of duplicating; an empty HubSpot value never clears a CRM value;
+    GDPR tombstones keep erased people out (Q-H6); no lifecycle mapping (Q-H10);
+  - only `https://api.hubapi.com` is called, by the kit's own HttpClient (no redirects, size and time caps,
+    `paging.next.link` ignored); optional OutboundUrlGuard DNS pin (`import.hubspot.outbound_url_guard`);
+    sensitive properties are never offered;
+  - one HubSpot page per write unit with a cursor compare-and-set; 429 / 5xx backoff in workers, a pause with
+    `resume_after` in web requests, the daily limit until the next UTC day; 401 marks the connection invalid and a new
+    credential resumes the import; the resume command also takes imports whose `resume_after` passed;
+  - pages `/crm/import/hubspot` (card), `/connect`, `/disconnect`, `/new`, `/{id}/mapping`, each a step fragment of
+    the import modal loaded on demand (links marked `data-crm-import-link` load in the modal); every denial answers
+    404; 7 locales.
+- `import.messenger.enabled` (off by default, any format, REQ-MSG-001): confirm and "Continue" dispatch
+  `RunCrmImport`; `RunCrmImportHandler` runs `import.messenger.units` units and dispatches the next message (with a
+  `DelayStamp` while HubSpot makes it wait).
+- `ImportView::$resumeAfter` / `$errorCode`; the import page shows why a HubSpot import paused and until when.
+
+### Changed
+
+- Schema: nullable columns `crm_import.connection_id`, `run_cursor`, `resume_after`, `error_code` (index
+  `crm_import_resume`), `crm_import_row.subject_type` for every host; the tables `crm_hubspot_connection` and
+  `crm_external_ref` only with `import.hubspot.enabled` (UPGRADING, "Unreleased").
+- `ImportServiceInterface::upload()` refuses the `hubspot` format (a HubSpot import starts from its connection).
+- A paused import's "Continue" clears its reason and wait time.
+
+### Security
+
+Immediate audit ZAM of the slice, fixed before release:
+
+- ZAM-1: unattended HubSpot pages (resume command, Messenger) run as the person who confirmed (`crm_import.confirmed_by_id`);
+  under `security.resource_scoping` a page that would update, affiliate or tag a record owned by someone else rolls
+  back and waits for a person's "Continue" (`hubspot_needs_person`); an unattended run never changes an existing
+  record's owner; the confirm needs `edit` whatever the policy; "Continue" checks `edit` on every list member.
+- ZAM-2: the credential's plaintext is no property of `HubSpotToken` any more (VarDumper, the profiler and Twig's
+  `dump` showed it next to `[redacted]`); it cannot be cloned.
+- ZAM-3: the write-scope check fails closed: only HubSpot's "unknown token" answer leads to probing; unreadable or
+  extra scope entries count as write scopes; a service key's scopes are stored and shown as "not verified".
+- ZAM-4: a connection is marked invalid only while it holds the sealed token that failed, and its version moves.
+- ZAM-5: the DoctrineEncrypt box accepts Halite and Defuse only (or an explicit opt-in), rethrows configuration
+  errors, and `secrets:rotate --all` re-seals every credential.
+- ZAM-6: `secrets.keys` is never a container parameter. ZAM-10: the rotation reads connections in SQL batches.
+
 ## [0.9.0] - 2026-11-23
 
 ### Added

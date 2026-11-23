@@ -7,6 +7,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Routing;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\AdminController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\HubSpotImportController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ImportController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineAdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineController;
@@ -31,10 +32,13 @@ final class UiRouteLoader extends Loader
     /** Route attribute that marks the CRM's routes (conflict formatter, exception listener). */
     public const ROUTE_ATTRIBUTE = '_nowo_crm_kit';
 
+    /** 0.10.0: route attribute of the routes whose every denial answers 404 (the HubSpot routes, design FR-001). */
+    public const HIDDEN_ATTRIBUTE = '_nowo_crm_kit_hidden';
+
     /**
      * Wires the settings.
      */
-    public function __construct(private readonly bool $enabled = false, private readonly string $path = '/crm', private readonly bool $pipeline = false)
+    public function __construct(private readonly bool $enabled = false, private readonly string $path = '/crm', private readonly bool $pipeline = false, private readonly bool $hubspot = false)
     {
         parent::__construct();
     }
@@ -81,6 +85,15 @@ final class UiRouteLoader extends Loader
         $this->add($routes, 'gdpr_export', $base . '/contacts/{id}/gdpr-export', $p . 'gdprExport', ['POST'], $id);
         $this->add($routes, 'erase', $base . '/contacts/{id}/erase', $p . 'erase', ['POST'], $id);
         $this->add($routes, 'import', $base . '/import', $i . 'index', ['GET', 'POST']);
+        if ($this->hubspot) {
+            // 0.10.0, before /import/{id} (the requirement keeps them apart anyway).
+            $h = HubSpotImportController::class . '::';
+            $this->add($routes, 'hubspot', $base . '/import/hubspot', $h . 'index', ['GET'], hidden: true);
+            $this->add($routes, 'hubspot_connect', $base . '/import/hubspot/connect', $h . 'connect', ['GET', 'POST'], hidden: true);
+            $this->add($routes, 'hubspot_disconnect', $base . '/import/hubspot/disconnect', $h . 'disconnect', ['POST'], hidden: true);
+            $this->add($routes, 'hubspot_new', $base . '/import/hubspot/new', $h . 'start', ['GET', 'POST'], hidden: true);
+            $this->add($routes, 'hubspot_mapping', $base . '/import/hubspot/{id}/mapping', $h . 'mapping', ['GET', 'POST'], $id, true);
+        }
         $this->add($routes, 'import_show', $base . '/import/{id}', $i . 'show', ['GET', 'POST'], $id);
         $this->add($routes, 'tags', $base . '/admin/tags', $a . 'tags', ['GET', 'POST']);
         $this->add($routes, 'tag_edit', $base . '/admin/tags/{id}', $a . 'tag', ['GET', 'POST'], $id);
@@ -132,9 +145,13 @@ final class UiRouteLoader extends Loader
      * @param list<string> $methods
      * @param array<string, string> $requirements
      */
-    private function add(RouteCollection $routes, string $name, string $path, string $controller, array $methods, array $requirements = []): void
+    private function add(RouteCollection $routes, string $name, string $path, string $controller, array $methods, array $requirements = [], bool $hidden = false): void
     {
-        $routes->add('nowo_crm_kit_' . $name, new Route($path, ['_controller' => $controller, self::ROUTE_ATTRIBUTE => true], $requirements, [], '', [], $methods));
+        $defaults = ['_controller' => $controller, self::ROUTE_ATTRIBUTE => true];
+        if ($hidden) {
+            $defaults[self::HIDDEN_ATTRIBUTE] = true;
+        }
+        $routes->add('nowo_crm_kit_' . $name, new Route($path, $defaults, $requirements, [], '', [], $methods));
     }
 
     /**

@@ -171,7 +171,7 @@ final class ImportTest extends CrmTestCase
         $id      = $imports->upload(SubjectType::Contact, ImportFormat::Csv, 'a.csv', "email,last_name\na@x.test,A\n");
         $imports->confirm($id, ['email' => 'email', 'last_name' => 'last_name'], DuplicatePolicy::Skip, 1);
         $runClaimed = new ReflectionMethod(ImportService::class, 'runClaimed');
-        self::assertFalse($runClaimed->invoke($this->service(ImportService::class), new TenantRef('acme'), $id, 'someone-else', null), 'the claim is gone: this runner stops');
+        self::assertSame('lost', $runClaimed->invoke($this->service(ImportService::class), new TenantRef('acme'), $id, 'someone-else', null, null, true, ImportFormat::Csv), 'the claim is gone: this runner stops');
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_contact'));
     }
 

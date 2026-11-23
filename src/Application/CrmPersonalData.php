@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Application;
 
 use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
+use Nowo\CrmKitBundle\Application\Port\ExternalRefHooksInterface;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
@@ -43,7 +44,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
     /**
      * Wires the collaborators.
      */
-    public function __construct(private WriteSupport $support, private PlanCounter $counter, private ?PipelineHousekeeping $pipeline = null)
+    public function __construct(private WriteSupport $support, private PlanCounter $counter, private ?PipelineHousekeeping $pipeline = null, private ?ExternalRefHooksInterface $refs = null)
     {
     }
 
@@ -137,6 +138,8 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
             }
             // 0.3.0: its deals are unlinked; its stage history, lifecycle stages and next actions are deleted.
             $this->pipeline?->forgetRecord($context->tenant, SubjectType::Contact, $contactId);
+            // 0.10.0 (Q-H6): its HubSpot references become tombstones, so a re-run never brings the person back.
+            $this->refs?->tombstone($context->tenant, $contactId);
             // The merge tombstones of this contact, and theirs in turn: locked, blanked, their merge traces deleted.
             $seen  = [$contactId => true];
             $level = [$contactId];

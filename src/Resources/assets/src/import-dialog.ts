@@ -346,6 +346,14 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
       event.preventDefault();
       close();
     }
+    // 0.10.0: a link of the flow (the HubSpot source and its steps) loads in the modal; its href is the page.
+    const link = target?.closest<HTMLAnchorElement>('a[data-crm-import-link]');
+    if (link && dialog.contains(link)) {
+      event.preventDefault();
+      if (controller === null) {
+        void load(link.href);
+      }
+    }
   };
   const onSubmit = (event: SubmitEvent): void => {
     const form = event.target instanceof HTMLFormElement ? event.target : null;

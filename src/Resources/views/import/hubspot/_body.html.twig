@@ -1,0 +1,55 @@
+{#
+  The body of a HubSpot step (0.10.0), shared by the page and the import modal's fragment. Links that stay in the
+  import flow carry data-crm-import-link (the modal loads them in place; without JavaScript they are plain links).
+  Variables: step (source | connect | start | mapping), connection (HubSpotConnectionView|null), form (FormView|null),
+  action (FormView|null, the disconnect CSRF form), alert (string|null), manage (bool), importId (string|null),
+  form_id (the id the footer's submit button points at), bundle.
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{%- set _b = bundle -%}
+{% if alert %}
+    <div class="{{ nowo_ui_class('flash_error', _b) }}" role="alert" data-testid="crm-hubspot-alert">{{ alert }}</div>
+{% endif %}
+{% if step == 'source' %}
+    <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-hubspot-source">
+        {% if connection %}
+            <dl data-testid="crm-hubspot-connection" data-status="{{ connection.status.value }}">
+                <dt>{{ 'import.hubspot.card.label'|trans({}, _d) }}</dt><dd>{{ connection.label }}</dd>
+                <dt>{{ 'import.hubspot.card.account'|trans({}, _d) }}</dt><dd>{{ connection.accountId }}</dd>
+                <dt>{{ 'import.hubspot.card.credential'|trans({}, _d) }}</dt><dd data-testid="crm-hubspot-last4">••••{{ connection.tokenLast4 }}</dd>
+                <dt>{{ 'import.hubspot.card.status'|trans({}, _d) }}</dt><dd>{{ ('import.hubspot.status.' ~ connection.status.value)|trans({}, _d) }}</dd>
+                <dt>{{ 'import.hubspot.card.scopes'|trans({}, _d) }}</dt><dd>{{ connection.scopes|join(', ') }}{% if not connection.scopesVerified %} <span data-testid="crm-hubspot-unverified">({{ 'import.hubspot.card.write_unverified'|trans({}, _d) }})</span>{% endif %}</dd>
+                <dt>{{ 'import.hubspot.card.validated'|trans({}, _d) }}</dt><dd>{{ connection.validatedAt|date('Y-m-d H:i') }} UTC</dd>
+            </dl>
+            <p>
+                {% if connection.status.value == 'active' %}
+                    <a href="{{ path('nowo_crm_kit_hubspot_new') }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-crm-import-link data-testid="crm-hubspot-start">{{ 'import.hubspot.start'|trans({}, _d) }}</a>
+                {% endif %}
+                {% if manage %}
+                    <a href="{{ path('nowo_crm_kit_hubspot_connect') }}" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-link data-testid="crm-hubspot-replace">{{ 'import.hubspot.replace'|trans({}, _d) }}</a>
+                {% endif %}
+            </p>
+            {% if manage and action %}
+                {{ form_start(action, {action: path('nowo_crm_kit_hubspot_disconnect'), attr: {class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
+                {{ form_widget(action) }}
+                <button type="submit" class="{{ nowo_ui_class('btn_danger', _b) }}" data-testid="crm-hubspot-disconnect">{{ 'import.hubspot.disconnect'|trans({}, _d) }}</button>
+                {{ form_end(action) }}
+            {% endif %}
+        {% else %}
+            <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'import.hubspot.not_connected'|trans({}, _d) }}</p>
+            {% if manage %}
+                <p><a href="{{ path('nowo_crm_kit_hubspot_connect') }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-crm-import-link data-testid="crm-hubspot-connect">{{ 'import.hubspot.connect'|trans({}, _d) }}</a></p>
+            {% else %}
+                <p data-testid="crm-hubspot-ask-manager">{{ 'import.hubspot.ask_manager'|trans({}, _d) }}</p>
+            {% endif %}
+        {% endif %}
+    </div>
+{% elseif form %}
+    <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-hubspot-{{ step }}">
+        <p class="{{ nowo_ui_class('muted', _b) }}">{{ ('import.hubspot.intro.' ~ step)|trans({}, _d) }}</p>
+        {% set _action = step == 'connect' ? path('nowo_crm_kit_hubspot_connect') : (step == 'start' ? path('nowo_crm_kit_hubspot_new') : path('nowo_crm_kit_hubspot_mapping', {id: importId})) %}
+        {{ form_start(form, {action: _action, attr: {id: form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
+        {{ include('@NowoCrmKit/import/_dialog_fields.html.twig', {form: form}, false) }}
+        {{ form_end(form) }}
+    </div>
+{% endif %}

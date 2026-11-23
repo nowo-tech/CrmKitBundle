@@ -307,6 +307,68 @@ merge:
         other: Id de l'autre fiche
         other_help: L'id figurant dans l'adresse de sa page.
 import:
+    hubspot:
+        title: 'Importer depuis HubSpot'
+        source: 'Ou importer depuis HubSpot'
+        step:
+            source: 'Connexion'
+            connect: 'Clé de service'
+            start: 'Quoi importer'
+            mapping: 'Correspondance'
+            result: 'Résultat'
+        intro:
+            connect: 'Collez une clé de service HubSpot (ou un ancien jeton d’app privée) avec des autorisations de lecture seulement. Elle est vérifiée auprès de HubSpot, stockée chiffrée et jamais réaffichée.'
+            start: 'Choisissez ce qu’il faut lire dans HubSpot. Les contacts amènent leurs entreprises.'
+            mapping: 'Choisissez le champ CRM de chaque propriété HubSpot. Une valeur HubSpot vide n’efface jamais une valeur du CRM.'
+        submit:
+            connect: 'Vérifier et enregistrer'
+            start: 'Suivant'
+            mapping: 'Importer'
+        form:
+            token: 'Clé de service (ou jeton d’app privée)'
+            token_help: 'Dans HubSpot : Development → Keys → Service keys. Cochez seulement les autorisations de lecture documentées.'
+            label: 'Nom (facultatif)'
+            confirm_account_change: 'La clé peut appartenir à un autre compte HubSpot'
+            objects: 'Objets'
+            objects_help: 'Les affaires arrivent dans une version ultérieure.'
+            lists: 'Listes (leurs membres reçoivent une étiquette)'
+            lists_help: '50 au plus.'
+        object:
+            companies: 'Entreprises'
+            contacts: 'Contacts'
+        list:
+            skip: 'Ne pas étiqueter'
+            create: 'Nouvelle étiquette au nom de la liste'
+            label: 'Liste « %name% »'
+            option: '%name% (%kind%, %size%)'
+        target:
+            owner: 'Responsable (par e-mail)'
+            domain: 'Site web depuis le domaine'
+            custom: 'Champ personnalisé %key%'
+        card:
+            write_unverified: 'autorisations d’écriture non vérifiées'
+            label: 'Nom'
+            account: 'Compte HubSpot'
+            credential: 'Clé de service'
+            status: 'État'
+            scopes: 'Autorisations'
+            validated: 'Vérifiée'
+        status:
+            active: 'Active'
+            invalid: 'Refusée : collez une nouvelle clé'
+        start: 'Lancer un import'
+        replace: 'Remplacer la clé'
+        disconnect: 'Déconnecter'
+        connect: 'Connecter HubSpot'
+        not_connected: 'HubSpot n’est pas encore connecté.'
+        ask_manager: 'Demandez à un gestionnaire du CRM de connecter HubSpot.'
+        connected: 'HubSpot est connecté.'
+        disconnected: 'HubSpot a été déconnecté et sa clé supprimée.'
+        waiting: 'Attend jusqu’à %time%'
+        col:
+            object: 'Objet'
+            id: 'Id HubSpot'
+        country_unknown: 'Pays non renseigné (pas un code à deux lettres)'
     steps: 'Étapes de l''import'
     step:
         file: 'Fichier'
@@ -410,6 +472,7 @@ search:
     see_all: 'Voir les %count%'
 flash:
     conflict:
+        crm_hubspot_rate_limited: 'Trop de vérifications de clé pour cette organisation. Patientez quelques minutes.'
         crm_stage_invalid: 'Cette étape ne peut pas être utilisée : elle appartient à un autre entonnoir, ou l’étape ou l’entonnoir est archivé ou clos.'
         crm_record_stale: 'Quelqu''un a modifié cette fiche au même moment. Le formulaire affiche les valeurs actuelles : vérifiez-les et enregistrez à nouveau.'
         crm_record_merged: Cette fiche a été fusionnée dans une autre.
@@ -420,6 +483,23 @@ flash:
         crm_settings_stale: Quelqu'un a modifié les paramètres au même moment. Vérifiez-les et enregistrez à nouveau.
         crm_write_conflict: 'Une autre modification des mêmes données est arrivée au même moment. Réessayez.'
 error:
+    hubspot_needs_person: 'Une personne doit poursuivre cet import : il a atteint des fiches d’autres personnes.'
+    hubspot_token_invalid: 'HubSpot a refusé cette clé de service (ou ce jeton d’app privée), ou elle appartient à un autre compte. Collez-en une valide.'
+    hubspot_scope_missing: 'Il manque à la clé une autorisation de lecture nécessaire à l’import. Ajoutez les autorisations documentées et réessayez.'
+    hubspot_scope_not_read_only: 'La clé peut aussi écrire dans HubSpot. Créez-en une avec des autorisations de lecture seulement.'
+    hubspot_unavailable: 'HubSpot n’a pas répondu. Réessayez dans un instant.'
+    hubspot_account_changed: 'Cette clé appartient à un autre compte HubSpot. Cochez la confirmation pour changer de compte.'
+    hubspot_not_connected: 'HubSpot n’est pas connecté.'
+    hubspot_list_unknown: 'Une des listes n’existe pas ou ne contient ni entreprises ni contacts des objets choisis.'
+    hubspot_list_name: 'Un nom de liste ne peut pas être un nom d’étiquette (1 à 60 caractères) : choisissez une étiquette existante.'
+    hubspot_rate_limited: 'La limite de requêtes de HubSpot est atteinte. L’import reprendra tout seul plus tard.'
+    hubspot_bad_response: 'HubSpot a répondu quelque chose que le CRM ne sait pas lire. L’import est en pause.'
+    hubspot_disconnected: 'HubSpot a été déconnecté : l’import s’est arrêté.'
+    hubspot_too_many: 'Le compte HubSpot contient plus de fiches que l’import n’en permet : il s’est arrêté.'
+    record_erased: 'La personne a été effacée (RGPD) : pas réimportée.'
+    record_trashed: 'La fiche est dans la corbeille : laissée telle quelle.'
+    record_merged: 'La fiche a été fusionnée entre-temps : réessayez.'
+    ambiguous_domain: 'Plusieurs entreprises partagent ce domaine : pas de correspondance.'
     stage_invalid: 'L’étape n’a pas pu être enregistrée : vérifiez le formulaire.'
     next_action_invalid: 'La prochaine action n’a pas pu être enregistrée : vérifiez le formulaire.'
     amount_invalid: 'Saisissez un montant (4 décimales au plus) et une devise de 3 lettres.'

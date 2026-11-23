@@ -65,22 +65,26 @@ abstract class CrmTestCase extends KernelTestCase
      * @param array<string, mixed> $config
      * @param array<string, mixed> $uiKit
      * @param (Closure(ServicesConfigurator): void)|null $services extra test services of the host
+     * @param (Closure(ContainerConfigurator): void)|null $extensions extra extension configuration of the host
      */
-    protected function bootWithUiKit(array $config, array $uiKit = [], ?Closure $services = null): void
+    protected function bootWithUiKit(array $config, array $uiKit = [], ?Closure $services = null, ?Closure $extensions = null): void
     {
         $host = $this->host();
         /** @var array<string, mixed> $merged */
         $merged    = array_replace_recursive(TestServices::PORTS, ['ui' => ['enabled' => true]], $config);
         $configure = $host->configure();
-        if ($uiKit !== [] || $services instanceof Closure) {
+        if ($uiKit !== [] || $services instanceof Closure || $extensions instanceof Closure) {
             $base      = $configure;
-            $configure = static function (ContainerConfigurator $container, string $url) use ($base, $uiKit, $services): void {
+            $configure = static function (ContainerConfigurator $container, string $url) use ($base, $uiKit, $services, $extensions): void {
                 $base($container, $url);
                 if ($uiKit !== []) {
                     $container->extension('nowo_ui_kit', $uiKit);
                 }
                 if ($services instanceof Closure) {
                     $services($container->services());
+                }
+                if ($extensions instanceof Closure) {
+                    $extensions($container);
                 }
             };
         }

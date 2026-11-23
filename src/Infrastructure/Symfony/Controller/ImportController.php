@@ -52,6 +52,7 @@ final readonly class ImportController
         private RecordForms $forms,
         private int $syncChunks = 5,
         private int $maxBytes = 5242880,
+        private bool $hubspot = false,
     ) {
     }
 
@@ -85,7 +86,7 @@ final readonly class ImportController
 
             $status = $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK;
             if ($dialog) {
-                return $this->step('file', $status, ['form' => $form->createView(), 'subject' => in_array($subject, ['contact', 'company'], true) ? $subject : null]);
+                return $this->step('file', $status, ['form' => $form->createView(), 'subject' => in_array($subject, ['contact', 'company'], true) ? $subject : null, 'hubspot' => $this->hubspot]);
             }
 
             return $this->ui->render('@NowoCrmKit/import/upload.html.twig', [
@@ -98,6 +99,7 @@ final readonly class ImportController
                     attributes: ['data-testid' => 'crm-import-upload'],
                     formAttributes: ['enctype' => 'multipart/form-data'],
                 ),
+                'hubspot' => $this->hubspot,
             ], $status, ImportDialog::privateHeaders());
         });
     }
@@ -108,7 +110,13 @@ final readonly class ImportController
     public function show(Request $request, string $id): Response
     {
         return $this->ui->guard(function () use ($request, $id): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $import  = $this->imports->preview($id);
+            $import = $this->imports->preview($id);
+            if (!$import->format->isFile() && $import->status === ImportStatus::Preview) {
+                // 0.10.0: a HubSpot import is mapped on its own step.
+                $url = $this->ui->url('nowo_crm_kit_hubspot_mapping', ['id' => $id]);
+
+                return ImportDialog::requested($request) ? ImportDialog::next($url) : $this->ui->redirect('nowo_crm_kit_hubspot_mapping', ['id' => $id]);
+            }
             $targets = ['import.target.skip' => ''];
             foreach (RecordFields::names($import->subjectType) as $field) {
                 $targets['field.' . $field] = $field;
@@ -268,6 +276,6 @@ final readonly class ImportController
      */
     private function step(string $step, int $status, array $context): Response
     {
-        return $this->ui->render('@NowoCrmKit/import/dialog.html.twig', ['step' => $step] + $context + ['form' => null, 'action' => null, 'import' => null, 'alert' => null, 'subject' => null], $status, ImportDialog::fragmentHeaders());
+        return $this->ui->render('@NowoCrmKit/import/dialog.html.twig', ['step' => $step] + $context + ['form' => null, 'action' => null, 'import' => null, 'alert' => null, 'subject' => null, 'hubspot' => false], $status, ImportDialog::fragmentHeaders());
     }
 }

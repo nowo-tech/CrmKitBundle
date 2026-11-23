@@ -705,7 +705,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     public function pauseImport(string $id, string $token, DateTimeImmutable $now): bool
     {
         return $this->connection()->executeStatement(
-            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = NULL, claimed_at = ?, version = version + 1 WHERE id = ? AND status = ? AND claim_token = ?',
+            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = NULL, claimed_at = ?, resume_after = NULL, version = version + 1 WHERE id = ? AND status = ? AND claim_token = ?',
             [$now, $id, ImportStatus::Running->value, $token],
             [0 => UtcDateTimeImmutableType::NAME],
         ) === 1;
@@ -717,10 +717,62 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
     public function resumeImport(TenantRef $tenant, string $id, string $token, DateTimeImmutable $now): bool
     {
         return $this->connection()->executeStatement(
-            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = ?, claimed_at = ?, version = version + 1 WHERE id = ? AND tenant_id = ? AND status = ? AND claim_token IS NULL',
+            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = ?, claimed_at = ?, resume_after = NULL, error_code = NULL, version = version + 1 WHERE id = ? AND tenant_id = ? AND status = ? AND claim_token IS NULL',
             [$token, $now, $id, $tenant->value, ImportStatus::Running->value],
             [1 => UtcDateTimeImmutableType::NAME],
         ) === 1;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function pauseImportUntil(string $id, string $token, DateTimeImmutable $now, ?DateTimeImmutable $resumeAfter, ?string $errorCode): bool
+    {
+        return $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Import::class) . ' SET claim_token = NULL, claimed_at = ?, resume_after = ?, error_code = ?, version = version + 1 WHERE id = ? AND status = ? AND claim_token = ?',
+            [$now, $resumeAfter, $errorCode, $id, ImportStatus::Running->value, $token],
+            [0 => UtcDateTimeImmutableType::NAME, 1 => UtcDateTimeImmutableType::NAME],
+        ) === 1;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function queueImport(string $id, string $token, DateTimeImmutable $now): bool
+    {
+        return $this->pauseImportUntil($id, $token, $now, $now, null);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function failImport(string $id, DateTimeImmutable $now, string $errorCode): void
+    {
+        $this->connection()->executeStatement(
+            'UPDATE ' . $this->table(Import::class) . ' SET status = ?, finished_at = ?, claim_token = NULL, resume_after = NULL, error_code = ?, version = version + 1 WHERE id = ? AND status = ?',
+            [ImportStatus::Failed->value, $now, $errorCode, $id, ImportStatus::Running->value],
+            [1 => UtcDateTimeImmutableType::NAME],
+        );
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function dueImports(DateTimeImmutable $now, int $limit): array
+    {
+        $rows = $this->connection()->fetchAllAssociative(
+            'SELECT tenant_id, id FROM ' . $this->table(Import::class) . ' WHERE status = ? AND claim_token IS NULL AND resume_after IS NOT NULL AND resume_after <= ? ORDER BY resume_after, id',
+            [ImportStatus::Running->value, $now],
+            [1 => UtcDateTimeImmutableType::NAME],
+        );
+        $due = [];
+        foreach ($rows as $row) {
+            if (count($due) < $limit && is_string($row['tenant_id']) && is_string($row['id'])) {
+                $due[] = ['tenant' => $row['tenant_id'], 'id' => $row['id']];
+            }
+        }
+
+        return $due;
     }
 
     /**

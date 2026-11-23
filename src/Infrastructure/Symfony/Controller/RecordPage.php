@@ -74,7 +74,7 @@ final readonly class RecordPage
         }
         if ($edit && $delete) {
             // A merge turns the other record into a tombstone: it needs delete too.
-            $actions[] = new Action('custom', UiSupport::label('record.merge'), $this->ui->url('nowo_crm_kit_merge', ['type' => $seg, 'id' => $view->id]), icon: 'merge');
+            $actions[] = new Action('custom', UiSupport::label('record.merge'), $this->ui->url('nowo_crm_kit_merge', ['type' => $seg, 'id' => $view->id]), icon: UiIcons::MERGE);
         }
         if ($type === SubjectType::Contact && $view->status !== RecordStatus::Erased) {
             $actions[] = new Action('download', UiSupport::label('record.vcard'), $this->ui->url('nowo_crm_kit_vcard', ['id' => $view->id]), icon: 'download');
@@ -173,8 +173,8 @@ final readonly class RecordPage
                 $buttons['affiliations'][$affiliation->id] = $this->post($token, 'close', 'affiliation.remove', 'nowo_crm_kit_unaffiliate', ['id' => $affiliation->id] + $back, null, 'secondary')->asIcon();
                 if ($type === SubjectType::Company) {
                     $buttons['primary_contact'][$affiliation->id] = $affiliation->primaryContact
-                        ? $this->post($token, 'custom', 'affiliation.clear_primary_contact', 'nowo_crm_kit_primary_contact_clear', ['id' => $view->id])
-                        : $this->post($token, 'custom', 'affiliation.make_primary_contact', 'nowo_crm_kit_primary_contact', ['id' => $view->id, 'contact' => $affiliation->contactId]);
+                        ? $this->post($token, 'custom', 'affiliation.clear_primary_contact', 'nowo_crm_kit_primary_contact_clear', ['id' => $view->id], icon: UiIcons::PRIMARY_CONTACT_CLEAR)
+                        : $this->post($token, 'custom', 'affiliation.make_primary_contact', 'nowo_crm_kit_primary_contact', ['id' => $view->id, 'contact' => $affiliation->contactId], icon: UiIcons::PRIMARY_CONTACT);
                 }
             }
         }
@@ -211,7 +211,7 @@ final readonly class RecordPage
      *
      * @param array<string, string> $params
      */
-    private function post(string $token, string $kind, string $label, string $route, array $params, ?string $confirm = null, ?string $variant = null): Action
+    private function post(string $token, string $kind, string $label, string $route, array $params, ?string $confirm = null, ?string $variant = null, ?string $icon = null): Action
     {
         return new Action(
             $kind,
@@ -220,6 +220,7 @@ final readonly class RecordPage
             method: 'POST',
             csrfToken: $token,
             confirm: $confirm === null ? null : new Confirm(UiSupport::label($confirm), null, UiSupport::label($label)),
+            icon: $icon,
             variant: $variant,
             csrfField: 'crm_action[_token]',
         );

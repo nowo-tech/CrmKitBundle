@@ -235,7 +235,7 @@ final readonly class PipelineAdminController
             }
 
             return $this->ui->render('@NowoCrmKit/pipeline/stats.html.twig', [
-                'page'    => new ShowPage(new PageHeader(UiSupport::label('stats.title_of', ['%name%' => $funnel->name]), null, [new Action('export', UiSupport::label('list.export'), $this->ui->url('nowo_crm_kit_funnel_stats_csv', ['id' => $id] + $request->query->all()), icon: 'download'), new Action('custom', UiSupport::label('board.title'), $this->ui->url('nowo_crm_kit_deal_board', ['id' => $id]))], tabs: $this->ui->tabs('deals')), bundle: UiSupport::DOMAIN, layout: $this->ui->layout(), attributes: ['data-testid' => 'crm-stats']),
+                'page'    => new ShowPage(new PageHeader(UiSupport::label('stats.title_of', ['%name%' => $funnel->name]), null, [new Action('export', UiSupport::label('list.export'), $this->ui->url('nowo_crm_kit_funnel_stats_csv', ['id' => $id] + $request->query->all()), icon: 'download'), new Action('custom', UiSupport::label('board.title'), $this->ui->url('nowo_crm_kit_deal_board', ['id' => $id]), icon: UiIcons::BOARD)], tabs: $this->ui->tabs('deals')), bundle: UiSupport::DOMAIN, layout: $this->ui->layout(), attributes: ['data-testid' => 'crm-stats']),
                 'funnel'  => $funnel,
                 'stats'   => $stats,
                 'max'     => $max,
@@ -303,7 +303,7 @@ final readonly class PipelineAdminController
 
     private function move(string $token, string $stageId, string $direction, string $funnelId): Action
     {
-        return new Action('custom', UiSupport::label('stage.move_' . $direction), $this->ui->url('nowo_crm_kit_stage_move', ['id' => $stageId, 'direction' => $direction, 'funnel' => $funnelId]), method: 'POST', csrfToken: $token, csrfField: 'crm_action[_token]');
+        return new Action('move', UiSupport::label('stage.move_' . $direction), $this->ui->url('nowo_crm_kit_stage_move', ['id' => $stageId, 'direction' => $direction, 'funnel' => $funnelId]), method: 'POST', csrfToken: $token, icon: $direction === 'up' ? UiIcons::STAGE_UP : UiIcons::STAGE_DOWN, csrfField: 'crm_action[_token]');
     }
 
     /**

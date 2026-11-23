@@ -69,7 +69,7 @@ final readonly class PipelineRecordBlock
         if ($edit) {
             foreach ($actions as $action) {
                 foreach (['done', 'cancel'] as $kind) {
-                    $buttons[$action->id][] = new Action('custom', UiSupport::label('next_action.' . $kind), $this->ui->url('nowo_crm_kit_next_action_close', ['id' => $action->id, 'action' => $kind, 'back_type' => $view->type->segment(), 'back' => $view->id]), method: 'POST', csrfToken: $token, csrfField: 'crm_action[_token]');
+                    $buttons[$action->id][] = new Action($kind === 'done' ? 'mark_done' : 'cancel', UiSupport::label('next_action.' . $kind), $this->ui->url('nowo_crm_kit_next_action_close', ['id' => $action->id, 'action' => $kind, 'back_type' => $view->type->segment(), 'back' => $view->id]), method: 'POST', csrfToken: $token, csrfField: 'crm_action[_token]');
                 }
             }
             $forms['action'] = $this->ui->form(NextActionType::class, ['dedupe' => PipelineForms::dedupe(), 'due_at' => new DateTimeImmutable('tomorrow 09:00', new DateTimeZone('UTC'))], ['owners' => $this->forms->owners()], 'crm_next_action')->createView();

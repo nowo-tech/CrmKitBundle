@@ -72,6 +72,12 @@ use function trim;
 final readonly class PipelineController
 {
     /**
+     * The form child of a domain field of a deal (0.8.1): the service names `company_id` / `contact_id`, the form
+     * `company` / `contact`; without the map the error went to the form root and the 422 showed no message.
+     */
+    private const DEAL_FIELDS = ['company_id' => 'company', 'contact_id' => 'contact'];
+
+    /**
      * Wires the collaborators.
      */
     public function __construct(
@@ -223,7 +229,7 @@ final readonly class PipelineController
 
                     return $this->ui->redirect('nowo_crm_kit_deal_show', ['id' => $id]);
                 } catch (InvalidInputException $e) {
-                    $this->ui->errors($form, $e);
+                    $this->ui->errors($form, $e, self::DEAL_FIELDS);
                 } catch (ConflictException $e) {
                     $this->ui->flash($request, 'error', 'flash.conflict.' . $e->errorCode);
 
@@ -298,8 +304,8 @@ final readonly class PipelineController
             if ($edit) {
                 foreach ($deal->nextActions as $action) {
                     $buttons[$action->id] = [
-                        $this->post($token, 'custom', 'next_action.done', 'nowo_crm_kit_next_action_close', ['id' => $action->id, 'action' => 'done', 'back_type' => 'deals', 'back' => $id]),
-                        $this->post($token, 'custom', 'next_action.cancel', 'nowo_crm_kit_next_action_close', ['id' => $action->id, 'action' => 'cancel', 'back_type' => 'deals', 'back' => $id]),
+                        $this->post($token, 'mark_done', 'next_action.done', 'nowo_crm_kit_next_action_close', ['id' => $action->id, 'action' => 'done', 'back_type' => 'deals', 'back' => $id]),
+                        $this->post($token, 'cancel', 'next_action.cancel', 'nowo_crm_kit_next_action_close', ['id' => $action->id, 'action' => 'cancel', 'back_type' => 'deals', 'back' => $id]),
                     ];
                 }
             }
@@ -344,7 +350,7 @@ final readonly class PipelineController
 
                     return $this->ui->redirect('nowo_crm_kit_deal_show', ['id' => $id]);
                 } catch (InvalidInputException $e) {
-                    $this->ui->errors($form, $e);
+                    $this->ui->errors($form, $e, self::DEAL_FIELDS);
                 } catch (ConflictException $e) {
                     $this->ui->flash($request, 'error', 'flash.conflict.' . $e->errorCode);
 
@@ -605,7 +611,7 @@ final readonly class PipelineController
         if (!$funnel->archived && $this->ui->can(CrmPermission::Create)) {
             $actions[] = Action::create($this->ui->url('nowo_crm_kit_deal_new', ['funnel' => $funnel->id]), UiSupport::label('deal.new'));
         }
-        $actions[] = new Action('custom', UiSupport::label('stats.title'), $this->ui->url('nowo_crm_kit_funnel_stats', ['id' => $funnel->id]), icon: 'chart');
+        $actions[] = new Action('custom', UiSupport::label('stats.title'), $this->ui->url('nowo_crm_kit_funnel_stats', ['id' => $funnel->id]), icon: UiIcons::STATS);
 
         return $actions;
     }

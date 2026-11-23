@@ -77,12 +77,12 @@ final class RouteListTest extends TestCase
             'nowo_crm_kit_funnel_edit'           => 'GET|POST /crm/admin/funnels/{id}',
             'nowo_crm_kit_stage_edit'            => 'POST /crm/admin/stages/{id}',
             'nowo_crm_kit_stage_move'            => 'POST /crm/admin/stages/{id}/move/{direction}',
-        ], self::describe((new UiRouteLoader(true, '/crm', true))->load('.')));
+        ], $this->describe((new UiRouteLoader(true, '/crm', true))->load('.')));
     }
 
     public function testTheUiRouteListWithoutThePipeline(): void
     {
-        $routes = self::describe((new UiRouteLoader(true, '/crm', false))->load('.'));
+        $routes = $this->describe((new UiRouteLoader(true, '/crm', false))->load('.'));
         self::assertCount(32, $routes);
         self::assertArrayNotHasKey('nowo_crm_kit_deals', $routes);
         self::assertSame('GET /crm', $routes['nowo_crm_kit_home']);
@@ -133,7 +133,7 @@ final class RouteListTest extends TestCase
             'nowo_crm_kit_api_deal_update'         => 'PATCH /api/crm/deals/{id}',
             'nowo_crm_kit_api_deal_move_stage'     => 'POST /api/crm/deals/{id}/stage',
             'nowo_crm_kit_api_deal_trash'          => 'DELETE /api/crm/deals/{id}',
-        ], self::describe((new CrmApiRouteLoader(true, '/api/crm', true))->load('.')));
+        ], $this->describe((new CrmApiRouteLoader(true, '/api/crm', true))->load('.')));
     }
 
     public function testNoControllerCarriesARouteAttribute(): void
@@ -160,7 +160,7 @@ final class RouteListTest extends TestCase
     /**
      * @return array<string, string> route name => "METHODS path"
      */
-    private static function describe(RouteCollection $routes): array
+    private function describe(RouteCollection $routes): array
     {
         $list = [];
         foreach ($routes->all() as $name => $route) {

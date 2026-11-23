@@ -105,7 +105,10 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 Owner rule of 2026-11-23: reuse or extend a nowo bundle before building anything CRM-only. Bundle versions are the
 latest tags on 2026-11-23. A version for an extension is that bundle's next free minor, planned at the time of writing;
-it moves if that bundle releases something else first. Each extension is noted in that bundle's `docs/ROADMAP.md`.
+it moves if that bundle releases something else first. Each extension is noted in that bundle's `docs/ROADMAP.md`
+(pull requests 2026-11-23: MailKitBundle #59, TimeTrackBundle #143, FormKitBundle #94, UiKitBundle #164,
+WorkingTimeBundle #21, WikiBundle #185, ChatKitBundle #125). AutomationKitBundle gets its plan in its contract (repo
+created, README only).
 
 | Capability | Block | Bundle | Verdict | What changes in that bundle | Version |
 | --- | --- | --- | --- | --- | --- |
@@ -182,7 +185,9 @@ it moves if that bundle releases something else first. Each extension is noted i
     comes with NotifyKit S4 (0.4.0) without CrmKit changes.
   - Templates and snippets: **extend MailKit** with stored templates (personal / shared scope, locale, subject, body,
     snippets) and a closed placeholder resolver registry by service tag. MailKit sends mail today but stores no
-    user-editable templates. CrmKit A-2 only contributes the `contact.*`, `company.*`, `deal.*`, `me.*` placeholder
+    templates (its own roadmap already plans "Phase 2 — branded, editable e-mail templates" with template definitions
+    as tagged services and placeholders; A-2's needs are added to that phase: personal / shared user templates and
+    snippets). CrmKit A-2 only contributes the `contact.*`, `company.*`, `deal.*`, `me.*` placeholder
     provider, the consent purpose per template and the insert in *Write e-mail*.
   - Sending, the log and tracking hooks: **reuse MailKit as is**. Search of the new fields: **reuse SearchKit as is**.
 - **Depends on.** Phase B (0.3.0). TaskBoard ≥ 2.24 (`CalendarEventSourceInterface`, timed events) through the existing
@@ -420,8 +425,9 @@ it moves if that bundle releases something else first. Each extension is noted i
 
 ### Block H — knowledge base (WikiBundle `published_spaces`; CrmKit bridge in 0.19.0)
 
-- **Reuse (owner rule).** Knowledge base: **extend WikiBundle** with `published_spaces` (Wiki's roadmap lists public
-  links as "later"). Suggestions: **reuse Wiki's search as is** through CrmKit's bridge.
+- **Reuse (owner rule).** Knowledge base: **extend WikiBundle** with `published_spaces`, built on the
+  "Public links" design Wiki's roadmap already has (off until an admin enables it per space, D-W23; no-index;
+  `frame-ancestors` allow-list for embeds). Suggestions: **reuse Wiki's search as is** through CrmKit's bridge.
 - **Depends on.** **WikiBundle `published_spaces`** (next Wiki minor; Wiki's roadmap lists public links as "later"):
   an organisation publishes a space; only pages marked published are public and read-only, without comments,
   revisions or author names; search over published pages only. CrmKit only adds the suggester (D-2).

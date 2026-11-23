@@ -24,11 +24,14 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FieldDefinitionType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\SettingsType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\TagType;
 use Nowo\TransactionDoctrine\WriteUnit\AsWriteUnit;
+use Nowo\UiKitBundle\Dialog\RemoteDialogResponder;
+use Nowo\UiKitBundle\Twig\ThemeExtension;
 use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Column;
 use Nowo\UiKitBundle\View\EmptyState;
 use Nowo\UiKitBundle\View\FilterField;
 use Nowo\UiKitBundle\View\FormPage;
+use Nowo\UiKitBundle\View\Label;
 use Nowo\UiKitBundle\View\ListPage;
 use Nowo\UiKitBundle\View\PageHeader;
 use Nowo\UiKitBundle\View\Pagination;
@@ -61,6 +64,9 @@ final readonly class AdminController
     /** Id of the "New tag" dialog (0.6.1, `ui.admin_create: dialog`). */
     public const TAG_DIALOG = 'crm-tag-dialog';
 
+    /** Id of the "New field" remote form dialog shell (0.8.0, `ui.admin_create: dialog`; one shell, two openers). */
+    public const FIELD_DIALOG = 'crm-field-dialog';
+
     /**
      * Wires the collaborators.
      */
@@ -71,6 +77,7 @@ final readonly class AdminController
         private FieldServiceInterface $fields,
         private CrmSettingsInterface $settings,
         private CrmAccess $access,
+        private ?RemoteDialogResponder $dialog = null,
     ) {
     }
 
@@ -82,7 +89,8 @@ final readonly class AdminController
     {
         return $this->ui->guard(function () use ($request): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->access->context(CrmPermission::Manage);
-            $form = $this->ui->form(TagType::class, ['colour' => 'neutral'], ['colours' => $this->colours()], 'crm_tag');
+            $remote = $this->remote();
+            $form   = $this->ui->form(TagType::class, ['colour' => 'neutral'], ['colours' => $this->colours()], 'crm_tag');
             $form->handleRequest($request);
             $status = Response::HTTP_OK;
             if ($form->isSubmitted()) {
@@ -92,25 +100,36 @@ final readonly class AdminController
                         $this->tags->create($this->text($form, 'name'), $this->text($form, 'colour'));
                         $this->ui->flash($request, 'success', 'tag.created');
 
-                        return $this->ui->redirect('nowo_crm_kit_tags');
+                        // 0.8.0, ui.admin_create: dialog: 204 + X-Nowo-Redirect in the dialog, else the 303.
+                        return $remote instanceof RemoteDialogResponder ? $remote->redirectToRoute('nowo_crm_kit_tags', [], Response::HTTP_SEE_OTHER, $request) : $this->ui->redirect('nowo_crm_kit_tags');
                     } catch (InvalidInputException $e) {
                         $this->ui->errors($form, $e);
                     }
                 }
+            }
+            if ($remote instanceof RemoteDialogResponder && $remote->isDialog($request)) {
+                return $this->dialogForm($remote, $form, $this->ui->url('nowo_crm_kit_tags'), self::TAG_DIALOG, 'crm-tag-form', 'tag.save', $status);
             }
             $filters        = $this->filters($request);
             $text           = $this->search($request);
             $rows           = array_map(static fn (TagView $t): array => ['id' => $t->id, 'name' => $t->name, 'colour' => $t->colour], array_values(array_filter($this->reader->tags(), static fn (TagView $t): bool => self::matches($text, $t->name))));
             [$rows, $pager] = $this->page($rows, 'nowo_crm_kit_tags', $request);
             $create         = null;
-            if ($this->ui->options->createDialog()) {
-                // 0.6.1: "New tag" is a header action opening the dialog; ?new=1 (its href) is the no-JS fallback.
-                $create = $this->create($request, $status, [['form' => $form, 'id' => self::TAG_DIALOG, 'title' => 'tag.add', 'submit' => 'tag.save', 'action' => $this->ui->url('nowo_crm_kit_tags'), 'testid' => 'crm-tag-form', 'open' => true]]);
+            $remoteShell    = null;
+            $actions        = [];
+            if ($remote instanceof RemoteDialogResponder) {
+                // 0.8.0: "New tag" links to ?new=1 (the form card, the no-JS fallback) and loads the form on demand.
+                $actions[]   = $this->remoteAction('tag.add', $this->ui->url('nowo_crm_kit_tags', ['new' => 1]), self::TAG_DIALOG, 'crm-tag-new', 'primary');
+                $remoteShell = $this->remoteShell($request, $status, self::TAG_DIALOG, 'tag.add', ['form' => $form, 'title' => 'tag.add', 'submit' => 'tag.save', 'action' => $this->ui->url('nowo_crm_kit_tags'), 'testid' => 'crm-tag-form']);
+            } elseif ($this->ui->options->createDialog()) {
+                // 0.6.1 (dialog_inline, deprecated): "New tag" opens the dialog in the page; ?new=1 is the no-JS fallback.
+                $create    = $this->create($request, $status, [['form' => $form, 'id' => self::TAG_DIALOG, 'title' => 'tag.add', 'submit' => 'tag.save', 'action' => $this->ui->url('nowo_crm_kit_tags'), 'testid' => 'crm-tag-form', 'open' => true]]);
+                $actions[] = $this->createAction('tag.add', $this->ui->url('nowo_crm_kit_tags', ['new' => 1]), self::TAG_DIALOG, 'crm-tag-new', 'primary');
             }
 
-            return $this->ui->render('@NowoCrmKit/admin/tags.html.twig', [
+            return $this->vary($remote, $this->ui->render('@NowoCrmKit/admin/tags.html.twig', [
                 'page' => new ListPage(
-                    new PageHeader(UiSupport::label('tags.title'), UiSupport::label('tags.intro'), $create === null ? [] : [$this->createAction('tag.add', $this->ui->url('nowo_crm_kit_tags', ['new' => 1]), self::TAG_DIALOG, 'crm-tag-new', 'primary')], tabs: $this->ui->tabs('tags')),
+                    new PageHeader(UiSupport::label('tags.title'), UiSupport::label('tags.intro'), $actions, tabs: $this->ui->tabs('tags')),
                     [new Column('name', UiSupport::label('tag.form.name'), required: true), new Column('colour', UiSupport::label('tag.form.colour'))],
                     $rows,
                     $this->ui->filterView($filters, $pager->perPage),
@@ -125,9 +144,10 @@ final readonly class AdminController
                     filterFields: $this->filterFields(),
                     responsive: 'cards',
                 ),
-                'form'       => $create === null ? $form->createView() : $create['dialogs'][0]['form'],
-                'crm_create' => $create,
-            ], $status);
+                'form'              => $create === null ? $form->createView() : $create['dialogs'][0]['form'],
+                'crm_create'        => $create,
+                'crm_create_remote' => $remoteShell,
+            ], $status));
         });
     }
 
@@ -190,6 +210,7 @@ final readonly class AdminController
     {
         return $this->ui->guard(function () use ($request): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->access->context(CrmPermission::Manage);
+            $remote  = $this->remote();
             $subject = SubjectType::tryFrom((string) $request->query->get('for', 'company')) ?? SubjectType::Company;
             $form    = $this->fieldForm();
             $form->handleRequest($request);
@@ -201,11 +222,14 @@ final readonly class AdminController
                         $this->fields->define($subject, $this->text($form, 'key'), $this->text($form, 'label'), FieldType::from($this->text($form, 'type')), $this->lines($this->text($form, 'choices')), $this->bool($form, 'required'), $this->int($form, 'position'));
                         $this->ui->flash($request, 'success', 'field.defined');
 
-                        return $this->ui->redirect('nowo_crm_kit_fields', ['for' => $subject->value]);
+                        return $remote instanceof RemoteDialogResponder ? $remote->redirectToRoute('nowo_crm_kit_fields', ['for' => $subject->value], Response::HTTP_SEE_OTHER, $request) : $this->ui->redirect('nowo_crm_kit_fields', ['for' => $subject->value]);
                     } catch (InvalidInputException $e) {
                         $this->ui->errors($form, $e);
                     }
                 }
+            }
+            if ($remote instanceof RemoteDialogResponder && $remote->isDialog($request)) {
+                return $this->dialogForm($remote, $form, $this->ui->url('nowo_crm_kit_fields', ['for' => $subject->value]), self::FIELD_DIALOG, 'crm-field-form-' . $subject->value, 'field.save', $status);
             }
             $filters = $this->filters($request);
             $text    = $this->search($request);
@@ -216,11 +240,18 @@ final readonly class AdminController
             }
             [$rows, $pager] = $this->page($rows, 'nowo_crm_kit_fields', $request);
 
-            $create  = null;
-            $actions = [];
-            $view    = null;
-            if ($this->ui->options->createDialog()) {
-                // 0.6.1: one header action and one dialog per subject; the submitted (or ?new=1) one opens.
+            $create      = null;
+            $actions     = [];
+            $view        = null;
+            $remoteShell = null;
+            if ($remote instanceof RemoteDialogResponder) {
+                // 0.8.0: one opener per subject (?for=<subject>&new=1, the form card without JavaScript), one shell.
+                foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
+                    $actions[] = $this->remoteAction('field.add.' . $type->value, $this->ui->url('nowo_crm_kit_fields', ['for' => $type->value, 'new' => 1]), self::FIELD_DIALOG, 'crm-field-new-' . $type->value, $type === SubjectType::Company ? 'primary' : null);
+                }
+                $remoteShell = $this->remoteShell($request, $status, self::FIELD_DIALOG, 'field.add.' . $subject->value, ['form' => $form, 'title' => 'field.add.' . $subject->value, 'submit' => 'field.save', 'action' => $this->ui->url('nowo_crm_kit_fields', ['for' => $subject->value]), 'testid' => 'crm-field-form']);
+            } elseif ($this->ui->options->createDialog()) {
+                // 0.6.1 (dialog_inline, deprecated): one header action and one dialog per subject; the submitted (or ?new=1) one opens.
                 $dialogs = [];
                 foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
                     $id        = 'crm-field-dialog-' . $type->value;
@@ -231,7 +262,7 @@ final readonly class AdminController
                 $view   = $create['dialogs'][$subject === SubjectType::Company ? 0 : 1]['form'] ?? null;
             }
 
-            return $this->ui->render('@NowoCrmKit/admin/fields.html.twig', [
+            return $this->vary($remote, $this->ui->render('@NowoCrmKit/admin/fields.html.twig', [
                 'page' => new ListPage(
                     new PageHeader(UiSupport::label('fields.title'), UiSupport::label('fields.intro'), $actions, tabs: $this->ui->tabs('fields')),
                     [new Column('subject', UiSupport::label('fields.col.subject')), new Column('label', UiSupport::label('field.form.label'), required: true), new Column('key', UiSupport::label('field.form.key'), priority: 2), new Column('type', UiSupport::label('field.form.type'), priority: 2), new Column('state', UiSupport::label('fields.col.state'), priority: 3)],
@@ -248,10 +279,11 @@ final readonly class AdminController
                     filterFields: $this->filterFields(),
                     responsive: 'cards',
                 ),
-                'form'       => $view ?? $form->createView(),
-                'subject'    => $subject->value,
-                'crm_create' => $create,
-            ], $status);
+                'form'              => $view ?? $form->createView(),
+                'subject'           => $subject->value,
+                'crm_create'        => $create,
+                'crm_create_remote' => $remoteShell,
+            ], $status));
         });
     }
 
@@ -372,6 +404,57 @@ final readonly class AdminController
         }
 
         return ['dialogs' => $views, 'open' => $open, 'clear' => $invalid ? false : 'new', 'fallback' => $fallback];
+    }
+
+    /**
+     * UiKit's remote dialog responder when Tags and Custom fields create on demand (0.8.0, `ui.admin_create: dialog`).
+     */
+    private function remote(): ?RemoteDialogResponder
+    {
+        return $this->ui->options->createRemote() ? $this->dialog : null;
+    }
+
+    /**
+     * The fragment of a create dialog (0.8.0): the form, its errors and the Save / Cancel row; 200, or 422 for an
+     * invalid submission; `Vary: X-Nowo-Dialog`.
+     *
+     * @param FormInterface<mixed> $form
+     */
+    private function dialogForm(RemoteDialogResponder $remote, FormInterface $form, string $action, string $dialog, string $testid, string $submit, int $status): Response
+    {
+        return $remote->fragment($this->ui->render('@NowoCrmKit/_dialog_form.html.twig', ['form' => $form->createView(), 'action' => $action, 'dialog' => $dialog, 'testid' => $testid . '-dialog-form', 'submit' => $submit], $status));
+    }
+
+    /**
+     * Adds `Vary: X-Nowo-Dialog` to a page whose URL also answers a dialog fragment (0.8.0).
+     */
+    private function vary(?RemoteDialogResponder $remote, Response $response): Response
+    {
+        return $remote instanceof RemoteDialogResponder ? $remote->fragment($response) : $response;
+    }
+
+    /**
+     * The empty remote form dialog shell of an admin list (0.8.0) and, for `?new=1` (the opener's href, the no-JS
+     * fallback and deep link) or an invalid submission without JavaScript (422), the form card.
+     *
+     * @param array{form: FormInterface<mixed>, title: string, submit: string, action: string, testid: string} $fallback
+     *
+     * @return array{id: string, title: Label, fallback: array{form: FormView, title: string, submit: string, action: string, testid: string}|null}
+     */
+    private function remoteShell(Request $request, int $status, string $id, string $title, array $fallback): array
+    {
+        $open = $status === Response::HTTP_UNPROCESSABLE_ENTITY || ($request->isMethod('GET') && $request->query->getBoolean('new'));
+
+        return ['id' => $id, 'title' => UiSupport::label($title), 'fallback' => $open ? ['form' => $fallback['form']->createView()] + $fallback : null];
+    }
+
+    /**
+     * A header action that loads a create form into the remote form dialog (0.8.0): a real link to the page
+     * (`?new=1`), with UiKit's opener attributes (`js/nowo-ui-dialog.js`); the label is the dialog title.
+     */
+    private function remoteAction(string $label, string $href, string $dialog, string $testid, ?string $variant): Action
+    {
+        return new Action('create', UiSupport::label($label), $href, variant: $variant, attributes: ThemeExtension::remoteFormOpener($dialog, $this->ui->trans($label), false, $href) + ['aria-haspopup' => 'dialog', 'aria-controls' => $dialog, 'data-testid' => $testid]);
     }
 
     /**

@@ -64,5 +64,9 @@ final class UiOptionsTest extends TestCase
         self::assertSame([10, 25, 50], $on->allowedPerPage(25));
         self::assertSame(10, $on->perPage('10', 25));
         self::assertSame(25, $on->perPage('100', 25), 'not a configured choice');
+        self::assertFalse($on->createRemote());
+        self::assertTrue((new UiOptions(adminCreate: 'dialog'))->createRemote());
+        self::assertFalse((new UiOptions(adminCreate: 'dialog'))->createDialog(), 'dialog is on demand since 0.8.0');
+        self::assertTrue((new UiOptions(adminCreate: 'dialog_inline'))->createDialog());
     }
 }

@@ -42,6 +42,14 @@ No schema change, no BC break in the public PHP API, no route change. What you m
   `ui.record_create: dialog` (create in a UiKit remote form dialog loaded on demand). With the dialog, e2e tests click
   `crm-record-new` and fill the form inside `crm-record-dialog`; the URL `…/new` still answers the full page. See
   CONFIGURATION, "Rows per page and the create dialog".
+- `ui.admin_create: dialog` now loads the create form on demand: the page has one empty remote form dialog shell
+  (`dialog#crm-tag-dialog`, `dialog#crm-field-dialog`) and no `form[name=crm_tag|crm_field]`; the header actions are
+  links to `?new=1` with `data-nowo-ui-dialog-*` attributes instead of `data-nowo-confirm-open`. E2E tests click
+  `crm-tag-new` / `crm-field-new-<subject>` and fill the form inside `crm-tag-dialog` / `crm-field-dialog` (submit:
+  `crm-tag-form-dialog-form-submit`, `crm-field-form-<subject>-dialog-form-submit`); `?new=1` shows the form card
+  instead of opening the dialog on load. A host that overrides `admin/tags.html.twig` / `admin/fields.html.twig` and
+  includes `admin/_create.html.twig` with `crm_create` either keeps working with the inline form (`crm_create` is null,
+  `form` is set) or sets `ui.admin_create: dialog_inline` (deprecated, removed in 1.0) to keep the 0.7 dialog.
 - Development: the lock moves to UiKit 2.68 and FormKit 2.24 (the constraints are unchanged).
 
 ## To 0.7.0

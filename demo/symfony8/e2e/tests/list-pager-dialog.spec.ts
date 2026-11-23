@@ -67,8 +67,9 @@ test.describe('CRM Kit 0.8.0 lists and create dialog', () => {
     await page.goto('/crm/admin/tags');
     await page.getByTestId('crm-tag-new').click();
     const tag = `Pager ${Date.now() % 100000}`;
-    await page.getByTestId('crm-tag-form-dialog').locator('input[name="crm_tag[name]"]').fill(tag);
-    await page.getByTestId('crm-tag-form-submit').click();
+    const tagDialog = page.getByTestId('crm-tag-dialog');
+    await tagDialog.locator('input[name="crm_tag[name]"]').fill(tag);
+    await tagDialog.getByTestId('crm-tag-form-dialog-form-submit').click();
     await expect(page.getByTestId('crm-tags')).toContainText(tag);
 
     const filters = page.locator('[data-nowo-ui-region="filters"]');

@@ -482,7 +482,7 @@ final class ServiceDefinitions
         foreach ([ActionType::class, AdminFilterType::class, AffiliationType::class, ConsentType::class, FieldDefinitionType::class, FilterType::class, HostLinkType::class, ImportConfirmType::class, ImportUploadType::class, MergePickType::class, MergeType::class, NoteType::class, RecordType::class, SettingsType::class, TagType::class, TagsAssignType::class] as $type) {
             $s->set($type)->tag('form.type');
         }
-        $s->set(AdminController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(TagServiceInterface::class), service(FieldServiceInterface::class), service(CrmSettingsInterface::class), service(CrmAccess::class)])->public()->tag('controller.service_arguments');
+        $s->set(AdminController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(TagServiceInterface::class), service(FieldServiceInterface::class), service(CrmSettingsInterface::class), service(CrmAccess::class), service(RemoteDialogResponder::class)->nullOnInvalid()])->public()->tag('controller.service_arguments');
     }
 
     /**

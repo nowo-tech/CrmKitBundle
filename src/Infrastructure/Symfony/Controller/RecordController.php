@@ -520,10 +520,10 @@ final readonly class RecordController
      */
     private function createDialog(SubjectType $type, FormInterface $form, RemoteDialogResponder $dialog, int $status): Response
     {
-        return $dialog->fragment($this->ui->render('@NowoCrmKit/record/_form_dialog.html.twig', [
+        return $dialog->fragment($this->ui->render('@NowoCrmKit/_dialog_form.html.twig', [
             'form'   => $form->createView(),
             'action' => $this->ui->url('nowo_crm_kit_new', ['type' => $type->segment()]),
-            'title'  => 'record.new.' . $type->value,
+            'dialog' => self::RECORD_DIALOG,
             'testid' => 'crm-record-dialog-form',
         ], $status));
     }

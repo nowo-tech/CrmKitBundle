@@ -47,6 +47,7 @@ final class ConfigurationTreeTest extends TestCase
         $config = $this->process(['ui' => ['list_per_page' => [10, 25, 50, 100], 'record_create' => 'dialog']]);
         self::assertSame([10, 25, 50, 100], $config['ui']['list_per_page'] ?? null);
         self::assertSame('dialog', $config['ui']['record_create'] ?? null);
+        self::assertSame('dialog_inline', $this->process(['ui' => ['admin_create' => 'dialog_inline']])['ui']['admin_create'] ?? null, 'the deprecated 0.6.1 dialog');
         self::assertSame([5, 15], $this->process(['ui' => ['page_size' => 15, 'list_per_page' => [5, 15]]])['ui']['list_per_page'] ?? null);
     }
 

@@ -27,10 +27,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `ui.list_per_page` (Beacon request 2026-11-23): a *Rows per page* select (`select[name=per_page]`, visible label) in the filter card of the company and contact lists, Tags and Custom fields; `per_page` is checked against the configured choices (else `ui.page_size`; without the option UiKit's 10, 25, 50, 100 and `page_size`). Default `[]`: no select, the filter card is unchanged.
 - The UiKit pager with its "Showing x–y of z" count under every list with rows (a single page included); a page past the end shows the last page.
 - `ui.record_create: dialog` (Beacon request 2026-11-23, rule "every dialog loads on demand"): *New company* / *New contact* open in a UiKit remote form dialog that loads the form page on demand (`X-Nowo-Dialog: 1` ⇒ fragment `record/_form_dialog.html.twig`, invalid ⇒ 422 in the dialog, saved ⇒ 204 + `X-Nowo-Redirect` to the new record, `Vary: X-Nowo-Dialog`); the header action stays a real link (the no-JS fallback). Same access checks, tenant and CSRF token as the page.
+- `ui.admin_create: dialog_inline` (deprecated): the 0.6.1 – 0.7 in-page create dialog, for hosts whose template overrides rely on `crm_create` / `admin/_create.html.twig`.
 - Tags and Custom fields: a filter card (name search `q`, *Rows per page* with `ui.list_per_page`) and the UiKit pager.
 - Translations of *Rows per page*, the name search and *Nothing matches the search.* in the seven locales.
 
 ### Changed
+
+- `ui.admin_create: dialog` (Tags, Custom fields) loads the create form on demand (Beacon rule D-20261123-01): a real link to `?new=1` with UiKit's remote form opener, one empty `remote_form_dialog` shell, the fragment for `X-Nowo-Dialog: 1`, 422 in the dialog, 204 + `X-Nowo-Redirect` once saved, `Vary: X-Nowo-Dialog`. The page no longer renders the form inside a hidden `confirm_dialog`; `?new=1` without JavaScript shows the form card. Same access checks and CSRF tokens.
+
+### Deprecated
+
+- `ui.admin_create: dialog_inline` and `admin/_create.html.twig` (removed in 1.0).
 
 - A `per_page` outside the accepted values falls back to `ui.page_size` (any value from 1 to 100 was used before while the pager counted 25). See UPGRADING, "To 0.8.0".
 

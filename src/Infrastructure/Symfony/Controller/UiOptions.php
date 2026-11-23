@@ -53,7 +53,7 @@ final readonly class UiOptions
      * @param string $recordActions `split` | `toolbar`
      * @param string|null $filtersSlot host template wrapping the filters region
      * @param bool $listTabs 0.6.1: the area tabs on every page but the company / contact record page
-     * @param string $adminCreate 0.6.1: `inline` | `dialog` (create on Tags and Custom fields)
+     * @param string $adminCreate 0.6.1: `inline` | `dialog` (0.8.0: on demand) | `dialog_inline` (deprecated)
      * @param string $settingsWidth 0.6.1: `form` | `full`
      * @param array<string, string|null> $tabIcons 0.7.0: host overrides of {@see self::DEFAULT_TAB_ICONS} by area;
      *                                             `''` or null = no icon (the tab shows its label in every tab style)
@@ -87,9 +87,19 @@ final readonly class UiOptions
     }
 
     /**
-     * Whether Tags and Custom fields create through a header action and a dialog (0.6.1).
+     * Whether Tags and Custom fields create through a header action and the 0.6.1 dialog whose form is in the page
+     * (`ui.admin_create: dialog_inline`, deprecated since 0.8.0).
      */
     public function createDialog(): bool
+    {
+        return $this->adminCreate === 'dialog_inline';
+    }
+
+    /**
+     * Whether Tags and Custom fields create through a header action and a remote form dialog loaded on demand
+     * (`ui.admin_create: dialog`, 0.8.0).
+     */
+    public function createRemote(): bool
     {
         return $this->adminCreate === 'dialog';
     }

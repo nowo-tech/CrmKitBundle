@@ -1,0 +1,14 @@
+{#
+  Create on Tags and Custom fields, on demand (0.8.0, `ui.admin_create: dialog`; rule "every dialog loads on demand"):
+  one empty UiKit remote form dialog shell that the header actions (real links to `?new=1`, with UiKit's remote form
+  opener attributes) fill with the page's fragment (`_dialog_form.html.twig`, `X-Nowo-Dialog: 1`). Nothing of the form
+  is in the list page, except the card of the no-JS fallback: `?new=1` or an invalid submission without JavaScript
+  (422) render the form in a card under the list.
+
+  Variables: create ({id, title, fallback: {form, title, submit, action, testid} or null}).
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{{ include(nowo_ui_partial('remote_form_dialog', _d), {id: create.id, title: create.title, size: 'md', attr: {'data-testid': create.id}, bundle: _d}, false) }}
+{% if create.fallback %}
+    {{ include('@NowoCrmKit/_form.html.twig', {form: create.fallback.form, title: create.fallback.title, submit: create.fallback.submit, action: create.fallback.action, testid: create.fallback.testid}, false) }}
+{% endif %}

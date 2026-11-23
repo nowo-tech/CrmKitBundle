@@ -80,7 +80,7 @@ nowo_crm_kit:
         filters_fold: false        # 0.6.0: UiKit fold toggle on the filters card
         filters_slot: null         # 0.6.0: host Twig template wrapping the filters (page, form, filters); see USAGE
         list_tabs: true            # 0.6.1: false hides the area tabs on list, admin and form pages (record: record_tabs)
-        admin_create: inline       # 0.6.1: inline | dialog (Tags / Custom fields create from a header action + dialog)
+        admin_create: inline       # 0.6.1: inline | dialog (0.8.0: loaded on demand) | dialog_inline (deprecated, 0.6.1 in-page dialog)
         settings_width: form       # 0.6.1: form (UiKit form panel) | full (bundle card, full content width)
         tab_icons: {}              # 0.7.0: area => icon name, merged over the built-in Tabler set (see "Area tab icons")
         list_per_page: []          # 0.8.0: "Rows per page" choices, e.g. [10, 25, 50, 100]; [] = no select (see "Rows per page")
@@ -274,7 +274,9 @@ Without `list_per_page` the lists accept UiKit's values (10, 25, 50, 100) and `p
 a page past the end shows the last page. The pages keep the filters, the sort and `per_page`.
 
 `ui.record_create: dialog` opens *New company* / *New contact* in a UiKit remote form dialog that loads the form page
-on demand (nothing of the form is in the list page); `page` (default) keeps the plain link. See USAGE, "Page layout
+on demand (nothing of the form is in the list page); `page` (default) keeps the plain link. Since 0.8.0
+`ui.admin_create: dialog` (Tags, Custom fields) loads its form on demand the same way; the 0.6.1 in-page dialog is
+`dialog_inline`, deprecated. See USAGE, "Page layout
 options".
 
 ### Area tab icons

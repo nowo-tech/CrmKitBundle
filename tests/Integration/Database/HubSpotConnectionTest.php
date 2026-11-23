@@ -17,6 +17,7 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Crypto\SodiumCrmSecretBox;
 use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\FakeHubSpot;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Throwable;
 
@@ -143,7 +144,7 @@ final class HubSpotConnectionTest extends HubSpotTestCase
         $this->expectDenied(fn (): ?\Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotConnectionView => $this->connections()->status());
     }
 
-    public function testRotationReSealsUnderTheCurrentKeyAndInvalidatesWhatNoLongerOpens(): void
+    public function testRotationReSealsUnderTheCurrentKeyAndNeverLosesAToken(): void
     {
         $old  = str_repeat("\x07", 32);
         $fake = $this->hubspot(['secrets' => ['keys' => ['old' => $old, 'k1' => self::KEY], 'current_key' => 'k1']]);
@@ -153,26 +154,31 @@ final class HubSpotConnectionTest extends HubSpotTestCase
         $sealed = (new SodiumCrmSecretBox(['old' => $old], 'old'))->seal($fake->token, new SecretContext(SecretContext::HUBSPOT_TOKEN, new TenantRef('acme'), $view->id));
         $this->connection()->executeStatement("UPDATE nowo_crm_hubspot_connection SET token_key_id = 'old', token_sealed = ?", [$sealed->ciphertext]);
         $tester = new CommandTester((new Application($this->kernel))->find('nowo:crm-kit:secrets:rotate'));
-        $tester->execute(['--dry-run' => true]);
-        self::assertStringContainsString('dry run: 1 re-sealed, 0 already current, 0 invalid', $tester->getDisplay());
+        self::assertSame(Command::SUCCESS, $tester->execute(['--dry-run' => true]));
+        self::assertStringContainsString('dry run: 1 re-sealed, 0 already current, 0 left unchanged', $tester->getDisplay());
         self::assertSame('old', $this->text('SELECT token_key_id FROM nowo_crm_hubspot_connection'));
-        $tester->execute([]);
-        self::assertStringContainsString('secrets: 1 re-sealed, 0 already current, 0 invalid', $tester->getDisplay());
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertStringContainsString('secrets: 1 re-sealed, 0 already current, 0 left unchanged', $tester->getDisplay());
         self::assertSame('k1', $this->text('SELECT token_key_id FROM nowo_crm_hubspot_connection'));
+        $this->hubImports()->lists(); // the re-sealed token opens (no input error)
+        self::assertSame('active', $this->connections()->status()?->status->value);
         $tester->execute([]);
         self::assertStringContainsString('0 re-sealed, 1 already current', $tester->getDisplay());
         self::assertFalse(str_contains($tester->getDisplay(), $fake->token));
-        // A value that does not open under its key: the connection becomes invalid (a manager pastes a new key).
-        $this->connection()->executeStatement("UPDATE nowo_crm_hubspot_connection SET token_key_id = 'old', token_sealed = ?", [$k1]);
-        $tester->execute(['--dry-run' => true]);
-        self::assertStringContainsString('1 invalid', $tester->getDisplay());
-        $before = $this->connections()->status();
-        self::assertNotNull($before);
-        self::assertSame(HubSpotConnectionStatus::Active, $before->status);
-        $tester->execute([]);
-        $after = $this->connections()->status();
-        self::assertNotNull($after);
-        self::assertSame(HubSpotConnectionStatus::Invalid, $after->status);
+        // 0.10.1 (ZAM-D2): a value that does not open, or whose key is not configured, is left exactly as it is.
+        foreach (['old' => '1 do not open', 'gone' => '1 key not available'] as $keyId => $count) {
+            $this->connection()->executeStatement('UPDATE nowo_crm_hubspot_connection SET token_key_id = ?, token_sealed = ?', [$keyId, $k1]);
+            foreach ([['--dry-run' => true], []] as $options) {
+                self::assertSame(Command::FAILURE, $tester->execute($options));
+                self::assertStringContainsString('1 left unchanged (' . ($keyId === 'old' ? '1 do not open, 0 key not available' : '0 do not open, 1 key not available'), $tester->getDisplay());
+                self::assertStringContainsString($count, $tester->getDisplay());
+                self::assertStringContainsString('Keep every old key configured', $tester->getDisplay());
+            }
+            $after = $this->connections()->status();
+            self::assertNotNull($after);
+            self::assertSame(HubSpotConnectionStatus::Active, $after->status);
+            self::assertSame([$keyId, $k1], [$this->text('SELECT token_key_id FROM nowo_crm_hubspot_connection'), $this->text('SELECT token_sealed FROM nowo_crm_hubspot_connection')]);
+        }
     }
 
     private function expectInput(Closure $call, string $field, string $key): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Domain\Port;
 
+use Nowo\CrmKitBundle\Domain\Exception\SecretKeyUnavailableException;
 use Nowo\CrmKitBundle\Domain\Exception\SecretUnsealException;
 use Nowo\CrmKitBundle\Domain\Value\SealedSecret;
 use Nowo\CrmKitBundle\Domain\Value\SecretContext;
@@ -20,13 +21,19 @@ interface CrmSecretBoxInterface
 {
     /**
      * Seals a plaintext for the context with the current key.
+     *
+     * @throws SecretKeyUnavailableException 0.10.1: the current key cannot be used (a configuration error)
      */
     public function seal(#[SensitiveParameter] string $plaintext, SecretContext $context): SealedSecret;
 
     /**
      * Opens a sealed value for the context.
      *
-     * @throws SecretUnsealException wrong or unknown key, tampering, or another context
+     * @throws SecretUnsealException wrong key, tampering, or another context (the value is bad: the connection is
+     *                               marked invalid)
+     * @throws SecretKeyUnavailableException 0.10.1: the key id is not configured or its key cannot be used; nothing
+     *                                       is said about the value, so it is kept (an implementation of 0.10.0 may
+     *                                       still throw SecretUnsealException for an unknown key id)
      */
     public function unseal(SealedSecret $sealed, SecretContext $context): string;
 

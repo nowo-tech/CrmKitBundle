@@ -480,7 +480,7 @@ final class ServiceDefinitions
         ]);
         $s->set(HubSpotConnectionService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(CrmSecretBoxInterface::class), param($p . 'import.hubspot.connect_rate_limit.limit'), param($p . 'import.hubspot.connect_rate_limit.interval')]);
         $s->alias(HubSpotConnectionServiceInterface::class, HubSpotConnectionService::class)->public();
-        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled')]);
+        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled'), param($p . 'import.hubspot.browse_rate_limit.limit'), param($p . 'import.hubspot.browse_rate_limit.interval')]);
         $s->alias(HubSpotImportServiceInterface::class, HubSpotImportService::class)->public();
         $s->set(SecretsRotateCommand::class)->args([service(HubSpotStoreInterface::class), service(CrmSecretBoxInterface::class), service(TransactionRunnerInterface::class), $clock])->tag('console.command');
     }

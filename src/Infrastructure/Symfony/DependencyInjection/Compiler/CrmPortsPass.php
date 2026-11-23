@@ -22,6 +22,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\ConfiguredCrmApiTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\SecurityUserCrmApiAuthenticator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
+use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistry;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
 use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiReadOperations;
@@ -32,8 +33,11 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
+use function array_values;
 use function class_exists;
+use function in_array;
 use function interface_exists;
+use function is_array;
 use function is_string;
 
 /**
@@ -103,8 +107,9 @@ final class CrmPortsPass implements CompilerPassInterface
 
     /**
      * The HubSpot import (0.10.0): the secret box is `secrets.box` (the
-     * DoctrineEncrypt bridge is defined here when chosen and DoctrineEncrypt is installed) or the sodium default; the
-     * OutboundUrlGuard pin follows `import.hubspot.outbound_url_guard`.
+     * DoctrineEncrypt bridge is defined here when chosen and DoctrineEncrypt is installed, with the profiles of
+     * `secrets.doctrine_encrypt`, 0.10.1) or the sodium default; the OutboundUrlGuard pin follows
+     * `import.hubspot.outbound_url_guard`.
      */
     private function hubspot(ContainerBuilder $container): void
     {
@@ -114,7 +119,17 @@ final class CrmPortsPass implements CompilerPassInterface
             if (!interface_exists(EncryptorRegistryInterface::class) || !$container->has(EncryptorRegistryInterface::class)) {
                 throw new LogicException('nowo_crm_kit.secrets.box is the DoctrineEncrypt bridge but nowo-tech/doctrine-encrypt-bundle is not installed and enabled.');
             }
-            $container->setDefinition($box, (new Definition($box))->setArguments([new Reference(EncryptorRegistryInterface::class)]));
+            $profile  = $container->getParameter($p . 'secrets.doctrine_encrypt.profile');
+            $profile  = is_string($profile) && $profile !== '' ? $profile : null;
+            $previous = [];
+            foreach ((array) $container->getParameter($p . 'secrets.doctrine_encrypt.previous') as $keyId => $old) {
+                $previous[(string) $keyId] = is_string($old) && $old !== '' ? $old : null;
+            }
+            // Audit ZAM-D4: a profile that is not Halite or Defuse fails the build, not the first seal.
+            foreach ([$profile, ...array_values($previous)] as $name) {
+                $this->assertAuthenticated($container, $name);
+            }
+            $container->setDefinition($box, (new Definition($box))->setArguments([new Reference(EncryptorRegistryInterface::class), $profile, false, $container->getParameter($p . 'secrets.doctrine_encrypt.key_id'), $previous]));
         }
         $container->setAlias(CrmSecretBoxInterface::class, is_string($box) && $box !== '' ? $box : $p . 'default.secret_box');
         $guard = $container->getParameter($p . 'import.hubspot.outbound_url_guard');
@@ -125,6 +140,29 @@ final class CrmPortsPass implements CompilerPassInterface
         if ($guard !== 'off' && $has) {
             $container->setDefinition(GuardedHubSpotRequestOptions::class, (new Definition(GuardedHubSpotRequestOptions::class))->setArguments([new Reference(OutboundUrlGuard::class)]));
             $container->getDefinition(HttpHubSpotReader::class)->replaceArgument(2, new Reference(GuardedHubSpotRequestOptions::class));
+        }
+    }
+
+    /**
+     * Refuses a DoctrineEncrypt profile whose encryptor is not Halite or Defuse, or that does not exist, when the
+     * registry is DoctrineEncrypt's own (0.10.1, audit ZAM-D4). A registry the host replaced is checked at the first
+     * seal or unseal instead (the box refuses it there too).
+     */
+    private function assertAuthenticated(ContainerBuilder $container, ?string $profile): void
+    {
+        $registry = $container->findDefinition(EncryptorRegistryInterface::class);
+        $map      = $registry->getArguments()[0] ?? null;
+        if ($container->getParameterBag()->resolveValue($registry->getClass()) !== EncryptorRegistry::class || !is_array($map)) {
+            return;
+        }
+        $name      = $profile ?? 'default';
+        $encryptor = $map[$name] ?? null;
+        if (!$encryptor instanceof Reference) {
+            throw new LogicException('nowo_crm_kit.secrets.doctrine_encrypt: "' . $name . '" is not a DoctrineEncrypt profile (nowo_doctrine_encrypt.profiles).');
+        }
+        $class = $container->getParameterBag()->resolveValue($container->findDefinition((string) $encryptor)->getClass());
+        if (!is_string($class) || !in_array($class, DoctrineEncryptCrmSecretBox::AUTHENTICATED, true)) {
+            throw new LogicException('nowo_crm_kit.secrets.doctrine_encrypt: the DoctrineEncrypt profile "' . $name . '" must use the Halite or Defuse encryptor, not ' . (is_string($class) ? $class : 'an unknown class') . ' (define your own DoctrineEncryptCrmSecretBox service with allowCustom: true for another authenticated encryptor).');
         }
     }
 

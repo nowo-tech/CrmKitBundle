@@ -496,6 +496,8 @@ error:
     hubspot_bad_response: 'O HubSpot respondeu algo que o CRM não consegue ler. A importação foi pausada.'
     hubspot_disconnected: 'O HubSpot foi desligado: a importação parou.'
     hubspot_too_many: 'A conta HubSpot tem mais registos do que a importação permite: parou.'
+    hubspot_key_unavailable: 'A chave do HubSpot não pode ser aberta nem selada com as chaves secretas configuradas. Nada foi alterado: um administrador tem de voltar a configurar a chave (ver o guia de rotação de chaves).'
+    hubspot_browse_limited: 'Demasiadas leituras do HubSpot para esta organização. Aguarde alguns minutos.'
     record_erased: 'A pessoa foi apagada (RGPD): não é importada de novo.'
     record_trashed: 'O registo está no lixo: fica como está.'
     record_merged: 'O registo foi fundido entretanto: tente de novo.'

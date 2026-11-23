@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Unit\Infrastructure;
 
+use Closure;
 use DateTimeImmutable;
+use InvalidArgumentException;
 use LogicException;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotException;
 use Nowo\CrmKitBundle\Application\ImportService;
@@ -12,6 +14,7 @@ use Nowo\CrmKitBundle\Application\Port\ImportRunDispatcherInterface;
 use Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox;
 use Nowo\CrmKitBundle\Bridge\OutboundUrlGuard\GuardedHubSpotRequestOptions;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
+use Nowo\CrmKitBundle\Domain\Exception\SecretKeyUnavailableException;
 use Nowo\CrmKitBundle\Domain\Exception\SecretUnsealException;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotAssociation;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotOwnerPage;
@@ -206,13 +209,20 @@ final class HubSpotInfrastructureTest extends TestCase
         self::assertSame('fake-credential', $box->unseal($sealed, $context));
         self::assertStringNotContainsString(str_repeat('a', 32), print_r($box, true));
         $other = new SecretContext(SecretContext::HUBSPOT_TOKEN, new TenantRef('acme'), '01890000-0000-7000-8000-000000000002');
-        foreach ([[$sealed, $other], [new SealedSecret('k9', $sealed->ciphertext), $context], [new SealedSecret('k1', $sealed->ciphertext), $context], [new SealedSecret('k2', 'AAAA'), $context]] as [$value, $ctx]) {
+        foreach ([[$sealed, $other], [new SealedSecret('k1', $sealed->ciphertext), $context], [new SealedSecret('k2', 'AAAA'), $context]] as [$value, $ctx]) {
             try {
                 $box->unseal($value, $ctx);
                 self::fail('does not open');
             } catch (SecretUnsealException $e) {
                 self::assertSame('The secret does not open.', $e->getMessage());
             }
+        }
+        // 0.10.1 (ZAM-D2): a key id that is not configured says nothing about the value (it is kept).
+        try {
+            $box->unseal(new SealedSecret('k9', $sealed->ciphertext), $context);
+            self::fail('the key is not available');
+        } catch (SecretKeyUnavailableException $e) {
+            self::assertSame(['k9', 'The key "k9" of a sealed secret is not available.'], [$e->keyId, $e->getMessage()]);
         }
         foreach ([static fn (): SodiumCrmSecretBox => new SodiumCrmSecretBox(['k1' => 'short'], 'k1'), static fn (): SodiumCrmSecretBox => new SodiumCrmSecretBox(['BAD' => str_repeat('a', 32)], 'BAD'), static fn (): SodiumCrmSecretBox => new SodiumCrmSecretBox(['k1' => str_repeat('a', 32)], 'k2')] as $bad) {
             try {
@@ -245,10 +255,22 @@ final class HubSpotInfrastructureTest extends TestCase
             public function get(string $name): EncryptorInterface
             {
                 return match ($name) {
-                    'aes'    => new MysqlAesEncryptor(),
-                    'defuse' => new DefuseEncryptor(),
-                    'custom' => $this->custom,
-                    default  => new HaliteEncryptor(),
+                    'aes'     => new MysqlAesEncryptor(),
+                    'defuse'  => new DefuseEncryptor(),
+                    'custom'  => $this->custom,
+                    'missing' => throw new InvalidArgumentException('Unknown encryptor config "missing".'),
+                    'broken'  => new class implements EncryptorInterface {
+                        public function encrypt(string $data): string
+                        {
+                            throw new RuntimeException('The key file is missing.');
+                        }
+
+                        public function decrypt(string $data): string
+                        {
+                            return $data;
+                        }
+                    },
+                    default => new HaliteEncryptor(),
                 };
             }
 
@@ -264,7 +286,7 @@ final class HubSpotInfrastructureTest extends TestCase
         self::assertSame('fake-credential', $box->unseal($sealed, $context));
         self::assertSame('fake-credential', (new DoctrineEncryptCrmSecretBox($registry, 'personal'))->unseal($sealed, $context));
         $other = new SecretContext(SecretContext::HUBSPOT_TOKEN, new TenantRef('globex'), '01890000-0000-7000-8000-000000000001');
-        foreach ([[$sealed, $other], [new SealedSecret('k1', $sealed->ciphertext), $context], [new SealedSecret(DoctrineEncryptCrmSecretBox::KEY_ID, base64_encode('nope')), $context], [new SealedSecret(DoctrineEncryptCrmSecretBox::KEY_ID, base64_encode('E:' . $context->aad() . "\n")), $context]] as [$value, $ctx]) {
+        foreach ([[$sealed, $other], [new SealedSecret(DoctrineEncryptCrmSecretBox::KEY_ID, 'A'), $context], [new SealedSecret(DoctrineEncryptCrmSecretBox::KEY_ID, base64_encode('nope')), $context], [new SealedSecret(DoctrineEncryptCrmSecretBox::KEY_ID, base64_encode('E:' . $context->aad() . "\n")), $context]] as [$value, $ctx]) {
             try {
                 $box->unseal($value, $ctx);
                 self::fail('does not open');
@@ -272,12 +294,21 @@ final class HubSpotInfrastructureTest extends TestCase
                 self::addToAssertionCount(1);
             }
         }
-        // A configuration error of the encryptor is thrown as it is (it never marks a connection invalid).
-        try {
-            (new DoctrineEncryptCrmSecretBox($registry, 'defuse'))->unseal($sealed, $context);
-            self::fail('a missing key is not a wrong value');
-        } catch (RuntimeException $e) {
-            self::assertNotInstanceOf(SecretUnsealException::class, $e);
+        // 0.10.1 (ZAM-D2): a key id that is not configured, an unknown profile, or an encryptor that fails for another
+        // reason than the value (a missing key) is "key not available": never a bad value, the token is kept.
+        foreach ([
+            static fn (): string => $box->unseal(new SealedSecret('k1', $sealed->ciphertext), $context),
+            static fn (): string => (new DoctrineEncryptCrmSecretBox($registry, 'defuse'))->unseal($sealed, $context),
+            static fn (): string => (new DoctrineEncryptCrmSecretBox($registry, 'missing'))->unseal($sealed, $context),
+            static fn (): SealedSecret => (new DoctrineEncryptCrmSecretBox($registry, 'missing'))->seal('x', $context),
+            static fn (): SealedSecret => (new DoctrineEncryptCrmSecretBox($registry, 'broken', true))->seal('x', $context),
+        ] as $unavailable) {
+            try {
+                $unavailable();
+                self::fail('the key is not available');
+            } catch (SecretKeyUnavailableException) {
+                self::addToAssertionCount(1);
+            }
         }
         // A custom encryptor only with the explicit opt-in; MysqlAes never.
         self::assertSame('fake-credential', (new DoctrineEncryptCrmSecretBox($registry, 'custom', true))->unseal((new DoctrineEncryptCrmSecretBox($registry, 'custom', true))->seal('fake-credential', $context), $context));
@@ -288,6 +319,32 @@ final class HubSpotInfrastructureTest extends TestCase
             } catch (LogicException) {
                 self::addToAssertionCount(1);
             }
+        }
+        // 0.10.1 (ZAM-D2): rotation through a second profile; values sealed before it keep opening.
+        $rotated = new DoctrineEncryptCrmSecretBox($registry, 'crm_2026', false, 'de2026', [DoctrineEncryptCrmSecretBox::KEY_ID => null]);
+        self::assertSame('fake-credential', $rotated->unseal($sealed, $context), 'sealed before the rotation');
+        $resealed = $rotated->seal('fake-credential', $context);
+        self::assertSame(['de2026', 'de2026'], [$resealed->keyId, $rotated->currentKeyId()]);
+        self::assertSame('fake-credential', $rotated->unseal($resealed, $context));
+        // The old key id mapped to a profile that cannot read it: never taken for a bad value.
+        $this->expectUnavailable(static fn (): string => (new DoctrineEncryptCrmSecretBox($registry, 'crm_2026', false, 'de2026', [DoctrineEncryptCrmSecretBox::KEY_ID => 'defuse']))->unseal($sealed, $context));
+        foreach ([static fn (): DoctrineEncryptCrmSecretBox => new DoctrineEncryptCrmSecretBox($registry, null, false, 'BAD'), static fn (): DoctrineEncryptCrmSecretBox => new DoctrineEncryptCrmSecretBox($registry, null, false, 'de2026', ['Bad Id' => null]), static fn (): DoctrineEncryptCrmSecretBox => new DoctrineEncryptCrmSecretBox($registry, null, false, 'de2026', ['de2026' => 'old'])] as $bad) {
+            try {
+                $bad();
+                self::fail('refused');
+            } catch (LogicException) {
+                self::addToAssertionCount(1);
+            }
+        }
+    }
+
+    private function expectUnavailable(Closure $call): void
+    {
+        try {
+            $call();
+            self::fail('the key is not available');
+        } catch (SecretKeyUnavailableException) {
+            self::addToAssertionCount(1);
         }
     }
 

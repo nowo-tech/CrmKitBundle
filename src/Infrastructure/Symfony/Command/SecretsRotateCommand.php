@@ -7,6 +7,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Command;
 use DateTimeZone;
 use Nowo\CrmKitBundle\Application\HubSpot\Port\HubSpotStoreInterface;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
+use Nowo\CrmKitBundle\Domain\Exception\SecretKeyUnavailableException;
 use Nowo\CrmKitBundle\Domain\Exception\SecretUnsealException;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection;
 use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
@@ -20,13 +21,20 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 use function end;
+use function hash_equals;
 use function sprintf;
 
 /**
- * `nowo:crm-kit:secrets:rotate` (0.10.0): re-seals every sealed HubSpot token under `secrets.current_key`, one unit
- * per connection under its row lock. A token that no longer opens marks its connection invalid (a manager pastes a
- * new one). `--all` re-seals every token (a box that manages its own keys, such as DoctrineEncrypt, keeps one key
- * id). `--dry-run` only counts. Prints counts only, never a secret.
+ * `nowo:crm-kit:secrets:rotate` (0.10.0): re-seals every sealed HubSpot token under the box's current key, one unit per
+ * connection under its row lock. `--all` re-seals every token (also those under the current key id). `--dry-run` does
+ * the same work without writing (so it also proves the new key seals). Prints counts only, never a secret.
+ *
+ * Never loses a token (0.10.1, audit ZAM-D2): a new seal is written only after it opened again to the same plaintext,
+ * and a token that does not open, whose key is not available, or that cannot be re-sealed is left exactly as it is
+ * (no connection is marked invalid here; the import does that on use for a value that does not open). The command then
+ * exits with 1 so the old key is not dropped yet. Concurrency: the row lock serialises it with a token replace; an
+ * import that read the old value meanwhile still opens it (the old key stays listed until the rotation is done), and
+ * its invalidation is conditional on the value it used, so it never hits the re-sealed one.
  */
 #[AsCommand(name: 'nowo:crm-kit:secrets:rotate', description: 'Re-seal the CRM secrets under the current key')]
 final class SecretsRotateCommand extends Command
@@ -41,15 +49,15 @@ final class SecretsRotateCommand extends Command
 
     protected function configure(): void
     {
-        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Count what would be re-sealed');
-        $this->addOption('all', null, InputOption::VALUE_NONE, 'Re-seal every secret, also those under the current key id (a box that manages its own keys, e.g. DoctrineEncrypt)');
+        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Re-seal in memory and count, write nothing');
+        $this->addOption('all', null, InputOption::VALUE_NONE, 'Re-seal every secret, also those under the current key id');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $dry    = $input->getOption('dry-run') === true;
         $all    = $input->getOption('all') === true;
-        $counts = ['resealed' => 0, 'current' => 0, 'invalid' => 0];
+        $counts = ['resealed' => 0, 'current' => 0, 'unopened' => 0, 'unavailable' => 0, 'failed' => 0];
         $after  = null;
         do {
             $batch = $this->runner->read(fn (): array => $this->store->connections($after, 100));
@@ -60,13 +68,19 @@ final class SecretsRotateCommand extends Command
             $last  = end($batch);
             $after = $last === false ? null : $last['id'];
         } while ($after !== null);
-        $output->writeln(sprintf('%s: %d re-sealed, %d already current, %d invalid', $dry ? 'dry run' : 'secrets', $counts['resealed'], $counts['current'], $counts['invalid']));
+        $kept = $counts['unopened'] + $counts['unavailable'] + $counts['failed'];
+        $output->writeln(sprintf('%s: %d re-sealed, %d already current, %d left unchanged (%d do not open, %d key not available, %d could not be re-sealed)', $dry ? 'dry run' : 'secrets', $counts['resealed'], $counts['current'], $kept, $counts['unopened'], $counts['unavailable'], $counts['failed']));
+        if ($kept > 0) {
+            $output->writeln('Keep every old key configured until a run leaves nothing unchanged.');
+
+            return Command::FAILURE;
+        }
 
         return Command::SUCCESS;
     }
 
     /**
-     * One connection: `resealed`, `current` or `invalid`.
+     * One connection: `resealed`, `current`, `unopened`, `unavailable` or `failed` (the last three change nothing).
      */
     private function rotate(TenantRef $tenant, string $id, bool $dry, bool $all): string
     {
@@ -75,20 +89,27 @@ final class SecretsRotateCommand extends Command
         if (!$connection instanceof HubSpotConnection || $connection->getId() !== $id || (!$all && $connection->getToken()->keyId === $this->box->currentKeyId())) {
             return 'current';
         }
-        $now     = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
         $context = new SecretContext(SecretContext::HUBSPOT_TOKEN, $tenant, $id);
 
         try {
             $plain = $this->box->unseal($connection->getToken(), $context);
         } catch (SecretUnsealException) {
-            if (!$dry) {
-                $this->store->invalidate($tenant, $id, $connection->getToken()->ciphertext, $now);
-            }
+            return 'unopened';
+        } catch (SecretKeyUnavailableException) {
+            return 'unavailable';
+        }
 
-            return 'invalid';
+        try {
+            // The new seal is kept only once it opens again to the same token.
+            $sealed = $this->box->seal($plain, $context);
+            if (!hash_equals($plain, $this->box->unseal($sealed, $context))) {
+                return 'failed';
+            }
+        } catch (SecretUnsealException|SecretKeyUnavailableException) {
+            return 'failed';
         }
         if (!$dry) {
-            $connection->reseal($this->box->seal($plain, $context), $now);
+            $connection->reseal($sealed, $this->clock->now()->setTimezone(new DateTimeZone('UTC')));
         }
 
         return 'resealed';

@@ -205,12 +205,19 @@ final class NowoCrmKitBundle extends AbstractBundle
         $parameters = $container->parameters();
         // Audit ZAM-6: the secret keys are never container parameters (they go to the box's definition only).
         $published = $config;
+        $previous  = [];
         if (is_array($published['secrets'] ?? null)) {
             unset($published['secrets']['keys']);
+            // 0.10.1: the DoctrineEncrypt box's previous profiles are one map parameter (key id => profile).
+            if (is_array($published['secrets']['doctrine_encrypt'] ?? null)) {
+                $previous = $published['secrets']['doctrine_encrypt']['previous'] ?? [];
+                unset($published['secrets']['doctrine_encrypt']['previous']);
+            }
         }
         foreach (ParameterFlattener::flatten(self::ALIAS, $published) as $name => $value) {
             $parameters->set($name, $value);
         }
+        $parameters->set(self::ALIAS . '.secrets.doctrine_encrypt.previous', $previous);
         /** @var array{doctrine: array{entity_manager: ?string}, import: array{sync_rows: int, chunk_rows: int}, api: array{http: array{prefix: string}}} $typed */
         $typed = $config;
         $parameters->set(self::ALIAS . '.import.sync_chunks', ServiceDefinitions::syncChunks($typed['import']['sync_rows'], $typed['import']['chunk_rows']));

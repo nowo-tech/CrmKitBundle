@@ -496,6 +496,8 @@ error:
     hubspot_bad_response: 'HubSpot answered something the CRM cannot read. The import paused.'
     hubspot_disconnected: 'HubSpot was disconnected: the import stopped.'
     hubspot_too_many: 'The HubSpot account holds more records than the import allows: it stopped.'
+    hubspot_key_unavailable: 'The HubSpot key cannot be opened or sealed with the configured secret keys. Nothing was changed: an administrator must configure the key again (see the key rotation guide).'
+    hubspot_browse_limited: 'Too many HubSpot reads for this organisation. Wait a few minutes and try again.'
     record_erased: 'The person was erased (GDPR): not imported again.'
     record_trashed: 'The record is in the trash: left as it is.'
     record_merged: 'The record was merged meanwhile: try again.'

@@ -22,6 +22,26 @@
 
 ## Unreleased
 
+Planned as **0.10.1**, from 0.10.0: `composer update nowo-tech/crm-kit-bundle`. No schema change and no BC break in the
+public PHP API or config; the new keys default to 0.10.0's behaviour.
+
+- **DoctrineEncrypt box: key rotation.** Tokens sealed by 0.10.0 carry the key id `doctrine_encrypt` and keep opening
+  with the default settings (`secrets.doctrine_encrypt.key_id: doctrine_encrypt`, `profile: ~`). To rotate the
+  DoctrineEncrypt key, follow [CONFIGURATION.md](CONFIGURATION.md#key-rotation): a new DoctrineEncrypt profile, a new
+  `key_id`, the old key id under `previous`, then `nowo:crm-kit:secrets:rotate`. The 0.10.0 advice
+  (`secrets:rotate --all` after rotating DoctrineEncrypt's own key) did not work and is withdrawn.
+- **Build-time check.** With `secrets.box: Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox`
+  defined by the kit, the build fails when the profile does not exist or is not Halite / Defuse (before, the first
+  seal failed).
+- **`nowo:crm-kit:secrets:rotate`** no longer marks connections invalid. It leaves any token it cannot re-seal
+  unchanged and exits with 1 (scripts that ran it should check the exit code). The summary line now reads
+  `secrets: N re-sealed, N already current, N left unchanged (…)`.
+- **A key id no longer configured** (sodium or DoctrineEncrypt) no longer invalidates the connection on use: the
+  import refuses with `error.hubspot_key_unavailable` and the token is kept. A host-written `CrmSecretBoxInterface`
+  may throw the new `SecretKeyUnavailableException` for the same case; throwing `SecretUnsealException` still works.
+- **`import.hubspot.browse_rate_limit`** (60 per 600 s by default) limits the HubSpot reads of the start and mapping
+  pages per tenant. Raise it if many people prepare imports in the same tenant at once.
+
 ## To 0.10.0
 
 From **0.9.0**:

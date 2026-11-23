@@ -210,6 +210,8 @@ their chunks), and "Cancel" ends it at once.
 | --- | --- |
 | connect / replace | Credential checked with HubSpot **outside** any transaction (after the attempt counter's own unit); then one unit: `SELECT … FROM crm_hubspot_connection WHERE tenant_id=? FOR UPDATE`, version compared, sealed, saved. A racing first connect loses on the unique `tenant_id` key ⇒ 409 `crm_record_stale` |
 | attempt counter | two `crm_counter` rows per tenant (`hubspot_connect_at`, then `hubspot_connect`), inserted if missing and locked in that order, incremented in the same unit |
+| browse counter (0.10.1) | the start and mapping pages' HubSpot reads: two other `crm_counter` rows per tenant (`hubspot_browse_at`, then `hubspot_browse`), same rules, in their own unit before HubSpot is asked; no unit takes both pairs, so the two never wait on each other |
+| key rotation vs a run (0.10.1) | `secrets:rotate` re-seals one connection per unit under its `FOR UPDATE` lock and writes only a seal that opened again (a replace waits, then meets a new `version` ⇒ 409 stale); a run that read the old value meanwhile opens it with the old key, still configured until the rotation ends; its invalidation is conditional on that old value, so it never hits the re-sealed token |
 | disconnect during a run | the run re-reads the connection at every page (not locked); a missing or different connection ends the import `failed` (`hubspot_disconnected`) |
 | two HubSpot imports of a tenant | `start()` checks "no import in preview / running" under the connection row's lock ⇒ 409 `crm_import_running` |
 | claim, counters | the CSV rules ([Import](#import)) |

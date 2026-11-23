@@ -47,6 +47,9 @@ final class ConfigurationTree
     /** Most keys per catalogue. */
     public const MAX_KEYS = 32;
 
+    /** A secret key id (anchored, `/D`), as SealedSecret::KEY_ID_PATTERN. */
+    private const KEY_ID = '/\A[a-z0-9_-]{1,16}\z/D';
+
     /**
      * Fills the root node.
      */
@@ -171,6 +174,16 @@ final class ConfigurationTree
             ->validate()->ifTrue(static fn (array $v): bool => !self::keyIds($v))->thenInvalid('secrets.keys maps key ids of 1-16 characters of a-z, 0-9, "_" or "-" to keys.')->end()
         ->end();
         $secrets->scalarNode('current_key')->defaultNull()->info('The key id that seals; the other keys only open (rotation: nowo:crm-kit:secrets:rotate).')->end();
+        $doctrine = $secrets->arrayNode('doctrine_encrypt')->addDefaultsIfNotSet()->info('0.10.1: profiles of the DoctrineEncrypt box (secrets.box: DoctrineEncryptCrmSecretBox, when the kit defines it). Rotation: CONFIGURATION, "Key rotation".')->children();
+        $doctrine->scalarNode('profile')->defaultNull()->info('DoctrineEncrypt profile that seals (null: its default profile). Halite or Defuse; anything else fails the build.')->end();
+        $doctrine->scalarNode('key_id')->defaultValue('doctrine_encrypt')->info('Key id stored with new seals (1-16 of a-z, 0-9, "_", "-"); a new one with each new profile.')
+            ->validate()->ifTrue(static fn (mixed $v): bool => !is_string($v) || preg_match(self::KEY_ID, $v) !== 1)->thenInvalid('secrets.doctrine_encrypt.key_id is 1-16 characters of a-z, 0-9, "_" or "-".')->end()
+        ->end();
+        $doctrine->arrayNode('previous')->info('Key id => DoctrineEncrypt profile (~: the default one) of tokens sealed before a rotation; they keep opening until nowo:crm-kit:secrets:rotate re-sealed them.')
+            ->useAttributeAsKey('id')->normalizeKeys(false)->scalarPrototype()->end()->defaultValue([])
+            ->validate()->ifTrue(static fn (array $v): bool => !self::profileMap($v))->thenInvalid('secrets.doctrine_encrypt.previous maps key ids of 1-16 characters of a-z, 0-9, "_" or "-" to DoctrineEncrypt profiles (~ for the default one).')->end()
+        ->end();
+        $doctrine->end()->validate()->ifTrue(static fn (array $v): bool => is_string($v['key_id'] ?? null) && is_array($v['previous'] ?? null) && array_key_exists($v['key_id'], $v['previous']))->thenInvalid('secrets.doctrine_encrypt.key_id seals: it cannot also be listed in secrets.doctrine_encrypt.previous.')->end()->end();
         $secrets->end()->end();
         $hubspot = $import->arrayNode('hubspot')->addDefaultsIfNotSet()->info('0.10.0: import companies, contacts, owners and lists from HubSpot (a private app token per tenant, read-only scopes).')->children();
         $hubspot->booleanNode('enabled')->defaultFalse()->info('Needs a secret box (secrets.box, or secrets.keys + current_key) and symfony/http-client; maps the HubSpot tables and routes.')->end();
@@ -189,6 +202,10 @@ final class ConfigurationTree
         ->end()->end();
         $hubspot->arrayNode('connect_rate_limit')->addDefaultsIfNotSet()->info('Token checks per tenant (valid or not).')->children()
             ->integerNode('limit')->defaultValue(5)->min(1)->max(100)->end()
+            ->integerNode('interval')->defaultValue(600)->min(60)->max(86400)->info('Window in seconds.')->end()
+        ->end()->end();
+        $hubspot->arrayNode('browse_rate_limit')->addDefaultsIfNotSet()->info('0.10.1: HubSpot reads of the start and mapping pages per tenant (each view and each start asks HubSpot; the portal\'s daily quota is shared). Beyond it the page says to wait.')->children()
+            ->integerNode('limit')->defaultValue(60)->min(1)->max(1000)->end()
             ->integerNode('interval')->defaultValue(600)->min(60)->max(86400)->info('Window in seconds.')->end()
         ->end()->end();
         $hubspot->end()->end();
@@ -227,6 +244,22 @@ final class ConfigurationTree
     }
 
     /**
+     * Whether every key of the map is a key id and every value a DoctrineEncrypt profile name or null.
+     *
+     * @param array<mixed> $value
+     */
+    private static function profileMap(array $value): bool
+    {
+        foreach ($value as $id => $profile) {
+            if (preg_match(self::KEY_ID, (string) $id) !== 1 || ($profile !== null && (!is_string($profile) || $profile === ''))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Whether every key of the map is a key id.
      *
      * @param array<mixed> $value
@@ -234,7 +267,7 @@ final class ConfigurationTree
     private static function keyIds(array $value): bool
     {
         foreach ($value as $id => $key) {
-            if (preg_match('/\A[a-z0-9_-]{1,16}\z/D', (string) $id) !== 1 || !is_string($key) || $key === '') {
+            if (preg_match(self::KEY_ID, (string) $id) !== 1 || !is_string($key) || $key === '') {
                 return false;
             }
         }

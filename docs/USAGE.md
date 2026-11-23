@@ -961,7 +961,9 @@ Before anything is saved, outside any transaction, the same way for both kinds:
    another HubSpot account"). An import that was running for the old account then fails with `hubspot_account_changed`.
 
 Token checks are counted per tenant, valid or not (`import.hubspot.connect_rate_limit`, default 5 per 10 minutes).
-Once that is exceeded the answer is 409 `crm_hubspot_rate_limited`. The credential is sealed (see
+Once that is exceeded the answer is 409 `crm_hubspot_rate_limited`. The HubSpot reads of the start and mapping pages
+are counted per tenant as well (`import.hubspot.browse_rate_limit`, default 60 per 10 minutes, 0.10.1): beyond it the
+page says to wait (`error.hubspot_browse_limited`) and HubSpot is not asked. The credential is sealed (see
 [SECURITY.md](SECURITY.md#hubspot-credential)) and is shown only as `••••` + its last four characters, with the
 account id, the label, the scopes and when it was checked.
 

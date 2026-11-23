@@ -37,6 +37,13 @@ interface HubSpotStoreInterface
      */
     public function takeConnectAttempt(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval): bool;
 
+    /**
+     * Counts a HubSpot read of the start or mapping page of the tenant in the current window (0.10.1, audit ZAM-9:
+     * `import.hubspot.browse_rate_limit`); false once `$limit` reads were made in it. Atomic under a row lock (its own
+     * counter rows, so it never waits on the token checks).
+     */
+    public function takeBrowseCall(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval): bool;
+
     /** Whether the tenant has a HubSpot import in preview or running. */
     public function hasOpenImport(TenantRef $tenant): bool;
 

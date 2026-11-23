@@ -20,6 +20,7 @@ use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
 use Nowo\CrmKitBundle\Domain\Event\ImportCompleted;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
+use Nowo\CrmKitBundle\Domain\Exception\SecretKeyUnavailableException;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection;
 use Nowo\CrmKitBundle\Domain\Model\Import;
@@ -126,7 +127,12 @@ final readonly class HubSpotRunner
         if ($connection->getAccountId()->value !== $state->account) {
             return $this->fail($id, $now, 'hubspot_account_changed');
         }
-        $secret = $connection->isActive() ? $this->tokens->open($tenant, $connection, $now) : null;
+        try {
+            $secret = $connection->isActive() ? $this->tokens->open($tenant, $connection, $now) : null;
+        } catch (SecretKeyUnavailableException) {
+            // 0.10.1 (audit ZAM-D2): the key is not configured; the token is kept, a person continues once it is back.
+            return $this->pause($id, $token, $now, null, HubSpotTokenOpener::KEY_UNAVAILABLE);
+        }
         if (!$secret instanceof HubSpotToken) {
             return $this->pause($id, $token, $now, null, HubSpotException::TOKEN_INVALID);
         }

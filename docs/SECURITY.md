@@ -129,19 +129,22 @@ record; another person's note needs `edit` on the record and `manage`.
   <tenant>|<connection id>` (the additional data): a copied value does not open for another tenant, row or purpose.
   Default `SodiumCrmSecretBox` (XChaCha20-Poly1305, random 24-byte nonce, keys from the environment, key ids for
   rotation); house option `DoctrineEncryptCrmSecretBox` (context inside the authenticated payload; only the Halite and
-  Defuse encryptors, another class only with an explicit opt-in, MysqlAes never; a configuration error of the
-  encryptor is thrown, never taken for a bad value). Only the last four characters are stored in clear. A value that
-  does not open marks the connection invalid, only while the connection still holds that sealed value (a token
-  replaced meanwhile stays active). The sodium keys come from the environment only: they are never container
-  parameters (only the box's own service definition receives them).
+  Defuse encryptors, checked at container build for the profiles the kit wires (0.10.1), another class only with an
+  explicit opt-in, MysqlAes never). Only the last four characters are stored in clear. A value that does not open
+  marks the connection invalid, only while the connection still holds that sealed value (a token replaced meanwhile
+  stays active). A key that is not available (a key id no longer configured, an unknown DoctrineEncrypt profile, a
+  missing key file) is never taken for a bad value (0.10.1): the import refuses with `hubspot_key_unavailable` and the
+  sealed token is kept. Rotation (`nowo:crm-kit:secrets:rotate`, both boxes since 0.10.1) writes a new seal only after
+  it opened again to the same token, and leaves every token it cannot re-seal unchanged. The sodium keys come from the
+  environment only: they are never container parameters (only the box's own service definition receives them).
 - **In use**: unsealed for one HubSpot call, sent only as `Authorization: Bearer` to `https://api.hubapi.com` by the
   kit's own HttpClient (not the framework's `http_client`, so no profiler or HTTP-client log sees it). It is never put
   in a URL, a property, a log, an exception, an audit entry or a page; the connect field is a password input, never
-  pre-filled or re-rendered. `HubSpotToken` keeps its plaintext out of its own properties (a class-private map entry
-  removed when the object is destroyed), so `var_dump()`, `print_r()`, Symfony's VarDumper (`dump()`, the profiler,
-  Twig's `dump`), `(array)` casts and traces show no value; it refuses cloning and serialisation; its parameters are
-  `#[\SensitiveParameter]`. Still, never paste a production credential into a page served with the Symfony profiler
-  or the debug toolbar on (the request's form data is collected there).
+  pre-filled or re-rendered. `HubSpotToken` keeps its plaintext out of its own properties (in the local frame of a
+  suspended generator that only the object holds, collected with it), so `var_dump()`, `print_r()`, Symfony's
+  VarDumper (`dump()`, the profiler, Twig's `dump`), `(array)` casts and traces show no value; it refuses cloning and
+  serialisation; its parameters are `#[\SensitiveParameter]`. Still, never paste a production credential into a page
+  served with the Symfony profiler or the debug toolbar on (the request's form data is collected there).
 - **Scopes**: read scopes only. Write scopes are refused when HubSpot lists the credential's scopes (private app
   tokens); the check fails closed: an entry the kit cannot read, or one past the 200th, counts as a write scope, and
   only HubSpot's "unknown token" answer (400 / 404) leads to probing, any other failure refuses the credential. For a
@@ -149,7 +152,8 @@ record; another person's note needs `edit` on the record and `manage`.
   write scopes cannot be seen: the connection card says "write scopes not verified" and the manager must tick read
   scopes only (known limit, documented in USAGE). Sensitive and highly sensitive properties are never offered or requested.
 - **Checks**: counted per tenant (`connect_rate_limit`), valid or not; answers are translation keys, never HubSpot's
-  text.
+  text. The HubSpot reads of the start and mapping pages are counted per tenant too (`browse_rate_limit`, 0.10.1), so
+  reloads cannot burn the portal's shared daily API quota.
 
 ## HubSpot import (0.10.0)
 

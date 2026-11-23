@@ -496,6 +496,8 @@ error:
     hubspot_bad_response: 'HubSpot gaf een antwoord dat het CRM niet kan lezen. De import is gepauzeerd.'
     hubspot_disconnected: 'HubSpot is losgekoppeld: de import is gestopt.'
     hubspot_too_many: 'Het HubSpot-account bevat meer records dan de import toestaat: hij is gestopt.'
+    hubspot_key_unavailable: 'De HubSpot-sleutel kan met de ingestelde geheime sleutels niet worden geopend of verzegeld. Er is niets gewijzigd: een beheerder moet de sleutel opnieuw instellen (zie de handleiding voor sleutelrotatie).'
+    hubspot_browse_limited: 'Te veel HubSpot-aanvragen voor deze organisatie. Wacht een paar minuten.'
     record_erased: 'De persoon is gewist (AVG): niet opnieuw geïmporteerd.'
     record_trashed: 'Het record staat in de prullenbak: ongewijzigd gelaten.'
     record_merged: 'Het record is intussen samengevoegd: probeer opnieuw.'

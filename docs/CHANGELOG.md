@@ -26,6 +26,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as 0.10.1 (patch): the follow-ups of audit ZAM and its delta. No BC break in the public PHP API or config;
+the new keys have defaults that keep 0.10.0's behaviour.
+
+### Added
+
+- `import.hubspot.browse_rate_limit` (`limit: 60`, `interval: 600`): HubSpot reads of the start and mapping pages
+  per tenant (ZAM-9).
+- `secrets.doctrine_encrypt` (`profile`, `key_id`, `previous`): the DoctrineEncrypt box's profiles, so its key can be
+  rotated (ZAM-D2). `DoctrineEncryptCrmSecretBox` takes two optional constructor arguments, `$keyId` and `$previous`.
+- `SecretKeyUnavailableException`: the key a sealed value names is not configured or cannot be used.
+
+### Fixed
+
+- ZAM-D2: the DoctrineEncrypt box can now be rotated without losing tokens. Add a DoctrineEncrypt profile with the new
+  key, seal with it under a new `key_id`, and list the old key id and profile under `previous`. The old tokens keep
+  working, and `nowo:crm-kit:secrets:rotate` re-seals them.
+- ZAM-D1: SECURITY.md now says where `HubSpotToken` keeps the plaintext: in a suspended generator's frame owned by the
+  object.
+
+### Security
+
+- ZAM-D2: `nowo:crm-kit:secrets:rotate` never loses a token. It writes a new seal only after the seal opens again to
+  the same token. It leaves unchanged any token that does not open, whose key is not available, or that cannot be
+  re-sealed. It no longer marks connections invalid, and it exits with 1 while any token is left unchanged.
+  `--dry-run` re-seals in memory, so it also proves that the new key works.
+- ZAM-D2: if a token's key is not configured (in the sodium or DoctrineEncrypt box), or a DoctrineEncrypt profile or
+  key file fails, the token is no longer taken for a bad value. The import refuses with
+  `error.hubspot_key_unavailable`, or a run pauses with `hubspot_key_unavailable`. The connection and its sealed token
+  are kept. A connect whose seal fails stores nothing. Saving a new token resumes such paused imports.
+- ZAM-D4: the DoctrineEncrypt profiles that the kit wires (`profile` and `previous`) must use Halite or Defuse and
+  must exist. Otherwise the container build fails; before, the refusal came at the first seal.
+- ZAM-9: once `browse_rate_limit` is reached, the start and mapping pages answer `error.hubspot_browse_limited` and
+  do not ask HubSpot. Reloads can no longer burn the portal's shared daily API quota. The confirm step is not counted.
+
 ## [0.10.0] - 2026-11-23
 
 Planned as 0.10.0.

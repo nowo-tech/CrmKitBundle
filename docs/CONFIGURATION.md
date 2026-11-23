@@ -70,6 +70,7 @@ nowo_crm_kit:
             http: { timeout: 10, max_duration: 30, max_response_bytes: 8388608 }
             rate_limit: { max_attempts: 5, max_retry_after: 60 }
             connect_rate_limit: { limit: 5, interval: 600 }   # credential checks per tenant per window (seconds)
+            browse_rate_limit: { limit: 60, interval: 600 }   # 0.10.1: HubSpot reads of the start / mapping pages per tenant
         messenger:                 # 0.10.0, any format
             enabled: false         # true: confirm / "Continue" dispatch RunCrmImport (symfony/messenger)
             units: 20              # 1..1000 chunks or pages per message
@@ -77,6 +78,10 @@ nowo_crm_kit:
         box: null                  # service id of CrmSecretBoxInterface; null = SodiumCrmSecretBox with keys below
         keys: {}                   # key id => '%env(base64:CRM_KIT_SECRET_KEY_2026)%' (32 bytes)
         current_key: null          # the key id that seals; the others only open
+        doctrine_encrypt:          # 0.10.1: the DoctrineEncrypt box (secrets.box: DoctrineEncryptCrmSecretBox)
+            profile: null          # DoctrineEncrypt profile that seals (null: its default profile); Halite or Defuse
+            key_id: doctrine_encrypt   # key id stored with new seals; a new one with each new profile
+            previous: {}           # key id => profile (~: the default one) of tokens sealed before a rotation
     actor_email_lookup: null       # 0.10.0: service id of CrmActorEmailLookupInterface (HubSpot owners by e-mail)
     gdpr:
         purposes: [marketing_email, newsletter, tracking]   # distinct keys ^[a-z][a-z0-9_.]{0,63}$
@@ -253,16 +258,64 @@ nowo_crm_kit:
         box: Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox
 ```
 
-Key rotation: add the new key, make it `current_key`, keep the old one listed, run
-`php bin/console nowo:crm-kit:secrets:rotate` (`--dry-run` counts first), then drop the old key. A credential that no
-longer opens marks its connection invalid; a manager pastes a new one. With the DoctrineEncrypt box the key id never
-changes: rotate DoctrineEncrypt's key while the old one can still decrypt, then run
-`nowo:crm-kit:secrets:rotate --all` (re-seals every credential), then retire the old key. The bridge accepts the
-Halite and Defuse encryptors; for another (authenticated) encryptor define your own service
-`new DoctrineEncryptCrmSecretBox($registry, $profile, allowCustom: true)` and name it in `secrets.box`.
+### Key rotation
+
+Rotation never loses a token (0.10.1). `nowo:crm-kit:secrets:rotate` re-seals each token under the current key in its
+own unit under the connection's row lock, and writes the new seal only after it opened again to the same token. A
+token that does not open, whose key is not available or that cannot be re-sealed is left exactly as it is, and the
+command exits with 1: keep the old key until a run ends with `0 left unchanged`. `--dry-run` does the same in memory
+(it also proves the new key seals) and writes nothing. Tokens sealed before the rotation keep working all along: every
+configured key opens. Running imports are not stopped (an import that read the old value opens it with the old key).
+
+If an import meets a token whose key is not configured (dropped too early, or a DoctrineEncrypt profile or key file
+that fails), it refuses with `error.hubspot_key_unavailable` (a running import pauses with `hubspot_key_unavailable`).
+Nothing is marked invalid and the sealed token is kept: configure the key again and press "Continue", or let a manager
+paste the token again (that resumes the paused imports).
+
+**Sodium box.** Add the new key, make it `current_key`, keep the old one listed, deploy, run
+`php bin/console nowo:crm-kit:secrets:rotate --dry-run`, then `nowo:crm-kit:secrets:rotate`, then drop the old key.
+
+**DoctrineEncrypt box.** A DoctrineEncrypt profile holds one key, and `doctrine:encrypt:rotate-keys` re-encrypts only
+`#[Encrypted]` columns, never the CRM's sealed tokens. So rotate through a second profile:
+
+1. Add a DoctrineEncrypt profile with a new key (generate it with `doctrine:encrypt:generate-secret-key`):
+
+   ```yaml
+   nowo_doctrine_encrypt:
+       profiles:
+           default: { encryptor_class: Halite }               # what sealed the tokens until now
+           crm_2026: { encryptor_class: Halite, secret_key_filename: .Halite.crm_2026.key }
+   ```
+
+2. Seal with it under a new key id and keep the old one opening:
+
+   ```yaml
+   nowo_crm_kit:
+       secrets:
+           box: Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox
+           doctrine_encrypt:
+               profile: crm_2026
+               key_id: de2026
+               previous:
+                   doctrine_encrypt: default    # 0.10.0 sealed under the key id "doctrine_encrypt"
+   ```
+
+3. Deploy, then run `nowo:crm-kit:secrets:rotate --dry-run` and `nowo:crm-kit:secrets:rotate` until it exits with 0.
+4. Remove `previous.doctrine_encrypt`. Keep the old DoctrineEncrypt profile while other columns use it.
+
+Name the profiles explicitly in `previous`: `~` means "the default profile", which moves if `default_profile` changes.
+The container build fails when `profile` or a `previous` profile does not exist or does not use Halite or Defuse
+(MysqlAes is never accepted). For another (authenticated) encryptor define your own service
+`new DoctrineEncryptCrmSecretBox($registry, $profile, allowCustom: true, keyId: …, previous: […])` and name it in
+`secrets.box` (`secrets.doctrine_encrypt` then does not apply; the box refuses another encryptor at its first use).
 
 Keys come from the environment only (`%env(base64:…)%`): `secrets.keys` is never published as container parameters.
 Never paste a production credential with the Symfony profiler or the debug toolbar on.
+
+`import.hubspot.browse_rate_limit` (0.10.1, default 60 per 600 seconds) counts, per tenant, each view of the start
+and mapping pages and each start: every one asks HubSpot (lists, counts, properties), and the portal's daily API quota
+is shared with the tenant's other HubSpot apps. Beyond it the page answers `error.hubspot_browse_limited` without
+asking HubSpot; the confirm step and the import's own pages are not counted.
 
 There is no base-URL key: the HubSpot host is the constant `https://api.hubapi.com`. In a demo or an end-to-end test,
 decorate the kit's client service `nowo_crm_kit.hubspot.http_client` with a fake (a `MockHttpClient` or a local fake

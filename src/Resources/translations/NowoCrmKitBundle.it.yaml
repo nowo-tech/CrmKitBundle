@@ -496,6 +496,8 @@ error:
     hubspot_bad_response: 'HubSpot ha risposto qualcosa che il CRM non sa leggere. L’importazione è in pausa.'
     hubspot_disconnected: 'HubSpot è stato scollegato: l’importazione si è fermata.'
     hubspot_too_many: 'L’account HubSpot contiene più record di quanti l’importazione ne consenta: si è fermata.'
+    hubspot_key_unavailable: 'La chiave HubSpot non può essere aperta né sigillata con le chiavi segrete configurate. Non è stato modificato nulla: un amministratore deve configurare di nuovo la chiave (vedi la guida alla rotazione delle chiavi).'
+    hubspot_browse_limited: 'Troppe letture HubSpot per questa organizzazione. Attendi qualche minuto.'
     record_erased: 'La persona è stata cancellata (GDPR): non viene reimportata.'
     record_trashed: 'Il record è nel cestino: lasciato com’è.'
     record_merged: 'Il record è stato unito nel frattempo: riprova.'

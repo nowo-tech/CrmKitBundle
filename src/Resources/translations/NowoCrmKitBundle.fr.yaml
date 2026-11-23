@@ -496,6 +496,8 @@ error:
     hubspot_bad_response: 'HubSpot a répondu quelque chose que le CRM ne sait pas lire. L’import est en pause.'
     hubspot_disconnected: 'HubSpot a été déconnecté : l’import s’est arrêté.'
     hubspot_too_many: 'Le compte HubSpot contient plus de fiches que l’import n’en permet : il s’est arrêté.'
+    hubspot_key_unavailable: 'La clé HubSpot ne peut être ni ouverte ni scellée avec les clés secrètes configurées. Rien n’a été modifié : un administrateur doit reconfigurer la clé (voir le guide de rotation des clés).'
+    hubspot_browse_limited: 'Trop de lectures HubSpot pour cette organisation. Patientez quelques minutes.'
     record_erased: 'La personne a été effacée (RGPD) : pas réimportée.'
     record_trashed: 'La fiche est dans la corbeille : laissée telle quelle.'
     record_merged: 'La fiche a été fusionnée entre-temps : réessayez.'

@@ -43,8 +43,14 @@ make demo-smoke            # boot, HTTP 200, down
 make -C demo down-symfony8
 ```
 
-Playwright e2e of the CRM pages and WebP screenshots (REQ-DEMO-013): `make test-e2e` against the running
-`demo/symfony8`. See [DEMO-FRANKENPHP.md](DEMO-FRANKENPHP.md).
+Playwright e2e of the CRM pages and WebP screenshots (REQ-DEMO-013), against the running `demo/symfony8`:
+
+```bash
+make test-e2e           # Playwright suite (demo/symfony8/e2e)
+make demo-screenshots   # on a fresh stack: refresh docs/images/demo/*.webp (PNG captured, converted to WebP, PNG removed)
+```
+
+See [DEMO-FRANKENPHP.md](DEMO-FRANKENPHP.md).
 
 ## Cursor Agent
 

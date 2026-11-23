@@ -24,6 +24,19 @@ referenced by id, and the bundle never flushes your EntityManager.
 
 This bundle is **FrankenPHP worker mode friendly** (kernel kept alive and not reset).
 
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/demo/crm-companies.webp" alt="CRM Kit companies list in the demo: search, tag, role, owner and status filters above a paginated table of companies with city, roles and row actions" />
+      <br /><sub>Companies list: filters, party roles and row actions</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/demo/crm-company-360.webp" alt="360-degree page of a company: details, roles, tags, its primary contact, a linked host project with the host panel, notes and the activity timeline" />
+      <br /><sub>360° record page: contacts, host links and panels, notes and timeline</sub>
+    </td>
+  </tr>
+</table>
+
 ## Features
 
 Phase A (0.1.0), always on when the bundle is enabled:
@@ -104,7 +117,8 @@ Every key of the contract is already accepted (strict tree): [docs/CONFIGURATION
 
 `demo/symfony7` (Symfony 7.4, http://localhost:8263) and `demo/symfony8` (Symfony 8.1, http://localhost:8262):
 FrankenPHP worker mode, MySQL, UiKit + FormKit, in-memory users `ana`, `mia` and `admin` (password `demo`);
-`make -C demo up-symfony8`, then `make test-e2e` for the Playwright run. See
+`make -C demo up-symfony8`, then `make test-e2e` for the Playwright run and `make demo-screenshots` (fresh stack) to
+refresh `docs/images/demo/*.webp`. See
 [docs/DEMO-FRANKENPHP.md](docs/DEMO-FRANKENPHP.md).
 
 ## Documentation

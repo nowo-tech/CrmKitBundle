@@ -1,6 +1,8 @@
 {#
   One funnel (manage, 0.3.0): rename / archive, its stages (edit, archive, order) and the add-stage form. Variables:
-  page (FormPage), funnel (FunnelView), stages (list of {stage, form, up, down}), add (FormView).
+  page (FormPage), funnel (FunnelView), stages (list of {stage, form, up, down}), add (FormView). 0.9.0, with
+  `ui.pipeline_forms: dialog`: each stage's form and add are null; stages[].edit and add_opener (View\Action links to
+  the forms' own pages) and crm_dialog (the page's remote form dialog, see pipeline/_dialog.html.twig).
 #}
 {% extends '@NowoUiKit/page/form.html.twig' %}
 
@@ -16,12 +18,20 @@
                     <h3>{{ row.stage.name }} · {{ ('stage.kind.' ~ row.stage.kind.value)|trans({}, _d) }} · {{ row.stage.probability }} %</h3>
                     {{ include(nowo_ui_partial('action', _b), {action: row.up, context: 'row', bundle: _b}) }}
                     {{ include(nowo_ui_partial('action', _b), {action: row.down, context: 'row', bundle: _b}) }}
+                    {% if row.edit|default(null) %}
+                        {{ include(nowo_ui_partial('action', _b), {action: row.edit, context: 'row', bundle: _b}) }}
+                    {% elseif row.form %}
                     <details><summary>{{ 'stage.edit'|trans({}, _d) }}</summary>
                         {{ include('@NowoCrmKit/_form.html.twig', {form: row.form, title: null, submit: 'stage.save', action: path('nowo_crm_kit_stage_edit', {id: row.stage.id, funnel: funnel.id}), testid: 'crm-stage-edit', variant: 'btn_secondary'}) }}
                     </details>
+                    {% endif %}
                 </article>
             {% endfor %}
+            {% if add_opener|default(null) %}<div class="{{ nowo_ui_class('toolbar', _b) }}">{{ include(nowo_ui_partial('action', _b), {action: add_opener, context: 'toolbar', bundle: _b}) }}</div>{% endif %}
         </div>
     </section>
-    {{ include('@NowoCrmKit/_form.html.twig', {form: add, title: 'stage.add', submit: 'stage.save', action: null, testid: 'crm-stage-form', variant: 'btn_secondary'}) }}
+    {% if add is not null %}
+        {{ include('@NowoCrmKit/_form.html.twig', {form: add, title: 'stage.add', submit: 'stage.save', action: null, testid: 'crm-stage-form', variant: 'btn_secondary'}) }}
+    {% endif %}
+    {{ include('@NowoCrmKit/pipeline/_dialog.html.twig', {crm_dialog: crm_dialog|default(null)}, false) }}
 {% endblock %}

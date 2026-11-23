@@ -29,6 +29,7 @@ use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealView;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\FunnelView;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\StageView;
+use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Value\DateImmutable;
 use Nowo\CrmKitBundle\Domain\Value\Money;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
@@ -84,6 +85,8 @@ final readonly class PipelineController
         private PipelineForms $forms,
         private CrmAccess $access,
         private CrmApiCursorCodec $cursors,
+        private ?PipelineDialogs $dialogs = null,
+        private ?CrmReaderInterface $records = null,
     ) {
     }
 
@@ -252,14 +255,20 @@ final readonly class PipelineController
             if ($edit) {
                 $actions[] = Action::edit($this->ui->url('nowo_crm_kit_deal_edit', ['id' => $id]), UiSupport::label('deal.edit'));
             }
+            $dialogs = $this->dialogs();
             if ($open && $delete) {
-                $actions[] = $this->post($token, 'delete', 'deal.trash', 'nowo_crm_kit_deal_trash', ['id' => $id], 'deal.trash_confirm', 'danger');
+                // 0.9.0: with the dialogs the confirm is the trash page itself, loaded on demand (no dialog in the page).
+                $actions[] = $dialogs instanceof PipelineDialogs
+                    ? $dialogs->opener('delete', 'deal.trash', 'nowo_crm_kit_deal_trash', ['id' => $id], 'crm-deal-trash', 'danger')
+                    : $this->post($token, 'delete', 'deal.trash', 'nowo_crm_kit_deal_trash', ['id' => $id], 'deal.trash_confirm', 'danger');
             }
             if (!$open && $delete) {
                 $actions[] = $this->post($token, 'restore', 'deal.restore', 'nowo_crm_kit_deal_restore', ['id' => $id]);
             }
             if (!$open && $this->access->can(CrmPermission::Manage, $subject)) {
-                $actions[] = $this->post($token, 'delete', 'deal.purge', 'nowo_crm_kit_deal_purge', ['id' => $id], 'deal.purge_confirm', 'danger');
+                $actions[] = $dialogs instanceof PipelineDialogs
+                    ? $dialogs->opener('delete', 'deal.purge', 'nowo_crm_kit_deal_purge', ['id' => $id], 'crm-deal-purge', 'danger')
+                    : $this->post($token, 'delete', 'deal.purge', 'nowo_crm_kit_deal_purge', ['id' => $id], 'deal.purge_confirm', 'danger');
             }
             $stage   = $funnel->stage($deal->stageId);
             $details = [
@@ -289,8 +298,13 @@ final readonly class PipelineController
                 $deal->stale => new PageStatus(UiSupport::label('deal.stale'), 'warning'),
                 default      => null,
             };
-            $forms = [];
-            if ($edit) {
+            $forms   = [];
+            $openers = [];
+            if ($edit && $dialogs instanceof PipelineDialogs) {
+                // 0.9.0: links to the forms' own pages instead of the forms (D-20261123-01).
+                $openers['move']   = $dialogs->opener('move', 'deal.move.title', 'nowo_crm_kit_deal_move', ['id' => $id], 'crm-deal-move-open', 'secondary');
+                $openers['action'] = $dialogs->opener('create', 'next_action.add', 'nowo_crm_kit_next_action_add', ['type' => 'deals', 'id' => $id], 'crm-next-action-open', 'secondary');
+            } elseif ($edit) {
                 $forms['move']   = $this->ui->form(StageMoveType::class, ['stage' => $deal->stageId, 'version' => (string) $deal->version], ['stages' => $this->forms->stages($funnel), 'reasons' => $this->forms->reasons()], 'crm_stage_move')->createView();
                 $forms['action'] = $this->ui->form(NextActionType::class, ['dedupe' => PipelineForms::dedupe(), 'due_at' => (new DateTimeImmutable('tomorrow 09:00', new DateTimeZone('UTC')))], ['owners' => $this->forms->owners()], 'crm_next_action')->createView();
             }
@@ -310,6 +324,9 @@ final readonly class PipelineController
                 'funnel'  => $funnel,
                 'forms'   => $forms,
                 'buttons' => $buttons,
+                // 0.9.0 (`ui.pipeline_forms: dialog`): the openers of the move and next action dialogs and the shell.
+                'openers'    => $openers,
+                'crm_dialog' => $openers !== [] || ($open && $delete) || (!$open && $this->access->can(CrmPermission::Manage, $subject)) ? $dialogs?->shell('deal.move.title') : null,
             ]);
         });
     }
@@ -362,6 +379,11 @@ final readonly class PipelineController
     #[AsWriteUnit]
     public function move(Request $request, string $id): Response
     {
+        $dialogs = $this->dialogs();
+        if ($dialogs instanceof PipelineDialogs || $request->isMethod('GET')) {
+            return $this->movePage($request, $id, $dialogs ?? $this->pageDialogs());
+        }
+
         return $this->ui->act($request, function () use ($request, $id): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $form = $this->ui->form(StageMoveType::class, null, ['stages' => ['_' => $this->field($request, 'crm_stage_move', 'stage')], 'reasons' => $this->forms->reasons()], 'crm_stage_move');
             $form->handleRequest($request);
@@ -382,6 +404,11 @@ final readonly class PipelineController
     #[AsWriteUnit]
     public function trash(Request $request, string $id): Response
     {
+        $dialogs = $this->dialogs();
+        if ($dialogs instanceof PipelineDialogs || $request->isMethod('GET')) {
+            return $this->confirmPage($request, $id, 'trash', $dialogs ?? $this->pageDialogs());
+        }
+
         return $this->ui->act($request, function () use ($request, $id): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->csrf($request);
             $this->deals->trash($id);
@@ -412,6 +439,11 @@ final readonly class PipelineController
     #[AsWriteUnit]
     public function purge(Request $request, string $id): Response
     {
+        $dialogs = $this->dialogs();
+        if ($dialogs instanceof PipelineDialogs || $request->isMethod('GET')) {
+            return $this->confirmPage($request, $id, 'purge', $dialogs ?? $this->pageDialogs());
+        }
+
         return $this->ui->act($request, function () use ($request, $id): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->csrf($request);
             $this->deals->purge($id);
@@ -427,7 +459,11 @@ final readonly class PipelineController
     public function addNextAction(Request $request, string $type, string $id): Response
     {
         $subject = $this->subject($type);
-        $back    = $this->back($subject, $id);
+        $dialogs = $this->dialogs();
+        if ($dialogs instanceof PipelineDialogs || $request->isMethod('GET')) {
+            return $this->nextActionPage($request, $subject, $id, $dialogs ?? $this->pageDialogs());
+        }
+        $back = $this->back($subject, $id);
 
         return $this->ui->act($request, function () use ($request, $subject, $id, $back): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $form = $this->ui->form(NextActionType::class, null, ['owners' => $this->forms->owners()], 'crm_next_action');
@@ -475,7 +511,11 @@ final readonly class PipelineController
     public function lifecycle(Request $request, string $type, string $id): Response
     {
         $subject = SubjectType::fromSegment($type) ?? throw new NotFoundHttpException();
-        $back    = $this->ui->toRecord($subject, $id);
+        $dialogs = $this->dialogs();
+        if ($dialogs instanceof PipelineDialogs || $request->isMethod('GET')) {
+            return $this->lifecyclePage($request, $subject, $id, $dialogs ?? $this->pageDialogs());
+        }
+        $back = $this->ui->toRecord($subject, $id);
 
         return $this->ui->act($request, function () use ($request, $subject, $id, $back): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $value = $this->field($request, 'crm_lifecycle', 'stage');
@@ -521,6 +561,176 @@ final readonly class PipelineController
         $v = $key['v'] ?? null;
 
         return is_string($key['id'] ?? null) && ($v === null || is_string($v)) ? ['v' => $v, 'id' => $key['id']] : null;
+    }
+
+    /**
+     * The funnel pages' dialogs, or null with `ui.pipeline_forms: inline` (0.9.0).
+     */
+    private function dialogs(): ?PipelineDialogs
+    {
+        return $this->dialogs instanceof PipelineDialogs && $this->dialogs->enabled() ? $this->dialogs : null;
+    }
+
+    /**
+     * The renderer of a form's own page with inline forms (its GET: a deep link, the no-JS page), 404 without it.
+     */
+    private function pageDialogs(): PipelineDialogs
+    {
+        return $this->dialogs ?? throw new NotFoundHttpException();
+    }
+
+    /**
+     * "Move to a stage" as its own page (0.9.0): `edit` on a deal that is not in the trash, the stages of its funnel.
+     */
+    private function movePage(Request $request, string $id, PipelineDialogs $dialogs): Response
+    {
+        return $this->ui->guard(function () use ($request, $id, $dialogs): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $deal = $this->reader->deal($id);
+            $this->ui->requireSubject(CrmPermission::Edit, SubjectRef::of(SubjectType::Deal, $deal->id, $deal->ownerId));
+            $form = $this->ui->form(StageMoveType::class, ['stage' => $deal->stageId, 'version' => (string) $deal->version], ['stages' => $this->forms->stages($this->funnels->funnel($deal->funnelId)), 'reasons' => $this->forms->reasons()], 'crm_stage_move');
+            $form->handleRequest($request);
+            $status = $request->isMethod('POST') ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK;
+            if ($form->isSubmitted() && $form->isValid()) {
+                $status = $dialogs->attempt($request, $form, function () use ($request, $form, $id, $dialogs): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                    $reason = $this->text($form, 'lost_reason');
+                    $moved  = $this->deals->moveStage($id, $this->text($form, 'stage'), $reason === '' ? null : $reason, $this->text($form, 'lost_note'), $this->int($form, 'version'));
+                    $this->ui->flash($request, 'success', $moved ? 'deal.moved' : 'deal.not_moved');
+
+                    return $dialogs->done($request, 'nowo_crm_kit_deal_show', ['id' => $id]);
+                });
+                if ($status instanceof Response) {
+                    return $status;
+                }
+            }
+
+            return $dialogs->render($request, $form, $this->ui->url('nowo_crm_kit_deal_move', ['id' => $id]), 'deal.move.title', 'deal.move.save', $this->ui->url('nowo_crm_kit_deal_show', ['id' => $id]), 'crm-deal-move', $status);
+        });
+    }
+
+    /**
+     * The trash / purge confirm of a deal as its own page (0.9.0): the question and a CSRF-protected POST. Trash needs
+     * `delete` on a deal not in the trash, purge `manage` on a deal in the trash (the deal page's rules).
+     */
+    private function confirmPage(Request $request, string $id, string $what, PipelineDialogs $dialogs): Response
+    {
+        return $this->ui->guard(function () use ($request, $id, $what, $dialogs): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $purge = $what === 'purge';
+            $deal  = $this->reader->deal($id, $purge);
+            if ($purge && $deal->status !== DealStatus::Trashed) {
+                throw new NotAvailableException();
+            }
+            $this->ui->requireSubject($purge ? CrmPermission::Manage : CrmPermission::Delete, SubjectRef::of(SubjectType::Deal, $deal->id, $deal->ownerId));
+            $form = $this->ui->form(ActionType::class, null, [], 'crm_action');
+            $form->handleRequest($request);
+            $status = $request->isMethod('POST') ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK;
+            if ($form->isSubmitted() && $form->isValid()) {
+                $status = $dialogs->attempt($request, $form, function () use ($request, $id, $purge, $dialogs): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                    $purge ? $this->deals->purge($id) : $this->deals->trash($id);
+                    $this->ui->flash($request, 'success', $purge ? 'deal.purged' : 'deal.trashed');
+
+                    return $dialogs->done($request, 'nowo_crm_kit_deals', $purge ? ['status' => 'trashed'] : []);
+                });
+                if ($status instanceof Response) {
+                    return $status;
+                }
+            }
+
+            return $dialogs->render($request, $form, $this->ui->url('nowo_crm_kit_deal_' . $what, ['id' => $id]), 'deal.' . $what, 'deal.' . $what, $this->ui->url('nowo_crm_kit_deal_show', ['id' => $id]), 'crm-deal-' . $what, $status, intro: 'deal.' . $what . '_confirm', variant: 'btn_danger');
+        });
+    }
+
+    /**
+     * "Add a next action" as its own page (0.9.0): `edit` on the company, contact or deal.
+     */
+    private function nextActionPage(Request $request, SubjectType $subject, string $id, PipelineDialogs $dialogs): Response
+    {
+        return $this->ui->guard(function () use ($request, $subject, $id, $dialogs): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            [$route, $params] = $this->editable($subject, $id);
+            $form             = $this->ui->form(NextActionType::class, ['dedupe' => PipelineForms::dedupe(), 'due_at' => new DateTimeImmutable('tomorrow 09:00', new DateTimeZone('UTC'))], ['owners' => $this->forms->owners()], 'crm_next_action');
+            $form->handleRequest($request);
+            $status = $request->isMethod('POST') ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK;
+            if ($form->isSubmitted() && $form->isValid()) {
+                $status = $dialogs->attempt($request, $form, function () use ($request, $form, $subject, $id, $route, $params, $dialogs): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                    $due      = $form->get('due_at')->getData();
+                    $assignee = $this->text($form, 'assignee');
+                    if (!$due instanceof DateTimeImmutable) {
+                        throw InvalidInputException::field('due_at', 'error.required');
+                    }
+                    try {
+                        $this->actions->set($subject, $id, $this->text($form, 'title'), $due, $assignee === '' ? null : $assignee, $this->text($form, 'dedupe'), null, $this->ui->url($route, $params)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                    } catch (CrmTaskRefusedException) {
+                        throw InvalidInputException::field('_', 'next_action.refused');
+                    }
+                    $this->ui->flash($request, 'success', 'next_action.added');
+
+                    return $dialogs->done($request, $route, $params);
+                });
+                if ($status instanceof Response) {
+                    return $status;
+                }
+            }
+
+            return $dialogs->render($request, $form, $this->ui->url('nowo_crm_kit_next_action_add', ['type' => $subject === SubjectType::Deal ? 'deals' : $subject->segment(), 'id' => $id]), 'next_action.add', 'next_action.save', $this->ui->url($route, $params), 'crm-next-action', $status);
+        });
+    }
+
+    /**
+     * "Set the lifecycle stage" as its own page (0.9.0): `edit` on the company or contact, the stages of the party
+     * funnels of its type (404 without any).
+     */
+    private function lifecyclePage(Request $request, SubjectType $subject, string $id, PipelineDialogs $dialogs): Response
+    {
+        return $this->ui->guard(function () use ($request, $subject, $id, $dialogs): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            [$route, $params] = $this->editable($subject, $id);
+            $choices          = [];
+            foreach ($this->funnels->funnels(FunnelKind::Party) as $funnel) {
+                if ($funnel->subjectType === $subject) {
+                    foreach ($this->forms->stages($funnel) as $label => $stageId) {
+                        $choices[$funnel->name . ' › ' . $label] = $funnel->id . '|' . $stageId;
+                    }
+                }
+            }
+            if ($choices === []) {
+                throw new NotAvailableException();
+            }
+            $form = $this->ui->form(LifecycleType::class, null, ['stages' => $choices], 'crm_lifecycle');
+            $form->handleRequest($request);
+            $status = $request->isMethod('POST') ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK;
+            if ($form->isSubmitted() && $form->isValid()) {
+                $status = $dialogs->attempt($request, $form, function () use ($request, $form, $subject, $id, $route, $params, $dialogs): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                    [$funnelId, $stageId] = explode('|', $this->text($form, 'stage') . '|');
+                    $this->lifecycle->set($subject, $id, $funnelId, $stageId); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                    $this->ui->flash($request, 'success', 'lifecycle.saved');
+
+                    return $dialogs->done($request, $route, $params);
+                });
+                if ($status instanceof Response) {
+                    return $status;
+                }
+            }
+
+            return $dialogs->render($request, $form, $this->ui->url('nowo_crm_kit_lifecycle', ['type' => $subject->segment(), 'id' => $id]), 'lifecycle.title', 'lifecycle.save', $this->ui->url($route, $params), 'crm-lifecycle', $status);
+        });
+    }
+
+    /**
+     * The page of a subject the actor may edit (the same checks as the POST: 404 outside the tenant or hidden, 403
+     * without `edit`): its route and parameters.
+     *
+     * @return array{string, array<string, string>}
+     */
+    private function editable(SubjectType $subject, string $id): array
+    {
+        if ($subject === SubjectType::Deal) {
+            $deal = $this->reader->deal($id);
+            $this->ui->requireSubject(CrmPermission::Edit, SubjectRef::of(SubjectType::Deal, $deal->id, $deal->ownerId));
+
+            return ['nowo_crm_kit_deal_show', ['id' => $id]];
+        }
+        $view = ($this->records ?? throw new NotFoundHttpException())->record($subject, $id);
+        $this->ui->requireOn(CrmPermission::Edit, $view);
+
+        return ['nowo_crm_kit_show', ['type' => $subject->segment(), 'id' => $id]];
     }
 
     /**

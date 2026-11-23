@@ -1,0 +1,13 @@
+{#
+  One form of the funnel pages as its own page (0.9.0, `ui.pipeline_forms: dialog`): move a deal, a next action, a
+  lifecycle stage, a new funnel, a new / edited stage, the trash / purge confirm of a deal. The no-JS fallback and the
+  deep link of the remote form dialog, whose fragment is `_dialog_form.html.twig`. UiKit form scaffold; the errors of
+  the form itself (a conflict, a refused task) show above the fields. Variables: page (FormPage; the form posts to
+  the page's own URL).
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_form_body %}
+    {% if page.form is not null and page.form.vars.errors|length > 0 %}<div class="{{ nowo_ui_class('flash_error', page.bundle) }}" role="alert">{{ form_errors(page.form) }}</div>{% endif %}
+    {{ parent() }}
+{% endblock %}

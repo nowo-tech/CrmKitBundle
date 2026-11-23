@@ -51,6 +51,12 @@ final class ConfigurationTreeTest extends TestCase
         self::assertSame([5, 15], $this->process(['ui' => ['page_size' => 15, 'list_per_page' => [5, 15]]])['ui']['list_per_page'] ?? null);
     }
 
+    public function testPipelineFormsStayInlineByDefault(): void
+    {
+        self::assertSame('inline', $this->process([])['ui']['pipeline_forms'] ?? null);
+        self::assertSame('dialog', $this->process(['ui' => ['pipeline_forms' => 'dialog']])['ui']['pipeline_forms'] ?? null);
+    }
+
     /**
      * @return iterable<string, array{array<string, mixed>, string}>
      */
@@ -62,6 +68,7 @@ final class ConfigurationTreeTest extends TestCase
         yield 'too many per page' => [['ui' => ['list_per_page' => range(10, 65, 5)]], 'ui.list_per_page'];
         yield 'per page without the page size' => [['ui' => ['list_per_page' => [10, 50]]], 'ui.page_size must be one of ui.list_per_page'];
         yield 'record create' => [['ui' => ['record_create' => 'modal']], 'record_create'];
+        yield 'pipeline forms' => [['ui' => ['pipeline_forms' => 'modal']], 'pipeline_forms'];
         yield 'prefix' => [['doctrine' => ['table_prefix' => 'Bad-']], 'table_prefix'];
         yield 'path' => [['ui' => ['path' => 'crm']], 'ui.path'];
         yield 'purpose' => [['gdpr' => ['purposes' => ['Marketing']]], 'gdpr.purposes'];

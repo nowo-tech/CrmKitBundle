@@ -1,6 +1,7 @@
 {#
   The next actions of a subject (0.3.0). Variables: actions (list of NextActionView), buttons (action id => list of
-  View\Action), form (FormView or null), action (URL of the add form), back (query of the close buttons).
+  View\Action), form (FormView or null), action (URL of the add form), back (query of the close buttons); 0.9.0:
+  opener (View\Action or null: "Add a next action" as a link to its own page, `ui.pipeline_forms: dialog`).
 #}
 {%- set _d = 'NowoCrmKitBundle' -%}
 {%- set _b = 'NowoCrmKitBundle' -%}
@@ -17,6 +18,7 @@
             {% endfor %}
             </ul>
         {% endif %}
+        {% if opener|default(null) %}<div class="{{ nowo_ui_class('toolbar', _b) }}">{{ include(nowo_ui_partial('action', _b), {action: opener, context: 'toolbar', bundle: _b}) }}</div>{% endif %}
     </div>
 </section>
 {% if form %}

@@ -23,6 +23,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Beacon request 2026-11-23: with UiKit's `icon_set: ux_icon` (and Iconify off or `ignore_not_found: false`) the funnel
+  page, the board, the statistics, a deal page and a company / contact page with next actions answered **500**. Their
+  actions asked for icons no set has: the stage *Move up* / *Move down*, the next action *Done* / *Cancel* and a
+  company's *Make* / *Clear primary contact* were `custom` actions without an icon (row context draws the kind icon,
+  `bi:custom`), the funnel's *Statistics* asked for `chart` and *Merge* for `merge`. Every kit action now names a
+  canonical UiKit kind or a Bootstrap Icons name that exists: *Done* is `mark_done`, *Cancel* is `cancel`, the stage moves are `move`
+  with the up / down arrows (`sort_asc` / `sort_desc`); *Statistics* draws `bar-chart`, the statistics' *Board*
+  `kanban`, *Merge* `union`, the primary contact buttons `person-check` / `person-dash` (Bootstrap Icons, UiKit's
+  default set; `bi:<name>` under `ux_icon`). The kinds follow the host's `nowo_ui_kit.action_icons`. A host on
+  `ux_icon` without Iconify imports the new names (`bi:bar-chart`, `bi:kanban`, `bi:union`, `bi:person-check`,
+  `bi:person-dash`) and drops any stand-in it drew for `bi:custom`, `bi:chart` or `bi:merge` (UPGRADING, "To 0.8.1").
+  A test renders every page with a kit action under a strict `ux_icon()` that throws on a missing icon. Known limit:
+  UiKit has no kind for these five, so under `icon_set: tabler-icons` they draw an empty Tabler glyph and under
+  `svg_inline` UiKit's generic *view* eye (no error; the label and tooltip are unchanged). The kinds above draw in
+  every set.
+- Beacon request 2026-11-23: a new or edited deal with neither a company nor a contact answered 422 with **no visible
+  message**: the service reports the field `company_id`, the form has `company`, so the error went to the form root,
+  which UiKit's form scaffold does not print. The deal pages map `company_id` / `contact_id` to the `company` /
+  `contact` fields (the message shows under *Company*), and `record/form.html.twig` now prints the form's own errors
+  above the fields in a `flash_error` box with `role="alert"` (as the 0.9 pipeline forms do), so no domain error is
+  silent again and screen readers announce it.
+
 ## [0.8.0] - 2026-11-23
 
 ### Added

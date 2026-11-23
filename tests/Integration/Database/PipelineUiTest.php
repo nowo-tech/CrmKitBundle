@@ -20,6 +20,7 @@ use Nowo\CrmKitBundle\Tests\Fixtures\TestTaskPort;
 use function array_replace_recursive;
 use function basename;
 use function str_repeat;
+use function substr_count;
 
 /**
  * The funnel pages (0.3.0): funnels administration, the deal list (keyset pages), the board, a deal's page and forms,
@@ -233,6 +234,44 @@ final class PipelineUiTest extends CrmTestCase
         $this->client->request('POST', '/crm/next-actions/00000000-0000-4000-8000-000000000000/done?back=nope');
         self::assertSame('/crm/deals', $this->client->getResponse()->headers->get('Location'));
         self::assertNotSame('', $deal);
+    }
+
+    public function testANewDealWithoutCompanyOrContactShowsWhy(): void
+    {
+        // 0.8.1 (Beacon request 2026-11-23): the service names the field company_id, the form has company; the
+        // message went to the form root, which UiKit's scaffold never printed — a 422 with no visible reason.
+        $this->boot();
+        $this->admin();
+        $funnel = $this->service(FunnelService::class)->create(FunnelKind::Deal, null, 'Sales');
+        $page   = $this->client->request('GET', '/crm/deals/new?funnel=' . $funnel);
+        $this->client->submit($page->filter('[data-testid="crm-deal-form"] form')->form(), ['crm_deal[title]' => 'Engines']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $html = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('A deal needs a company or a contact.', $html);
+        $crawler = $this->client->getCrawler();
+        self::assertStringContainsString('A deal needs a company or a contact.', $crawler->filter('#crm_deal_company')->ancestors()->first()->text(), 'next to the company field');
+
+        $deal = $this->service(DealService::class)->create(new DealInput('Z', $funnel, companyId: $this->company('Acme')));
+        $edit = $this->client->request('GET', '/crm/deals/' . $deal . '/edit');
+        $this->client->submit($edit->filter('[data-testid="crm-deal-form"] form')->form(), ['crm_deal[company]' => '', 'crm_deal[contact]' => '']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertSame(1, substr_count((string) $this->client->getResponse()->getContent(), 'A deal needs a company or a contact.'), 'once, at the company field');
+    }
+
+    public function testTheFormsOwnErrorsAreAnAlert(): void
+    {
+        // ZAG-7: an error of the form itself (here Symfony's CSRF error, which has no field) shows above the fields in
+        // a flash_error box with role="alert", so screen readers announce it (as the pipeline forms of 0.9 do).
+        $this->boot();
+        $this->admin();
+        $funnel = $this->service(FunnelService::class)->create(FunnelKind::Deal, null, 'Sales');
+        $page   = $this->client->request('GET', '/crm/deals/new?funnel=' . $funnel);
+        self::assertCount(0, $page->filter('[data-testid="crm-deal-form"] [role="alert"]'), 'no empty alert box');
+        $this->client->submit($page->filter('[data-testid="crm-deal-form"] form')->form(), ['crm_deal[title]' => 'Engines', 'crm_deal[_token]' => 'nope']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $alert = $this->client->getCrawler()->filter('[data-testid="crm-deal-form"] [role="alert"]');
+        self::assertCount(1, $alert);
+        self::assertStringContainsString('CSRF', $alert->text());
     }
 
     public function testFormEdgesOfTheDealPages(): void

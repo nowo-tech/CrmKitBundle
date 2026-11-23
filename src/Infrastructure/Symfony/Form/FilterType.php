@@ -13,6 +13,9 @@ use Symfony\Component\Form\Extension\Core\Type\SearchType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
+use function array_combine;
+use function array_map;
+
 /**
  * The filters of a list (GET, no CSRF).
  *
@@ -42,7 +45,26 @@ final class FilterType extends AbstractType
             }
             $this->addTypedField('owner', ChoiceType::class, ['label' => 'list.filter.owner', 'choices' => $options['owners'], 'required' => false, 'placeholder' => 'list.filter.any_owner', 'choice_translation_domain' => false]);
             $this->addTypedField('status', ChoiceType::class, ['label' => 'list.filter.status', 'choices' => ['list.status.active' => 'active', 'list.status.trashed' => 'trashed'], 'required' => false, 'placeholder' => false]);
+            /** @var list<int> $perPage */
+            $perPage = $options['per_page'];
+            if ($perPage !== []) {
+                $this->addTypedField('per_page', ChoiceType::class, self::perPageOptions($perPage));
+            }
         });
+    }
+
+    /**
+     * The options of the "Rows per page" select (0.8.0, `ui.list_per_page`): a visible label, the numbers as they are,
+     * no empty choice. A value outside the choices is not an error of the filters: the list falls back to the page
+     * size and the controller shows the value it used.
+     *
+     * @param list<int> $choices
+     *
+     * @return array<string, mixed>
+     */
+    public static function perPageOptions(array $choices): array
+    {
+        return ['label' => 'list.filter.per_page', 'choices' => array_combine(array_map(strval(...), $choices), $choices), 'required' => false, 'placeholder' => false, 'choice_translation_domain' => false];
     }
 
     /**
@@ -60,11 +82,13 @@ final class FilterType extends AbstractType
             'owners'             => [],
             'roles'              => [],
             'purposes'           => [],
+            'per_page'           => [],
         ]);
+        $resolver->setAllowedTypes('per_page', 'int[]');
     }
 
     /**
-     * Field names `q, tag, role, purpose, primary_contact, owner, status[...]`.
+     * Field names `q, tag, role, purpose, primary_contact, owner, status, per_page[...]`.
      */
     public function getBlockPrefix(): string
     {

@@ -2,7 +2,10 @@
   A list of companies or contacts (contract section 11.1): UiKit list scaffold (filters, server sort, pages, row
   actions, phone cards) and the focus-mode toggle; 0.4.0: the import modal, for someone who may import (opened by the
   page action "Import") and a notice linking the person's unfinished imports. Variables: page (ListPage),
-  crm_import_dialog ({url, unfinished: {total, imports: [{id, file}]}} or null).
+  crm_import_dialog ({url, unfinished: {total, imports: [{id, file}]}} or null), crm_record_dialog (0.8.0,
+  `ui.record_create: dialog`: {id, title} or null): one empty UiKit remote form dialog shell that "New company /
+  contact" fills on demand with the form page's fragment (record/_form_dialog.html.twig); nothing of the form is in the
+  list page.
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
 
@@ -29,5 +32,6 @@
         </div>
     {% endif %}
     {{ parent() }}
+    {% if crm_record_dialog|default(null) is not null %}{{ include(nowo_ui_partial('remote_form_dialog', page.bundle), {id: crm_record_dialog.id, title: crm_record_dialog.title, size: 'lg', attr: {'data-testid': crm_record_dialog.id}, bundle: page.bundle}, false) }}{% endif %}
     {% if crm_import_dialog|default(null) is not null %}{{ include('@NowoCrmKit/import/_dialog_shell.html.twig', {dialog: crm_import_dialog}, false) }}{% endif %}
 {% endblock %}

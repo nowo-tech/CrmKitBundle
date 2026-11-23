@@ -30,6 +30,7 @@ list:
         company: No companies yet.
         contact: No contacts yet.
     empty_hint: Create one, or import a CSV or vCard file.
+    no_match: 'Nothing matches the search.'
     export: Export CSV
     import: 'Import'
     col:
@@ -51,6 +52,9 @@ list:
         any_purpose: 'Any purpose'
         any_primary_contact: 'Any primary-contact setting'
         any_owner: 'Any owner'
+        per_page: 'Rows per page'
+        name: 'Name'
+        name_placeholder: 'Search by name'
     status:
         active: Active
         trashed: Trash

@@ -210,7 +210,7 @@ final class UiPresentationTest extends CrmTestCase
 
     public function testCreateDialogsOnTagsAndFields(): void
     {
-        $this->boot(['ui' => ['admin_create' => 'dialog']]);
+        $this->boot(['ui' => ['admin_create' => 'dialog_inline']]);
         $this->admin();
         $tags = $this->client->request('GET', '/crm/admin/tags');
         $new  = $tags->filter('[data-testid="crm-tag-new"]');
@@ -258,7 +258,7 @@ final class UiPresentationTest extends CrmTestCase
 
     public function testCreateDialogKeepsTheGateAndTheCsrfToken(): void
     {
-        $this->boot(['ui' => ['admin_create' => 'dialog']]);
+        $this->boot(['ui' => ['admin_create' => 'dialog_inline']]);
         $this->admin();
         $form = $this->client->request('GET', '/crm/admin/tags')->filter('dialog#crm-tag-dialog form')->form();
         $this->client->submit($form, ['crm_tag[name]' => 'VIP', 'crm_tag[_token]' => 'forged']);

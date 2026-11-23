@@ -24,6 +24,9 @@ earlier order B → C → D → E → F → G.
 | **E1** lists and segments | 0.9.0 | Static lists and dynamic segments (role, tag, affiliation purpose, has e-mail, consent purpose, score band, funnel stage); bulk add; segments filter the funnel statistics | own switch | Not started |
 | **E2** informative circulars | 0.10.0 | One e-mail per recipient through MailKit's queue with a rate limit; per-purpose unsubscribe; `service_notice` purpose; commercial circulars need marketing consent; bounces mark the address; send log; open signal to scoring; payment reminders through this channel | `campaigns.enabled` | Not started |
 | **G** reports | later → 1.0.0 | Deal scoring, deeper forecasts, velocity and cohorts, open / click tracking, two-way sync with external calendars, inactive-contact review | `reports.enabled` | Not started |
+| **H1** HubSpot import: connection, companies, contacts | 0.9.0 (proposed) | HubSpot as a third import source next to CSV and vCard (same `crm_import` queue, mapping, duplicate policy, limits, progress): a per-tenant private app token, validated (account id, read-only scopes) and sealed; companies, contacts, contact ↔ company associations, owners → members by e-mail, lists → tags; HubSpot ids kept as external refs so a re-run updates; paging, 429 backoff, resume; optional Messenger run. Design: [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md) (Beacon spec 253, D-20261123-04) | `import.hubspot.enabled` | Designed, not started |
+| **H2** HubSpot import: deals | 0.10.0 (proposed) | Pipelines → deal funnels, stages → stages (created on confirmation), deals with amount, currency, close date and open / won / lost; deal ↔ company / contact | `import.hubspot.deals` (needs `pipeline.enabled`, phase B released in 0.3.0) | Designed, not started |
+| **H3** HubSpot import: OAuth | 0.11.0 (proposed) | "Connect to HubSpot" with state + PKCE, sealed refresh token, revoke on disconnect; the token path keeps working | `import.hubspot.oauth.enabled` | Designed, not started |
 
 Status as of 2026-11-23 (latest tag v0.7.0). Tags v0.4.0 to v0.7.0 were not the phases of the plan: they are UI and
 reader releases requested by Beacon (see [CHANGELOG.md](CHANGELOG.md)): 0.4.0 / 0.4.1 / 0.4.2 import modal, 0.5.0 notes
@@ -50,6 +53,8 @@ processing, native apps.
 1.0.0 follows the last phase (G), `bundle-req-audit` at 100 % of the applicable REQs and the REQ-SEC-004 audits.
 Status as of 2026-11-23, latest tag v0.7.0.
 
+- **HubSpot import (H1–H3)** is designed in [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md); its version numbers
+  follow 0.8.0 (PR #19) and move up if another release lands first. Open owner questions Q-H1..Q-H13 are listed there.
 - **Phases left:** B2 tasks and agenda, C quotes, D invoices, F customer portal, S scoring, E1 lists and segments,
   E2 informative circulars, G reports; plus the configurable numbering and import key (QN-1..10). Each phase needs its
   own contract revision first. This is the large part of the distance to 1.0.0.

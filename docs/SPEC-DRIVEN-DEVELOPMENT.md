@@ -40,6 +40,8 @@ Every phase updates the baseline spec, the code inventory and the integrator doc
 | US-06 | **As a** data controller, **I want** consent per purpose, a contact export, an erasure and a retention purge **so that** I meet GDPR requests. | Consent, export, erasure, purge | [SECURITY.md](SECURITY.md#gdpr) |
 | US-07 | **As an** operator, **I want** concurrent writes and worker mode to be safe **so that** no data is lost, doubled or leaked between tenants. | Write units, 409 codes, worker hygiene | [CONCURRENCY.md](CONCURRENCY.md), [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md) |
 
+## Bundle functional scope
+
 **Goal:** a reusable, configurable CRM for Symfony applications, built phase by phase (A companies and contacts, B
 pipeline, C quotes, D invoices, E campaigns, F customer portal, G reports), tenant-aware and deny by default, on a
 private entity manager with a UiKit + FormKit UI and bridges to the Nowo bundles. The full design is

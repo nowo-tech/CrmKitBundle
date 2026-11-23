@@ -333,7 +333,7 @@ final class ServiceDefinitions
             self::api($container, $pipeline);
         }
         if ($ui) {
-            self::ui($container);
+            self::ui($container, self::tabIcons($config['ui']));
         }
         if ($ui && $pipeline) {
             self::pipelineUi($container);
@@ -443,13 +443,32 @@ final class ServiceDefinitions
     }
 
     /**
-     * The pages (only with `ui.enabled`).
+     * The host overrides of the area tab icons (`ui.tab_icons`, validated by the tree), passed as they are: the
+     * built-in set fills the areas the host leaves out ({@see UiOptions::tabIcon()}).
+     *
+     * @return array<string, string|null>
      */
-    private static function ui(ContainerConfigurator $container): void
+    private static function tabIcons(mixed $ui): array
+    {
+        $icons = is_array($ui) && is_array($ui['tab_icons'] ?? null) ? $ui['tab_icons'] : [];
+        $out   = [];
+        foreach ($icons as $area => $icon) {
+            $out[(string) $area] = is_string($icon) ? $icon : null;
+        }
+
+        return $out;
+    }
+
+    /**
+     * The pages (only with `ui.enabled`).
+     *
+     * @param array<string, string|null> $tabIcons host overrides of the area tab icons
+     */
+    private static function ui(ContainerConfigurator $container, array $tabIcons): void
     {
         $s = $container->services();
         $p = self::P;
-        $s->set(UiOptions::class)->args([param($p . 'ui.row_actions'), param($p . 'ui.header_actions'), param($p . 'ui.record_actions'), param($p . 'ui.record_tabs'), param($p . 'ui.filters_fold'), param($p . 'ui.filters_slot'), param($p . 'ui.list_tabs'), param($p . 'ui.admin_create'), param($p . 'ui.settings_width')]);
+        $s->set(UiOptions::class)->args([param($p . 'ui.row_actions'), param($p . 'ui.header_actions'), param($p . 'ui.record_actions'), param($p . 'ui.record_tabs'), param($p . 'ui.filters_fold'), param($p . 'ui.filters_slot'), param($p . 'ui.list_tabs'), param($p . 'ui.admin_create'), param($p . 'ui.settings_width'), $tabIcons]);
         $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size'), param($p . 'pipeline.enabled'), service(UiOptions::class)]);
         $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid()]);

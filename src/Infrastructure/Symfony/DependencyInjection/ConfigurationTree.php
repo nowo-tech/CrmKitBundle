@@ -8,11 +8,15 @@ use Nowo\CrmKitBundle\Domain\Value\AffiliationPurpose;
 use Nowo\CrmKitBundle\Domain\Value\ConsentPurpose;
 use Nowo\CrmKitBundle\Domain\Value\LostReasonKey;
 use Nowo\CrmKitBundle\Domain\Value\RoleKey;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\UiOptions;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\NodeBuilder;
 
+use function array_key_exists;
+use function array_keys;
 use function array_unique;
 use function count;
+use function implode;
 use function is_array;
 use function is_string;
 use function preg_match;
@@ -121,6 +125,12 @@ final class ConfigurationTree
             ->booleanNode('list_tabs')->defaultTrue()->info('0.6.1: show the area tabs (Companies, Contacts, Tags, Custom fields, Settings...) on the list, admin and form pages; false hides them there. The company / contact record page follows record_tabs.')->end()
             ->enumNode('admin_create')->values(['inline', 'dialog'])->defaultValue('inline')->info('0.6.1: how Tags and Custom fields offer create. inline = the create form in a card under the list (as before); dialog = a View\\Action in page.header.actions (New tag, New field for companies, New field for contacts) that opens a UiKit confirm_dialog; ?new=1 is the no-JS fallback and an invalid submission answers 422 with the dialog open.')->end()
             ->enumNode('settings_width')->values(['form', 'full'])->defaultValue('form')->info('0.6.1: the Settings form. form = the UiKit form panel (the host form column width, as before); full = the bundle card at the full content width, like the lists.')->end()
+            ->arrayNode('tab_icons')->info('0.7.0: the icon of an area tab, by area (' . implode(', ', array_keys(UiOptions::DEFAULT_TAB_ICONS)) . '), merged over the built-in Tabler set (companies: tabler:building, contacts: tabler:users, deals: tabler:briefcase, tags: tabler:tags, fields: tabler:forms, settings: tabler:settings, funnels: tabler:filter). An icon name "[prefix:]name" as UiKit takes it; "" or null = no icon (the tab shows its label in every tab style). Name only the areas you change. Decoration only: the access checks decide which tabs show.')
+                ->useAttributeAsKey('area')->normalizeKeys(false)
+                ->scalarPrototype()->end()
+                ->defaultValue([])
+                ->validate()->ifTrue(static fn (array $v): bool => !self::tabIcons($v))->thenInvalid('ui.tab_icons maps an area (' . implode(', ', array_keys(UiOptions::DEFAULT_TAB_ICONS)) . ') to an icon name "[prefix:]name" of lowercase letters, digits and single hyphens (e.g. "tabler:building"), "" or null; got %s.')->end()
+            ->end()
         ->end()->end();
         self::pipeline($children);
         self::api($children);
@@ -178,6 +188,25 @@ final class ConfigurationTree
             ->scalarNode('column')->defaultNull()->info('The column (TaskBoard status name) new tasks go to; null = the board\'s first.')->end()
         ->end()->end();
         $pipeline->end()->end();
+    }
+
+    /**
+     * Whether a value maps known areas to icon names, "" or null (`ui.tab_icons`).
+     *
+     * @param array<mixed> $value
+     */
+    private static function tabIcons(array $value): bool
+    {
+        foreach ($value as $area => $icon) {
+            if (!array_key_exists($area, UiOptions::DEFAULT_TAB_ICONS)) {
+                return false;
+            }
+            if ($icon !== null && $icon !== '' && (!is_string($icon) || preg_match(UiOptions::ICON_PATTERN, $icon) !== 1)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

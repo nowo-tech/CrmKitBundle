@@ -297,23 +297,24 @@ final readonly class UiSupport
     }
 
     /**
-     * The CRM's area navigation, with the entries the actor may open.
+     * The CRM's area navigation, with the entries the actor may open (the access checks decide the entries; the icon
+     * of each one, `ui.tab_icons` over the built-in set, is decoration only).
      */
     public function areaNav(string $current): AreaNav
     {
         $items = [
-            new AreaNavItem(self::label('nav.companies'), $this->url('nowo_crm_kit_list', ['type' => 'companies']), $current === 'companies'),
-            new AreaNavItem(self::label('nav.contacts'), $this->url('nowo_crm_kit_list', ['type' => 'contacts']), $current === 'contacts'),
+            new AreaNavItem(self::label('nav.companies'), $this->url('nowo_crm_kit_list', ['type' => 'companies']), $current === 'companies', icon: $this->options->tabIcon('companies')),
+            new AreaNavItem(self::label('nav.contacts'), $this->url('nowo_crm_kit_list', ['type' => 'contacts']), $current === 'contacts', icon: $this->options->tabIcon('contacts')),
         ];
         if ($this->pipeline) {
-            $items[] = new AreaNavItem(self::label('nav.deals'), $this->url('nowo_crm_kit_deals'), $current === 'deals');
+            $items[] = new AreaNavItem(self::label('nav.deals'), $this->url('nowo_crm_kit_deals'), $current === 'deals', icon: $this->options->tabIcon('deals'));
         }
         if ($this->can(CrmPermission::Manage)) {
-            $items[] = new AreaNavItem(self::label('nav.tags'), $this->url('nowo_crm_kit_tags'), $current === 'tags');
-            $items[] = new AreaNavItem(self::label('nav.fields'), $this->url('nowo_crm_kit_fields'), $current === 'fields');
-            $items[] = new AreaNavItem(self::label('nav.settings'), $this->url('nowo_crm_kit_settings'), $current === 'settings');
+            $items[] = new AreaNavItem(self::label('nav.tags'), $this->url('nowo_crm_kit_tags'), $current === 'tags', icon: $this->options->tabIcon('tags'));
+            $items[] = new AreaNavItem(self::label('nav.fields'), $this->url('nowo_crm_kit_fields'), $current === 'fields', icon: $this->options->tabIcon('fields'));
+            $items[] = new AreaNavItem(self::label('nav.settings'), $this->url('nowo_crm_kit_settings'), $current === 'settings', icon: $this->options->tabIcon('settings'));
             if ($this->pipeline) {
-                $items[] = new AreaNavItem(self::label('nav.funnels'), $this->url('nowo_crm_kit_funnels'), $current === 'funnels');
+                $items[] = new AreaNavItem(self::label('nav.funnels'), $this->url('nowo_crm_kit_funnels'), $current === 'funnels', icon: $this->options->tabIcon('funnels'));
             }
         }
 

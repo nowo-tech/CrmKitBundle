@@ -1875,6 +1875,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         list_tabs?: bool|Param, // 0.6.1: show the area tabs (Companies, Contacts, Tags, Custom fields, Settings...) on the list, admin and form pages; false hides them there. The company / contact record page follows record_tabs. // Default: true
  *         admin_create?: "inline"|"dialog"|Param, // 0.6.1: how Tags and Custom fields offer create. inline = the create form in a card under the list (as before); dialog = a View\Action in page.header.actions (New tag, New field for companies, New field for contacts) that opens a UiKit confirm_dialog; ?new=1 is the no-JS fallback and an invalid submission answers 422 with the dialog open. // Default: "inline"
  *         settings_width?: "form"|"full"|Param, // 0.6.1: the Settings form. form = the UiKit form panel (the host form column width, as before); full = the bundle card at the full content width, like the lists. // Default: "form"
+ *         tab_icons?: array<string, scalar|Param|null>,
  *     },
  *     pipeline?: array{ // 0.3.0: funnels with per-stage statistics, deals and next actions (tables and routes only while enabled).
  *         enabled?: bool|Param, // Default: false

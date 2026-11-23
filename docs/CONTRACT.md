@@ -1,5 +1,8 @@
 # CRM kit bundle (CrmKitBundle). Contract v0.1 for symfony-beacon spec 245
 
+Status 2026-11-23: **released through v0.7.0**: phases A (0.1.0), A2 (0.2.0, 0.2.1) and B (0.3.0, with the API) are built;
+0.4.0 to 0.7.0 are Beacon UI and reader releases (see [ROADMAP.md](ROADMAP.md)); phases B2 to G are not started and the
+release numbers in §1 and §25 for them are taken, so each phase gets its number in its own contract revision.
 Status 2026-11-19: **v0.2, phase A2 (0.2.0: party roles, affiliation purposes and the company's primary contact) on
 top of phase A (0.1.0), with the owner's phase plan of 2026-11-19 (§25).** Status 2026-11-18: **v0.1, written for the
 build of phase A (0.1.0).** Every Q-O (§22) and Q-B (§23) question has a

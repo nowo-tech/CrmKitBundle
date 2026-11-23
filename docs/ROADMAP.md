@@ -84,11 +84,11 @@ change. "Kit option" is the configuration switch; off means no tables mapped, no
 | **D-2** e-mail channel + articles | 0.19.0 | Ticket address per organisation, e-mail → ticket, reply threading by token, unknown sender without contact; article suggester port and Wiki bridge | `tickets.inbound.enabled` | **MailKit inbound routing for per-organisation addresses**; Wiki (block H) | v1.180 |
 | **D-3** chat channel | later | Signed-in customers' chat opens or continues a ticket | `tickets.chat.enabled` | **ChatKit customer-channel option**; needs phase F (portal) | after phase F (Q-254-8) |
 | **E-1** segments (phase E1) | 0.20.0 | Static lists and dynamic segments with live counts, bulk actions; HubSpot lists → lists / segments | `segments.enabled` | — | v1.181 |
-| **E-2** web forms | 0.21.0 | Form builder, field mapping, UTM fields, consent per purpose, embed by script / iframe, allowed origins, signed token, honeypot + Altcha, rate limits, double opt-in; HubSpot form definitions (Q-254-3) | `forms.enabled` | AltchaType, LegalKit (privacy link), MailKit (double opt-in, verified domain) | v1.181 or v1.182 |
+| **E-2** web forms | 0.21.0 | Form builder, field mapping, UTM fields, consent per purpose, embed by script / iframe, allowed origins, signed token, honeypot + Altcha, rate limits, double opt-in; no HubSpot form definitions in v1 (Q-254-3) | `forms.enabled` | AltchaType, LegalKit (privacy link), MailKit (double opt-in, verified domain) | v1.181 or v1.182 |
 | **F-0** sending domains | — | Per-organisation sending domain, SPF / DKIM / DMARC verification before campaigns and daily for sequences | — | **MailKit `sending_domains`** (Q-254-6) | with F-2 |
 | **F-1** scoring (phase S) | 0.22.0 | Explainable rule scoring, hot / warm / cold bands, breakdown, worker-safe recompute | `scoring.enabled` | — | v1.182 |
 | **F-2** circulars (phase E2) | 0.23.0 | Informative and marketing circulars through MailKit's queue, only from a verified domain | `campaigns.enabled` | MailKit (`sending_domains`, tracking) | v1.183 |
-| **F-3** automation + sequences | 0.24.0 | CRM triggers and actions for AutomationKit; sequences (steps, windows, caps, stop rules) from the person's mailbox | `automation.enabled`, `sequences.enabled` | **new `nowo-tech/automation-kit-bundle`** 0.1.0 (Q-254-7); WorkflowBundle through an AutomationKit action; OutboundUrlGuard (webhooks) | v1.184 |
+| **F-3** automation + sequences | 0.24.0 | CRM triggers and actions for AutomationKit; sequences (steps, windows, caps, stop rules) from the person's mailbox | `automation.enabled`, `sequences.enabled` | **new `nowo-tech/automation-kit-bundle`** 0.1.0 (Q-254-7: repo being created, contract first); WorkflowBundle through an AutomationKit action; OutboundUrlGuard (webhooks) | v1.184 |
 | **G** forecast, goals, teams | 0.25.0 | Forecast categories with override history, goals per rep / team and period; HubSpot goals and owners' teams | `forecast.enabled` | ReportKit types in Beacon | v1.185 (may swap with C or E) |
 | **H** knowledge base | — (bridge in 0.19.0) | Published spaces; suggestions in ticket replies | — | **WikiBundle `published_spaces`** (next Wiki minor) | with D-2 or alone |
 | **I** booking links | 0.26.0 | Booking pages, availability (free / busy only), signed cancel / reschedule, meeting + ICS, sequence stop | `booking.enabled` | TaskBoard (event source); **MailKit Graph free / busy** (after B1) | v1.186 |
@@ -211,8 +211,8 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
 
 - **Depends on.** Block A (the `form_submitted` activity). E-2: AltchaTypeBundle (proof of work next to the honeypot),
   LegalKit (privacy link and consent text), Symfony RateLimiter, MailKit for the double opt-in mail from the
-  organisation's verified domain (F-0 or an explicit exception, Q-254-6). ContactFormBundle is not reused by default
-  (Q-254-5): it serves hosted contact forms without embedding, origin checks, field mapping or double opt-in.
+  organisation's verified domain once F-0 exists; until then from Beacon's platform domain as a service message (Q-254-6, decided). ContactFormBundle is not reused
+  (Q-254-5, decided): it serves hosted contact forms without embedding, origin checks, field mapping or double opt-in.
 - **New ports.** `CrmCaptchaVerifierInterface` (Altcha adapter; default: honeypot only), `CrmPrivacyLinkInterface`
   (LegalKit adapter: URL of the current privacy page per locale).
 - **New VOs / enums.** `ListId`, `SegmentRule` (closed set of fields and operators: role, tag, purpose, consent, score
@@ -224,11 +224,11 @@ assumes one kit minor per Beacon release from v1.176; it is not a commitment.
   answer whether the e-mail exists), no personal data echoed, redirect only to allowed URLs, consent recorded only
   after double opt-in, no file upload in v1.
 - **HubSpot import.** E-1 lists (static → lists; active → segments where every filter maps to a `SegmentRule`, else a
-  static snapshot with a note); E-2 form definitions only if Q-254-3 allows the scope.
+  static snapshot with a note); form definitions are not imported in v1 (Q-254-3, decided 2026-11-23: `forms` is not a read-only scope).
 
 ### Block F — automation, sequences and lead scoring (F-1 0.22.0, F-2 0.23.0, F-3 0.24.0)
 
-- **Depends on.** **New `nowo-tech/automation-kit-bundle`** (generic: trigger / condition / action registry by service
+- **Depends on.** **New `nowo-tech/automation-kit-bundle`** (repo being created, contract first; generic: trigger / condition / action registry by service
   tag, delays on Messenger, idempotency per event, loop depth, dry run, run log, audit, UiKit pages; no CRM dependency).
   WorkflowBundle stays the state-machine engine and is reached through an AutomationKit action that applies one of its
   transitions; it is not extended into a rule engine (it has no triggers, delays or actions). **MailKit
@@ -291,35 +291,38 @@ Checked on 2026-11-23 against HubSpot's public scope page
 | Block | Objects | Spec 254 proposal | Finding | Proposed for the build |
 | --- | --- | --- | --- | --- |
 | A | notes, calls, meetings, tasks | parent read scopes + `crm.objects.owners.read` | Verified: the legacy v3 `GET /crm/v3/objects/calls` accepts `crm.objects.contacts.read`. Granular `crm.objects.notes.read`, `crm.objects.calls.read`, `crm.objects.meetings.read`, `crm.objects.tasks.read` exist in the `2026-09` API (accepted by the object endpoints); they are **not** on the scope page. Minimum per endpoint for the date-versioned API: **unverified** | Parent `.read` scopes (as in H1 / H2) + `crm.objects.owners.read`; accept the granular ones when present; confirm per endpoint in the A-1 build task |
-| B | e-mails | `sales-email-read`, `crm.objects.contacts.read` | `sales-email-read` verified, described as "read **and manage** one-to-one email engagements", and it does not end in `.read`, so the H1 read-only rule (Q-H2) refuses it. `crm.objects.emails.read` exists in the `2026-09` API (not on the scope page) | `crm.objects.emails.read` + parent scopes; `sales-email-read` only if Q-254-3 allows it. Endpoint minimum: **unverified** |
+| B | e-mails | `sales-email-read`, `crm.objects.contacts.read` | `sales-email-read` verified, described as "read **and manage** one-to-one email engagements", and it does not end in `.read`, so the H1 read-only rule (Q-H2) refuses it. `crm.objects.emails.read` exists in the `2026-09` API (not on the scope page) | `crm.objects.emails.read` + parent scopes; not `sales-email-read` (Q-254-3, decided). Endpoint minimum: **unverified** |
 | C | products, line items, quotes | `e-commerce`, `crm.objects.line_items.read`, `crm.objects.quotes.read` | `e-commerce` is **deprecated** ("should not be used for new apps") and is not read-only. `crm.objects.line_items.read`, `crm.schemas.line_items.read`, `crm.objects.quotes.read`, `crm.schemas.quotes.read`, `tax_rates.read` verified. `crm.objects.products.read` exists in the `2026-09` API but is not on the scope page (**unverified** for v3) | `crm.objects.products.read`, `crm.objects.line_items.read`, `crm.objects.quotes.read` (+ the `crm.schemas.*.read` for the mapping step, `tax_rates.read` if tax rates are mapped); never `e-commerce` |
 | D | tickets, ticket pipelines | `tickets` | `tickets` is **legacy** ("migrate to the granular scopes") and is not read-only. `crm.objects.tickets.read` verified. Scope for `GET /crm/v3/pipelines/tickets`: **unverified** (v1 docs name `tickets`) | `crm.objects.tickets.read`; confirm the pipelines endpoint accepts it in the D-1 build task |
-| E | lists, form definitions | `crm.lists.read`, `forms` | `crm.lists.read` verified ("view contact lists"). `forms` verified for `GET /marketing/v3/forms`, but it covers the forms APIs as a whole (no read-only variant), so the H1 rule refuses it. Whether active-list filter definitions are readable with `crm.lists.read`: **unverified** | `crm.lists.read`; forms per Q-254-3 |
+| E | lists, form definitions | `crm.lists.read`, `forms` | `crm.lists.read` verified ("view contact lists"). `forms` verified for `GET /marketing/v3/forms`, but it covers the forms APIs as a whole (no read-only variant), so the H1 rule refuses it. Whether active-list filter definitions are readable with `crm.lists.read`: **unverified** | `crm.lists.read`; no `forms` (Q-254-3, decided: form definitions not imported in v1) |
 | G | goals, owners' teams | `crm.objects.goals.read`, `crm.objects.owners.read` | Both verified (`crm.objects.goals.read`: Sales Hub Starter or higher). `settings.users.teams.read` exists for teams; whether the owners endpoint returns teams with `crm.objects.owners.read` alone: **unverified** | Both, plus `settings.users.teams.read` only if the owners response lacks teams |
 
 Also found: HubSpot's reference now documents date-versioned paths (`/crm/objects/2026-09/…`, `/crm/owners/2026-03`)
 and files the `v3` paths under "legacy". H1–H3 use `v3` as designed; a move is a separate slice when HubSpot announces
 a sunset date (to be re-checked in each block's build task). The H1 read-only rule stays: every new scope above is a
-`.read` scope except `sales-email-read` and `forms` (Q-254-3).
+`.read` scope; `sales-email-read` and `forms` are not requested (Q-254-3, decided 2026-11-23).
 
 ### Owner questions (Q-254)
 
-| # | Question | Options | Recommendation |
+All fourteen were decided by the owner on 2026-11-23: every recommendation was accepted. The options stay listed for
+the record.
+
+| # | Question | Options | Recommendation and decision |
 | --- | --- | --- | --- |
-| Q-254-1 | Ship block A as one minor or two? | (a) one minor (spec size M); (b) A-1 activities 0.13.0 + A-2 templates 0.14.0 | **(b)**: smaller PRs and audits, as for H1 / H2; A-2 can wait for spec 248's *Write e-mail* without holding A-1 |
-| Q-254-2 | Phase B2's "my agenda" and NotifyKit reminders: with A-1 or later? | (a) inside A-1; (b) a later B2 slice | **(a) only the reminders** (A-1 already brings NotifyKit for mentions); "my agenda" as a later slice when Beacon asks |
-| Q-254-3 | HubSpot scopes that are not `.read` (`sales-email-read` "read and manage", `forms` covers all forms APIs): how to import e-mails and form definitions? | (a) allow-list these two as exceptions to Q-H2; (b) use `crm.objects.emails.read` for e-mails and skip form definitions in v1; (c) a second, separately sealed token only for these objects | **(b)**: keeps the rule "a stolen token cannot write to the customer's HubSpot"; forms are quick to rebuild; revisit if `crm.objects.emails.read` proves insufficient in the B build |
-| Q-254-4 | Gmail: if Google's security assessment (needed for the restricted `gmail.readonly`) lags or its cost is too high, ship Gmail send-only first? `gmail.send` is only sensitive | (a) wait for the full approval; (b) send-only Gmail first (logging by BCC address of spec 248), reading when approved | **(b)** as a fallback the owner can trigger; Outlook stays first either way |
-| Q-254-5 | Web forms engine | (a) CrmKit's own `forms` option on AltchaType + LegalKit; (b) extend ContactFormBundle with embed, origins, signed token, mapping and double opt-in, CrmKit only maps | **(a)**: CRM mapping, consent and double opt-in live with the contact and its GDPR; ContactForm keeps its hosted forms. Extract a shared embed guard later if a second bundle needs it |
-| Q-254-6 | Where does sending-domain verification (FR-064) live, and does the double opt-in mail of E-2 need it too? | (a) MailKit `sending_domains` used by every kit; (b) Beacon only; (c) inside CrmKit | **(a)**, reusable by other projects; and **yes** for double opt-in once F-0 exists (until then E-2 sends it from Beacon's platform domain as a service message, not marketing) |
-| Q-254-7 | Create `nowo-tech/AutomationKitBundle` (package `nowo-tech/automation-kit-bundle`)? | (a) create the public repo now, contract first, Packagist by the owner before the first tag; (b) build rules inside CrmKit first and extract later; (c) extend WorkflowBundle | **(a)**, contract written while E-1 is built; WorkflowBundle stays the state machine (an action applies its transitions) |
-| Q-254-8 | Chat channel of block D (signed-in customers) | (a) defer D-3 until phase F (portal) and a ChatKit customer-channel contract; (b) a CrmKit-native message thread on the ticket for portal users, no ChatKit | **(a)**: D ships with the e-mail channel; ChatKit's roadmap keeps external accounts out today |
-| Q-254-9 | Ticket inbound transport on Beacon's inbound domain | (a) one Graph shared mailbox with plus addresses `support+<token>@…` (MailKit 1.9 parses them); (b) a catch-all domain on Resend inbound or another webhook provider; (c) one mailbox per organisation | **(a)** for v1 (no new provider, tokens rotatable); (b) if volume or Exchange limits require it |
-| Q-254-10 | Quote acceptance evidence: full IP or truncated? | (a) full IP and user agent in the immutable record, kept with the quote; (b) truncated as for tracking | **(a)**: it is evidence of a contract (legal basis: contract), not tracking; disclosed in the privacy text and erased with the quote's retention, not the contact's |
-| Q-254-11 | `CrmTeamDirectoryInterface` in D-1 (needed by "agents see their teams' tickets") instead of G | (a) in D-1; (b) in G, D-1 with owner-only scoping | **(a)** |
-| Q-254-12 | Accepted quote moves the deal to won automatically (FR-034): also when the deal has other open quotes? | (a) yes, others become superseded; (b) only when it is the last open quote | **(a)**, with the other quotes superseded in the same write unit |
-| Q-254-13 | Lead scoring (F-1) does not need blocks B or E: pull it forward if a release slot is free? | (a) keep the spec order; (b) allow it earlier | **(b)**, only when no block of the agreed order is ready |
-| Q-254-14 | When is CrmKit 1.0.0 now that spec 254 adds nine blocks? | (a) after every block and phases D / F / G; (b) after blocks A–D are released and audited, later blocks as additive 1.x minors; (c) unchanged (after phase G) | **(b)**: A–D settle the core schema; every later block is opt-in and additive |
+| Q-254-1 | Ship block A as one minor or two? | (a) one minor (spec size M); (b) A-1 activities 0.13.0 + A-2 templates 0.14.0 | Decision 2026-11-23: **(b)**: smaller PRs and audits, as for H1 / H2; A-2 can wait for spec 248's *Write e-mail* without holding A-1 |
+| Q-254-2 | Phase B2's "my agenda" and NotifyKit reminders: with A-1 or later? | (a) inside A-1; (b) a later B2 slice | Decision 2026-11-23: **(a) only the reminders** (A-1 already brings NotifyKit for mentions); "my agenda" as a later slice when Beacon asks |
+| Q-254-3 | HubSpot scopes that are not `.read` (`sales-email-read` "read and manage", `forms` covers all forms APIs): how to import e-mails and form definitions? | (a) allow-list these two as exceptions to Q-H2; (b) use `crm.objects.emails.read` for e-mails and skip form definitions in v1; (c) a second, separately sealed token only for these objects | Decision 2026-11-23: **(b)**: keeps the rule "a stolen token cannot write to the customer's HubSpot"; forms are quick to rebuild; revisit if `crm.objects.emails.read` proves insufficient in the B build |
+| Q-254-4 | Gmail: if Google's security assessment (needed for the restricted `gmail.readonly`) lags or its cost is too high, ship Gmail send-only first? `gmail.send` is only sensitive | (a) wait for the full approval; (b) send-only Gmail first (logging by BCC address of spec 248), reading when approved | Decision 2026-11-23: **(b)** as a fallback the owner can trigger; Outlook stays first either way |
+| Q-254-5 | Web forms engine | (a) CrmKit's own `forms` option on AltchaType + LegalKit; (b) extend ContactFormBundle with embed, origins, signed token, mapping and double opt-in, CrmKit only maps | Decision 2026-11-23: **(a)**: CRM mapping, consent and double opt-in live with the contact and its GDPR; ContactForm keeps its hosted forms. Extract a shared embed guard later if a second bundle needs it |
+| Q-254-6 | Where does sending-domain verification (FR-064) live, and does the double opt-in mail of E-2 need it too? | (a) MailKit `sending_domains` used by every kit; (b) Beacon only; (c) inside CrmKit | Decision 2026-11-23: **(a)**, reusable by other projects; and **yes** for double opt-in once F-0 exists (until then E-2 sends it from Beacon's platform domain as a service message, not marketing) |
+| Q-254-7 | Create `nowo-tech/AutomationKitBundle` (package `nowo-tech/automation-kit-bundle`)? | (a) create the public repo now, contract first, Packagist by the owner before the first tag; (b) build rules inside CrmKit first and extract later; (c) extend WorkflowBundle | Decision 2026-11-23: **(a)**, contract written while E-1 is built; WorkflowBundle stays the state machine (an action applies its transitions) |
+| Q-254-8 | Chat channel of block D (signed-in customers) | (a) defer D-3 until phase F (portal) and a ChatKit customer-channel contract; (b) a CrmKit-native message thread on the ticket for portal users, no ChatKit | Decision 2026-11-23: **(a)**: D ships with the e-mail channel; ChatKit's roadmap keeps external accounts out today |
+| Q-254-9 | Ticket inbound transport on Beacon's inbound domain | (a) one Graph shared mailbox with plus addresses `support+<token>@…` (MailKit 1.9 parses them); (b) a catch-all domain on Resend inbound or another webhook provider; (c) one mailbox per organisation | Decision 2026-11-23: **(a)** for v1 (no new provider, tokens rotatable); (b) if volume or Exchange limits require it |
+| Q-254-10 | Quote acceptance evidence: full IP or truncated? | (a) full IP and user agent in the immutable record, kept with the quote; (b) truncated as for tracking | Decision 2026-11-23: **(a)**: it is evidence of a contract (legal basis: contract), not tracking; disclosed in the privacy text and erased with the quote's retention, not the contact's |
+| Q-254-11 | `CrmTeamDirectoryInterface` in D-1 (needed by "agents see their teams' tickets") instead of G | (a) in D-1; (b) in G, D-1 with owner-only scoping | Decision 2026-11-23: **(a)** |
+| Q-254-12 | Accepted quote moves the deal to won automatically (FR-034): also when the deal has other open quotes? | (a) yes, others become superseded; (b) only when it is the last open quote | Decision 2026-11-23: **(a)**, with the other quotes superseded in the same write unit |
+| Q-254-13 | Lead scoring (F-1) does not need blocks B or E: pull it forward if a release slot is free? | (a) keep the spec order; (b) allow it earlier | Decision 2026-11-23: **(b)**, only when no block of the agreed order is ready |
+| Q-254-14 | When is CrmKit 1.0.0 now that spec 254 adds nine blocks? | (a) after every block and phases D / F / G; (b) after blocks A–D are released and audited, later blocks as additive 1.x minors; (c) unchanged (after phase G) | Decision 2026-11-23: **(b)**: A–D settle the core schema; every later block is opt-in and additive |
 
 ### Sequencing
 
@@ -363,12 +366,12 @@ processing, native apps.
 ## Road to 1.0.0
 
 1.0.0 follows the last phase (G), `bundle-req-audit` at 100 % of the applicable REQs and the REQ-SEC-004 audits;
-with spec 254 the point of 1.0.0 is an owner question (Q-254-14). Status as of 2026-11-23, latest tag v0.8.0.
+with spec 254, 1.0.0 comes once blocks A–D are released and audited, later blocks as additive 1.x minors (Q-254-14, decided 2026-11-23). Status as of 2026-11-23, latest tag v0.8.0.
 
 - **HubSpot import (H1–H3)** is designed in [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md): H1 0.10.0 (PR #23),
   H2 0.11.0, H3 0.12.0; numbers move up if another release lands first. Owner questions Q-H1..Q-H13 are listed there.
-- **HubSpot parity (Beacon spec 254)** adds nine blocks A–I after H3 (section below); its owner questions are
-  Q-254-1..Q-254-14.
+- **HubSpot parity (Beacon spec 254)** adds nine blocks A–I after H3 (section below); its owner questions
+  Q-254-1..Q-254-14 were decided on 2026-11-23 (all recommendations accepted).
 - **Phases left:** B2 tasks and agenda, C quotes, D invoices, F customer portal, S scoring, E1 lists and segments,
   E2 informative circulars, G reports; plus the configurable numbering and import key (QN-1..10). Each phase needs its
   own contract revision first. This is the large part of the distance to 1.0.0.

@@ -196,7 +196,7 @@ final class HubSpotEdgeTest extends HubSpotTestCase
         $fake->lists  = ['77' => ['name' => 'Fans', 'type' => '0-1', 'members' => []]];
         $this->connect($fake);
         self::assertSame([], $this->hubImports()->lists(), 'no lists scope, no lists');
-        $this->expectRefusal(fn () => $this->imports()->upload(SubjectType::Contact, ImportFormat::HubSpot, 'x.csv', "email\na@x.test\n"), ImportFileException::class);
+        $this->expectRefusal(fn (): string => $this->imports()->upload(SubjectType::Contact, ImportFormat::HubSpot, 'x.csv', "email\na@x.test\n"), ImportFileException::class);
         $this->expectRefusal(fn (): string => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact], [new HubSpotObjectId('77')])), InvalidInputException::class);
         $fake->failNext('/crm/v3/objects/companies/search', 502);
         $this->expectRefusal(fn (): string => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Company])), InvalidInputException::class);

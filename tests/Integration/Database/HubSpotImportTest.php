@@ -76,7 +76,7 @@ final class HubSpotImportTest extends HubSpotTestCase
         self::assertSame('ES', $this->text("SELECT c.country FROM nowo_crm_company c JOIN nowo_crm_external_ref r ON r.target_id = c.id WHERE r.external_id = '1001'"));
         // Rows hold the kind and the HubSpot id only.
         foreach ($done->rows as $row) {
-            self::assertSame(['object', 'id'], array_keys($row->data));
+            self::assertEqualsCanonicalizing(['object', 'id'], array_keys($row->data), 'MySQL reorders JSON keys');
         }
         self::assertFalse(str_contains($this->text("SELECT data FROM nowo_crm_import_row WHERE data LIKE '%people.example%'"), '@'));
         self::assertContains('ImportCompleted', $this->recorder()->eventNames());

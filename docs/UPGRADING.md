@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.8.0](#to-080)
 - [To 0.7.0](#to-070)
 - [To 0.6.1](#to-061)
 - [To 0.6.0](#to-060)
@@ -17,6 +18,31 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.8.0
+
+From **0.7.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
+
+No schema change, no BC break in the public PHP API, no route change. What you may notice:
+
+- The company and contact lists accept only known rows per page: a `per_page` that is not one of UiKit's values
+  (10, 25, 50, 100) or `ui.page_size` (or, with the new `ui.list_per_page`, not one of its values) now falls back to
+  `page_size`; before, any value from 1 to 100 was used while the pager counted 25. A page past the end shows the last
+  page instead of an empty list.
+- Tags and Custom fields now have a filter card (name search `q`) and the UiKit pager: they show `page_size` rows per
+  page (25 by default) instead of all of them. E2E tests that count every tag or field on one page set `per_page` or
+  search by name.
+- The *New company* / *New contact* actions carry `data-testid="crm-record-new"` (header) and
+  `crm-record-new-empty` (empty state).
+- New opt-in options: `ui.list_per_page` (a *Rows per page* select; `ui.page_size` must be one of its values) and
+  `ui.record_create: dialog` (create in a UiKit remote form dialog loaded on demand). With the dialog, e2e tests click
+  `crm-record-new` and fill the form inside `crm-record-dialog`; the URL `…/new` still answers the full page. See
+  CONFIGURATION, "Rows per page and the create dialog".
+- Development: the lock moves to UiKit 2.68 and FormKit 2.24 (the constraints are unchanged).
 
 ## To 0.7.0
 

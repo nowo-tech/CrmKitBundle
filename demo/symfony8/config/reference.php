@@ -1875,6 +1875,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         list_tabs?: bool|Param, // 0.6.1: show the area tabs (Companies, Contacts, Tags, Custom fields, Settings...) on the list, admin and form pages; false hides them there. The company / contact record page follows record_tabs. // Default: true
  *         admin_create?: "inline"|"dialog"|Param, // 0.6.1: how Tags and Custom fields offer create. inline = the create form in a card under the list (as before); dialog = a View\Action in page.header.actions (New tag, New field for companies, New field for contacts) that opens a UiKit confirm_dialog; ?new=1 is the no-JS fallback and an invalid submission answers 422 with the dialog open. // Default: "inline"
  *         settings_width?: "form"|"full"|Param, // 0.6.1: the Settings form. form = the UiKit form panel (the host form column width, as before); full = the bundle card at the full content width, like the lists. // Default: "form"
+ *         list_per_page?: list<int|Param>,
+ *         record_create?: "page"|"dialog"|Param, // 0.8.0: how "New company" / "New contact" open. page = the form page (as before); dialog = the header action (a real link to the form page, the no-JS fallback) loads that page on demand into a UiKit remote form dialog (X-Nowo-Dialog: 1 answers the fragment, an invalid submission 422 in the dialog, success 204 + X-Nowo-Redirect to the new record). Same access checks and CSRF token as the page. // Default: "page"
  *         tab_icons?: array<string, scalar|Param|null>,
  *     },
  *     pipeline?: array{ // 0.3.0: funnels with per-stage statistics, deals and next actions (tables and routes only while enabled).

@@ -22,6 +22,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `ui.list_per_page` (Beacon request 2026-11-23): a *Rows per page* select (`select[name=per_page]`, visible label) in the filter card of the company and contact lists, Tags and Custom fields; `per_page` is checked against the configured choices (else `ui.page_size`; without the option UiKit's 10, 25, 50, 100 and `page_size`). Default `[]`: no select, the filter card is unchanged.
+- The UiKit pager with its "Showing x–y of z" count under every list with rows (a single page included); a page past the end shows the last page.
+- `ui.record_create: dialog` (Beacon request 2026-11-23, rule "every dialog loads on demand"): *New company* / *New contact* open in a UiKit remote form dialog that loads the form page on demand (`X-Nowo-Dialog: 1` ⇒ fragment `record/_form_dialog.html.twig`, invalid ⇒ 422 in the dialog, saved ⇒ 204 + `X-Nowo-Redirect` to the new record, `Vary: X-Nowo-Dialog`); the header action stays a real link (the no-JS fallback). Same access checks, tenant and CSRF token as the page.
+- Tags and Custom fields: a filter card (name search `q`, *Rows per page* with `ui.list_per_page`) and the UiKit pager.
+- Translations of *Rows per page*, the name search and *Nothing matches the search.* in the seven locales.
+
+### Changed
+
+- A `per_page` outside the accepted values falls back to `ui.page_size` (any value from 1 to 100 was used before while the pager counted 25). See UPGRADING, "To 0.8.0".
+
 ### Demo
 
 - Both demos run in UiKit's demo platform shell (`@NowoUiKit/demo_platform/layout.html.twig`, layouts admin + guest, REQ-DEMO-014); the screenshot spec frames the shell and creates its own readable data, and the README shows the companies list and the 360° page near the top (REQ-DEMO-013).

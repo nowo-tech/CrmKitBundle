@@ -25,7 +25,7 @@
 - [Errors](#errors)
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Pages and routes](#pages-and-routes)
-  - [Page layout options (0.6.0, 0.6.1, 0.7.0)](#page-layout-options-060-061-070)
+  - [Page layout options (0.6.0, 0.6.1, 0.7.0, 0.8.0)](#page-layout-options-060-061-070-080)
 - [Imports](#imports)
 - [The API (0.3.0)](#the-api-030)
 - [SearchKit](#searchkit)
@@ -788,7 +788,7 @@ Under the import prefix and `ui.path` (default `/crm`); names `nowo_crm_kit_<nam
 Templates live under `@NowoCrmKit/` and extend UiKit's page templates; a host overrides one through Symfony's bundle
 template path (`templates/bundles/NowoCrmKitBundle/…`) if it must, but the brand comes from UiKit tokens.
 
-### Page layout options (0.6.0, 0.6.1, 0.7.0)
+### Page layout options (0.6.0, 0.6.1, 0.7.0, 0.8.0)
 
 Beacon's UX review 1.171 (UX-002, 003, 005, 006, 010, 026 – 031). Every option lives under `nowo_crm_kit.ui` and keeps
 the 0.5.0 behaviour unless it says otherwise:
@@ -805,6 +805,20 @@ the 0.5.0 behaviour unless it says otherwise:
 | `admin_create` (0.6.1) | `inline` (default) \| `dialog` | Create on **Tags** and **Custom fields**. `inline`: the create form in a card under the list (0.6.0). `dialog`: a `View\Action` (kind `create`) in `page.header.actions` — *New tag*, or *New field for companies* and *New field for contacts* — that opens a UiKit `confirm_dialog` with its anatomy (title, the form in the body, *Cancel* and the one primary in the footer, a sheet on phones; ids `crm-tag-dialog`, `crm-field-dialog-company`, `crm-field-dialog-contact`). The action carries `data-nowo-confirm-open` / `data-nowo-confirm-target` (UiKit `js/nowo-ui-confirm.js`, one of UiKit's default runtime scripts); its href, the page with `?new=1` (`?for=<subject>&new=1` for fields), is the no-JS fallback: that page renders the form in a card inside `<noscript>` and, with JavaScript, opens the dialog on load (UiKit `open_modal_on_load`, the page loads `js/nowo-ui-open-modal.js` itself) and drops the parameter. An invalid submission answers **422** with the dialog open and its errors. Same routes, form names (`crm_tag`, `crm_field`), CSRF tokens and access checks (`manage`, the access checker and the `*_ACCESS_CHECK` events) as the inline form; each rendering has its own element ids. |
 | `settings_width` (0.6.1) | `form` (default) \| `full` | `form`: the Settings form in UiKit's form panel, whose width is the host's form column (`form_panel` slot). `full`: the form in the bundle's card at the full content width, like the lists and the other CRM forms. |
 | `tab_icons` (0.7.0) | `{}` (default: the built-in Tabler set) \| area ⇒ icon name | The icon of each area tab, shown when the host's tab style (`data-tab-style` `icon-text` or `icon`) asks for icons and its UiKit icon set draws the name. Merged over the defaults (`companies: tabler:building`, `contacts: tabler:users`, `deals: tabler:briefcase`, `tags: tabler:tags`, `fields: tabler:forms`, `settings: tabler:settings`, `funnels: tabler:filter`): name only the areas you change; `""` or `null` removes an icon. See CONFIGURATION, "Area tab icons". |
+| `list_per_page` (0.8.0) | `[]` (default) \| a list such as `[10, 25, 50, 100]` | A **Rows per page** select (`select[name=per_page]`, label *Rows per page*) in the filter card of the company and contact lists, Tags and Custom fields, submitted with the other filters (no auto-submit). `per_page` is checked against the list (else `page_size`; without the option: UiKit's 10, 25, 50, 100 and `page_size`); `page_size` must be one of the values. The pager (`[data-nowo-ui-region="pagination"]`, "Showing x–y of z") renders under every list with rows, a single page included. |
+| `record_create` (0.8.0) | `page` (default) \| `dialog` | *New company* / *New contact* (header action `crm-record-new`, empty state `crm-record-new-empty`). `dialog`: the action stays a real `<a href="…/{companies\|contacts}/new">` (the no-JS fallback and deep link) and carries UiKit's remote form opener attributes (`data-nowo-ui-dialog-open="crm-record-dialog"`, `data-nowo-ui-dialog-src`, `data-nowo-ui-dialog-form`, `data-nowo-ui-dialog-title`, `aria-haspopup="dialog"`); the list renders one empty `remote_form_dialog` shell (`dialog#crm-record-dialog`). On open UiKit's `js/nowo-ui-dialog.js` fetches the form page with `X-Nowo-Dialog: 1`: the route answers the fragment `record/_form_dialog.html.twig` (200), an invalid submission **422** re-rendered in the dialog (a plan limit too, with its message on top), success **204** + `X-Nowo-Redirect: <ui.path>/{companies\|contacts}/<id>` (generated from the route, same origin; the flash shows on the record page). Every answer of the route carries `Vary: X-Nowo-Dialog`. The header selects only the template and the success answer: the same access checks (`create`, the access checker and the `*_ACCESS_CHECK` events, 403 on the fragment too), tenant and CSRF token (`crm_record[_token]`) as the page. |
+
+Tags and Custom fields (0.8.0) always have a filter card (the name search `q`: the tag name, or the field label or key,
+case-insensitive, at most 100 characters; plus *Rows per page* with `list_per_page`) and the pager; *Nothing matches
+the search.* when the search finds nothing.
+
+#### Templates (0.8.0)
+
+| Template | Variables | Notes |
+| --- | --- | --- |
+| `record/list.html.twig` | `page` (`ListPage`), `crm_import_dialog`, `crm_record_dialog` (`{id, title}` or null) | With `record_create: dialog`, includes UiKit's `remote_form_dialog` partial once (id `crm-record-dialog`, `data-testid="crm-record-dialog"`). |
+| `record/_form_dialog.html.twig` | `form` (`FormView`), `action` (the create URL), `title`, `testid` | The dialog fragment: `form[name=crm_record]` named by the dialog title (`aria-labelledby="crm-record-dialog-title"`), the form errors in a `role="alert"` block (`crm-record-dialog-form-errors`), the fields, and the Save (`type="submit"`) / Cancel (`type="button"`, `data-nowo-ui-dialog-close`) row marked `data-nowo-ui-dialog-actions`, which UiKit moves into the dialog footer. |
+| `admin/tags.html.twig`, `admin/fields.html.twig` | `page` now has `filters` (`q`, `per_page`) and `pagination` | No template change: the UiKit list scaffold renders the filter card and the pager. |
 
 Always on (visual fixes): every filter field has a label, a placeholder or an empty option that names it (*Any tag*,
 *Any role*, *Any owner*…), the search field has a label and a placeholder; checkboxes no longer take the text input

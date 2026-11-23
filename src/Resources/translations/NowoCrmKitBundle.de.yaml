@@ -30,6 +30,7 @@ list:
         company: Noch keine Unternehmen.
         contact: Noch keine Kontakte.
     empty_hint: Legen Sie einen an oder importieren Sie eine CSV- oder vCard-Datei.
+    no_match: 'Nichts entspricht der Suche.'
     export: CSV exportieren
     import: 'Importieren'
     col:
@@ -51,6 +52,9 @@ list:
         any_purpose: 'Beliebiger Zweck'
         any_primary_contact: 'Beliebige Einstellung Hauptkontakt'
         any_owner: 'Beliebiger Verantwortlicher'
+        per_page: 'Zeilen pro Seite'
+        name: 'Name'
+        name_placeholder: 'Nach Name suchen'
     status:
         active: Aktiv
         trashed: Papierkorb

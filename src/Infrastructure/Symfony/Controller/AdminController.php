@@ -19,6 +19,7 @@ use Nowo\CrmKitBundle\Domain\Service\CrmSettingsInterface;
 use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ActionType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\AdminFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FieldDefinitionType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\SettingsType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\TagType;
@@ -26,9 +27,11 @@ use Nowo\TransactionDoctrine\WriteUnit\AsWriteUnit;
 use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Column;
 use Nowo\UiKitBundle\View\EmptyState;
+use Nowo\UiKitBundle\View\FilterField;
 use Nowo\UiKitBundle\View\FormPage;
 use Nowo\UiKitBundle\View\ListPage;
 use Nowo\UiKitBundle\View\PageHeader;
+use Nowo\UiKitBundle\View\Pagination;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\Request;
@@ -38,11 +41,15 @@ use function array_combine;
 use function array_filter;
 use function array_map;
 use function array_merge;
+use function array_slice;
 use function array_values;
+use function count;
 use function implode;
 use function is_array;
 use function is_numeric;
 use function is_string;
+use function mb_stripos;
+use function mb_substr;
 use function preg_split;
 use function trim;
 
@@ -91,8 +98,11 @@ final readonly class AdminController
                     }
                 }
             }
-            $rows   = array_map(static fn (TagView $t): array => ['id' => $t->id, 'name' => $t->name, 'colour' => $t->colour], $this->reader->tags());
-            $create = null;
+            $filters        = $this->filters($request);
+            $text           = $this->search($request);
+            $rows           = array_map(static fn (TagView $t): array => ['id' => $t->id, 'name' => $t->name, 'colour' => $t->colour], array_values(array_filter($this->reader->tags(), static fn (TagView $t): bool => self::matches($text, $t->name))));
+            [$rows, $pager] = $this->page($rows, 'nowo_crm_kit_tags', $request);
+            $create         = null;
             if ($this->ui->options->createDialog()) {
                 // 0.6.1: "New tag" is a header action opening the dialog; ?new=1 (its href) is the no-JS fallback.
                 $create = $this->create($request, $status, [['form' => $form, 'id' => self::TAG_DIALOG, 'title' => 'tag.add', 'submit' => 'tag.save', 'action' => $this->ui->url('nowo_crm_kit_tags'), 'testid' => 'crm-tag-form', 'open' => true]]);
@@ -103,12 +113,16 @@ final readonly class AdminController
                     new PageHeader(UiSupport::label('tags.title'), UiSupport::label('tags.intro'), $create === null ? [] : [$this->createAction('tag.add', $this->ui->url('nowo_crm_kit_tags', ['new' => 1]), self::TAG_DIALOG, 'crm-tag-new', 'primary')], tabs: $this->ui->tabs('tags')),
                     [new Column('name', UiSupport::label('tag.form.name'), required: true), new Column('colour', UiSupport::label('tag.form.colour'))],
                     $rows,
-                    rowActions: fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_tag_edit', ['id' => $row['id']]), UiSupport::label('tag.edit'))] : [],
+                    $this->ui->filterView($filters, $pager->perPage),
+                    fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_tag_edit', ['id' => $row['id']]), UiSupport::label('tag.edit'))] : [],
+                    $pager,
                     // 0.6.1 (UX-005): one sentence, the UiKit `empty` message (no title, so no second "No items found.").
-                    empty: new EmptyState(null, UiSupport::label('tags.empty')),
+                    new EmptyState(null, UiSupport::label($text === null ? 'tags.empty' : 'list.no_match')),
+                    $this->ui->url('nowo_crm_kit_tags'),
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-tags'],
+                    filterFields: $this->filterFields(),
                     responsive: 'cards',
                 ),
                 'form'       => $create === null ? $form->createView() : $create['dialogs'][0]['form'],
@@ -193,10 +207,14 @@ final readonly class AdminController
                     }
                 }
             }
-            $rows = [];
+            $filters = $this->filters($request);
+            $text    = $this->search($request);
+            $rows    = [];
             foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
-                $rows = array_merge($rows, array_map(fn (FieldView $f): array => ['id' => $f->id, 'subject' => $this->ui->trans('type.' . $f->subjectType->value), 'key' => $f->key, 'label' => $f->label, 'type' => $this->ui->trans('field_type.' . $f->type->value), 'state' => $this->ui->trans($f->archived ? 'field.archived' : 'field.active')], $this->reader->fields($type, true)));
+                $matching = array_filter($this->reader->fields($type, true), static fn (FieldView $f): bool => self::matches($text, $f->label) || self::matches($text, $f->key));
+                $rows     = array_merge($rows, array_map(fn (FieldView $f): array => ['id' => $f->id, 'subject' => $this->ui->trans('type.' . $f->subjectType->value), 'key' => $f->key, 'label' => $f->label, 'type' => $this->ui->trans('field_type.' . $f->type->value), 'state' => $this->ui->trans($f->archived ? 'field.archived' : 'field.active')], array_values($matching)));
             }
+            [$rows, $pager] = $this->page($rows, 'nowo_crm_kit_fields', $request);
 
             $create  = null;
             $actions = [];
@@ -218,12 +236,16 @@ final readonly class AdminController
                     new PageHeader(UiSupport::label('fields.title'), UiSupport::label('fields.intro'), $actions, tabs: $this->ui->tabs('fields')),
                     [new Column('subject', UiSupport::label('fields.col.subject')), new Column('label', UiSupport::label('field.form.label'), required: true), new Column('key', UiSupport::label('field.form.key'), priority: 2), new Column('type', UiSupport::label('field.form.type'), priority: 2), new Column('state', UiSupport::label('fields.col.state'), priority: 3)],
                     $rows,
-                    rowActions: fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_field_edit', ['id' => $row['id']]), UiSupport::label('field.edit'))] : [],
+                    $this->ui->filterView($filters, $pager->perPage),
+                    fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_field_edit', ['id' => $row['id']]), UiSupport::label('field.edit'))] : [],
+                    $pager,
                     // 0.6.1 (UX-005): one sentence, the UiKit `empty` message.
-                    empty: new EmptyState(null, UiSupport::label('fields.empty')),
+                    new EmptyState(null, UiSupport::label($text === null ? 'fields.empty' : 'list.no_match')),
+                    $this->ui->url('nowo_crm_kit_fields'),
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-fields'],
+                    filterFields: $this->filterFields(),
                     responsive: 'cards',
                 ),
                 'form'       => $view ?? $form->createView(),
@@ -359,6 +381,65 @@ final readonly class AdminController
     private function createAction(string $label, string $href, string $dialog, string $testid, ?string $variant): Action
     {
         return new Action('create', UiSupport::label($label), $href, variant: $variant, attributes: ['data-nowo-confirm-open' => true, 'data-nowo-confirm-target' => $dialog, 'aria-haspopup' => 'dialog', 'aria-controls' => $dialog, 'data-testid' => $testid]);
+    }
+
+    /**
+     * The filter card of Tags and Custom fields (0.8.0): the name search and, with `ui.list_per_page`, the rows per
+     * page.
+     *
+     * @return FormInterface<mixed>
+     */
+    private function filters(Request $request): FormInterface
+    {
+        $form = $this->ui->form(AdminFilterType::class, null, ['per_page' => $this->ui->options->listPerPage], '');
+        $form->handleRequest($request);
+
+        return $form;
+    }
+
+    /**
+     * The UiKit options of the admin filter fields (0.8.0).
+     *
+     * @return list<FilterField>
+     */
+    private function filterFields(): array
+    {
+        return [new FilterField('q', UiSupport::label('list.filter.name_placeholder'), 'lg'), ...$this->ui->perPageField()];
+    }
+
+    /**
+     * The name search of an admin list (0.8.0): trimmed, at most 100 characters; null = no search.
+     */
+    private function search(Request $request): ?string
+    {
+        $q    = $request->query->all()['q'] ?? null;
+        $text = is_string($q) ? trim(mb_substr($q, 0, 100)) : '';
+
+        return $text === '' ? null : $text;
+    }
+
+    /**
+     * Whether a value contains the search, case-insensitive (no search = everything).
+     */
+    private static function matches(?string $text, string $value): bool
+    {
+        return $text === null || mb_stripos($value, $text) !== false;
+    }
+
+    /**
+     * One page of the rows of an admin list (0.8.0) and its pager: the page and rows per page of the request, checked
+     * like the lists (an unknown per_page = the page size, the page within the pages).
+     *
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return array{list<array<string, mixed>>, Pagination}
+     */
+    private function page(array $rows, string $route, Request $request): array
+    {
+        $q     = $request->query->all();
+        $pager = $this->ui->pagination(count($rows), is_numeric($q['page'] ?? null) ? (int) $q['page'] : 1, $this->ui->options->perPage($q['per_page'] ?? null, $this->ui->pageSize), $route, $request);
+
+        return [array_slice($rows, $pager->offset(), $pager->limit()), $pager];
     }
 
     /**

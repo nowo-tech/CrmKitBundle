@@ -61,6 +61,7 @@ final class TranslationCatalogueTest extends TestCase
             'import.format.vcard',
             'import.show_title',
             'import.title',
+            'list.filter.name',
             'list.filter.tag',
             'nav.deals',
             'nav.label',

@@ -119,6 +119,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordPartsController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\UiOptions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\UiSupport;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ActionType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\AdminFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\AffiliationType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ConsentType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\DealFilterType;
@@ -163,6 +164,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseFormatterInterface;
+use Nowo\UiKitBundle\Dialog\RemoteDialogResponder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 use function class_exists;
@@ -470,14 +472,14 @@ final class ServiceDefinitions
     {
         $s = $container->services();
         $p = self::P;
-        $s->set(UiOptions::class)->args([param($p . 'ui.row_actions'), param($p . 'ui.header_actions'), param($p . 'ui.record_actions'), param($p . 'ui.record_tabs'), param($p . 'ui.filters_fold'), param($p . 'ui.filters_slot'), param($p . 'ui.list_tabs'), param($p . 'ui.admin_create'), param($p . 'ui.settings_width'), $tabIcons]);
+        $s->set(UiOptions::class)->args([param($p . 'ui.row_actions'), param($p . 'ui.header_actions'), param($p . 'ui.record_actions'), param($p . 'ui.record_tabs'), param($p . 'ui.filters_fold'), param($p . 'ui.filters_slot'), param($p . 'ui.list_tabs'), param($p . 'ui.admin_create'), param($p . 'ui.settings_width'), $tabIcons, param($p . 'ui.list_per_page'), param($p . 'ui.record_create')]);
         $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size'), param($p . 'pipeline.enabled'), service(UiOptions::class)]);
         $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid()]);
-        $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class), service(ImportServiceInterface::class)])->public()->tag('controller.service_arguments');
+        $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class), service(ImportServiceInterface::class), service(RemoteDialogResponder::class)->nullOnInvalid()])->public()->tag('controller.service_arguments');
         $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class), service(HostObjectPickerInterface::class)])->public()->tag('controller.service_arguments');
         $s->set(ImportController::class)->args([service(UiSupport::class), service(ImportServiceInterface::class), service(RecordForms::class), param($p . 'import.sync_chunks'), param($p . 'import.max_bytes')])->public()->tag('controller.service_arguments');
-        foreach ([ActionType::class, AffiliationType::class, ConsentType::class, FieldDefinitionType::class, FilterType::class, HostLinkType::class, ImportConfirmType::class, ImportUploadType::class, MergePickType::class, MergeType::class, NoteType::class, RecordType::class, SettingsType::class, TagType::class, TagsAssignType::class] as $type) {
+        foreach ([ActionType::class, AdminFilterType::class, AffiliationType::class, ConsentType::class, FieldDefinitionType::class, FilterType::class, HostLinkType::class, ImportConfirmType::class, ImportUploadType::class, MergePickType::class, MergeType::class, NoteType::class, RecordType::class, SettingsType::class, TagType::class, TagsAssignType::class] as $type) {
             $s->set($type)->tag('form.type');
         }
         $s->set(AdminController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(TagServiceInterface::class), service(FieldServiceInterface::class), service(CrmSettingsInterface::class), service(CrmAccess::class)])->public()->tag('controller.service_arguments');

@@ -11,6 +11,7 @@
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Search](#search)
 - [UI](#ui)
+  - [Rows per page and the create dialog (0.8.0)](#rows-per-page-and-the-create-dialog-080)
   - [Area tab icons](#area-tab-icons)
 - [Later phases](#later-phases)
 - [Per-tenant settings](#per-tenant-settings)
@@ -82,6 +83,8 @@ nowo_crm_kit:
         admin_create: inline       # 0.6.1: inline | dialog (Tags / Custom fields create from a header action + dialog)
         settings_width: form       # 0.6.1: form (UiKit form panel) | full (bundle card, full content width)
         tab_icons: {}              # 0.7.0: area => icon name, merged over the built-in Tabler set (see "Area tab icons")
+        list_per_page: []          # 0.8.0: "Rows per page" choices, e.g. [10, 25, 50, 100]; [] = no select (see "Rows per page")
+        record_create: page        # 0.8.0: page | dialog ("New company / contact" in a UiKit remote form dialog, on demand)
     pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
     api:                           # 0.3.0: see API.md
         enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)
@@ -250,6 +253,29 @@ configuration) switch it off or reorder it; the number of results per page and t
   menus on row actions (`nowo_ui_kit.theme.context_menus: true`) and the focus-mode toggle
   (`nowo_ui_kit.theme.focus_mode.enabled: true`); without them the kebab menus still work and the toggle renders
   nothing.
+
+### Rows per page and the create dialog (0.8.0)
+
+`ui.list_per_page` adds a **Rows per page** select (`select[name=per_page]`, a visible label) to the filter card of the
+company and contact lists, Tags and Custom fields. Default `[]`: no select, so the filter card of an existing host is
+unchanged (a new field moves the grid of a host that styles it); opt in with the values you offer:
+
+```yaml
+nowo_crm_kit:
+    ui:
+        page_size: 25                    # must be one of list_per_page when that is set
+        list_per_page: [10, 25, 50, 100] # 1-10 distinct integers from 5 to 100
+        record_create: dialog
+```
+
+A `per_page` outside the list (or not an integer) falls back to `page_size`, and the select shows the value used.
+Without `list_per_page` the lists accept UiKit's values (10, 25, 50, 100) and `page_size`. The UiKit pager with its
+"Showing x–y of z" line renders under every list that has rows, on a single page too (page links from two pages on);
+a page past the end shows the last page. The pages keep the filters, the sort and `per_page`.
+
+`ui.record_create: dialog` opens *New company* / *New contact* in a UiKit remote form dialog that loads the form page
+on demand (nothing of the form is in the list page); `page` (default) keeps the plain link. See USAGE, "Page layout
+options".
 
 ### Area tab icons
 

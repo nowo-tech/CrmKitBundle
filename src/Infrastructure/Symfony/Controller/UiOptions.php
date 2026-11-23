@@ -4,13 +4,23 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
+use Nowo\UiKitBundle\View\Pagination;
+
 use function array_key_exists;
+use function array_unique;
+use function array_values;
+use function in_array;
+use function is_int;
+use function is_string;
+use function preg_match;
+use function sort;
 
 /**
  * The 0.6.0 presentation options of the pages (`nowo_crm_kit.ui.*`): where the row and header actions go, the record
  * header layout, the list tabs on records and the filters card; 0.6.1: the area tabs of the other pages, create in a
  * dialog on Tags and Custom fields, the Settings width; 0.7.0: the icon of each area tab. The defaults keep the previous
- * behaviour except the pure visual fixes. Immutable: the tab icons are resolved from the configured map on every call,
+ * behaviour except the pure visual fixes. 0.8.0: the "Rows per page" choices of the lists and the "New company / contact"
+ * dialog. Immutable: the tab icons are resolved from the configured map on every call,
  * nothing is memoised (FrankenPHP worker, REQ-RUNTIME-002).
  *
  * @internal
@@ -47,6 +57,8 @@ final readonly class UiOptions
      * @param string $settingsWidth 0.6.1: `form` | `full`
      * @param array<string, string|null> $tabIcons 0.7.0: host overrides of {@see self::DEFAULT_TAB_ICONS} by area;
      *                                             `''` or null = no icon (the tab shows its label in every tab style)
+     * @param list<int> $listPerPage 0.8.0: the "Rows per page" choices of the lists; [] = no select
+     * @param string $recordCreate 0.8.0: `page` | `dialog` ("New company / contact" in a remote form dialog)
      */
     public function __construct(
         public string $rowActions = 'buttons',
@@ -59,6 +71,8 @@ final readonly class UiOptions
         public string $adminCreate = 'inline',
         public string $settingsWidth = 'form',
         public array $tabIcons = [],
+        public array $listPerPage = [],
+        public string $recordCreate = 'page',
     ) {
     }
 
@@ -78,6 +92,46 @@ final readonly class UiOptions
     public function createDialog(): bool
     {
         return $this->adminCreate === 'dialog';
+    }
+
+    /**
+     * Whether "New company" / "New contact" open the form page in a remote form dialog (0.8.0).
+     */
+    public function recordDialog(): bool
+    {
+        return $this->recordCreate === 'dialog';
+    }
+
+    /**
+     * Whether the lists show the "Rows per page" select (0.8.0).
+     */
+    public function perPageSelect(): bool
+    {
+        return $this->listPerPage !== [];
+    }
+
+    /**
+     * The per-page values a list accepts (0.8.0): the configured choices, else UiKit's (10, 25, 50, 100) and the
+     * configured page size, ascending.
+     *
+     * @return list<int>
+     */
+    public function allowedPerPage(int $pageSize): array
+    {
+        $allowed = $this->listPerPage !== [] ? $this->listPerPage : array_values(array_unique([...Pagination::ALLOWED_PER_PAGE, $pageSize]));
+        sort($allowed);
+
+        return $allowed;
+    }
+
+    /**
+     * The rows per page of a request value (0.8.0): one of {@see self::allowedPerPage()}, else the page size.
+     */
+    public function perPage(mixed $requested, int $pageSize): int
+    {
+        $value = is_string($requested) && preg_match('/^\d{1,3}$/D', $requested) === 1 ? (int) $requested : (is_int($requested) ? $requested : null);
+
+        return $value !== null && in_array($value, $this->allowedPerPage($pageSize), true) ? $value : $pageSize;
     }
 
     /**

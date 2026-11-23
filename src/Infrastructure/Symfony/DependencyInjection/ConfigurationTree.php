@@ -17,7 +17,9 @@ use function array_keys;
 use function array_unique;
 use function count;
 use function implode;
+use function in_array;
 use function is_array;
+use function is_int;
 use function is_string;
 use function preg_match;
 use function str_starts_with;
@@ -125,13 +127,21 @@ final class ConfigurationTree
             ->booleanNode('list_tabs')->defaultTrue()->info('0.6.1: show the area tabs (Companies, Contacts, Tags, Custom fields, Settings...) on the list, admin and form pages; false hides them there. The company / contact record page follows record_tabs.')->end()
             ->enumNode('admin_create')->values(['inline', 'dialog'])->defaultValue('inline')->info('0.6.1: how Tags and Custom fields offer create. inline = the create form in a card under the list (as before); dialog = a View\\Action in page.header.actions (New tag, New field for companies, New field for contacts) that opens a UiKit confirm_dialog; ?new=1 is the no-JS fallback and an invalid submission answers 422 with the dialog open.')->end()
             ->enumNode('settings_width')->values(['form', 'full'])->defaultValue('form')->info('0.6.1: the Settings form. form = the UiKit form panel (the host form column width, as before); full = the bundle card at the full content width, like the lists.')->end()
+            ->arrayNode('list_per_page')->info('0.8.0: the "Rows per page" choices of the lists (companies, contacts, Tags, Custom fields), e.g. [10, 25, 50, 100]: a select[name=per_page] in the filter card. A per_page outside the list falls back to page_size. [] (default) = no select (the filter card is unchanged) and the per_page values UiKit accepts (10, 25, 50, 100) plus page_size. 1-10 distinct values from 5 to 100 that include page_size.')
+                ->integerPrototype()->end()
+                ->defaultValue([])
+                ->validate()->ifTrue(static fn (array $v): bool => !self::perPage($v))->thenInvalid('ui.list_per_page holds 1-10 distinct integers from 5 to 100; got %s.')->end()
+            ->end()
+            ->enumNode('record_create')->values(['page', 'dialog'])->defaultValue('page')->info('0.8.0: how "New company" / "New contact" open. page = the form page (as before); dialog = the header action (a real link to the form page, the no-JS fallback) loads that page on demand into a UiKit remote form dialog (X-Nowo-Dialog: 1 answers the fragment, an invalid submission 422 in the dialog, success 204 + X-Nowo-Redirect to the new record). Same access checks and CSRF token as the page.')->end()
             ->arrayNode('tab_icons')->info('0.7.0: the icon of an area tab, by area (' . implode(', ', array_keys(UiOptions::DEFAULT_TAB_ICONS)) . '), merged over the built-in Tabler set (companies: tabler:building, contacts: tabler:users, deals: tabler:briefcase, tags: tabler:tags, fields: tabler:forms, settings: tabler:settings, funnels: tabler:filter). An icon name "[prefix:]name" as UiKit takes it; "" or null = no icon (the tab shows its label in every tab style). Name only the areas you change. Decoration only: the access checks decide which tabs show.')
                 ->useAttributeAsKey('area')->normalizeKeys(false)
                 ->scalarPrototype()->end()
                 ->defaultValue([])
                 ->validate()->ifTrue(static fn (array $v): bool => !self::tabIcons($v))->thenInvalid('ui.tab_icons maps an area (' . implode(', ', array_keys(UiOptions::DEFAULT_TAB_ICONS)) . ') to an icon name "[prefix:]name" of lowercase letters, digits and single hyphens (e.g. "tabler:building"), "" or null; got %s.')->end()
             ->end()
-        ->end()->end();
+        ->end()
+            ->validate()->ifTrue(static fn (array $v): bool => is_array($v['list_per_page'] ?? null) && $v['list_per_page'] !== [] && !in_array($v['page_size'] ?? null, $v['list_per_page'], true))->thenInvalid('ui.page_size must be one of ui.list_per_page; got %s.')->end()
+        ->end();
         self::pipeline($children);
         self::api($children);
         foreach (self::LATER_PHASES as $phase => $release) {
@@ -188,6 +198,22 @@ final class ConfigurationTree
             ->scalarNode('column')->defaultNull()->info('The column (TaskBoard status name) new tasks go to; null = the board\'s first.')->end()
         ->end()->end();
         $pipeline->end()->end();
+    }
+
+    /**
+     * Whether a value is a list of 1-10 distinct integers from 5 to 100 (`ui.list_per_page`, 0.8.0).
+     *
+     * @param array<mixed> $value
+     */
+    private static function perPage(array $value): bool
+    {
+        foreach ($value as $size) {
+            if (!is_int($size) || $size < 5 || $size > 100) {
+                return false;
+            }
+        }
+
+        return count($value) <= 10 && count(array_unique($value)) === count($value);
     }
 
     /**

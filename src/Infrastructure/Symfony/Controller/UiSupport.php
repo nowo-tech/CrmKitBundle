@@ -199,14 +199,16 @@ final readonly class UiSupport
     }
 
     /**
-     * Copies domain input errors onto a form (field `custom.<key>` → child `custom_<key>`, unknown fields → form).
+     * Copies domain input errors onto a form (field `custom.<key>` → child `custom_<key>`, `$fields` maps a domain
+     * field to its form child, e.g. `company_id` → `company` (0.8.1), unknown fields → form).
      *
      * @param FormInterface<mixed> $form
+     * @param array<string, string> $fields domain field => form child
      */
-    public function errors(FormInterface $form, InvalidInputException $e): void
+    public function errors(FormInterface $form, InvalidInputException $e, array $fields = []): void
     {
         foreach ($e->errors as $field => $key) {
-            $name    = str_starts_with($field, 'custom.') ? 'custom_' . substr($field, 7) : $field;
+            $name    = $fields[$field] ?? (str_starts_with($field, 'custom.') ? 'custom_' . substr($field, 7) : $field);
             $message = $this->trans($key, $e->params);
             if ($form->has($name)) {
                 $form->get($name)->addError(new FormError($message));

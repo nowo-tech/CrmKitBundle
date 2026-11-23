@@ -116,6 +116,7 @@ Read for this contract (2026-11-18):
   - [25.6 0.8.0: explainable scoring](#256-080-explainable-scoring)
   - [25.7 0.9.0: lists and segments](#257-090-lists-and-segments)
   - [25.8 0.10.0: lean informative circulars](#258-0100-lean-informative-circulars)
+- [26. Addendum: HubSpot import source (design, 2026-11-23)](#26-addendum-hubspot-import-source-design-2026-11-23)
 
 ## 0. Findings that shaped the contract
 
@@ -1203,3 +1204,31 @@ band, funnel stage. Bulk add from list views and from the record. Segments also 
 - Per-purpose unsubscribe; a new consent purpose `service_notice` (legitimate interest with opt-out); commercial
   circulars need `marketing_email` / `newsletter` consent.
 - Bounces mark the address; the open signal goes to scoring; payment reminders can use this channel too.
+
+## 26. Addendum: HubSpot import source (design, 2026-11-23)
+
+Design only, not built: [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md) for symfony-beacon spec 253 and owner
+decision D-20261123-04. It becomes this contract's revision for each slice before the slice is built. In short:
+
+- **Slices.** H1 (proposed 0.9.0): private app token connection per tenant, companies, contacts, contact ↔ company
+  associations, owners → members by e-mail, lists → tags. H2 (0.10.0): deals, pipelines → funnels, stages → stages
+  (needs `pipeline.enabled`, released in 0.3.0). H3 (0.11.0): OAuth with state + PKCE. Numbers follow 0.8.0 (PR #19).
+- **Same queue.** `ImportFormat::HubSpot`; `crm_import` / `crm_import_row` with nullable additions only
+  (`connection_id`, `cursor`, `resume_after`, `error_code`; `crm_import_row.subject_type`); HubSpot rows store the
+  object kind and id only, never property values or response bodies.
+- **New tables** (mapping group `doctrine-hubspot`): `crm_hubspot_connection` (unique per tenant, sealed token, last 4,
+  scopes, version) and `crm_external_ref` (unique `(tenant_id, source, account_id, object_type, external_id)`); new
+  exact-key columns `source`, `object_type`, `target_type`, `token_key_id` join `CrmMetadataListener::EXACT_COLUMNS`.
+- **New ports.** `CrmSecretBoxInterface` (AEAD seal / open bound to a `SecretContext`; built-in sodium default,
+  DoctrineEncrypt bridge) and the optional `CrmActorEmailLookupInterface` (owners by e-mail, keys re-checked with
+  `===`); H3 adds `CrmHubSpotOAuthAppInterface` (runtime settings). The permission is the existing
+  `CrmPermission::Import` (`canImport`); every HubSpot route answers 404 on a denial.
+- **Client.** Constant base URL `https://api.hubapi.com`, the kit's own HttpClient, no redirects, size and time caps,
+  `next.link` ignored, read-only scopes only, optional OutboundUrlGuard DNS pin; token and bodies never logged.
+- **Run.** Fixed stages (owners → companies → contacts → deals → lists); one HubSpot page settled per write unit with
+  the cursor advanced in the same unit; 429 backoff in workers, pause with `resume_after` in web requests; resume
+  through `nowo:crm-kit:import:resume` or the optional `RunCrmImport` Messenger handler.
+- **Matching.** External ref first (always update), then the duplicate policy (contacts by e-mail, companies by a
+  single matching domain); a record, its ref, its associations and its taggings commit together, so no half
+  association is ever stored.
+- **Open owner questions** Q-H1..Q-H13 with recommended answers are in section 15 of the design.

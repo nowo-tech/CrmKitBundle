@@ -4,6 +4,7 @@
 
 - [Unreleased](#unreleased)
 - [To 0.9.0](#to-090)
+- [To 0.8.1](#to-081)
 - [To 0.8.0](#to-080)
 - [To 0.7.0](#to-070)
 - [To 0.6.1](#to-061)
@@ -55,6 +56,32 @@ What changes with `dialog`:
   template keeps working with `inline` (the default).
 - Beacon tests and host checks: no `form[name="crm_stage_move"]`, `crm_next_action`, `crm_lifecycle`, `crm_funnel`
   (funnels list) or `crm_stage` in those pages any more; fetch the fragments instead.
+
+## To 0.8.1
+
+From **0.8.0**: `composer update nowo-tech/crm-kit-bundle`. No schema change, no BC break in the public PHP API, no
+route change. What you may notice:
+
+- Icons of the kit's actions. *Done* / *Cancel* of a next action are now the UiKit kinds `mark_done` / `cancel`, the
+  stage *Move up* / *Move down* are `move` with the `sort_asc` / `sort_desc` arrows; they follow
+  `nowo_ui_kit.action_icons` and draw in every icon set. Five actions use Bootstrap Icons names that UiKit has no
+  kind for: *Statistics* `bar-chart`, the statistics' *Board* `kanban`, *Merge* `union`, *Make* / *Clear primary
+  contact* `person-check` / `person-dash`.
+  - `icon_set: ux_icon` **without Iconify**: import these five. With `ux_icons.ignore_not_found: false` (Symfony's
+    default) a missing one makes the pages that show it answer 500; with `true` the button has no glyph:
+
+    ```bash
+    php bin/console ux:icons:import bi:bar-chart bi:kanban bi:union bi:person-check bi:person-dash
+    ```
+
+    Drop any stand-in SVG you added for `bi:custom`, `bi:chart` or `bi:merge`; 0.8.1 no longer asks for them.
+  - `icon_set: bootstrap-icons` (the default) and `ux_icon` with Iconify: nothing to do.
+  - `icon_set: tabler-icons`: the five are drawn as `ti ti-<name>`, which Tabler does not have, so those buttons show
+    their label with an empty glyph (no error). `svg_inline` draws UiKit's generic *view* eye for them. Their
+    `nowo_ui_kit.action_icons` key is not accepted (it lists UiKit kinds only).
+- A new or edited deal with neither a company nor a contact now shows its message under *Company* (it answered 422
+  with no visible message). A host that overrides `record/form.html.twig` keeps the `nowo_ui_form_body` block, or
+  prints `form_errors(page.form)` itself, so the form's own errors stay visible.
 
 ## To 0.8.0
 

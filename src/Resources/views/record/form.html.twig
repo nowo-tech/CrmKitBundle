@@ -1,4 +1,11 @@
 {#
-  Create or edit a company or contact (contract section 9): UiKit form scaffold. Variables: page (FormPage).
+  Create or edit a company, a contact or a deal (contract section 9): UiKit form scaffold. Variables: page (FormPage).
+  0.8.1: errors of the form itself (a domain error with no field of its own) show above the fields; UiKit's scaffold
+  renders only the fields' errors. They sit in a `flash_error` box with `role="alert"` so screen readers announce them.
 #}
 {% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_form_body %}
+    {% if page.form is not null and page.form.vars.errors|length > 0 %}<div class="{{ nowo_ui_class('flash_error', page.bundle) }}" role="alert">{{ form_errors(page.form) }}</div>{% endif %}
+    {{ parent() }}
+{% endblock %}

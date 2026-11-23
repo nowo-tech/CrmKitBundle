@@ -203,7 +203,12 @@ final class NowoCrmKitBundle extends AbstractBundle
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $parameters = $container->parameters();
-        foreach (ParameterFlattener::flatten(self::ALIAS, $config) as $name => $value) {
+        // Audit ZAM-6: the secret keys are never container parameters (they go to the box's definition only).
+        $published = $config;
+        if (is_array($published['secrets'] ?? null)) {
+            unset($published['secrets']['keys']);
+        }
+        foreach (ParameterFlattener::flatten(self::ALIAS, $published) as $name => $value) {
             $parameters->set($name, $value);
         }
         /** @var array{doctrine: array{entity_manager: ?string}, import: array{sync_rows: int, chunk_rows: int}, api: array{http: array{prefix: string}}} $typed */

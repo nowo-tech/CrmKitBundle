@@ -16,6 +16,7 @@
         <field name="tokenKeyId" column="token_key_id" type="string" length="16"/>
         <field name="tokenSealed" column="token_sealed" type="text"/>
         <field name="scopes" column="scopes" type="json"/>
+        <field name="scopesVerified" column="scopes_verified" type="boolean"/>
         <field name="validatedAt" column="validated_at" type="nowo_crm_utc_datetime"/>
         <field name="createdById" column="created_by_id" type="string" length="128" nullable="true"/>
         <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime"/>

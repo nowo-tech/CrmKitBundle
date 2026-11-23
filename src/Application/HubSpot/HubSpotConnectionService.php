@@ -109,11 +109,11 @@ final readonly class HubSpotConnectionService implements HubSpotConnectionServic
                 $sealed = $this->box->seal($secret->reveal(), new SecretContext(SecretContext::HUBSPOT_TOKEN, $context->tenant, $id));
                 $name   = $label ?? 'HubSpot ' . $info->accountId->value;
                 if ($current instanceof HubSpotConnection) {
-                    $current->replace($info->accountId, $name, $secret->last4(), $sealed, $info->scopes, $context->now, $context->actor->value);
+                    $current->replace($info->accountId, $name, $secret->last4(), $sealed, $info->scopes, $context->now, $context->actor->value, $info->introspected);
                     // Imports paused because HubSpot refused the old token run again.
                     $this->store->resumeForConnection($context->tenant, $id, $context->now);
                 } else {
-                    $this->support->store->add(new HubSpotConnection($id, $context->tenant->value, $info->accountId, $name, $secret->last4(), $sealed, $info->scopes, $context->now, $context->actor->value, $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                    $this->support->store->add(new HubSpotConnection($id, $context->tenant->value, $info->accountId, $name, $secret->last4(), $sealed, $info->scopes, $context->now, $context->actor->value, $context->now, $info->introspected)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
                 }
                 $replaced = $current instanceof HubSpotConnection;
                 $effects->event(new HubSpotConnected($context->tenant, $context->actor, $context->now, $info->accountId, $replaced));
@@ -162,10 +162,11 @@ final readonly class HubSpotConnectionService implements HubSpotConnectionServic
             try {
                 $info = $this->reader->tokenInfo($token);
             } catch (HubSpotException $e) {
-                if ($e->isTransient()) {
+                // Only HubSpot's "not a private app token" answer leads to probing (a service key); any other failure
+                // refuses the credential (audit ZAM-3: the write-scope check fails closed).
+                if ($e->errorCode !== HubSpotException::UNKNOWN_TOKEN) {
                     throw $e;
                 }
-                // Not a private app token (a service key): probe the read scopes instead.
                 $info = null;
             }
             if ($info instanceof HubSpotTokenInfo && !$info->accountId->equals($account)) {

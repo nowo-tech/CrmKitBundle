@@ -346,6 +346,7 @@ import:
             domain: 'Website uit het domein'
             custom: 'Eigen veld %key%'
         card:
+            write_unverified: 'schrijfrechten niet gecontroleerd'
             label: 'Naam'
             account: 'HubSpot-account'
             credential: 'Servicesleutel'
@@ -482,6 +483,7 @@ flash:
         crm_settings_stale: Iemand heeft de instellingen op hetzelfde moment gewijzigd. Controleer ze en sla opnieuw op.
         crm_write_conflict: 'Een andere wijziging van dezelfde gegevens kwam op hetzelfde moment binnen. Probeer het opnieuw.'
 error:
+    hubspot_needs_person: 'Een persoon moet deze import voortzetten: hij kwam bij records van iemand anders.'
     hubspot_token_invalid: 'HubSpot heeft deze servicesleutel (of privé-app-token) geweigerd, of hij hoort bij een ander account. Plak een geldige.'
     hubspot_scope_missing: 'De sleutel mist een leesrecht dat de import nodig heeft. Voeg de gedocumenteerde scopes toe en probeer opnieuw.'
     hubspot_scope_not_read_only: 'De sleutel mag ook naar HubSpot schrijven. Maak er een met alleen leesrechten.'

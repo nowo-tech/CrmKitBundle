@@ -29,13 +29,15 @@ on the bundle's entity manager) or apply (default prefix `nowo_`):
 ```sql
 -- MySQL 8.4
 ALTER TABLE nowo_crm_import ADD connection_id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
-    ADD run_cursor JSON DEFAULT NULL, ADD resume_after DATETIME DEFAULT NULL, ADD error_code VARCHAR(40) DEFAULT NULL;
+    ADD run_cursor JSON DEFAULT NULL, ADD resume_after DATETIME DEFAULT NULL, ADD error_code VARCHAR(40) DEFAULT NULL,
+    ADD confirmed_by_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL;
 CREATE INDEX nowo_crm_import_resume ON nowo_crm_import (status, resume_after);
 ALTER TABLE nowo_crm_import_row ADD subject_type VARCHAR(16) DEFAULT NULL;
 -- MariaDB 11.4: the same with utf8mb4_nopad_bin and run_cursor LONGTEXT DEFAULT NULL (JSON is an alias of LONGTEXT)
 -- PostgreSQL 16
 ALTER TABLE nowo_crm_import ADD connection_id VARCHAR(36) DEFAULT NULL, ADD run_cursor JSON DEFAULT NULL,
-    ADD resume_after TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL, ADD error_code VARCHAR(40) DEFAULT NULL;
+    ADD resume_after TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL, ADD error_code VARCHAR(40) DEFAULT NULL,
+    ADD confirmed_by_id VARCHAR(128) DEFAULT NULL;
 CREATE INDEX nowo_crm_import_resume ON nowo_crm_import (status, resume_after);
 ALTER TABLE nowo_crm_import_row ADD subject_type VARCHAR(16) DEFAULT NULL;
 -- SQLite
@@ -43,6 +45,7 @@ ALTER TABLE nowo_crm_import ADD COLUMN connection_id VARCHAR(36) DEFAULT NULL;
 ALTER TABLE nowo_crm_import ADD COLUMN run_cursor CLOB DEFAULT NULL;
 ALTER TABLE nowo_crm_import ADD COLUMN resume_after DATETIME DEFAULT NULL;
 ALTER TABLE nowo_crm_import ADD COLUMN error_code VARCHAR(40) DEFAULT NULL;
+ALTER TABLE nowo_crm_import ADD COLUMN confirmed_by_id VARCHAR(128) DEFAULT NULL;
 CREATE INDEX nowo_crm_import_resume ON nowo_crm_import (status, resume_after);
 ALTER TABLE nowo_crm_import_row ADD COLUMN subject_type VARCHAR(16) DEFAULT NULL;
 ```
@@ -62,7 +65,7 @@ ALTER TABLE nowo_crm_import_row ADD COLUMN subject_type VARCHAR(16) DEFAULT NULL
        status VARCHAR(16) NOT NULL, account_id VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
        label VARCHAR(80) NOT NULL, token_last4 VARCHAR(4) NOT NULL,
        token_key_id VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, token_sealed LONGTEXT NOT NULL,
-       scopes JSON NOT NULL, validated_at DATETIME NOT NULL,
+       scopes JSON NOT NULL, scopes_verified TINYINT(1) NOT NULL, validated_at DATETIME NOT NULL,
        created_by_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL, created_at DATETIME NOT NULL,
        updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL, updated_at DATETIME(6) NOT NULL,
        version INT DEFAULT 1 NOT NULL, UNIQUE INDEX nowo_crm_hubspot_connection_tenant (tenant_id), PRIMARY KEY(id));

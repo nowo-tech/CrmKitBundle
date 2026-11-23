@@ -14,9 +14,11 @@ use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Application\WriteSupport;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
+use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
 use Nowo\CrmKitBundle\Domain\Event\ImportCompleted;
+use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection;
@@ -36,6 +38,7 @@ use Nowo\CrmKitBundle\Domain\Value\EmailAddress;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotMapping;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotObjectId;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotToken;
+use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
@@ -139,6 +142,9 @@ final readonly class HubSpotRunner
             };
         } catch (HubSpotException $e) {
             $result = $this->failure($tenant, $connection, $id, $token, $e, $now);
+        } catch (NeedsPersonException) {
+            // The page's unit rolled back: a person's "Continue" settles it with their own access (audit ZAM-1).
+            $result = $this->pause($id, $token, $now, null, NeedsPersonException::CODE);
         }
         $this->logger?->info('nowo_crm_kit: HubSpot import page', ['import' => $id, 'stage' => $state->stage, 'page' => $state->page, 'result' => $result, 'ms' => intdiv(hrtime(true) - $started, 1000000)]);
 
@@ -149,6 +155,7 @@ final readonly class HubSpotRunner
      * A page of companies or contacts (with the contacts' company associations).
      *
      * @throws HubSpotException
+     * @throws NeedsPersonException
      */
     private function records(CrmContext $context, Import $import, HubSpotRunState $state, HubSpotObject $object, HubSpotToken $secret, string $token, bool $attended): string
     {
@@ -210,6 +217,7 @@ final readonly class HubSpotRunner
      * A page of a list's members: those with a live record of the same account get the list's tag (add only).
      *
      * @throws HubSpotException
+     * @throws NeedsPersonException
      */
     private function lists(CrmContext $context, Import $import, HubSpotRunState $state, HubSpotToken $secret, string $token, bool $attended): string
     {
@@ -223,7 +231,7 @@ final readonly class HubSpotRunner
         /** @var HubSpotIdPage $page */
         $page = $this->ask(fn (): HubSpotIdPage => $this->reader->members($secret, new HubSpotObjectId($list['id']), $state->cursor(), $this->pageSize), $attended);
 
-        return $this->unit($context, $import, $state, $token, function () use ($context, $state, $page, $object, $tag): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+        return $this->unit($context, $import, $state, $token, function () use ($context, $state, $page, $object, $tag, $attended): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $tagged = 0;
             $store  = $this->support->store;
             if ($store->tag($context->tenant, $tag) instanceof Tag) {
@@ -240,7 +248,7 @@ final readonly class HubSpotRunner
                     $have[$tagging->getSubjectId() . '|' . $tagging->getTagId()] = true;
                 }
                 foreach ($store->records($type, $context->tenant, $targets) as $record) {
-                    if ($record instanceof CrmRecord && $record->isActive() && !isset($have[$record->getId() . '|' . $tag])) {
+                    if ($record instanceof CrmRecord && $record->isActive() && !isset($have[$record->getId() . '|' . $tag]) && $this->mayTag($context, $record, $attended)) {
                         $store->add(new Tagging($this->support->id(), $context->tenant->value, $tag, $type, $record->getId(), $context->now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
                         $this->support->activity($context, $type, $record->getId(), ActivityKind::Tagged, ['count' => 1]);
                         ++$tagged;
@@ -250,6 +258,29 @@ final readonly class HubSpotRunner
 
             return [$state->advance($page->next, tagged: $tagged), 0, []];
         });
+    }
+
+    /**
+     * Whether a list member may get its tag: `edit` on it when a person runs the page; unattended, the owner rule
+     * (audit ZAM-1).
+     *
+     * @throws NeedsPersonException
+     */
+    private function mayTag(CrmContext $context, CrmRecord $record, bool $attended): bool
+    {
+        if (!$attended) {
+            $this->writer->mayWriteUnattended($context, $record);
+
+            return true;
+        }
+
+        try {
+            $this->support->access->require($context, CrmPermission::Edit, SubjectRef::of($record::type(), $record->getId(), $record->getOwnerId()));
+        } catch (AccessDeniedException) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -336,7 +367,7 @@ final readonly class HubSpotRunner
         };
         if ($e->errorCode === HubSpotException::TOKEN_INVALID) {
             $this->support->write(function () use ($tenant, $connection, $now): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
-                $this->store->invalidate($tenant, $connection->getId(), $now);
+                $this->store->invalidate($tenant, $connection->getId(), $connection->getToken()->ciphertext, $now);
             });
         }
 

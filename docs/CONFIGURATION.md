@@ -255,7 +255,14 @@ nowo_crm_kit:
 
 Key rotation: add the new key, make it `current_key`, keep the old one listed, run
 `php bin/console nowo:crm-kit:secrets:rotate` (`--dry-run` counts first), then drop the old key. A credential that no
-longer opens marks its connection invalid; a manager pastes a new one.
+longer opens marks its connection invalid; a manager pastes a new one. With the DoctrineEncrypt box the key id never
+changes: rotate DoctrineEncrypt's key while the old one can still decrypt, then run
+`nowo:crm-kit:secrets:rotate --all` (re-seals every credential), then retire the old key. The bridge accepts the
+Halite and Defuse encryptors; for another (authenticated) encryptor define your own service
+`new DoctrineEncryptCrmSecretBox($registry, $profile, allowCustom: true)` and name it in `secrets.box`.
+
+Keys come from the environment only (`%env(base64:…)%`): `secrets.keys` is never published as container parameters.
+Never paste a production credential with the Symfony profiler or the debug toolbar on.
 
 There is no base-URL key: the HubSpot host is the constant `https://api.hubapi.com`. In a demo or an end-to-end test,
 decorate the kit's client service `nowo_crm_kit.hubspot.http_client` with a fake (a `MockHttpClient` or a local fake

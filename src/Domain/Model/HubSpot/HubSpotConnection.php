@@ -13,7 +13,8 @@ use Nowo\CrmKitBundle\Domain\Value\SealedSecret;
 /**
  * A tenant's HubSpot connection (0.10.0, table `crm_hubspot_connection`, unique per tenant): the sealed private app
  * token with the id of the key that sealed it, its last four characters, the account and the scopes HubSpot
- * reported. Replaced under its version; a disconnect deletes the row.
+ * reported (`scopes_verified`: HubSpot listed them, so write scopes were checked; false for a service key, whose read
+ * scopes were probed and whose write scopes cannot be seen). Replaced under its version; a disconnect deletes the row.
  */
 class HubSpotConnection
 {
@@ -47,6 +48,7 @@ class HubSpotConnection
         private DateTimeImmutable $validatedAt,
         private ?string $createdById,
         private DateTimeImmutable $createdAt,
+        private bool $scopesVerified = true,
     ) {
         $this->accountId   = $accountId->value;
         $this->tokenKeyId  = $token->keyId;
@@ -60,18 +62,19 @@ class HubSpotConnection
      *
      * @param list<string> $scopes
      */
-    public function replace(HubSpotAccountId $accountId, string $label, string $tokenLast4, SealedSecret $token, array $scopes, DateTimeImmutable $now, ?string $actor): void
+    public function replace(HubSpotAccountId $accountId, string $label, string $tokenLast4, SealedSecret $token, array $scopes, DateTimeImmutable $now, ?string $actor, bool $scopesVerified = true): void
     {
-        $this->accountId   = $accountId->value;
-        $this->label       = $label;
-        $this->tokenLast4  = $tokenLast4;
-        $this->tokenKeyId  = $token->keyId;
-        $this->tokenSealed = $token->ciphertext;
-        $this->scopes      = $scopes;
-        $this->status      = HubSpotConnectionStatus::Active;
-        $this->validatedAt = $now;
-        $this->updatedById = $actor;
-        $this->updatedAt   = $now;
+        $this->scopesVerified = $scopesVerified;
+        $this->accountId      = $accountId->value;
+        $this->label          = $label;
+        $this->tokenLast4     = $tokenLast4;
+        $this->tokenKeyId     = $token->keyId;
+        $this->tokenSealed    = $token->ciphertext;
+        $this->scopes         = $scopes;
+        $this->status         = HubSpotConnectionStatus::Active;
+        $this->validatedAt    = $now;
+        $this->updatedById    = $actor;
+        $this->updatedAt      = $now;
     }
 
     /**
@@ -180,6 +183,6 @@ class HubSpotConnection
      */
     public function view(): HubSpotConnectionView
     {
-        return new HubSpotConnectionView($this->id, $this->kind, $this->status, $this->accountId, $this->label, $this->tokenLast4, $this->scopes, $this->validatedAt, $this->version);
+        return new HubSpotConnectionView($this->id, $this->kind, $this->status, $this->accountId, $this->label, $this->tokenLast4, $this->scopes, $this->validatedAt, $this->version, $this->scopesVerified);
     }
 }

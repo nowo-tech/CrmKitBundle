@@ -196,10 +196,9 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
     public function confirm(string $importId, HubSpotMapping $mapping, DuplicatePolicy $policy, int $expectedVersion): void
     {
         $context = $this->support->access->context(CrmPermission::Import);
-        if ($policy === DuplicatePolicy::Update) {
-            // An unattended run updates records nobody reviews one by one: the person who confirms may edit.
-            $this->support->access->require($context, CrmPermission::Edit);
-        }
+        // Audit ZAM-1: a re-run updates the records an earlier run linked whatever the policy, and unattended pages run
+        // as the person who confirms: that person may edit.
+        $this->support->access->require($context, CrmPermission::Edit);
         $import = $this->support->read(fn (): Import => $this->import($context->tenant, $importId));
         $scope  = $this->scope($import);
         $keys   = $this->support->read(fn (): array => $this->customKeys($context->tenant, $scope));
@@ -254,6 +253,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
                     // Another confirm won: the tags created here roll back with this unit.
                     throw new ConflictException(ConflictException::IMPORT_RUNNING, $import->getId());
                 }
+                $this->store->confirmedBy($import->getId(), $context->actor->value);
                 if ($this->queued) {
                     // import.messenger.enabled: the background run takes it (ImportService::run() dispatches it).
                     $this->support->store->queueImport($import->getId(), $token, $context->now);

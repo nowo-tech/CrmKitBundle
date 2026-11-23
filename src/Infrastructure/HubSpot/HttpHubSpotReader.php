@@ -131,18 +131,17 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
         try {
             $data = $this->call($token, 'POST', '/oauth/v2/private-apps/get/access-token-info', [], ['tokenKey' => $token->reveal()]);
         } catch (HubSpotException $e) {
-            // HubSpot answers an unknown token here with 400 / 404.
-            throw in_array($e->status, [400, 404], true) ? new HubSpotException(HubSpotException::TOKEN_INVALID, $e->status) : $e;
+            // HubSpot answers a credential it does not know here (a service key) with 400 / 404; nothing else means that.
+            throw in_array($e->status, [400, 404], true) ? new HubSpotException(HubSpotException::UNKNOWN_TOKEN, $e->status) : $e;
         }
         $hub    = $data['hubId'] ?? null;
         $scopes = [];
         foreach (is_array($data['scopes'] ?? null) ? $data['scopes'] : [] as $scope) {
-            if (is_string($scope) && preg_match('/\A[a-z0-9._-]{1,100}\z/D', $scope) === 1) {
-                $scopes[] = $scope;
-            }
+            // Fails closed (audit ZAM-3): an entry the kit cannot read, or one past the 200th, counts as a write scope.
+            $scopes[] = is_string($scope) && preg_match('/\A[a-z0-9._-]{1,100}\z/D', $scope) === 1 && count($scopes) < 200 ? $scope : HubSpotTokenInfo::UNREADABLE;
         }
 
-        return new HubSpotTokenInfo($this->parseAccount($hub), array_slice($scopes, 0, 200));
+        return new HubSpotTokenInfo($this->parseAccount($hub), $scopes);
     }
 
     /**

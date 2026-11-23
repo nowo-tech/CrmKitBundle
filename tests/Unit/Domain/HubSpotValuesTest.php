@@ -32,6 +32,8 @@ use Nowo\CrmKitBundle\Domain\Value\SecretContext;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\VarDumper\Cloner\VarCloner;
+use Symfony\Component\VarDumper\Dumper\CliDumper;
 
 use function json_decode;
 use function print_r;
@@ -39,6 +41,7 @@ use function serialize;
 use function str_contains;
 use function strlen;
 use function unserialize;
+use function var_export;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -107,6 +110,18 @@ final class HubSpotValuesTest extends TestCase
         try {
             unserialize('O:' . strlen(HubSpotToken::class) . ':"' . HubSpotToken::class . '":1:{s:5:"value";s:8:"abcdefgh";}');
             self::fail('never unserialised');
+        } catch (LogicException) {
+            self::addToAssertionCount(1);
+        }
+        // Audit ZAM-2: no dump shows the value (VarDumper casts objects to arrays; the plaintext is no property).
+        $dumper = new CliDumper();
+        $dumped = (string) $dumper->dump((new VarCloner())->cloneVar(['token' => $key]), true);
+        self::assertStringNotContainsString('abc/DEF', $dumped);
+        self::assertStringNotContainsString('abc/DEF', var_export((array) $key, true));
+        self::assertStringNotContainsString('abc/DEF', print_r((array) $key, true));
+        try {
+            $copy = clone $key;
+            self::fail('never cloned: ' . $copy->last4());
         } catch (LogicException) {
             self::addToAssertionCount(1);
         }

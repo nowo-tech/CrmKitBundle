@@ -16,6 +16,9 @@ use function str_ends_with;
  */
 final readonly class HubSpotTokenInfo
 {
+    /** A scope entry the kit could not read (counted as a write scope: the check fails closed). */
+    public const UNREADABLE = '!unreadable';
+
     /**
      * @param list<string> $scopes the token's scopes as HubSpot lists them
      */

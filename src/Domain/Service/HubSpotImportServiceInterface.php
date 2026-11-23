@@ -42,7 +42,8 @@ interface HubSpotImportServiceInterface
 
     /**
      * Claims the import with the mapping (one confirm wins, as for CSV); tags marked "create" are created in the claim
-     * unit. Policy `update` also needs `edit`.
+     * unit. Needs `edit` too (whatever the policy, a re-run updates the records an earlier run linked); unattended
+     * pages then run as the person who confirmed.
      *
      * @throws InvalidInputException `mapping`: error.mapping
      * @throws ConflictException crm_import_running

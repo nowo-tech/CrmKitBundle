@@ -388,11 +388,12 @@ final readonly class ImportService implements ImportServiceInterface
     }
 
     /**
-     * The actor of an unattended run: the uploader, unless anonymised or unknown, else {@see self::SYSTEM_ACTOR}.
+     * The actor of an unattended run: the person who confirmed a HubSpot import (0.10.0, audit ZAM-1), else the
+     * uploader, unless anonymised or unknown, else {@see self::SYSTEM_ACTOR}.
      */
     public static function runActor(Import $import): string
     {
-        $creator = $import->getCreatedById();
+        $creator = $import->getConfirmedById() ?? $import->getCreatedById();
 
         return $creator !== null && ExactId::isValid($creator) && !ActorRef::isReserved($creator) ? $creator : self::SYSTEM_ACTOR;
     }

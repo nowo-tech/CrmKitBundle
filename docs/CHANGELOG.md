@@ -70,6 +70,23 @@ Planned as 0.10.0.
 - `ImportServiceInterface::upload()` refuses the `hubspot` format (a HubSpot import starts from its connection).
 - A paused import's "Continue" clears its reason and wait time.
 
+### Security
+
+Immediate audit ZAM of the slice, fixed before release:
+
+- ZAM-1: unattended HubSpot pages (resume command, Messenger) run as the person who confirmed (`crm_import.confirmed_by_id`);
+  under `security.resource_scoping` a page that would update, affiliate or tag a record owned by someone else rolls
+  back and waits for a person's "Continue" (`hubspot_needs_person`); an unattended run never changes an existing
+  record's owner; the confirm needs `edit` whatever the policy; "Continue" checks `edit` on every list member.
+- ZAM-2: the credential's plaintext is no property of `HubSpotToken` any more (VarDumper, the profiler and Twig's
+  `dump` showed it next to `[redacted]`); it cannot be cloned.
+- ZAM-3: the write-scope check fails closed: only HubSpot's "unknown token" answer leads to probing; unreadable or
+  extra scope entries count as write scopes; a service key's scopes are stored and shown as "not verified".
+- ZAM-4: a connection is marked invalid only while it holds the sealed token that failed, and its version moves.
+- ZAM-5: the DoctrineEncrypt box accepts Halite and Defuse only (or an explicit opt-in), rethrows configuration
+  errors, and `secrets:rotate --all` re-seals every credential.
+- ZAM-6: `secrets.keys` is never a container parameter. ZAM-10: the rotation reads connections in SQL batches.
+
 ## [0.9.0] - 2026-11-23
 
 ### Added

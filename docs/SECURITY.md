@@ -128,17 +128,26 @@ record; another person's note needs `edit` on the record and `manage`.
 - **At rest**: sealed by `CrmSecretBoxInterface` with authenticated encryption bound to `nowo-crm-kit|v1|hubspot.token|
   <tenant>|<connection id>` (the additional data): a copied value does not open for another tenant, row or purpose.
   Default `SodiumCrmSecretBox` (XChaCha20-Poly1305, random 24-byte nonce, keys from the environment, key ids for
-  rotation); house option `DoctrineEncryptCrmSecretBox` (context inside the authenticated payload, MysqlAes refused).
-  Only the last four characters are stored in clear. A value that does not open marks the connection invalid.
+  rotation); house option `DoctrineEncryptCrmSecretBox` (context inside the authenticated payload; only the Halite and
+  Defuse encryptors, another class only with an explicit opt-in, MysqlAes never; a configuration error of the
+  encryptor is thrown, never taken for a bad value). Only the last four characters are stored in clear. A value that
+  does not open marks the connection invalid, only while the connection still holds that sealed value (a token
+  replaced meanwhile stays active). The sodium keys come from the environment only: they are never container
+  parameters (only the box's own service definition receives them).
 - **In use**: unsealed for one HubSpot call, sent only as `Authorization: Bearer` to `https://api.hubapi.com` by the
   kit's own HttpClient (not the framework's `http_client`, so no profiler or HTTP-client log sees it). It is never put
   in a URL, a property, a log, an exception, an audit entry or a page; the connect field is a password input, never
-  pre-filled or re-rendered. `HubSpotToken` hides its value from dumps and refuses serialisation; its parameters are
-  `#[\SensitiveParameter]`.
+  pre-filled or re-rendered. `HubSpotToken` keeps its plaintext out of its own properties (a class-private map entry
+  removed when the object is destroyed), so `var_dump()`, `print_r()`, Symfony's VarDumper (`dump()`, the profiler,
+  Twig's `dump`), `(array)` casts and traces show no value; it refuses cloning and serialisation; its parameters are
+  `#[\SensitiveParameter]`. Still, never paste a production credential into a page served with the Symfony profiler
+  or the debug toolbar on (the request's form data is collected there).
 - **Scopes**: read scopes only. Write scopes are refused when HubSpot lists the credential's scopes (private app
-  tokens). For a service key HubSpot offers no scope listing, so the required read scopes are probed (a 403 is a
-  missing scope) and write scopes cannot be seen: the manager must tick read scopes only (known limit, documented in
-  USAGE). Sensitive and highly sensitive properties are never offered or requested.
+  tokens); the check fails closed: an entry the kit cannot read, or one past the 200th, counts as a write scope, and
+  only HubSpot's "unknown token" answer (400 / 404) leads to probing, any other failure refuses the credential. For a
+  service key HubSpot offers no scope listing, so the required read scopes are probed (a 403 is a missing scope) and
+  write scopes cannot be seen: the connection card says "write scopes not verified" and the manager must tick read
+  scopes only (known limit, documented in USAGE). Sensitive and highly sensitive properties are never offered or requested.
 - **Checks**: counted per tenant (`connect_rate_limit`), valid or not; answers are translation keys, never HubSpot's
   text.
 
@@ -152,13 +161,19 @@ record; another person's note needs `edit` on the record and `manage`.
 - **Data**: only the mapped properties are requested; import rows keep the object kind and the HubSpot id only;
   values go through the form's validation (too long ⇒ refused, never truncated); labels and list names are shown
   escaped; logs (one `info` line per page) carry the import id, stage, page, result and duration only.
-- **GDPR**: an erased contact's references become tombstones (`erased`, no personal data) and the person is never
-  imported again (Q-H6); a purge deletes the references of purged records (tombstones stay).
-- **Authorisation of unattended runs**: the resume command and the Messenger handler run as the uploader (the system
-  actor when unknown) with the mapping and policy a person confirmed: policy `update` needs `edit` at confirm; the
-  per-record `edit` / `view` checks apply when a person runs the pages ("Continue"). Under `security.resource_scoping`
-  an unattended run may therefore update a record linked to HubSpot (or, with `update`, matched by e-mail or domain)
-  that the confirming person could not edit one by one. Audit point.
+- **GDPR**: an erased contact's references become tombstones (`erased`, no personal data), so a HubSpot re-run of the
+  same account does not bring that HubSpot contact back (Q-H6). Another HubSpot account, a new HubSpot contact for the
+  same person, a CSV / vCard import or a manual entry can still create a record; a purge deletes the references of
+  purged records (tombstones stay).
+- **Authorisation** (audit ZAM-1): the confirm needs `import` and `edit` (whatever the policy: a re-run updates the
+  records an earlier run linked); the person who confirms is stored (`confirmed_by_id`) and unattended pages (the
+  resume command, the Messenger handler) run as that person. When a person runs the pages ("Continue"), every
+  existing record needs `edit` on it, every company of an affiliation `view` and every list member `edit` (else no tag).
+  Unattended, nobody's access can be asked, so under `security.resource_scoping` a page that would write a record
+  (update, affiliation, tag) owned by someone else than the confirming person rolls back and the import waits for a
+  person's "Continue" (`hubspot_needs_person`), as CSV imports do (UP-M-2 / UP2-1); ownerless and own records are
+  written. An unattended run never changes the owner of an existing record. Hosts that scope records in their own
+  access checker set `security.resource_scoping: true` to get this rule.
 
 ## GDPR
 

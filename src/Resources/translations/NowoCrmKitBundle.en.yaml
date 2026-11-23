@@ -346,6 +346,7 @@ import:
             domain: 'Website from the domain'
             custom: 'Custom field %key%'
         card:
+            write_unverified: 'write scopes not verified'
             label: 'Name'
             account: 'HubSpot account'
             credential: 'Service key'
@@ -482,6 +483,7 @@ flash:
         crm_settings_stale: Someone changed the settings at the same moment. Check them and save again.
         crm_write_conflict: 'Another change of the same data arrived at the same moment. Try again.'
 error:
+    hubspot_needs_person: 'A person must continue this import: it reached records owned by someone else.'
     hubspot_token_invalid: 'HubSpot refused this service key (or private app token), or it belongs to another account. Paste a valid one.'
     hubspot_scope_missing: 'The key lacks a read scope the import needs. Add the scopes listed in the documentation and try again.'
     hubspot_scope_not_read_only: 'The key may also write to HubSpot. Create one with read scopes only.'

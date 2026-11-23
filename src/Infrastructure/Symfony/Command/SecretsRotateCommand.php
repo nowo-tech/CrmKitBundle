@@ -25,7 +25,8 @@ use function sprintf;
 /**
  * `nowo:crm-kit:secrets:rotate` (0.10.0): re-seals every sealed HubSpot token under `secrets.current_key`, one unit
  * per connection under its row lock. A token that no longer opens marks its connection invalid (a manager pastes a
- * new one). `--dry-run` only counts. Prints counts only, never a secret.
+ * new one). `--all` re-seals every token (a box that manages its own keys, such as DoctrineEncrypt, keeps one key
+ * id). `--dry-run` only counts. Prints counts only, never a secret.
  */
 #[AsCommand(name: 'nowo:crm-kit:secrets:rotate', description: 'Re-seal the CRM secrets under the current key')]
 final class SecretsRotateCommand extends Command
@@ -41,17 +42,19 @@ final class SecretsRotateCommand extends Command
     protected function configure(): void
     {
         $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Count what would be re-sealed');
+        $this->addOption('all', null, InputOption::VALUE_NONE, 'Re-seal every secret, also those under the current key id (a box that manages its own keys, e.g. DoctrineEncrypt)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $dry    = $input->getOption('dry-run') === true;
+        $all    = $input->getOption('all') === true;
         $counts = ['resealed' => 0, 'current' => 0, 'invalid' => 0];
         $after  = null;
         do {
             $batch = $this->runner->read(fn (): array => $this->store->connections($after, 100));
             foreach ($batch as $row) {
-                $outcome = $this->runner->write(fn (): string => $this->rotate(new TenantRef($row['tenant']), $row['id'], $dry));
+                $outcome = $this->runner->write(fn (): string => $this->rotate(new TenantRef($row['tenant']), $row['id'], $dry, $all));
                 ++$counts[$outcome];
             }
             $last  = end($batch);
@@ -65,11 +68,11 @@ final class SecretsRotateCommand extends Command
     /**
      * One connection: `resealed`, `current` or `invalid`.
      */
-    private function rotate(TenantRef $tenant, string $id, bool $dry): string
+    private function rotate(TenantRef $tenant, string $id, bool $dry, bool $all): string
     {
         $connection = $this->store->lockConnection($tenant);
-        // Replaced by another connection since it was listed, or already sealed under the current key.
-        if (!$connection instanceof HubSpotConnection || $connection->getId() !== $id || $connection->getToken()->keyId === $this->box->currentKeyId()) {
+        // Replaced by another connection since it was listed, or already sealed under the current key (unless --all).
+        if (!$connection instanceof HubSpotConnection || $connection->getId() !== $id || (!$all && $connection->getToken()->keyId === $this->box->currentKeyId())) {
             return 'current';
         }
         $now     = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
@@ -79,7 +82,7 @@ final class SecretsRotateCommand extends Command
             $plain = $this->box->unseal($connection->getToken(), $context);
         } catch (SecretUnsealException) {
             if (!$dry) {
-                $this->store->invalidate($tenant, $id, $now);
+                $this->store->invalidate($tenant, $id, $connection->getToken()->ciphertext, $now);
             }
 
             return 'invalid';

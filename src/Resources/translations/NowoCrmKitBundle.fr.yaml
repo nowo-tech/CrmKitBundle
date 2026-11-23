@@ -346,6 +346,7 @@ import:
             domain: 'Site web depuis le domaine'
             custom: 'Champ personnalisé %key%'
         card:
+            write_unverified: 'autorisations d’écriture non vérifiées'
             label: 'Nom'
             account: 'Compte HubSpot'
             credential: 'Clé de service'
@@ -482,6 +483,7 @@ flash:
         crm_settings_stale: Quelqu'un a modifié les paramètres au même moment. Vérifiez-les et enregistrez à nouveau.
         crm_write_conflict: 'Une autre modification des mêmes données est arrivée au même moment. Réessayez.'
 error:
+    hubspot_needs_person: 'Une personne doit poursuivre cet import : il a atteint des fiches d’autres personnes.'
     hubspot_token_invalid: 'HubSpot a refusé cette clé de service (ou ce jeton d’app privée), ou elle appartient à un autre compte. Collez-en une valide.'
     hubspot_scope_missing: 'Il manque à la clé une autorisation de lecture nécessaire à l’import. Ajoutez les autorisations documentées et réessayez.'
     hubspot_scope_not_read_only: 'La clé peut aussi écrire dans HubSpot. Créez-en une avec des autorisations de lecture seulement.'

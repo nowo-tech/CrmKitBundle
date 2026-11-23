@@ -51,6 +51,8 @@ class Import
 
     private ?string $errorCode = null;
 
+    private ?string $confirmedById = null;
+
     /**
      * @param list<string> $columns the header columns of the file
      * @param array<string, string> $mapping detected column => field
@@ -97,6 +99,20 @@ class Import
         $this->claimToken  = null;
         $this->resumeAfter = $resumeAfter;
         $this->errorCode   = $errorCode;
+    }
+
+    /**
+     * Who confirmed a HubSpot import (the store writes it in the claim unit; this mirrors it in memory).
+     */
+    public function confirmBy(string $actor): void
+    {
+        $this->confirmedById = $actor;
+    }
+
+    /** Who confirmed a HubSpot import (unattended pages run as this person, audit ZAM-1), or null. */
+    public function getConfirmedById(): ?string
+    {
+        return $this->confirmedById;
     }
 
     /** The HubSpot connection it reads (null: a file import). */

@@ -26,6 +26,9 @@ final class HubSpotException extends RuntimeException
     /** 5xx, a timeout or a transport failure. */
     public const UNAVAILABLE = 'hubspot_unavailable';
 
+    /** 400 / 404 from the token-info endpoint: not a private app token HubSpot knows (a service key). */
+    public const UNKNOWN_TOKEN = 'hubspot_unknown_token';
+
     /** A redirect, an oversized or malformed body, or a shape the kit does not expect. */
     public const BAD_RESPONSE = 'hubspot_bad_response';
 

@@ -17,6 +17,7 @@ final readonly class HubSpotConnectionView
 
     /**
      * @param list<string> $scopes
+     * @param bool $scopesVerified HubSpot listed the scopes (write scopes checked); false: probed, write scopes not verified
      */
     public function __construct(
         public string $id,
@@ -28,6 +29,7 @@ final readonly class HubSpotConnectionView
         public array $scopes,
         public DateTimeImmutable $validatedAt,
         public int $version,
+        public bool $scopesVerified = true,
     ) {
     }
 }

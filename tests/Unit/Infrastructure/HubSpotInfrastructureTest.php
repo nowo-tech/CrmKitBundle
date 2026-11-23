@@ -34,8 +34,10 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\MessengerImportRunDispatc
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImport;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImportHandler;
 use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\FakeHubSpot;
+use Nowo\DoctrineEncryptBundle\Encryptors\DefuseEncryptor;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorInterface;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
+use Nowo\DoctrineEncryptBundle\Encryptors\HaliteEncryptor;
 use Nowo\DoctrineEncryptBundle\Encryptors\MysqlAesEncryptor;
 use Nowo\OutboundUrlGuardBundle\Exception\UnsafeOutboundUrlException;
 use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
@@ -102,7 +104,7 @@ final class HubSpotInfrastructureTest extends TestCase
         self::assertFalse($reader->probe($token, 'crm.lists.read'));
         $this->fails(static fn (): bool => $reader->probe($token, 'crm.unknown.read'), HubSpotException::BAD_RESPONSE);
         $fake->introspect = false;
-        $this->fails(static fn (): HubSpotTokenInfo => $reader->tokenInfo($token), HubSpotException::TOKEN_INVALID);
+        $this->fails(static fn (): HubSpotTokenInfo => $reader->tokenInfo($token), HubSpotException::UNKNOWN_TOKEN);
         // Every request went to the constant host, with the bearer header only.
         foreach ($fake->requests as [, $url]) {
             self::assertStringStartsWith(HttpHubSpotReader::BASE_URL . '/', $url);
@@ -152,7 +154,12 @@ final class HubSpotInfrastructureTest extends TestCase
         $fake->failNext('/oauth/v2/private-apps/get/access-token-info', 500);
         $this->fails(static fn (): HubSpotTokenInfo => $reader->tokenInfo($token), HubSpotException::UNAVAILABLE);
         $fake->failNext('/oauth/v2/private-apps/get/access-token-info', 200, [], '{"hubId": 4242, "scopes": ["crm.objects.contacts.read", "BAD SCOPE", 5]}');
-        self::assertSame(['crm.objects.contacts.read'], $reader->tokenInfo($token)->scopes);
+        $info = $reader->tokenInfo($token);
+        self::assertSame(['crm.objects.contacts.read', '!unreadable', '!unreadable'], $info->scopes, 'unreadable entries fail closed');
+        self::assertSame(['!unreadable', '!unreadable'], $info->writeScopes());
+        $many = '{"hubId": 4242, "scopes": [' . implode(',', array_fill(0, 201, '"crm.objects.contacts.read"')) . ']}';
+        $fake->failNext('/oauth/v2/private-apps/get/access-token-info', 200, [], $many);
+        self::assertSame(['!unreadable'], $this->reader($fake)->tokenInfo($token)->writeScopes(), 'past the 200th entry');
         $fake->failNext('/crm/v3/properties/companies', 200, [], '{"results": [{"name": "ok", "label": "", "type": 5}, {"name": "bad name"}, {"name": "x", "label": "\u0007"}]}');
         self::assertSame([['ok', 'ok', 'string'], ['x', 'x', 'string']], array_map(static fn (HubSpotProperty $p): array => [$p->name->value, $p->label, $p->type], $reader->properties($token, HubSpotObject::Company)));
         $fake->failNext('/crm/v3/objects/companies', 200, [], '{"results": [{"id": 12, "properties": {"a": 3, "b": true, "c": false, "d": 1.5, "e": [1]}}]}');
@@ -219,34 +226,35 @@ final class HubSpotInfrastructureTest extends TestCase
 
     public function testTheDoctrineEncryptBridge(): void
     {
-        $encryptor = new class implements EncryptorInterface {
+        $custom = new class implements EncryptorInterface {
             public function encrypt(string $data): string
             {
-                return 'E:' . $data;
+                return 'C:' . $data;
             }
 
             public function decrypt(string $data): string
             {
-                if (!str_starts_with($data, 'E:')) {
-                    throw new RuntimeException('bad');
-                }
-
                 return substr($data, 2);
             }
         };
-        $registry = new class($encryptor) implements EncryptorRegistryInterface {
-            public function __construct(private EncryptorInterface $encryptor)
+        $registry = new class($custom) implements EncryptorRegistryInterface {
+            public function __construct(private EncryptorInterface $custom)
             {
             }
 
             public function get(string $name): EncryptorInterface
             {
-                return $name === 'aes' ? new MysqlAesEncryptor() : $this->encryptor;
+                return match ($name) {
+                    'aes'    => new MysqlAesEncryptor(),
+                    'defuse' => new DefuseEncryptor(),
+                    'custom' => $this->custom,
+                    default  => new HaliteEncryptor(),
+                };
             }
 
             public function getDefault(): EncryptorInterface
             {
-                return $this->encryptor;
+                return new HaliteEncryptor();
             }
         };
         $box     = new DoctrineEncryptCrmSecretBox($registry);
@@ -264,8 +272,23 @@ final class HubSpotInfrastructureTest extends TestCase
                 self::addToAssertionCount(1);
             }
         }
-        $this->expectException(LogicException::class);
-        (new DoctrineEncryptCrmSecretBox($registry, 'aes'))->seal('x', $context);
+        // A configuration error of the encryptor is thrown as it is (it never marks a connection invalid).
+        try {
+            (new DoctrineEncryptCrmSecretBox($registry, 'defuse'))->unseal($sealed, $context);
+            self::fail('a missing key is not a wrong value');
+        } catch (RuntimeException $e) {
+            self::assertNotInstanceOf(SecretUnsealException::class, $e);
+        }
+        // A custom encryptor only with the explicit opt-in; MysqlAes never.
+        self::assertSame('fake-credential', (new DoctrineEncryptCrmSecretBox($registry, 'custom', true))->unseal((new DoctrineEncryptCrmSecretBox($registry, 'custom', true))->seal('fake-credential', $context), $context));
+        foreach ([new DoctrineEncryptCrmSecretBox($registry, 'custom'), new DoctrineEncryptCrmSecretBox($registry, 'aes', true)] as $refused) {
+            try {
+                $refused->seal('x', $context);
+                self::fail('refused');
+            } catch (LogicException) {
+                self::addToAssertionCount(1);
+            }
+        }
     }
 
     public function testTheMessengerParts(): void

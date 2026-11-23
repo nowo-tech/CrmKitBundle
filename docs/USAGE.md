@@ -984,7 +984,8 @@ Each page is settled in one write unit ([CONCURRENCY.md](CONCURRENCY.md#hubspot-
 every record:
 
 - **Matching.** The HubSpot id first: a record imported earlier is updated, whatever the duplicate policy. A person
-  erased under GDPR is skipped (`error.record_erased`, a tombstone keeps the id). A trashed record is left alone. A
+  erased under GDPR is skipped by re-runs of the same account (`error.record_erased`, a tombstone keeps the id; another
+  account, a CSV import or a manual entry can still add the person). A trashed record is left alone. A
   merged record leads to its survivor. Then the duplicate key: contacts by e-mail, companies by a domain that exactly
   one active company has (several ⇒ `error.ambiguous_domain`). Under `update` such a record is updated and linked;
   under `skip` it is a `duplicate` and gets no link. Otherwise the record is created, under the plan limit.
@@ -1002,9 +1003,10 @@ every record:
   - A redirect, an oversized or malformed body: `hubspot_bad_response`.
 - **Failures.** A disconnect, an account change or more than `max_records` objects ends the import as `failed`, with
   the reason.
-- **Permissions.** With `update`, the person who confirms needs `edit`. When a person runs the pages ("Continue"),
-  each existing record needs `edit` on it, and each company of an affiliation needs `view`. The resume command and
-  the handler run as the uploader with the confirmed mapping (see SECURITY).
+- **Permissions.** The person who confirms needs `import` and `edit`; unattended pages run as that person. When a person
+  runs the pages ("Continue"), each existing record needs `edit` on it, each company of an affiliation `view` and each
+  list member `edit`. Unattended under `security.resource_scoping`, a page that would write a record owned by someone
+  else waits for a person (`hubspot_needs_person`); an unattended run never moves an owner (SECURITY).
 
 `HubSpotConnectionServiceInterface` (`status()`, `connect()`, `disconnect()`) and `HubSpotImportServiceInterface`
 (`lists()`, `start()`, `schema()`, `confirm()`) are public services. `ImportServiceInterface::run()`, `cancel()`,

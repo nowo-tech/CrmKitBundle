@@ -62,6 +62,9 @@ interface HubSpotStoreInterface
      */
     public function lockCursor(string $importId, string $token): ?array;
 
+    /** Records who confirmed the import (inside the claim unit). */
+    public function confirmedBy(string $importId, string $actor): void;
+
     /** Stores the next run cursor (inside the unit that settles the page). */
     public function saveCursor(string $importId, string $cursorJson): void;
 
@@ -70,6 +73,10 @@ interface HubSpotStoreInterface
      */
     public function resumeForConnection(TenantRef $tenant, string $connectionId, DateTimeImmutable $now): int;
 
-    /** Marks the connection invalid in its own statement (HubSpot refused the token). */
-    public function invalidate(TenantRef $tenant, string $connectionId, DateTimeImmutable $now): void;
+    /**
+     * Marks the connection invalid in its own statement (HubSpot refused the token, or it no longer opens), only while
+     * it still holds the sealed token that failed: a token replaced meanwhile stays active (audit ZAM-4). Bumps the
+     * version.
+     */
+    public function invalidate(TenantRef $tenant, string $connectionId, string $usedSealed, DateTimeImmutable $now): void;
 }

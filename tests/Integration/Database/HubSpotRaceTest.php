@@ -83,7 +83,7 @@ final class HubSpotRaceTest extends HubSpotTestCase
         }
         $fake  = $this->hubspot();
         $other = $this->second($fake);
-        $this->hold(fn (): mixed => $this->connection()->executeStatement("INSERT INTO nowo_crm_hubspot_connection (id, tenant_id, kind, status, account_id, label, token_last4, token_key_id, token_sealed, scopes, validated_at, created_at, updated_at, version) VALUES ('01890000-0000-7000-8000-0000000000aa', 'acme', 'private_app', 'active', '4242', 'First', 'abcd', 'k1', 'AAAA', '[]', '2026-11-18 10:00:00', '2026-11-18 10:00:00', '2026-11-18 10:00:00', 1)"), function () use ($other, $fake): void {
+        $this->hold(fn (): mixed => $this->connection()->executeStatement("INSERT INTO nowo_crm_hubspot_connection (id, tenant_id, kind, status, account_id, label, token_last4, token_key_id, token_sealed, scopes, scopes_verified, validated_at, created_at, updated_at, version) VALUES ('01890000-0000-7000-8000-0000000000aa', 'acme', 'private_app', 'active', '4242', 'First', 'abcd', 'k1', 'AAAA', '[]', 1, '2026-11-18 10:00:00', '2026-11-18 10:00:00', '2026-11-18 10:00:00', 1)"), function () use ($other, $fake): void {
             $this->expectLockConflict(static fn () => self::svc($other, HubSpotConnectionServiceInterface::class)->connect($fake->token, null, null));
         }, true);
         try {

@@ -55,8 +55,26 @@ final readonly class HubSpotRecordWriter
     /**
      * Wires the collaborators.
      */
-    public function __construct(private WriteSupport $support, private HubSpotStoreInterface $store, private PlanCounter $counter)
+    /**
+     * @param bool $ownerRule `security.resource_scoping`: an unattended run writes only records without an owner or
+     *                        owned by the run's actor (the person who confirmed); any other needs a person
+     */
+    public function __construct(private WriteSupport $support, private HubSpotStoreInterface $store, private PlanCounter $counter, private bool $ownerRule = false)
     {
+    }
+
+    /**
+     * Whether an unattended run may write the record on its own: always without the owner rule; with it, only a record
+     * without an owner or owned by the run's actor.
+     *
+     * @throws NeedsPersonException
+     */
+    public function mayWriteUnattended(CrmContext $context, CrmRecord $record): void
+    {
+        $owner = $record->getOwnerId();
+        if ($this->ownerRule && $owner !== null && $owner !== $context->actor->value) {
+            throw new NeedsPersonException();
+        }
     }
 
     /**
@@ -189,6 +207,11 @@ final readonly class HubSpotRecordWriter
         if ($attended && !$this->may($context, CrmPermission::Edit, $record)) {
             return [RowOutcome::Invalid, null, 'error.forbidden'];
         }
+        if (!$attended) {
+            // Audit ZAM-1: nobody signed in decides on this record; under resource scoping only the confirming person's
+            // own (or ownerless) records are written, any other waits for "Continue".
+            $this->mayWriteUnattended($context, $record);
+        }
 
         try {
             $values = RecordValidator::values($type, $mapped['values'], false);
@@ -208,7 +231,8 @@ final readonly class HubSpotRecordWriter
         $record->apply($values);
         $record->changeCustom($custom);
         $owner = $mapped['owner'] === null ? null : ($owners['o' . $mapped['owner']] ?? null);
-        if ($owner !== null) {
+        if ($owner !== null && $attended) {
+            // An existing record changes owner only when a person runs the page (never unattended, audit ZAM-1).
             $record->changeOwner($owner);
         }
         $record->touch($context->now, $context->actor->value);
@@ -278,6 +302,9 @@ final readonly class HubSpotRecordWriter
                 ++$skipped;
 
                 continue;
+            }
+            if (!$attended) {
+                $this->mayWriteUnattended($context, $company);
             }
             if (isset($have[$company->getId()])) {
                 continue;

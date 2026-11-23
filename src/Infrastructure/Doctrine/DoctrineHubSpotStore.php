@@ -28,7 +28,6 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType;
 
-use function count;
 use function in_array;
 use function intdiv;
 use function is_array;
@@ -93,13 +92,13 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
      */
     public function connections(?string $afterId, int $limit): array
     {
-        $rows = $this->db()->fetchAllAssociative(
-            'SELECT id, tenant_id FROM ' . $this->table(HubSpotConnection::class) . ' WHERE id > ? ORDER BY id',
-            [$afterId ?? ''],
-        );
+        // Audit ZAM-10: one batch at a time (LIMIT in SQL).
+        $rows = $this->db()->createQueryBuilder()->select('id', 'tenant_id')->from($this->table(HubSpotConnection::class))
+            ->where('id > :after')->orderBy('id')->setParameter('after', $afterId ?? '')->setMaxResults($limit)
+            ->executeQuery()->fetchAllAssociative();
         $out = [];
         foreach ($rows as $row) {
-            if (count($out) < $limit && is_string($row['id']) && is_string($row['tenant_id'])) {
+            if (is_string($row['id']) && is_string($row['tenant_id'])) {
                 $out[] = ['tenant' => $row['tenant_id'], 'id' => $row['id']];
             }
         }
@@ -196,6 +195,14 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
     /**
      * {@inheritDoc}
      */
+    public function confirmedBy(string $importId, string $actor): void
+    {
+        $this->db()->executeStatement('UPDATE ' . $this->table(Import::class) . ' SET confirmed_by_id = ? WHERE id = ?', [$actor, $importId]);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function saveCursor(string $importId, string $cursorJson): void
     {
         $this->db()->executeStatement('UPDATE ' . $this->table(Import::class) . ' SET run_cursor = ? WHERE id = ?', [$cursorJson, $importId]);
@@ -216,11 +223,11 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
     /**
      * {@inheritDoc}
      */
-    public function invalidate(TenantRef $tenant, string $connectionId, DateTimeImmutable $now): void
+    public function invalidate(TenantRef $tenant, string $connectionId, string $usedSealed, DateTimeImmutable $now): void
     {
         $this->db()->executeStatement(
-            'UPDATE ' . $this->table(HubSpotConnection::class) . ' SET status = ?, updated_at = ? WHERE id = ? AND tenant_id = ?',
-            [HubSpotConnectionStatus::Invalid->value, $now, $connectionId, $tenant->value],
+            'UPDATE ' . $this->table(HubSpotConnection::class) . ' SET status = ?, updated_at = ?, version = version + 1 WHERE id = ? AND tenant_id = ? AND token_sealed = ?',
+            [HubSpotConnectionStatus::Invalid->value, $now, $connectionId, $tenant->value, $usedSealed],
             [1 => UtcMicroDateTimeImmutableType::NAME],
         );
     }

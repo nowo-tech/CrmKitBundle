@@ -18,7 +18,7 @@
                 <dt>{{ 'import.hubspot.card.account'|trans({}, _d) }}</dt><dd>{{ connection.accountId }}</dd>
                 <dt>{{ 'import.hubspot.card.credential'|trans({}, _d) }}</dt><dd data-testid="crm-hubspot-last4">••••{{ connection.tokenLast4 }}</dd>
                 <dt>{{ 'import.hubspot.card.status'|trans({}, _d) }}</dt><dd>{{ ('import.hubspot.status.' ~ connection.status.value)|trans({}, _d) }}</dd>
-                <dt>{{ 'import.hubspot.card.scopes'|trans({}, _d) }}</dt><dd>{{ connection.scopes|join(', ') }}</dd>
+                <dt>{{ 'import.hubspot.card.scopes'|trans({}, _d) }}</dt><dd>{{ connection.scopes|join(', ') }}{% if not connection.scopesVerified %} <span data-testid="crm-hubspot-unverified">({{ 'import.hubspot.card.write_unverified'|trans({}, _d) }})</span>{% endif %}</dd>
                 <dt>{{ 'import.hubspot.card.validated'|trans({}, _d) }}</dt><dd>{{ connection.validatedAt|date('Y-m-d H:i') }} UTC</dd>
             </dl>
             <p>

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Domain\Value;
 
+use Generator;
 use InvalidArgumentException;
 use LogicException;
 use SensitiveParameter;
 
+use function is_string;
 use function preg_match;
 use function substr;
 
@@ -15,16 +17,19 @@ use function substr;
  * A HubSpot bearer credential in clear (0.10.0): a service key, or a legacy private app token. Its kind is never told
  * from a prefix and no format is refused by shape: the only rule is what an HTTP header can carry safely (8–4096
  * visible ASCII characters, no space or control character, so no header injection). HubSpot decides whether it is
- * valid. Lives for one call only: never stored in a property of a service, never logged, never serialised, never
- * printed; `var_dump()` / `print_r()` and exception traces show no value; `serialize()` refuses it.
+ * valid. Lives for one call only: never stored in a property of a service, never logged, never serialised.
+ *
+ * The plaintext is not a property value (audit ZAM-2): it lives in the local frame of a suspended generator, which no
+ * dumper can read, so `var_dump()`, `print_r()`, Symfony's VarDumper (`dump()`, the profiler, Twig's `dump`),
+ * `(array)` casts and exception traces show no value. It cannot be cloned or serialised.
  */
 final readonly class HubSpotToken
 {
     /** The pattern (anchored, `/D`). */
     public const PATTERN = '/\A[\x21-\x7E]{8,4096}\z/D';
 
-    /** The token; read it only to set the `Authorization` header or to seal it. */
-    private string $value;
+    /** Yields the plaintext from its own frame (a generator's locals are not dumpable). */
+    private Generator $value;
 
     /**
      * @param string $value the token as pasted
@@ -34,7 +39,19 @@ final readonly class HubSpotToken
         if (!self::isValid($value)) {
             throw new InvalidArgumentException('A HubSpot credential is 8-4096 visible ASCII characters without spaces.');
         }
-        $this->value = $value;
+        $this->value = (static function (#[SensitiveParameter] string $plaintext): Generator {
+            while (true) {
+                yield $plaintext;
+            }
+        })($value);
+    }
+
+    /**
+     * Never cloned (a clone would share the plaintext's lifetime).
+     */
+    public function __clone()
+    {
+        throw new LogicException('A HubSpot token is never cloned.');
     }
 
     /**
@@ -50,7 +67,9 @@ final readonly class HubSpotToken
      */
     public function reveal(): string
     {
-        return $this->value;
+        $plaintext = $this->value->current();
+
+        return is_string($plaintext) ? $plaintext : '';
     }
 
     /**
@@ -58,7 +77,7 @@ final readonly class HubSpotToken
      */
     public function last4(): string
     {
-        return substr($this->value, -4);
+        return substr($this->reveal(), -4);
     }
 
     /**

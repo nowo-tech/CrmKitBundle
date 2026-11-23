@@ -462,7 +462,7 @@ final class ServiceDefinitions
             $s->set($p . 'default.secret_box', SodiumCrmSecretBox::class)->args([$secrets['keys'], $secrets['current_key']]);
         }
         $s->set(HubSpotTokenOpener::class)->args([service(CrmSecretBoxInterface::class), service(HubSpotStoreInterface::class), service(TransactionRunnerInterface::class)]);
-        $s->set(HubSpotRecordWriter::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(PlanCounter::class)]);
+        $s->set(HubSpotRecordWriter::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(PlanCounter::class), param($p . 'security.resource_scoping')]);
         $s->set(HubSpotRunner::class)->args([
             service(WriteSupport::class),
             service(HubSpotStoreInterface::class),

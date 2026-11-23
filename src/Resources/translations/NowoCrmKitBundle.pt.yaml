@@ -346,6 +346,7 @@ import:
             domain: 'Site a partir do domínio'
             custom: 'Campo personalizado %key%'
         card:
+            write_unverified: 'permissões de escrita não verificadas'
             label: 'Nome'
             account: 'Conta HubSpot'
             credential: 'Chave de serviço'
@@ -482,6 +483,7 @@ flash:
         crm_settings_stale: Alguém alterou as definições ao mesmo tempo. Verifique-as e guarde novamente.
         crm_write_conflict: 'Outra alteração dos mesmos dados chegou ao mesmo tempo. Tente novamente.'
 error:
+    hubspot_needs_person: 'Uma pessoa tem de continuar esta importação: chegou a registos de outra pessoa.'
     hubspot_token_invalid: 'O HubSpot recusou esta chave de serviço (ou token de app privada), ou pertence a outra conta. Cole uma válida.'
     hubspot_scope_missing: 'Falta à chave uma permissão de leitura necessária à importação. Adicione as permissões documentadas e tente de novo.'
     hubspot_scope_not_read_only: 'A chave também pode escrever no HubSpot. Crie uma só com permissões de leitura.'

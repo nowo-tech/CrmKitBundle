@@ -40,7 +40,7 @@ final readonly class HubSpotTokenOpener
             return new HubSpotToken($this->box->unseal($connection->getToken(), new SecretContext(SecretContext::HUBSPOT_TOKEN, $tenant, $connection->getId())));
         } catch (SecretUnsealException|InvalidArgumentException) {
             $this->runner->write(function () use ($tenant, $connection, $now): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
-                $this->store->invalidate($tenant, $connection->getId(), $now);
+                $this->store->invalidate($tenant, $connection->getId(), $connection->getToken()->ciphertext, $now);
             });
 
             return null;

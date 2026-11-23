@@ -84,12 +84,12 @@ final class HubSpotConnectionTest extends HubSpotTestCase
         $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect('wrong-key-1234567', null, null), 'token', 'error.hubspot_token_invalid');
         $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect('short', null, null), 'token', 'error.hubspot_token_invalid');
         $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, str_repeat('L', 81), null), 'label', 'error.invalid');
-        $fake->failNext('/account-info', 503);
+        $fake->failNext('/account-info/v3/details', 503);
         $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_unavailable');
-        $fake->failNext('/oauth/v2/private-apps', 502);
+        $fake->failNext('/oauth/v2/private-apps/get/access-token-info', 502);
         $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_unavailable');
         // Token info of another account than the credential's: refused.
-        $fake->failNext('/oauth/v2/private-apps', 200, [], '{"hubId": 777, "scopes": []}');
+        $fake->failNext('/oauth/v2/private-apps/get/access-token-info', 200, [], '{"hubId": 777, "scopes": []}');
         $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_token_invalid');
         self::assertNull($this->connections()->status());
         self::assertContains('crm.hubspot.token_invalid', $this->recorder()->actions());

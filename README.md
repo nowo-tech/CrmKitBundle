@@ -55,6 +55,9 @@ Phase A (0.1.0), always on when the bundle is enabled:
   resolved by your code on every view), host panels (your read models), notes, timeline, possible duplicates, consents.
 - **Import and export**: CSV (`,` or `;`) and vCard 3.0 / 4.0 import in a modal from the lists (0.4.0; the import page
   stays the no-JS fallback) with a preview, an editable column mapping and a duplicate policy; CSV export of a filtered list (formula cells neutralised) and a vCard 4.0 per contact.
+- **HubSpot import** (unreleased, 0.10.0, opt-in): companies, contacts, associations, owners and lists from a HubSpot
+  account through a service key (or a legacy private app token) sealed at rest; re-runs update instead of duplicating
+  (USAGE, "HubSpot import").
 - **Duplicates and merging**: hints by name, website domain and tax id (companies) or sort name (contacts); a
   field-by-field merge that moves every child row and keeps a snapshot.
 - **GDPR**: consent per contact and purpose (append-only), a JSON export, an erasure that keeps consent proof without

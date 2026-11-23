@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.7.0](#to-070)
 - [To 0.6.1](#to-061)
 - [To 0.6.0](#to-060)
 - [To 0.5.0](#to-050)
@@ -16,6 +17,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.7.0
+
+From **0.6.1**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 **Link picker (optional, nothing to do).** `CrmHostObjectResolverInterface` is unchanged: a resolver that implements
 only it keeps today's form (the type's `type()` as its label, a text field for the id, now labelled "Object id"), and

@@ -55,8 +55,8 @@ test.describe('CRM Kit 0.9.0 pipeline dialogs', () => {
     await expect(page.locator('form[name="crm_stage_move"], form[name="crm_next_action"]')).toHaveCount(0);
     await page.getByTestId('crm-deal-move-open').click();
     await expect(dialog.locator('select[name="crm_stage_move[stage]"]')).toBeVisible();
-    const qualified = await dialog.locator('select[name="crm_stage_move[stage]"] option', { hasText: 'Qualified' }).getAttribute('value');
-    await dialog.locator('select[name="crm_stage_move[stage]"]').selectOption(qualified ?? '');
+    const won = await dialog.locator('select[name="crm_stage_move[stage]"] option', { hasText: 'Won' }).getAttribute('value');
+    await dialog.locator('select[name="crm_stage_move[stage]"]').selectOption(won ?? '');
     await dialog.getByTestId('crm-deal-move-dialog-form-submit').click();
     await expect(page).toHaveURL(dealUrl);
     await expect(page.getByTestId('crm-stage-change')).toHaveCount(2);

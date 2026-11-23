@@ -9,6 +9,8 @@ use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Model\RecordFields;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectSearchInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectTypeLabelInterface;
 use Nowo\CrmKitBundle\Domain\Read\FieldView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
@@ -82,7 +84,9 @@ final readonly class RecordForms
     }
 
     /**
-     * Host object types that have a resolver (link form choices).
+     * Host object types that have a resolver (link form choices: label => type). The label is the resolver's
+     * {@see CrmHostObjectTypeLabelInterface::typeLabel()} (0.7.0), else `type()`; two types with one label keep
+     * their type in brackets. Checked per call, nothing cached (worker mode).
      *
      * @return array<string, string>
      */
@@ -90,10 +94,29 @@ final readonly class RecordForms
     {
         $types = [];
         foreach ($this->resolvers as $resolver) {
-            $types[$resolver->type()] = $resolver->type();
+            $type = $resolver->type();
+            if (in_array($type, $types, true)) {
+                continue;
+            }
+            $label                                                               = $resolver instanceof CrmHostObjectTypeLabelInterface ? $this->ui->hostLabel($resolver->typeLabel()) : $type;
+            $types[isset($types[$label]) ? $label . ' (' . $type . ')' : $label] = $type;
         }
 
         return $types;
+    }
+
+    /**
+     * Whether a resolver offers the link picker (0.7.0, {@see CrmHostObjectSearchInterface}).
+     */
+    public function hasHostPicker(): bool
+    {
+        foreach ($this->resolvers as $resolver) {
+            if ($resolver instanceof CrmHostObjectSearchInterface) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

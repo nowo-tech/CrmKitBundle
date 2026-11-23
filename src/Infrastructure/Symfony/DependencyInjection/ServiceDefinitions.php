@@ -80,6 +80,7 @@ use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmSettingsInterface;
 use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\HostObjectPickerInterface;
 use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
@@ -281,6 +282,7 @@ final class ServiceDefinitions
         $s->alias(NoteServiceInterface::class, NoteService::class)->public();
         $s->set(HostLinkService::class)->args([service(WriteSupport::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG)]);
         $s->alias(HostLinkServiceInterface::class, HostLinkService::class)->public();
+        $s->alias(HostObjectPickerInterface::class, HostLinkService::class)->public();
         $s->alias(TimelineInterface::class, HostLinkService::class)->public();
         $s->set(ConsentService::class)->args([service(WriteSupport::class), param($p . 'gdpr.purposes')]);
         $s->alias(ConsentServiceInterface::class, ConsentService::class)->public();
@@ -473,7 +475,7 @@ final class ServiceDefinitions
         $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid()]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class), service(ImportServiceInterface::class)])->public()->tag('controller.service_arguments');
-        $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class)])->public()->tag('controller.service_arguments');
+        $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class), service(HostObjectPickerInterface::class)])->public()->tag('controller.service_arguments');
         $s->set(ImportController::class)->args([service(UiSupport::class), service(ImportServiceInterface::class), service(RecordForms::class), param($p . 'import.sync_chunks'), param($p . 'import.max_bytes')])->public()->tag('controller.service_arguments');
         foreach ([ActionType::class, AffiliationType::class, ConsentType::class, FieldDefinitionType::class, FilterType::class, HostLinkType::class, ImportConfirmType::class, ImportUploadType::class, MergePickType::class, MergeType::class, NoteType::class, RecordType::class, SettingsType::class, TagType::class, TagsAssignType::class] as $type) {
             $s->set($type)->tag('form.type');

@@ -404,7 +404,7 @@ final readonly class ProjectResolver implements CrmHostObjectResolverInterface
 
     public function search(TenantRef $tenant, string $text, int $limit): array
     {
-        return [];   // reserved for a link picker; the 0.1.0 UI does not call it
+        return [];   // called only when the resolver also implements CrmHostObjectSearchInterface (0.7.0)
     }
 }
 ```
@@ -414,10 +414,65 @@ Rules on the 360° page:
 - a type **with** a resolver: a link the resolver returns (same id, byte for byte) shows its label and URL; a link it
   does not return (deleted, other tenant, no permission) is **hidden**;
 - a type **without** a resolver: the link shows its stored label (or "type id") **without** a URL;
-- the UI's "add link" form offers only the types that have a resolver (the host id is typed); the service
-  `HostLinkServiceInterface::link()` accepts any valid type.
+- the UI's "add link" form offers only the types that have a resolver (the host id is typed, or picked: see "Link
+  picker" below); the service `HostLinkServiceInterface::link()` accepts any valid type.
 
 Return only `http(s)` URLs or local paths from `resolve()`: the template renders the URL as given.
+
+### Link picker (0.7.0, optional)
+
+Two optional capabilities turn the *Link to* form's raw type and bare id field into a named type and a search. They
+are separate interfaces a resolver **may** also implement; CrmKit checks them with `instanceof` on every call
+(nothing is cached, worker-safe). A resolver that implements neither keeps the form exactly as before.
+
+```php
+use Nowo\CrmKitBundle\Domain\Port\{CrmHostObjectResolverInterface, CrmHostObjectSearchInterface, CrmHostObjectTypeLabelInterface};
+use Nowo\CrmKitBundle\Domain\Value\{HostObjectView, HostTypeLabel, TenantRef};
+
+final readonly class ProjectResolver implements CrmHostObjectResolverInterface, CrmHostObjectTypeLabelInterface, CrmHostObjectSearchInterface
+{
+    // type() and resolve() as above
+
+    public function typeLabel(): HostTypeLabel
+    {
+        return HostTypeLabel::trans('crm.host.project', 'messages');   // or HostTypeLabel::text('Project')
+    }
+
+    public function search(TenantRef $tenant, string $text, int $limit): array
+    {
+        $views = [];
+        foreach ($this->projects->searchVisible($tenant->value, $text, $limit) as $p) {   // your query, your matching
+            $views[] = new HostObjectView($p->id, $p->name);
+        }
+
+        return $views;   // list<HostObjectView>, best first, at most $limit
+    }
+}
+```
+
+- **Label.** `typeLabel()` returns a `HostTypeLabel`: a translation key and domain (translated with the request's
+  locale), or a plain text. Without the capability the form shows `type()`. Two types with the same label keep their
+  type in brackets.
+- **Search.** With `CrmHostObjectSearchInterface` the id field becomes a UiKit combobox (the form loads the
+  `combobox` runtime). It calls `GET <ui.path>/{type}/{id}/links/search?q=<text>` (route
+  `nowo_crm_kit_link_search`), lists the matches grouped by type label, and puts the picked `<type>:<id>` in the
+  hidden `crm_link[hostRef]`; typing again clears it. **Without JavaScript**, or when nothing is picked, the field
+  submits the typed text as the id of the type chosen in the select, as before, so the form always works.
+- **What CrmKit guarantees around your `search()`.** It is called only after the actor passed the link action's own
+  access decision (`edit` on the active record through the CRM gate: the feature gate, your access checker and the
+  `nowo_crm_kit.record_access_check` listeners), with the actor's tenant, a text trimmed and nothing else (1–100
+  characters; an empty or longer text never reaches you) and a `limit` of 1–20. Every answer is passed back through
+  your `resolve()` and kept only when it returns the same id byte for byte, so the picker never lists an object the
+  link would refuse, and the label shown is `resolve()`'s. A refused actor gets 404 / 403 (409 for a trashed record)
+  and you are not asked.
+- **What your `search()` must do.** Scope to `$tenant` and to what the actor may see (as `resolve()` does), match the
+  way you want (case, accents, prefix or infix: CrmKit compares nothing, REQ-SEC-006), honour `$limit`, keep it
+  stateless (FrankenPHP worker mode). The endpoint has no rate limit of its own: put the CRM path under your usual
+  request throttling if your search is costly.
+- **On submit** a picked value is accepted only for a type whose resolver has the search capability, and `link()`
+  still asks `resolve()` to confirm the id; anything else is the "invalid" / "unknown object" flash, never a free link.
+- `Domain\Service\HostObjectPickerInterface` (`searchableTypes()`, `search()`) is the same search as a service, for a
+  host page of its own.
 
 ## Services a host calls
 

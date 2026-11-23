@@ -271,7 +271,7 @@ FormKit field per active definition. The values are part of the record (versione
 link is resolved per call; a link the resolver does not return (deleted, other tenant, no permission) is **hidden**,
 never shown with its id. **(0.1.0)** A link of a type **without** a resolver (added through the service) shows its
 stored label (or "type id") without a URL. The UI's add-link form offers only the resolver types and asks for the
-host id; `CrmHostObjectResolverInterface::search()` (link picker) is not called yet. Panels (§8.2) are the host's own read models; the bundle passes the subject and the tenant and
+host id; `CrmHostObjectResolverInterface::search()` (link picker) is called only for a resolver that also implements the optional `CrmHostObjectSearchInterface` (0.7.0; type names through the optional `CrmHostObjectTypeLabelInterface`). Panels (§8.2) are the host's own read models; the bundle passes the subject and the tenant and
 renders what they return.
 
 ### 6.6 Timeline
@@ -416,7 +416,7 @@ UUID); UPGRADING has the migration of existing ids.
 | Port | Default | Purpose |
 |---|---|---|
 | `CrmPanelProviderInterface` (tagged `nowo_crm_kit.panel`, priority order) | none | `key(): string` (`^[a-z0-9_-]{1,40}$`), `supports(SubjectType): bool`, `panel(PanelContext $ctx): ?Panel`. `PanelContext`: tenant, subject (`SubjectRef`), actor, linked host refs of the subject. `Panel`: title (translation key + domain, or text), `list<PanelItem>` (title, url (local path or http(s)), subtitle, badge text + tone, meta), `total`, `moreUrl`, `emptyText`, `position` (`main` \| `side`). Returns null to show nothing. A provider that throws is logged (class names only) and skipped; a transient storage failure is rethrown (REQ-RUNTIME-003 rule 8) |
-| `CrmHostObjectResolverInterface` (tagged `nowo_crm_kit.host_object`) | none | `type(): string`, `resolve(TenantRef, list<string> $ids): array<string, HostObjectView>` (label, url; only the ids that exist in the tenant and the actor may see; keys must equal the requested ids byte for byte), `search(TenantRef, string $text, int $limit): list<HostObjectView>` for the link picker (**0.1.0**: not called yet) |
+| `CrmHostObjectResolverInterface` (tagged `nowo_crm_kit.host_object`) | none | `type(): string`, `resolve(TenantRef, list<string> $ids): array<string, HostObjectView>` (label, url; only the ids that exist in the tenant and the actor may see; keys must equal the requested ids byte for byte), `search(TenantRef, string $text, int $limit): list<HostObjectView>` for the link picker (**0.7.0**: called only when the resolver also implements the optional `CrmHostObjectSearchInterface`; `CrmHostObjectTypeLabelInterface::typeLabel(): HostTypeLabel` names the type) |
 | `CrmAuditSinkInterface::record(AuditEntry)` | `PsrLogAuditSink` (one structured line) | `crm.*` audit keys of every write (§13); AuditKit bridge later |
 | `IdGeneratorInterface::new(): string` | `SymfonyUuidGenerator` (UUIDv7) | Row ids |
 | `Psr\Clock\ClockInterface` | native clock | Every "now"; tests use `MockClock` |

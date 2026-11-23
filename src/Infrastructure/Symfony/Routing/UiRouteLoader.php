@@ -69,6 +69,7 @@ final class UiRouteLoader extends Loader
         $this->add($routes, 'note_edit', $base . '/notes/{id}/edit', $p . 'editNote', ['POST'], $id);
         $this->add($routes, 'note_delete', $base . '/notes/{id}/delete', $p . 'deleteNote', ['POST'], $id);
         $this->add($routes, 'tags_assign', $base . '/{type}/{id}/tags', $p . 'assignTags', ['POST'], $seg + $id);
+        $this->add($routes, 'link_search', $base . '/{type}/{id}/links/search', $p . 'searchLinks', ['GET'], $seg + $id);
         $this->add($routes, 'link_add', $base . '/{type}/{id}/links', $p . 'addLink', ['POST'], $seg + $id);
         $this->add($routes, 'link_remove', $base . '/links/{id}/remove', $p . 'removeLink', ['POST'], $id);
         $this->add($routes, 'affiliate', $base . '/contacts/{id}/affiliations', $p . 'affiliate', ['POST'], $id);

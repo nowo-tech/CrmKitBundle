@@ -133,7 +133,7 @@ final readonly class RecordPage
             }
             $types = $this->forms->hostTypes();
             if ($types !== []) {
-                $forms['link'] = $this->ui->form(HostLinkType::class, null, ['types' => $types], 'crm_link')->createView();
+                $forms['link'] = $this->ui->form(HostLinkType::class, null, ['types' => $types, 'picker' => $this->forms->hasHostPicker()], 'crm_link')->createView();
             }
             if ($type === SubjectType::Contact) {
                 // The add form offers the companies the contact is not linked to yet; a linked one has its own form below,

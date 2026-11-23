@@ -55,6 +55,9 @@ final class TestContext
      */
     public array $denied = [];
 
+    /** @var list<array{string, string, int}> tenant, text and limit of each call of the test tickets' search() */
+    public array $ticketSearches = [];
+
     /** @var list<string> channel|token of the record events seen (API tests) */
     public array $seenChannels = [];
 

@@ -17,7 +17,14 @@
 
 ## Unreleased
 
-No schema change, no BC break, no route change. **Visible change for every host that keeps the area tabs**
+**Link picker (optional, nothing to do).** `CrmHostObjectResolverInterface` is unchanged: a resolver that implements
+only it keeps today's form (the type's `type()` as its label, a text field for the id, now labelled "Object id"), and
+its `search()` is still never called. To get the type label and the picker, also implement
+`CrmHostObjectTypeLabelInterface` and / or `CrmHostObjectSearchInterface` (USAGE, "Link picker"). One new read-only
+route, `nowo_crm_kit_link_search` (GET, under `ui.path`); behind your firewall like every CRM route. E2E tests that
+read the field label "Id" now find "Object id".
+
+Area tabs: no schema change, no BC break. **Visible change for every host that keeps the area tabs**
 (`ui.list_tabs` / `ui.record_tabs` true, the defaults) **and whose UiKit icon set draws Tabler names**
 (`nowo_ui_kit.icon_set: tabler-icons`, or `ux_icon` with the Tabler set): the tabs gain an icon by default — next to the
 label with the `icon-text` tab style, instead of the label (shown as a tooltip, still the accessible name) with the

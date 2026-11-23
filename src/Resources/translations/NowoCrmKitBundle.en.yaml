@@ -179,7 +179,10 @@ link:
     remove: Remove
     form:
         type: Type
-        id: Id
+        id: 'Object id'
+        object: 'Object'
+        object_help: 'Type a name and pick one from the list, or type the object''s id.'
+        object_list: 'Matching objects'
         label: Label
 panel:
     empty: Nothing here yet.

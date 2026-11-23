@@ -17,18 +17,27 @@ use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectSearchInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\HostObjectPickerInterface;
 use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
+use Nowo\CrmKitBundle\Domain\Value\ExactId;
+use Nowo\CrmKitBundle\Domain\Value\HostObjectMatch;
 use Nowo\CrmKitBundle\Domain\Value\HostObjectRef;
+use Nowo\CrmKitBundle\Domain\Value\HostObjectView;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 
+use function array_slice;
 use function count;
+use function in_array;
 use function is_bool;
 use function is_float;
 use function is_int;
 use function is_string;
+use function max;
 use function mb_strlen;
+use function min;
 use function preg_match;
 use function str_starts_with;
 use function trim;
@@ -37,7 +46,7 @@ use function trim;
  * Host links and host timeline entries (contract sections 6.5 and 6.6). A link is unique per record and host object,
  * so a double add (or a racing one) stores one row. Stateless.
  */
-final readonly class HostLinkService implements HostLinkServiceInterface, TimelineInterface
+final readonly class HostLinkService implements HostLinkServiceInterface, HostObjectPickerInterface, TimelineInterface
 {
     /**
      * @param iterable<CrmHostObjectResolverInterface> $resolvers the host's resolvers (tag `nowo_crm_kit.host_object`)
@@ -133,6 +142,70 @@ final readonly class HostLinkService implements HostLinkServiceInterface, Timeli
 
             return $subjects;
         });
+    }
+
+    /**
+     * The (valid) host types whose resolver implements the search capability (checked per call, nothing cached).
+     */
+    public function searchableTypes(): array
+    {
+        $types = [];
+        foreach ($this->resolvers as $resolver) {
+            if ($resolver instanceof CrmHostObjectSearchInterface && preg_match(HostObjectRef::TYPE_PATTERN, $resolver->type()) === 1 && !in_array($resolver->type(), $types, true)) {
+                $types[] = $resolver->type();
+            }
+        }
+
+        return $types;
+    }
+
+    /**
+     * The link picker (0.7.0). The access decision is the link action's: `edit` on an active record of the tenant,
+     * through the same gate (feature gate, access checker, `nowo_crm_kit.record_access_check` listeners). The text is
+     * trimmed and passed to the resolver as it is (the resolver owns the comparison, REQ-SEC-006); every answer goes
+     * back through `resolve()` and is kept only when the resolver confirms the same id byte for byte, so the picker
+     * never offers an object the link action would refuse.
+     */
+    public function search(SubjectType $type, string $subjectId, string $text, int $limit = self::MAX_LIMIT): array
+    {
+        $context = $this->support->access->base();
+        $this->support->read(function () use ($context, $type, $subjectId): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $this->support->load($context, $type, $subjectId, CrmPermission::Edit);
+        });
+        $text  = trim($text);
+        $limit = max(1, min(self::MAX_LIMIT, $limit));
+        if ($text === '' || mb_strlen($text) > self::MAX_TEXT) {
+            return [];
+        }
+        $matches = [];
+        $done    = [];
+        foreach ($this->resolvers as $resolver) {
+            $hostType = $resolver->type();
+            if (!$resolver instanceof CrmHostObjectSearchInterface || isset($done[$hostType]) || preg_match(HostObjectRef::TYPE_PATTERN, $hostType) !== 1) {
+                continue;
+            }
+            $done[$hostType] = true;
+            $found           = $resolver->search($context->tenant, $text, $limit);
+            $ids             = [];
+            foreach ($found as $view) {
+                if (ExactId::isValid($view->id) && !in_array($view->id, $ids, true)) {
+                    $ids[] = $view->id;
+                }
+            }
+            $ids = array_slice($ids, 0, $limit);
+            if ($ids === []) {
+                continue;
+            }
+            $confirmed = $resolver->resolve($context->tenant, $ids);
+            foreach ($ids as $id) {
+                $view = $confirmed[$id] ?? null;
+                if ($view instanceof HostObjectView && $view->id === $id) {
+                    $matches[] = new HostObjectMatch(new HostObjectRef($hostType, $id), trim($view->label) === '' ? $id : $view->label);
+                }
+            }
+        }
+
+        return $matches;
     }
 
     /**

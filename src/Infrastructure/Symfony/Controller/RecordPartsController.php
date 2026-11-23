@@ -7,11 +7,13 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 use InvalidArgumentException;
 use Nowo\CrmKitBundle\Domain\Enum\ConsentSource;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\HostObjectPickerInterface;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
@@ -32,7 +34,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 use function array_filter;
+use function array_flip;
 use function array_values;
+use function in_array;
 use function is_array;
 use function is_numeric;
 use function is_string;
@@ -57,6 +61,7 @@ final readonly class RecordPartsController
         private CrmExporterInterface $exporter,
         private CrmPersonalDataInterface $personalData,
         private RecordForms $forms,
+        private HostObjectPickerInterface $picker,
     ) {
     }
 
@@ -142,18 +147,74 @@ final readonly class RecordPartsController
         $subject = RecordController::type($type);
 
         return $this->ui->act($request, function () use ($request, $subject, $id): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $types = $this->forms->hostTypes();
-            $data  = $this->submitted($request, HostLinkType::class, 'crm_link', ['types' => $types]);
-            try {
-                $host = new HostObjectRef(is_string($data['hostType'] ?? null) ? $data['hostType'] : '', is_string($data['hostId'] ?? null) ? $data['hostId'] : '');
-            } catch (InvalidArgumentException) {
-                throw InvalidInputException::field('hostId', 'error.invalid');
+            $types  = $this->forms->hostTypes();
+            $picker = $this->forms->hasHostPicker();
+            $data   = $this->submitted($request, HostLinkType::class, 'crm_link', ['types' => $types, 'picker' => $picker]);
+            $picked = $picker && is_string($data['hostRef'] ?? null) && $data['hostRef'] !== '' ? $data['hostRef'] : null;
+            if ($picked !== null) {
+                // 0.7.0: an object picked in the link picker, `<type>:<id>`, of a type that has a picker. The id is
+                // taken byte for byte; link() still asks the resolver to confirm it.
+                $host = HostObjectRef::fromKey($picked);
+                if (!$host instanceof HostObjectRef || !in_array($host->type, $this->picker->searchableTypes(), true)) {
+                    throw InvalidInputException::field('hostId', 'error.invalid');
+                }
+            } else {
+                try {
+                    $host = new HostObjectRef(is_string($data['hostType'] ?? null) ? $data['hostType'] : '', is_string($data['hostId'] ?? null) ? $data['hostId'] : '');
+                } catch (InvalidArgumentException) {
+                    throw InvalidInputException::field('hostId', 'error.invalid');
+                }
             }
             $this->links->link($subject, $id, $host, is_string($data['label'] ?? null) ? $data['label'] : null);
             $this->ui->flash($request, 'success', 'link.added');
 
             return $this->ui->toRecord($subject, $id);
         }, $this->ui->toRecord($subject, $id));
+    }
+
+    /**
+     * The link picker's answers (0.7.0): `GET …/{type}/{id}/links/search?q=<text>[&limit=<n>]`, the JSON of the UiKit
+     * combobox (`{"groups": [{"label", "options": [{"value": "<type>:<id>", "label"}]}]}`), one group per host type.
+     * Read only; the access decision is the link action's (`edit` on the record: 404 / 403 otherwise), the tenant is
+     * the actor's, `limit` is clamped to 1–20 per type. Never cached by the browser or a proxy.
+     */
+    public function searchLinks(Request $request, string $type, string $id): Response
+    {
+        $subject = RecordController::type($type);
+
+        return $this->ui->guard(function () use ($request, $subject, $id): Response { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $query = $request->query->all();
+            $text  = is_string($query['q'] ?? null) ? $query['q'] : '';
+            $limit = is_string($query['limit'] ?? null) && is_numeric($query['limit']) ? (int) $query['limit'] : HostObjectPickerInterface::MAX_LIMIT;
+            try {
+                $matches = $this->picker->search($subject, $id, $text, $limit);
+            } catch (ConflictException) {
+                return $this->json(['groups' => []], Response::HTTP_CONFLICT);
+            }
+            $labels = array_flip($this->forms->hostTypes());
+            $groups = [];
+            foreach ($matches as $match) {
+                $groups[$match->ref->type] ??= ['label' => $labels[$match->ref->type] ?? $match->ref->type, 'options' => []];
+                $groups[$match->ref->type]['options'][] = ['value' => $match->ref->key(), 'label' => $match->label];
+            }
+
+            return $this->json(['groups' => array_values($groups)]);
+        });
+    }
+
+    /**
+     * A JSON answer of the picker: private, never stored.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function json(array $data, int $status = Response::HTTP_OK): JsonResponse
+    {
+        $response = new JsonResponse($data, $status);
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->setVary(['Cookie', 'Accept'], false);
+
+        return $response;
     }
 
     /**

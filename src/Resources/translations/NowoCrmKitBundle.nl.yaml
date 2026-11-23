@@ -179,7 +179,10 @@ link:
     remove: Verwijderen
     form:
         type: Type
-        id: Id
+        id: 'Object-id'
+        object: 'Object'
+        object_help: 'Typ een naam en kies er een uit de lijst, of typ de id van het object.'
+        object_list: 'Gevonden objecten'
         label: Label
 panel:
     empty: Hier is nog niets.

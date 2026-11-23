@@ -35,4 +35,4 @@ processing, native apps.
 - The public JSON API `/crm/v1` (contract Q-O6 / Q-O16: decided for 0.3.0 by the owner on 2026-11-19).
 - A Messenger handler that runs large imports outside the request (0.1.0 runs them in requests and in
   `nowo:crm-kit:import:resume`).
-- A link picker on the 360° page that uses `CrmHostObjectResolverInterface::search()` (0.1.0 asks for the host id).
+- ~~A link picker on the 360° page that uses `CrmHostObjectResolverInterface::search()`~~ — done in 0.7.0 (optional `CrmHostObjectSearchInterface`).

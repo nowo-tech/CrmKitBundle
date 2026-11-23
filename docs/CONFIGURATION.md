@@ -119,6 +119,11 @@ Panel providers (`CrmPanelProviderInterface`) and host object resolvers (`CrmHos
 configured: any service implementing them is autoconfigured with its tag (`nowo_crm_kit.panel`,
 `nowo_crm_kit.host_object`).
 
+The link picker (0.7.0) has no configuration key either: a host object resolver turns it on by also implementing
+`CrmHostObjectSearchInterface`, and names its type by implementing `CrmHostObjectTypeLabelInterface` (USAGE, "Link
+picker"). Its endpoint `nowo_crm_kit_link_search` is registered with the other UI routes (`ui.enabled`, under
+`ui.path`) and needs the same firewall as the rest of the CRM.
+
 ## Security (REQ-UI-002)
 
 The house access shape of the Nowo admin UIs. Two layers: the host's firewall (`access_control` on the CRM's path) and

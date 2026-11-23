@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection" table="crm_hubspot_connection">
+        <unique-constraints>
+            <unique-constraint name="crm_hubspot_connection_tenant" columns="tenant_id"/>
+        </unique-constraints>
+        <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
+        <field name="tenantId" column="tenant_id" type="string" length="128"/>
+        <field name="kind" column="kind" type="string" length="16"/>
+        <field name="status" column="status" type="string" length="16" enum-type="Nowo\CrmKitBundle\Domain\Enum\HubSpotConnectionStatus"/>
+        <field name="accountId" column="account_id" type="string" length="20"/>
+        <field name="label" column="label" type="string" length="80"/>
+        <field name="tokenLast4" column="token_last4" type="string" length="4"/>
+        <field name="tokenKeyId" column="token_key_id" type="string" length="16"/>
+        <field name="tokenSealed" column="token_sealed" type="text"/>
+        <field name="scopes" column="scopes" type="json"/>
+        <field name="validatedAt" column="validated_at" type="nowo_crm_utc_datetime"/>
+        <field name="createdById" column="created_by_id" type="string" length="128" nullable="true"/>
+        <field name="createdAt" column="created_at" type="nowo_crm_utc_datetime"/>
+        <field name="updatedById" column="updated_by_id" type="string" length="128" nullable="true"/>
+        <field name="updatedAt" column="updated_at" type="nowo_crm_utc_datetime_micro"/>
+        <field name="version" column="version" type="integer" version="true"/>
+    </entity>
+</doctrine-mapping>

@@ -25,6 +25,9 @@ final class TestContext
     /** @var array<string, array<string, string>> tenant => actor => name */
     public array $owners = [];
 
+    /** @var array<string, array<string, string>> tenant => actor => e-mail (0.10.0, the HubSpot owner match) */
+    public array $emails = [];
+
     /** @var array<string, bool> tenant => feature on (default on) */
     public array $enabled = [];
 

@@ -21,6 +21,8 @@ final readonly class ImportView
      * @param array{created: int, updated: int, duplicate: int, invalid: int, limit: int} $counts
      * @param list<ImportRowView> $rows the first rows
      * @param bool $awaitingPerson an unattended run paused before a row that needs a person: "Continue" takes it at once
+     * @param DateTimeImmutable|null $resumeAfter 0.10.0: a paused HubSpot import waits until then
+     * @param string|null $errorCode 0.10.0: why a HubSpot import paused or failed
      */
     public function __construct(
         public string $id,
@@ -40,6 +42,8 @@ final readonly class ImportView
         public DateTimeImmutable $createdAt,
         public ?DateTimeImmutable $claimedAt,
         public bool $awaitingPerson = false,
+        public ?DateTimeImmutable $resumeAfter = null,
+        public ?string $errorCode = null,
     ) {
     }
 }

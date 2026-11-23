@@ -307,6 +307,67 @@ merge:
         other: Id van het andere record
         other_help: Het id in het adres van de pagina.
 import:
+    hubspot:
+        title: 'Importeren uit HubSpot'
+        source: 'Of importeren uit HubSpot'
+        step:
+            source: 'Verbinding'
+            connect: 'Servicesleutel'
+            start: 'Wat importeren'
+            mapping: 'Koppeling'
+            result: 'Resultaat'
+        intro:
+            connect: 'Plak een HubSpot-servicesleutel (of een oud privé-app-token) met alleen leesrechten. Hij wordt bij HubSpot gecontroleerd, versleuteld bewaard en nooit meer getoond.'
+            start: 'Kies wat uit HubSpot gelezen wordt. Contacten nemen hun bedrijven mee.'
+            mapping: 'Kies het CRM-veld van elke HubSpot-eigenschap. Lege HubSpot-waarden wissen nooit een CRM-waarde.'
+        submit:
+            connect: 'Controleren en opslaan'
+            start: 'Volgende'
+            mapping: 'Importeren'
+        form:
+            token: 'Servicesleutel (of privé-app-token)'
+            token_help: 'In HubSpot: Development → Keys → Service keys. Vink alleen de gedocumenteerde leesrechten aan.'
+            label: 'Naam (optioneel)'
+            confirm_account_change: 'De sleutel mag bij een ander HubSpot-account horen'
+            objects: 'Objecten'
+            objects_help: 'Deals volgen in een latere versie.'
+            lists: 'Lijsten (hun leden krijgen een label)'
+            lists_help: 'Hoogstens 50.'
+        object:
+            companies: 'Bedrijven'
+            contacts: 'Contacten'
+        list:
+            skip: 'Geen label'
+            create: 'Nieuw label met de naam van de lijst'
+            label: 'Lijst ‘%name%’'
+            option: '%name% (%kind%, %size%)'
+        target:
+            owner: 'Eigenaar (via e-mail)'
+            domain: 'Website uit het domein'
+            custom: 'Eigen veld %key%'
+        card:
+            label: 'Naam'
+            account: 'HubSpot-account'
+            credential: 'Servicesleutel'
+            status: 'Status'
+            scopes: 'Scopes'
+            validated: 'Gecontroleerd'
+        status:
+            active: 'Actief'
+            invalid: 'Geweigerd: plak een nieuwe sleutel'
+        start: 'Import starten'
+        replace: 'Sleutel vervangen'
+        disconnect: 'Loskoppelen'
+        connect: 'HubSpot verbinden'
+        not_connected: 'HubSpot is nog niet verbonden.'
+        ask_manager: 'Vraag een CRM-beheerder om HubSpot te verbinden.'
+        connected: 'HubSpot is verbonden.'
+        disconnected: 'HubSpot is losgekoppeld en de sleutel verwijderd.'
+        waiting: 'Wacht tot %time%'
+        col:
+            object: 'Object'
+            id: 'HubSpot-id'
+        country_unknown: 'Land niet ingevuld (geen tweeletterige code)'
     steps: 'Importstappen'
     step:
         file: 'Bestand'
@@ -410,6 +471,7 @@ search:
     see_all: 'Alle %count% tonen'
 flash:
     conflict:
+        crm_hubspot_rate_limited: 'Te veel sleutelcontroles voor deze organisatie. Wacht een paar minuten.'
         crm_stage_invalid: 'Deze fase kan niet worden gebruikt: ze hoort bij een andere trechter, of de fase of de trechter is gearchiveerd of gesloten.'
         crm_record_stale: 'Iemand heeft dit record op hetzelfde moment gewijzigd. Het formulier toont de huidige waarden: controleer ze en sla opnieuw op.'
         crm_record_merged: Dit record is met een ander record samengevoegd.
@@ -420,6 +482,22 @@ flash:
         crm_settings_stale: Iemand heeft de instellingen op hetzelfde moment gewijzigd. Controleer ze en sla opnieuw op.
         crm_write_conflict: 'Een andere wijziging van dezelfde gegevens kwam op hetzelfde moment binnen. Probeer het opnieuw.'
 error:
+    hubspot_token_invalid: 'HubSpot heeft deze servicesleutel (of privé-app-token) geweigerd, of hij hoort bij een ander account. Plak een geldige.'
+    hubspot_scope_missing: 'De sleutel mist een leesrecht dat de import nodig heeft. Voeg de gedocumenteerde scopes toe en probeer opnieuw.'
+    hubspot_scope_not_read_only: 'De sleutel mag ook naar HubSpot schrijven. Maak er een met alleen leesrechten.'
+    hubspot_unavailable: 'HubSpot gaf geen antwoord. Probeer het zo opnieuw.'
+    hubspot_account_changed: 'Deze sleutel hoort bij een ander HubSpot-account. Vink de bevestiging aan om van account te wisselen.'
+    hubspot_not_connected: 'HubSpot is niet verbonden.'
+    hubspot_list_unknown: 'Een van de lijsten bestaat niet of bevat geen bedrijven of contacten van de gekozen objecten.'
+    hubspot_list_name: 'Een lijstnaam kan geen labelnaam zijn (1 tot 60 tekens): kies een bestaand label.'
+    hubspot_rate_limited: 'De aanvraaglimiet van HubSpot is bereikt. De import gaat later vanzelf verder.'
+    hubspot_bad_response: 'HubSpot gaf een antwoord dat het CRM niet kan lezen. De import is gepauzeerd.'
+    hubspot_disconnected: 'HubSpot is losgekoppeld: de import is gestopt.'
+    hubspot_too_many: 'Het HubSpot-account bevat meer records dan de import toestaat: hij is gestopt.'
+    record_erased: 'De persoon is gewist (AVG): niet opnieuw geïmporteerd.'
+    record_trashed: 'Het record staat in de prullenbak: ongewijzigd gelaten.'
+    record_merged: 'Het record is intussen samengevoegd: probeer opnieuw.'
+    ambiguous_domain: 'Meerdere bedrijven delen dit domein: niet gekoppeld.'
     stage_invalid: 'De fase kon niet worden opgeslagen: controleer het formulier.'
     next_action_invalid: 'De volgende actie kon niet worden opgeslagen: controleer het formulier.'
     amount_invalid: 'Vul een bedrag in (hoogstens 4 decimalen) en een valuta van 3 letters.'

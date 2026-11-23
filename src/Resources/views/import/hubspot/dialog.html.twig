@@ -1,0 +1,25 @@
+{#
+  A HubSpot step of the import modal (0.10.0; answered to js/nowo-crm-import.js, see ImportDialog): the header steps,
+  the body and the footer of the modal's UiKit confirm_dialog anatomy. Cancel / Close first, then at most one primary,
+  bound to the step's form with form="…". Variables: see _body.html.twig.
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{%- set _b = 'NowoCrmKitBundle' -%}
+{%- set _index = {source: 0, connect: 0, start: 1, mapping: 2}[step] -%}
+{%- set _steps = [] -%}
+{%- for _name in ['source', 'start', 'mapping', 'result'] -%}
+    {%- set _steps = _steps|merge([{label: ('import.hubspot.step.' ~ _name)|trans({}, _d), status: loop.index0 < _index ? 'done' : (loop.index0 == _index ? 'current' : 'upcoming')}]) -%}
+{%- endfor -%}
+{%- set _form_id = 'crm-import-dialog-form' -%}
+<div data-crm-import-step="hubspot-{{ step }}" data-testid="crm-import-step" data-step="hubspot-{{ step }}">
+    <div data-part="steps">{{ include(nowo_ui_partial('steps', _b), {items: _steps, label: 'import.steps'|trans({}, _d), attr: {class: 'nowo-ui-steps--compact'}}, false) }}</div>
+    <div data-part="body">
+        {{ include('@NowoCrmKit/import/hubspot/_body.html.twig', {step: step, connection: connection, form: form, action: action, alert: alert, manage: manage, importId: importId, form_id: _form_id, bundle: _b}, false) }}
+    </div>
+    <div data-part="footer">
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-close data-testid="crm-import-dialog-cancel">{{ 'import.dialog.cancel'|trans({}, _d) }}</button>
+        {% if form %}
+            <button type="submit" form="{{ _form_id }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ ('import.hubspot.submit.' ~ step)|trans({}, _d) }}</button>
+        {% endif %}
+    </div>
+</div>

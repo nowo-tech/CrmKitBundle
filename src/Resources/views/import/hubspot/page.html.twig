@@ -1,0 +1,21 @@
+{#
+  A HubSpot step as a page (0.10.0; the no-JS fallback of the import modal). Variables: page (FormPage, no form),
+  step, connection, form, action, alert, manage, importId (see _body.html.twig).
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {%- set _d = 'NowoCrmKitBundle' -%}
+    {%- set _b = page.bundle -%}
+    <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-hubspot-step" data-step="{{ step }}">
+        <div class="{{ nowo_ui_class('card_body', _b) }}">
+            {{ include('@NowoCrmKit/import/hubspot/_body.html.twig', {step: step, connection: connection, form: form, action: action, alert: alert, manage: manage, importId: importId, form_id: 'crm-hubspot-form', bundle: _b}, false) }}
+            {% if form %}
+                <div class="{{ nowo_ui_class('form_actions', _b) }}">
+                    <button type="submit" form="crm-hubspot-form" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-hubspot-submit">{{ ('import.hubspot.submit.' ~ step)|trans({}, _d) }}</button>
+                    <a href="{{ path('nowo_crm_kit_hubspot') }}" class="{{ nowo_ui_class('btn_secondary', _b) }}">{{ 'import.dialog.cancel'|trans({}, _d) }}</a>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+{% endblock %}

@@ -12,6 +12,7 @@
     - import: ImportView (every step but file) or null
     - alert: an error shown above the step (a conflict, a refused CSRF token) or null
     - subject: contact | company | null (file: the list the modal was opened from)
+    - hubspot: 0.10.0, whether the HubSpot source is offered (file step)
 #}
 {%- set _d = 'NowoCrmKitBundle' -%}
 {%- set _b = 'NowoCrmKitBundle' -%}
@@ -36,6 +37,10 @@
                 {{ form_start(form, {action: path('nowo_crm_kit_import', subject ? {subject: subject} : {}), attr: {id: _form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
                 {{ include('@NowoCrmKit/import/_dialog_fields.html.twig', {form: form}, false) }}
                 {{ form_end(form) }}
+                {% if hubspot %}
+                    {#- 0.10.0: the HubSpot source, loaded in the modal (a plain link without JavaScript) -#}
+                    <p data-testid="crm-import-source-hubspot"><a href="{{ path('nowo_crm_kit_hubspot') }}" data-crm-import-link>{{ 'import.hubspot.source'|trans({}, _d) }}</a></p>
+                {% endif %}
             </div>
         {% elseif step == 'mapping' %}
             <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-import-mapping">
@@ -64,6 +69,7 @@
             <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-import-result" data-status="{{ import.status.value }}">
                 <h3>{{ ('import.status.' ~ import.status.value)|trans({}, _d) }}</h3>
                 <p data-testid="crm-import-summary-text">{{ 'import.summary'|trans({'%done%': import.rowsDone, '%total%': import.rowsTotal}, _d) }}</p>
+                {{ include('@NowoCrmKit/import/_hubspot_state.html.twig', {import: import, bundle: _b}, false) }}
                 <ul>
                     {% for outcome, count in import.counts %}<li data-testid="crm-import-count" data-outcome="{{ outcome }}">{{ ('import.outcome.' ~ outcome)|trans({}, _d) }}: {{ count }}</li>{% endfor %}
                 </ul>

@@ -9,6 +9,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
+use Nowo\CrmKitBundle\Application\Port\ExternalRefHooksInterface;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
@@ -52,6 +53,7 @@ final readonly class RecordPurger
         private ClockInterface $clock,
         private ?EventDispatcherInterface $events = null,
         private ?PipelineHousekeeping $pipeline = null,
+        private ?ExternalRefHooksInterface $refs = null,
     ) {
     }
 
@@ -62,6 +64,8 @@ final readonly class RecordPurger
     {
         $type = $record::type();
         $id   = $record->getId();
+        // 0.10.0: its HubSpot references go with it (an erased person's tombstone stays).
+        $this->refs?->forget($tenant, $type, $id);
         foreach ($this->store->taggings($tenant, $type, [$id]) as $row) {
             $this->store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }

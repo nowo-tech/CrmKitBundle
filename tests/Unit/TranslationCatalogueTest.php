@@ -38,6 +38,10 @@ final class TranslationCatalogueTest extends TestCase
      */
     private const ALLOWED_IDENTICAL = [
         'de' => [
+            'import.hubspot.form.label',
+            'import.hubspot.card.label',
+            'import.hubspot.card.status',
+            'import.hubspot.card.scopes',
             'board.title',
             'colour.orange',
             'consent.purpose.newsletter',
@@ -90,6 +94,8 @@ final class TranslationCatalogueTest extends TestCase
             'value.no',
         ],
         'fr' => [
+            'import.hubspot.object.contacts',
+            'import.hubspot.status.active',
             'colour.orange',
             'consent.source.api',
             'consent.source.import',
@@ -135,6 +141,9 @@ final class TranslationCatalogueTest extends TestCase
             'value.no',
         ],
         'nl' => [
+            'import.hubspot.card.status',
+            'import.hubspot.card.scopes',
+            'import.hubspot.col.object',
             'activity.host',
             'activity.via_token',
             'consent.source.api',

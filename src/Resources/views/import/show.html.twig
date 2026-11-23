@@ -11,6 +11,7 @@
     <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-import-summary" data-status="{{ import.status.value }}">
         <div class="{{ nowo_ui_class('card_body', _b) }}">
             <p>{{ 'import.summary'|trans({'%done%': import.rowsDone, '%total%': import.rowsTotal}, _d) }}</p>
+            {{ include('@NowoCrmKit/import/_hubspot_state.html.twig', {import: import, bundle: _b}, false) }}
             <ul>
                 {% for outcome, count in import.counts %}<li data-testid="crm-import-count" data-outcome="{{ outcome }}">{{ ('import.outcome.' ~ outcome)|trans({}, _d) }}: {{ count }}</li>{% endfor %}
             </ul>

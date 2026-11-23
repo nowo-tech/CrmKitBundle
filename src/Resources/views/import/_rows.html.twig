@@ -5,12 +5,14 @@
 {%- set _d = 'NowoCrmKitBundle' -%}
 <div class="nowo-ui-table-scroll" tabindex="0" role="region" aria-label="{{ 'import.preview'|trans({}, _d) }}">
 <table class="{{ nowo_ui_class('table', bundle) }}">
-    <thead><tr><th scope="col">#</th>{% for column in import.columns %}<th scope="col">{{ column }}</th>{% endfor %}<th scope="col">{{ 'import.col.check'|trans({}, _d) }}</th></tr></thead>
+    {#- 0.10.0: a HubSpot row is the object kind and its HubSpot id -#}
+    {%- set _columns = import.format.value == 'hubspot' ? ['object', 'id'] : import.columns -%}
+    <thead><tr><th scope="col">#</th>{% for column in _columns %}<th scope="col">{{ import.format.value == 'hubspot' ? ('import.hubspot.col.' ~ column)|trans({}, _d) : column }}</th>{% endfor %}<th scope="col">{{ 'import.col.check'|trans({}, _d) }}</th></tr></thead>
     <tbody>
     {% for row in import.rows %}
         <tr data-testid="crm-import-row" data-outcome="{{ row.outcome.value }}">
             <th scope="row">{{ row.rowNo }}</th>
-            {% for column in import.columns %}<td>{{ row.data[column] ?? '' }}</td>{% endfor %}
+            {% for column in _columns %}<td>{{ row.data[column] ?? '' }}</td>{% endfor %}
             <td>
                 {% if row.outcome.value != 'pending' %}{{ ('import.outcome.' ~ row.outcome.value)|trans({}, _d) }}{% if row.message %} · {{ row.message|trans({}, _d) }}{% endif %}
                 {% elseif row.errors is not empty %}{% for field, error in row.errors %}{{ field }}: {{ error|trans({}, _d) }}{% if not loop.last %}; {% endif %}{% endfor %}

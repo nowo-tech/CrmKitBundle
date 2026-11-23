@@ -307,6 +307,67 @@ merge:
         other: Id do outro registo
         other_help: O id que consta do endereço da sua página.
 import:
+    hubspot:
+        title: 'Importar do HubSpot'
+        source: 'Ou importar do HubSpot'
+        step:
+            source: 'Ligação'
+            connect: 'Chave de serviço'
+            start: 'O que importar'
+            mapping: 'Correspondência'
+            result: 'Resultado'
+        intro:
+            connect: 'Cole uma chave de serviço HubSpot (ou um antigo token de app privada) só com permissões de leitura. É verificada no HubSpot, guardada cifrada e nunca mais mostrada.'
+            start: 'Escolha o que ler do HubSpot. Os contactos trazem as suas empresas.'
+            mapping: 'Escolha o campo do CRM de cada propriedade HubSpot. Um valor vazio do HubSpot nunca apaga um valor do CRM.'
+        submit:
+            connect: 'Verificar e guardar'
+            start: 'Seguinte'
+            mapping: 'Importar'
+        form:
+            token: 'Chave de serviço (ou token de app privada)'
+            token_help: 'No HubSpot: Development → Keys → Service keys. Marque só as permissões de leitura documentadas.'
+            label: 'Nome (opcional)'
+            confirm_account_change: 'A chave pode pertencer a outra conta HubSpot'
+            objects: 'Objetos'
+            objects_help: 'Os negócios chegam numa versão posterior.'
+            lists: 'Listas (os membros recebem uma etiqueta)'
+            lists_help: 'No máximo 50.'
+        object:
+            companies: 'Empresas'
+            contacts: 'Contactos'
+        list:
+            skip: 'Não etiquetar'
+            create: 'Nova etiqueta com o nome da lista'
+            label: 'Lista «%name%»'
+            option: '%name% (%kind%, %size%)'
+        target:
+            owner: 'Responsável (por e-mail)'
+            domain: 'Site a partir do domínio'
+            custom: 'Campo personalizado %key%'
+        card:
+            label: 'Nome'
+            account: 'Conta HubSpot'
+            credential: 'Chave de serviço'
+            status: 'Estado'
+            scopes: 'Permissões'
+            validated: 'Verificada'
+        status:
+            active: 'Ativa'
+            invalid: 'Recusada: cole uma chave nova'
+        start: 'Iniciar uma importação'
+        replace: 'Substituir a chave'
+        disconnect: 'Desligar'
+        connect: 'Ligar o HubSpot'
+        not_connected: 'O HubSpot ainda não está ligado.'
+        ask_manager: 'Peça a um gestor do CRM para ligar o HubSpot.'
+        connected: 'O HubSpot está ligado.'
+        disconnected: 'O HubSpot foi desligado e a chave apagada.'
+        waiting: 'Aguarda até %time%'
+        col:
+            object: 'Objeto'
+            id: 'Id HubSpot'
+        country_unknown: 'País não definido (não é um código de duas letras)'
     steps: 'Passos da importação'
     step:
         file: 'Ficheiro'
@@ -410,6 +471,7 @@ search:
     see_all: 'Ver os %count%'
 flash:
     conflict:
+        crm_hubspot_rate_limited: 'Demasiadas verificações de chave para esta organização. Aguarde alguns minutos.'
         crm_stage_invalid: 'Esta etapa não pode ser usada: pertence a outro funil, ou a etapa ou o funil está arquivado ou fechado.'
         crm_record_stale: 'Alguém alterou este registo ao mesmo tempo. O formulário mostra os valores atuais: verifique-os e guarde novamente.'
         crm_record_merged: Este registo foi unido a outro.
@@ -420,6 +482,22 @@ flash:
         crm_settings_stale: Alguém alterou as definições ao mesmo tempo. Verifique-as e guarde novamente.
         crm_write_conflict: 'Outra alteração dos mesmos dados chegou ao mesmo tempo. Tente novamente.'
 error:
+    hubspot_token_invalid: 'O HubSpot recusou esta chave de serviço (ou token de app privada), ou pertence a outra conta. Cole uma válida.'
+    hubspot_scope_missing: 'Falta à chave uma permissão de leitura necessária à importação. Adicione as permissões documentadas e tente de novo.'
+    hubspot_scope_not_read_only: 'A chave também pode escrever no HubSpot. Crie uma só com permissões de leitura.'
+    hubspot_unavailable: 'O HubSpot não respondeu. Tente de novo daqui a pouco.'
+    hubspot_account_changed: 'Esta chave pertence a outra conta HubSpot. Marque a confirmação para mudar de conta.'
+    hubspot_not_connected: 'O HubSpot não está ligado.'
+    hubspot_list_unknown: 'Uma das listas não existe ou não contém empresas nem contactos dos objetos escolhidos.'
+    hubspot_list_name: 'O nome de uma lista não pode ser nome de etiqueta (1 a 60 caracteres): escolha uma etiqueta existente.'
+    hubspot_rate_limited: 'O limite de pedidos do HubSpot foi atingido. A importação continua sozinha mais tarde.'
+    hubspot_bad_response: 'O HubSpot respondeu algo que o CRM não consegue ler. A importação foi pausada.'
+    hubspot_disconnected: 'O HubSpot foi desligado: a importação parou.'
+    hubspot_too_many: 'A conta HubSpot tem mais registos do que a importação permite: parou.'
+    record_erased: 'A pessoa foi apagada (RGPD): não é importada de novo.'
+    record_trashed: 'O registo está no lixo: fica como está.'
+    record_merged: 'O registo foi fundido entretanto: tente de novo.'
+    ambiguous_domain: 'Várias empresas partilham este domínio: sem correspondência.'
     stage_invalid: 'Não foi possível guardar a etapa: verifique o formulário.'
     next_action_invalid: 'Não foi possível guardar a próxima ação: verifique o formulário.'
     amount_invalid: 'Introduza um valor (até 4 casas decimais) e uma moeda de 3 letras.'

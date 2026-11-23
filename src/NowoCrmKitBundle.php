@@ -52,6 +52,9 @@ final class NowoCrmKitBundle extends AbstractBundle
     /** Doctrine mapping name of the funnels (0.3.0; only with `pipeline.enabled`). */
     public const PIPELINE_MAPPING_NAME = 'NowoCrmKitBundlePipeline';
 
+    /** Doctrine mapping name of the HubSpot import (0.10.0; only with `import.hubspot.enabled`). */
+    public const HUBSPOT_MAPPING_NAME = 'NowoCrmKitBundleHubSpot';
+
     /** Public path of the bundle's assets after `assets:install` (REQ-ASSETS-004, the `nowo_crm_kit` asset package). */
     public const ASSETS_PATH = '/bundles/nowocrmkit';
 
@@ -117,6 +120,7 @@ final class NowoCrmKitBundle extends AbstractBundle
         $manager  = self::ALIAS;
         $pipeline = false;
         $api      = false;
+        $hubspot  = false;
         foreach ($builder->getExtensionConfig(self::ALIAS) as $config) {
             $doctrine = is_array($config) && is_array($config['doctrine'] ?? null) ? $config['doctrine'] : [];
             if (array_key_exists('entity_manager', $doctrine)) {
@@ -127,6 +131,10 @@ final class NowoCrmKitBundle extends AbstractBundle
             }
             if (is_array($config) && is_array($config['pipeline'] ?? null) && array_key_exists('enabled', $config['pipeline'])) {
                 $pipeline = $config['pipeline']['enabled'] === true;
+            }
+            $import = is_array($config) && is_array($config['import'] ?? null) ? $config['import'] : [];
+            if (is_array($import['hubspot'] ?? null) && array_key_exists('enabled', $import['hubspot'])) {
+                $hubspot = $import['hubspot']['enabled'] === true;
             }
         }
         $builder->prependExtensionConfig('doctrine', ['dbal' => ['types' => [UtcDateTimeImmutableType::NAME => UtcDateTimeImmutableType::class, UtcMicroDateTimeImmutableType::NAME => UtcMicroDateTimeImmutableType::class]]]);
@@ -143,6 +151,10 @@ final class NowoCrmKitBundle extends AbstractBundle
         if ($api) {
             // 0.3.0: the idempotency table is mapped only while `api.enabled`.
             $mappings[self::API_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-api', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Api', 'is_bundle' => false];
+        }
+        if ($hubspot) {
+            // 0.10.0: the HubSpot connection and external reference tables only while `import.hubspot.enabled`.
+            $mappings[self::HUBSPOT_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-hubspot', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\HubSpot', 'is_bundle' => false];
         }
         $builder->prependExtensionConfig('doctrine', ['orm' => ['entity_managers' => [$manager => ['mappings' => $mappings]]]]);
     }

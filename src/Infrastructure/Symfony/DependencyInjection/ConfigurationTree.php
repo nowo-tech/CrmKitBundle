@@ -51,7 +51,7 @@ final class ConfigurationTree
     public static function define(ArrayNodeDefinition $root): void
     {
         $children = $root->addDefaultsIfNotSet()->children();
-        foreach (['tenant_resolver', 'feature_gate', 'plan_limits', 'actor_directory', 'audit_sink', 'clock'] as $port) {
+        foreach (['tenant_resolver', 'feature_gate', 'plan_limits', 'actor_directory', 'audit_sink', 'clock', 'actor_email_lookup'] as $port) {
             $children->scalarNode($port)->defaultNull()->info('Service id of the host implementation; null = the bundle default.')->end();
         }
         $security = $children->arrayNode('security')->addDefaultsIfNotSet()->info('REQ-UI-002: who may use the CRM. Each *_roles list grants its area to any of its roles; an empty list (access, manage, amounts, campaigns only) means any authenticated user.')->children();
@@ -84,13 +84,14 @@ final class ConfigurationTree
         $children->arrayNode('fields')->addDefaultsIfNotSet()->children()
             ->integerNode('max_per_subject')->defaultValue(50)->min(1)->max(200)->end()
         ->end()->end();
-        $children->arrayNode('import')->addDefaultsIfNotSet()->children()
-            ->integerNode('max_rows')->defaultValue(5000)->min(1)->max(50000)->end()
-            ->integerNode('max_bytes')->defaultValue(5242880)->min(1024)->max(52428800)->end()
-            ->integerNode('sync_rows')->defaultValue(500)->min(10)->max(50000)->end()
-            ->integerNode('chunk_rows')->defaultValue(100)->min(10)->max(1000)->end()
-            ->integerNode('stale_claim_seconds')->defaultValue(600)->min(60)->max(86400)->end()
-        ->end()->end();
+        $import = $children->arrayNode('import')->addDefaultsIfNotSet()->children();
+        $import->integerNode('max_rows')->defaultValue(5000)->min(1)->max(50000)->end();
+        $import->integerNode('max_bytes')->defaultValue(5242880)->min(1024)->max(52428800)->end();
+        $import->integerNode('sync_rows')->defaultValue(500)->min(10)->max(50000)->end();
+        $import->integerNode('chunk_rows')->defaultValue(100)->min(10)->max(1000)->end();
+        $import->integerNode('stale_claim_seconds')->defaultValue(600)->min(60)->max(86400)->end();
+        self::hubspot($children, $import);
+        $import->end()->end();
         $children->arrayNode('gdpr')->addDefaultsIfNotSet()->children()
             ->arrayNode('purposes')->scalarPrototype()->end()->defaultValue(['marketing_email', 'newsletter', 'tracking'])
                 ->validate()->ifTrue(static fn (array $v): bool => !self::purposes($v))->thenInvalid('gdpr.purposes are distinct keys of 1-64 characters of a-z, 0-9, "_" or ".", starting with a letter.')->end()
@@ -144,6 +145,7 @@ final class ConfigurationTree
         ->end();
         self::pipeline($children);
         self::api($children);
+        $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !self::hasSecretBox($v))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs a secret box: set secrets.box, or secrets.keys with secrets.current_key one of them.')->end();
         foreach (self::LATER_PHASES as $phase => $release) {
             $children->arrayNode($phase)->addDefaultsIfNotSet()->children()
                 ->booleanNode('enabled')->defaultFalse()
@@ -151,6 +153,89 @@ final class ConfigurationTree
                 ->end()
             ->end()->end();
         }
+    }
+
+    /**
+     * The secret box (0.10.0) and the HubSpot import source with the optional background run (design section 6).
+     */
+    private static function hubspot(NodeBuilder $children, NodeBuilder $import): void
+    {
+        $secrets = $children->arrayNode('secrets')->addDefaultsIfNotSet()->info('0.10.0: the box that seals the kit\'s secrets (the HubSpot token).')->children();
+        $secrets->scalarNode('box')->defaultNull()->info('Service id of a CrmSecretBoxInterface (e.g. Nowo\\CrmKitBundle\\Bridge\\DoctrineEncrypt\\DoctrineEncryptCrmSecretBox); null = SodiumCrmSecretBox with the keys below.')->end();
+        $secrets->arrayNode('keys')->info('Key id (1-16 of a-z, 0-9, "_", "-") => 32-byte key, from the environment: \'%env(base64:CRM_KIT_SECRET_KEY_2026)%\'. Every key opens; current_key seals.')
+            ->useAttributeAsKey('id')->normalizeKeys(false)->scalarPrototype()->end()->defaultValue([])
+            ->validate()->ifTrue(static fn (array $v): bool => !self::keyIds($v))->thenInvalid('secrets.keys maps key ids of 1-16 characters of a-z, 0-9, "_" or "-" to keys.')->end()
+        ->end();
+        $secrets->scalarNode('current_key')->defaultNull()->info('The key id that seals; the other keys only open (rotation: nowo:crm-kit:secrets:rotate).')->end();
+        $secrets->end()->end();
+        $hubspot = $import->arrayNode('hubspot')->addDefaultsIfNotSet()->info('0.10.0: import companies, contacts, owners and lists from HubSpot (a private app token per tenant, read-only scopes).')->children();
+        $hubspot->booleanNode('enabled')->defaultFalse()->info('Needs a secret box (secrets.box, or secrets.keys + current_key) and symfony/http-client; maps the HubSpot tables and routes.')->end();
+        $hubspot->integerNode('page_size')->defaultValue(100)->min(10)->max(100)->info('Objects per HubSpot page (HubSpot\'s maximum is 100).')->end();
+        $hubspot->integerNode('pages_per_request')->defaultValue(2)->min(1)->max(20)->info('Pages a web request settles before "Continue", the resume command or the background run.')->end();
+        $hubspot->integerNode('max_records')->defaultValue(50000)->min(1)->max(500000)->info('Most objects per kind per run; beyond, the import fails with hubspot_too_many.')->end();
+        $hubspot->enumNode('outbound_url_guard')->values(['auto', 'required', 'off'])->defaultValue('auto')->info('Pin api.hubapi.com to the public address OutboundUrlGuard resolves: auto = when nowo-tech/outbound-url-guard-bundle is installed, required = fail the build without it, off.')->end();
+        $hubspot->arrayNode('http')->addDefaultsIfNotSet()->children()
+            ->integerNode('timeout')->defaultValue(10)->min(1)->max(120)->info('Idle timeout in seconds.')->end()
+            ->integerNode('max_duration')->defaultValue(30)->min(1)->max(600)->info('Seconds per request.')->end()
+            ->integerNode('max_response_bytes')->defaultValue(8388608)->min(65536)->max(67108864)->info('Largest body read; a larger one is hubspot_bad_response.')->end()
+        ->end()->end();
+        $hubspot->arrayNode('rate_limit')->addDefaultsIfNotSet()->children()
+            ->integerNode('max_attempts')->defaultValue(5)->min(1)->max(10)->info('Attempts per request on 429 / 5xx in the resume command and the background run (a web request never waits).')->end()
+            ->integerNode('max_retry_after')->defaultValue(60)->min(1)->max(3600)->info('Longest wait in seconds; a longer one (the daily limit) pauses the import until then.')->end()
+        ->end()->end();
+        $hubspot->arrayNode('connect_rate_limit')->addDefaultsIfNotSet()->info('Token checks per tenant (valid or not).')->children()
+            ->integerNode('limit')->defaultValue(5)->min(1)->max(100)->end()
+            ->integerNode('interval')->defaultValue(600)->min(60)->max(86400)->info('Window in seconds.')->end()
+        ->end()->end();
+        $hubspot->end()->end();
+        $import->arrayNode('messenger')->addDefaultsIfNotSet()->info('0.10.0 (REQ-MSG-001): run imports (any format) in the background with Symfony Messenger.')->children()
+            ->booleanNode('enabled')->defaultFalse()->info('true: confirm and "Continue" dispatch RunCrmImport instead of running in the request (route it to an async transport).')->end()
+            ->integerNode('units')->defaultValue(20)->min(1)->max(1000)->info('Chunks (HubSpot: pages) per message; the handler dispatches the next message.')->end()
+        ->end()->end();
+    }
+
+    /**
+     * Whether `import.hubspot.enabled` is true in a validated root.
+     *
+     * @param array<mixed> $root
+     */
+    private static function hubspotOn(array $root): bool
+    {
+        $import = is_array($root['import'] ?? null) ? $root['import'] : [];
+
+        return is_array($import['hubspot'] ?? null) && ($import['hubspot']['enabled'] ?? false) === true;
+    }
+
+    /**
+     * Whether a secret box is configured: a service id, or keys with a current key among them.
+     *
+     * @param array<mixed> $root
+     */
+    private static function hasSecretBox(array $root): bool
+    {
+        $secrets = is_array($root['secrets'] ?? null) ? $root['secrets'] : [];
+        if (is_string($secrets['box'] ?? null) && $secrets['box'] !== '') {
+            return true;
+        }
+        $keys = is_array($secrets['keys'] ?? null) ? $secrets['keys'] : [];
+
+        return is_string($secrets['current_key'] ?? null) && array_key_exists($secrets['current_key'], $keys);
+    }
+
+    /**
+     * Whether every key of the map is a key id.
+     *
+     * @param array<mixed> $value
+     */
+    private static function keyIds(array $value): bool
+    {
+        foreach ($value as $id => $key) {
+            if (preg_match('/\A[a-z0-9_-]{1,16}\z/D', (string) $id) !== 1 || !is_string($key) || $key === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

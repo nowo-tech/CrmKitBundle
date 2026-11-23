@@ -329,6 +329,28 @@ interface CrmStoreInterface
     /** Claims a running import that waits for a person (claim token empty) for `$token`; whether this call won. */
     public function resumeImport(TenantRef $tenant, string $id, string $token, DateTimeImmutable $now): bool;
 
+    /**
+     * 0.10.0: releases the claim of `$token` on a running import that waits until a time (null: until a person or a
+     * new token resumes it), with the reason; whether this call held it.
+     */
+    public function pauseImportUntil(string $id, string $token, DateTimeImmutable $now, ?DateTimeImmutable $resumeAfter, ?string $errorCode): bool;
+
+    /**
+     * 0.10.0 (`import.messenger.enabled`): releases the claim of `$token` and makes the import due now, for the
+     * background run; whether this call held it.
+     */
+    public function queueImport(string $id, string $token, DateTimeImmutable $now): bool;
+
+    /** 0.10.0: ends a running import as failed with the reason. */
+    public function failImport(string $id, DateTimeImmutable $now, string $errorCode): void;
+
+    /**
+     * 0.10.0: running imports without a claim whose `resume_after` passed (paused HubSpot imports, queued runs).
+     *
+     * @return list<array{tenant: string, id: string}>
+     */
+    public function dueImports(DateTimeImmutable $now, int $limit): array;
+
     /** Locks the import row and tells whether `$token` still holds it. */
     public function holdsImport(string $id, string $token): bool;
 

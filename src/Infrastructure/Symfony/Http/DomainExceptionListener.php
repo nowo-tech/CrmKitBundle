@@ -39,7 +39,8 @@ final readonly class DomainExceptionListener
             return;
         }
         if ($failure instanceof AccessDeniedException) {
-            $event->setThrowable(new AccessDeniedHttpException('Forbidden.', $failure));
+            // 0.10.0: on the HubSpot routes every denial is a 404 (no profile learns that the source exists).
+            $event->setThrowable($request->attributes->get(UiRouteLoader::HIDDEN_ATTRIBUTE) === true ? new NotFoundHttpException('Not found.', $failure) : new AccessDeniedHttpException('Forbidden.', $failure));
 
             return;
         }

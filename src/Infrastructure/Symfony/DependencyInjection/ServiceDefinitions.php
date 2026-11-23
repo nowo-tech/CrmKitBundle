@@ -27,6 +27,13 @@ use Nowo\CrmKitBundle\Application\CrmPersonalData;
 use Nowo\CrmKitBundle\Application\CrmReader;
 use Nowo\CrmKitBundle\Application\FieldService;
 use Nowo\CrmKitBundle\Application\HostLinkService;
+use Nowo\CrmKitBundle\Application\HubSpot\HubSpotConnectionService;
+use Nowo\CrmKitBundle\Application\HubSpot\HubSpotImportService;
+use Nowo\CrmKitBundle\Application\HubSpot\HubSpotRecordWriter;
+use Nowo\CrmKitBundle\Application\HubSpot\HubSpotRunner;
+use Nowo\CrmKitBundle\Application\HubSpot\HubSpotTokenOpener;
+use Nowo\CrmKitBundle\Application\HubSpot\Port\HubSpotReaderInterface;
+use Nowo\CrmKitBundle\Application\HubSpot\Port\HubSpotStoreInterface;
 use Nowo\CrmKitBundle\Application\ImportService;
 use Nowo\CrmKitBundle\Application\MergeService;
 use Nowo\CrmKitBundle\Application\NoteService;
@@ -47,6 +54,8 @@ use Nowo\CrmKitBundle\Application\PlanCounter;
 use Nowo\CrmKitBundle\Application\Port\CrmActorDataStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmBatchLookupStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
+use Nowo\CrmKitBundle\Application\Port\ExternalRefHooksInterface;
+use Nowo\CrmKitBundle\Application\Port\ImportRunDispatcherInterface;
 use Nowo\CrmKitBundle\Application\RecordPurger;
 use Nowo\CrmKitBundle\Application\RecordService;
 use Nowo\CrmKitBundle\Application\RecordViews;
@@ -61,12 +70,14 @@ use Nowo\CrmKitBundle\Bridge\SearchKit\CrmRecordSearchDefinition;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmActorEmailLookupInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
@@ -81,19 +92,25 @@ use Nowo\CrmKitBundle\Domain\Service\CrmSettingsInterface;
 use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostObjectPickerInterface;
+use Nowo\CrmKitBundle\Domain\Service\HubSpotConnectionServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\HubSpotImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
+use Nowo\CrmKitBundle\Infrastructure\Crypto\SodiumCrmSecretBox;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Api\DoctrineCrmApiIdempotencyStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\CrmMetadataListener;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmActorDataStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmBatchLookupStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineHubSpotStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrinePipelineStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
+use Nowo\CrmKitBundle\Infrastructure\HubSpot\HttpHubSpotReader;
+use Nowo\CrmKitBundle\Infrastructure\HubSpot\HubSpotHttpClientFactory;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\ConfiguredCrmApiTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\Controller\CrmApiController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\CrmApiAuthenticatorInterface;
@@ -106,7 +123,9 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\ApiPurgeIdempotencyCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\CountersRebuildCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\ImportResumeCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\PurgeCommand;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\SecretsRotateCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\AdminController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\HubSpotImportController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ImportController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineAdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineController;
@@ -128,6 +147,9 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FieldDefinitionType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FunnelType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\HostLinkType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\HubSpotConnectType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\HubSpotMappingType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\HubSpotStartType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ImportConfirmType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ImportUploadType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\LifecycleType;
@@ -145,6 +167,9 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\TagType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\CrmConflictFormatter;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\DomainExceptionListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\EntityManagerHygieneListener;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\MessengerImportRunDispatcher;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImport;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImportHandler;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredFeatureGate;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredPlanLimits;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\PsrLogAuditSink;
@@ -166,6 +191,7 @@ use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseFormatterInterface;
 use Nowo\UiKitBundle\Dialog\RemoteDialogResponder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 use function class_exists;
 use function intdiv;
@@ -271,7 +297,11 @@ final class ServiceDefinitions
         $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class), service(PartyCatalogue::class), service(CrmActorResolverInterface::class)]);
         $pipeline     = is_array($config['pipeline'] ?? null) && ($config['pipeline']['enabled'] ?? false) === true;
         $housekeeping = $pipeline ? service(PipelineHousekeeping::class) : null;
-        $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $housekeeping])->public();
+        $hubspot      = self::hubspotOn($config);
+        $messenger    = self::messengerOn($config);
+        // 0.10.0: merges, purges and erasures keep the external references in step (only while HubSpot is on).
+        $refs = $hubspot ? service(ExternalRefHooksInterface::class) : null;
+        $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $housekeeping, $refs])->public();
         $s->set(RecordService::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(Taggings::class), service(CrmActorDirectoryInterface::class), service(RecordPurger::class), service(Roles::class), service(PartyCatalogue::class)]);
         $s->alias(RecordServiceInterface::class, RecordService::class)->public();
         $s->set(CrmReader::class)->args([service(WriteSupport::class), service(RecordViews::class), service(CrmActorDirectoryInterface::class), tagged_iterator(CrmPanelProviderInterface::PANEL_TAG), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), $logger])->public();
@@ -297,9 +327,12 @@ final class ServiceDefinitions
             param($p . 'import.max_bytes'),
             param($p . 'import.chunk_rows'),
             param($p . 'import.stale_claim_seconds'),
+            $hubspot ? service(HubSpotRunner::class) : null,
+            param($p . 'import.hubspot.pages_per_request'),
+            $messenger ? service(ImportRunDispatcherInterface::class) : null,
         ])->public();
         $s->alias(ImportServiceInterface::class, ImportService::class)->public();
-        $s->set(MergeService::class)->args([service(WriteSupport::class), service(RecordViews::class), service(PlanCounter::class), $housekeeping]);
+        $s->set(MergeService::class)->args([service(WriteSupport::class), service(RecordViews::class), service(PlanCounter::class), $housekeeping, $refs]);
         $s->alias(MergeServiceInterface::class, MergeService::class)->public();
         $s->set(CrmExporter::class)->args([service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class)]);
         $s->alias(CrmExporterInterface::class, CrmExporter::class)->public();
@@ -308,7 +341,7 @@ final class ServiceDefinitions
         $s->alias(CrmActorDataStoreInterface::class, DoctrineCrmActorDataStore::class);
         $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events]);
         $s->alias(CrmActorPersonalDataInterface::class, ActorPersonalData::class)->public();
-        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping]);
+        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping, $refs]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
@@ -324,7 +357,7 @@ final class ServiceDefinitions
 
         // HTTP.
         $s->set(CrmApiRouteLoader::class)->args([param($p . 'api.http.enabled'), param($p . 'api_path'), param($p . 'pipeline.enabled')])->tag('routing.loader');
-        $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path'), param($p . 'pipeline.enabled')])->tag('routing.loader');
+        $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path'), param($p . 'pipeline.enabled'), param($p . 'import.hubspot.enabled')])->tag('routing.loader');
         $s->set(DomainExceptionListener::class)->tag('kernel.event_listener', ['event' => 'kernel.exception', 'method' => 'onKernelException', 'priority' => 32]);
         if (interface_exists(ConflictResponseFormatterInterface::class)) {
             $s->set(CrmConflictFormatter::class)->tag('nowo_transaction_doctrine.conflict_response_formatter', ['priority' => 10]);
@@ -332,6 +365,14 @@ final class ServiceDefinitions
         $ui = is_array($config['ui'] ?? null) && ($config['ui']['enabled'] ?? false) === true;
         if ($pipeline) {
             self::pipeline($container);
+        }
+        if ($hubspot) {
+            self::hubspot($container, $config);
+        }
+        if ($messenger) {
+            $s->set(ImportRunDispatcherInterface::class, MessengerImportRunDispatcher::class)->args([service('messenger.default_bus'), $clock]);
+            $s->set(RunCrmImportHandler::class)->args([service(ImportService::class), service(ImportRunDispatcherInterface::class), param($p . 'import.messenger.units')])
+                ->tag('messenger.message_handler', ['handles' => RunCrmImport::class]);
         }
         if ($api) {
             self::api($container, $pipeline);
@@ -341,6 +382,12 @@ final class ServiceDefinitions
         }
         if ($ui && $pipeline) {
             self::pipelineUi($container);
+        }
+        if ($ui && $hubspot) {
+            $s->set(HubSpotImportController::class)->args([service(UiSupport::class), service(HubSpotConnectionServiceInterface::class), service(HubSpotImportServiceInterface::class), service(ImportServiceInterface::class), param($p . 'import.sync_chunks')])->public()->tag('controller.service_arguments');
+            foreach ([HubSpotConnectType::class, HubSpotStartType::class, HubSpotMappingType::class] as $type) {
+                $s->set($type)->tag('form.type');
+            }
         }
         $search = is_array($config['search'] ?? null) && ($config['search']['enabled'] ?? false) === true;
         if ($ui && $search && class_exists(self::SEARCH_DEFINITION_CLASS)) {
@@ -365,6 +412,76 @@ final class ServiceDefinitions
         if ($pipeline) {
             $s->set($p . 'search.deal', CrmDealSearchDefinition::class)->args($args)->tag(self::SEARCH_DEFINITION_TAG, ['priority' => 58])->public();
         }
+    }
+
+    /**
+     * Whether `import.hubspot.enabled` (0.10.0).
+     *
+     * @param array<string, mixed> $config
+     */
+    public static function hubspotOn(array $config): bool
+    {
+        $import = is_array($config['import'] ?? null) ? $config['import'] : [];
+
+        return is_array($import['hubspot'] ?? null) && ($import['hubspot']['enabled'] ?? false) === true;
+    }
+
+    /**
+     * Whether `import.messenger.enabled` (0.10.0).
+     *
+     * @param array<string, mixed> $config
+     */
+    public static function messengerOn(array $config): bool
+    {
+        $import = is_array($config['import'] ?? null) ? $config['import'] : [];
+
+        return is_array($import['messenger'] ?? null) && ($import['messenger']['enabled'] ?? false) === true;
+    }
+
+    /**
+     * The HubSpot import (0.10.0, only with `import.hubspot.enabled`): the kit's own HttpClient, the reader, the store,
+     * the default secret box (the secret box alias and the OutboundUrlGuard pin are set by CrmPortsPass), the services
+     * and the rotation command.
+     *
+     * @param array<string, mixed> $config
+     */
+    private static function hubspot(ContainerConfigurator $container, array $config): void
+    {
+        $s       = $container->services();
+        $p       = self::P;
+        $clock   = service($p . 'clock');
+        $secrets = is_array($config['secrets'] ?? null) ? $config['secrets'] : [];
+        $s->set($p . 'hubspot.http_client', HttpClientInterface::class)->factory([HubSpotHttpClientFactory::class, 'create'])->args([param($p . 'import.hubspot.http.timeout'), param($p . 'import.hubspot.http.max_duration')]);
+        $s->set(HttpHubSpotReader::class)->args([service($p . 'hubspot.http_client'), param($p . 'import.hubspot.http.max_response_bytes'), null]);
+        $s->alias(HubSpotReaderInterface::class, HttpHubSpotReader::class);
+        $s->set(DoctrineHubSpotStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->alias(HubSpotStoreInterface::class, DoctrineHubSpotStore::class);
+        $s->alias(ExternalRefHooksInterface::class, DoctrineHubSpotStore::class);
+        if (is_string($secrets['current_key'] ?? null) && is_array($secrets['keys'] ?? null)) {
+            $s->set($p . 'default.secret_box', SodiumCrmSecretBox::class)->args([$secrets['keys'], $secrets['current_key']]);
+        }
+        $s->set(HubSpotTokenOpener::class)->args([service(CrmSecretBoxInterface::class), service(HubSpotStoreInterface::class), service(TransactionRunnerInterface::class)]);
+        $s->set(HubSpotRecordWriter::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(PlanCounter::class)]);
+        $s->set(HubSpotRunner::class)->args([
+            service(WriteSupport::class),
+            service(HubSpotStoreInterface::class),
+            service(HubSpotReaderInterface::class),
+            service(HubSpotTokenOpener::class),
+            service(HubSpotRecordWriter::class),
+            $clock,
+            service(CrmActorDirectoryInterface::class),
+            service(CrmActorEmailLookupInterface::class)->nullOnInvalid(),
+            service('logger')->nullOnInvalid(),
+            param($p . 'import.hubspot.page_size'),
+            param($p . 'import.hubspot.max_records'),
+            param($p . 'import.hubspot.rate_limit.max_attempts'),
+            param($p . 'import.hubspot.rate_limit.max_retry_after'),
+        ]);
+        $s->set(HubSpotConnectionService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(CrmSecretBoxInterface::class), param($p . 'import.hubspot.connect_rate_limit.limit'), param($p . 'import.hubspot.connect_rate_limit.interval')]);
+        $s->alias(HubSpotConnectionServiceInterface::class, HubSpotConnectionService::class)->public();
+        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled')]);
+        $s->alias(HubSpotImportServiceInterface::class, HubSpotImportService::class)->public();
+        $s->set(SecretsRotateCommand::class)->args([service(HubSpotStoreInterface::class), service(CrmSecretBoxInterface::class), service(TransactionRunnerInterface::class), $clock])->tag('console.command');
     }
 
     /**
@@ -478,7 +595,7 @@ final class ServiceDefinitions
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid()]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class), service(ImportServiceInterface::class), service(RemoteDialogResponder::class)->nullOnInvalid()])->public()->tag('controller.service_arguments');
         $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class), service(HostObjectPickerInterface::class)])->public()->tag('controller.service_arguments');
-        $s->set(ImportController::class)->args([service(UiSupport::class), service(ImportServiceInterface::class), service(RecordForms::class), param($p . 'import.sync_chunks'), param($p . 'import.max_bytes')])->public()->tag('controller.service_arguments');
+        $s->set(ImportController::class)->args([service(UiSupport::class), service(ImportServiceInterface::class), service(RecordForms::class), param($p . 'import.sync_chunks'), param($p . 'import.max_bytes'), param($p . 'import.hubspot.enabled')])->public()->tag('controller.service_arguments');
         foreach ([ActionType::class, AdminFilterType::class, AffiliationType::class, ConsentType::class, FieldDefinitionType::class, FilterType::class, HostLinkType::class, ImportConfirmType::class, ImportUploadType::class, MergePickType::class, MergeType::class, NoteType::class, RecordType::class, SettingsType::class, TagType::class, TagsAssignType::class] as $type) {
             $s->set($type)->tag('form.type');
         }

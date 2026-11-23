@@ -307,6 +307,67 @@ merge:
         other: Other record id
         other_help: The id in the address of its page.
 import:
+    hubspot:
+        title: 'Import from HubSpot'
+        source: 'Import from HubSpot instead'
+        step:
+            source: 'Connection'
+            connect: 'Service key'
+            start: 'What to import'
+            mapping: 'Mapping'
+            result: 'Result'
+        intro:
+            connect: 'Paste a HubSpot service key (or a legacy private app token) with read scopes only. It is checked with HubSpot, stored encrypted and never shown again.'
+            start: 'Choose what to read from HubSpot. Contacts bring their companies along.'
+            mapping: 'Choose the CRM field of each HubSpot property. Empty HubSpot values never clear a CRM value.'
+        submit:
+            connect: 'Check and save'
+            start: 'Next'
+            mapping: 'Import'
+        form:
+            token: 'Service key (or private app token)'
+            token_help: 'In HubSpot: Development → Keys → Service keys. Tick the read scopes of the documentation only.'
+            label: 'Name (optional)'
+            confirm_account_change: 'The key may belong to another HubSpot account'
+            objects: 'Objects'
+            objects_help: 'Deals come in a later release.'
+            lists: 'Lists (their members get a tag)'
+            lists_help: 'At most 50.'
+        object:
+            companies: 'Companies'
+            contacts: 'Contacts'
+        list:
+            skip: 'Do not tag'
+            create: 'New tag named after the list'
+            label: 'List “%name%”'
+            option: '%name% (%kind%, %size%)'
+        target:
+            owner: 'Owner (by e-mail)'
+            domain: 'Website from the domain'
+            custom: 'Custom field %key%'
+        card:
+            label: 'Name'
+            account: 'HubSpot account'
+            credential: 'Service key'
+            status: 'Status'
+            scopes: 'Scopes'
+            validated: 'Checked'
+        status:
+            active: 'Active'
+            invalid: 'Refused: paste a new key'
+        start: 'Start an import'
+        replace: 'Replace the key'
+        disconnect: 'Disconnect'
+        connect: 'Connect HubSpot'
+        not_connected: 'HubSpot is not connected yet.'
+        ask_manager: 'Ask a CRM manager to connect HubSpot.'
+        connected: 'HubSpot is connected.'
+        disconnected: 'HubSpot was disconnected and its key deleted.'
+        waiting: 'Waits until %time%'
+        col:
+            object: 'Object'
+            id: 'HubSpot id'
+        country_unknown: 'Country not set (not a two-letter code)'
     steps: 'Import steps'
     step:
         file: 'File'
@@ -410,6 +471,7 @@ search:
     see_all: 'See all %count%'
 flash:
     conflict:
+        crm_hubspot_rate_limited: 'Too many key checks for this organisation. Wait a few minutes and try again.'
         crm_stage_invalid: 'This stage cannot be used: it belongs to another funnel, or the stage or the funnel is archived or closed.'
         crm_record_stale: 'Someone changed this record at the same moment. The form shows the current values: check them and save again.'
         crm_record_merged: This record was merged into another one.
@@ -420,6 +482,22 @@ flash:
         crm_settings_stale: Someone changed the settings at the same moment. Check them and save again.
         crm_write_conflict: 'Another change of the same data arrived at the same moment. Try again.'
 error:
+    hubspot_token_invalid: 'HubSpot refused this service key (or private app token), or it belongs to another account. Paste a valid one.'
+    hubspot_scope_missing: 'The key lacks a read scope the import needs. Add the scopes listed in the documentation and try again.'
+    hubspot_scope_not_read_only: 'The key may also write to HubSpot. Create one with read scopes only.'
+    hubspot_unavailable: 'HubSpot did not answer. Try again in a moment.'
+    hubspot_account_changed: 'This key belongs to another HubSpot account. Tick the confirmation to switch accounts.'
+    hubspot_not_connected: 'HubSpot is not connected.'
+    hubspot_list_unknown: 'One of the lists does not exist or holds neither companies nor contacts of the chosen objects.'
+    hubspot_list_name: 'A list name cannot be a tag name (1 to 60 characters): choose an existing tag.'
+    hubspot_rate_limited: 'HubSpot''s rate limit was reached. The import goes on by itself later.'
+    hubspot_bad_response: 'HubSpot answered something the CRM cannot read. The import paused.'
+    hubspot_disconnected: 'HubSpot was disconnected: the import stopped.'
+    hubspot_too_many: 'The HubSpot account holds more records than the import allows: it stopped.'
+    record_erased: 'The person was erased (GDPR): not imported again.'
+    record_trashed: 'The record is in the trash: left as it is.'
+    record_merged: 'The record was merged meanwhile: try again.'
+    ambiguous_domain: 'Several companies share this domain: not matched.'
     stage_invalid: 'The stage could not be saved: check the form.'
     next_action_invalid: 'The next action could not be saved: check the form.'
     amount_invalid: 'Enter an amount (up to 4 decimals) and a 3-letter currency.'

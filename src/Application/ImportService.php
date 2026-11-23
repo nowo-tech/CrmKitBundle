@@ -7,6 +7,8 @@ namespace Nowo\CrmKitBundle\Application;
 use DateInterval;
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\CrmKitBundle\Application\HubSpot\HubSpotRunner;
+use Nowo\CrmKitBundle\Application\Port\ImportRunDispatcherInterface;
 use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
@@ -53,6 +55,7 @@ use function count;
 use function json_encode;
 use function mb_strlen;
 use function mb_strtolower;
+use function min;
 use function trim;
 
 use const JSON_THROW_ON_ERROR;
@@ -60,7 +63,10 @@ use const JSON_THROW_ON_ERROR;
 /**
  * CSV and vCard imports (contract sections 9 and 15.4): upload parses into rows; confirm claims the import with a
  * conditional UPDATE (one winner); run settles pending rows in chunks, one transaction each, holding the import row
- * lock for the chunk so two runners never process the same rows; a stale claim is taken over. Stateless.
+ * lock for the chunk so two runners never process the same rows; a stale claim is taken over. **(0.10.0)** A HubSpot
+ * import runs through the same claim, one HubSpot page per unit ({@see HubSpotRunner}); the resume command also takes
+ * the imports whose `resume_after` passed; with `import.messenger.enabled` a confirmed import is queued and "Continue"
+ * dispatches the background run ({@see self::runQueued()}). Stateless.
  */
 final readonly class ImportService implements ImportServiceInterface
 {
@@ -79,6 +85,9 @@ final readonly class ImportService implements ImportServiceInterface
         private int $maxBytes = 5242880,
         private int $chunkRows = 100,
         private int $staleSeconds = 600,
+        private ?HubSpotRunner $hubspot = null,
+        private int $pagesPerRequest = 2,
+        private ?ImportRunDispatcherInterface $dispatcher = null,
     ) {
     }
 
@@ -89,6 +98,10 @@ final readonly class ImportService implements ImportServiceInterface
     {
         $context = $this->support->access->context(CrmPermission::Import);
         $name    = trim($fileName) === '' || mb_strlen($fileName) > 255 || !ExactId::isValid(trim($fileName), 1020) ? 'import' : trim($fileName);
+        if (!$format->isFile()) {
+            // 0.10.0: a HubSpot import starts from its connection (HubSpotImportServiceInterface::start()).
+            throw new ImportFileException('import.error.read');
+        }
         if ($format === ImportFormat::Vcard && $type !== SubjectType::Contact) {
             throw new ImportFileException('import.error.vcard_contacts');
         }
@@ -150,11 +163,21 @@ final readonly class ImportService implements ImportServiceInterface
             $import  = $this->import($context->tenant, $id);
             $fields  = $this->activeFields($context->tenant, $import->getSubjectType());
             $mapping = $with ?? $import->getMapping();
+            if ($with !== null && !$import->getFormat()->isFile()) {
+                // A HubSpot import's mapping is HubSpotImportServiceInterface::schema()'s.
+                throw InvalidInputException::field('mapping', 'import.error.mapping');
+            }
             if ($with !== null && !ImportMapping::valid($with, $import->getColumns(), ImportMapping::targets($import->getSubjectType(), $fields))) {
                 throw InvalidInputException::field('mapping', 'import.error.mapping');
             }
             $views = [];
             foreach ($this->support->store->importRows($id, max(1, min(100, $rows)), false) as $row) {
+                if (!$import->getFormat()->isFile()) {
+                    // 0.10.0: a HubSpot row holds the object kind and its HubSpot id only, settled when written.
+                    $views[] = new ImportRowView($row->getRowNo(), $row->getData(), $row->getOutcome(), $row->getRecordId(), $row->getMessage(), [], []);
+
+                    continue;
+                }
                 $errors                           = [];
                 $duplicates                       = [];
                 [$input, , , $purposes, $primary] = ImportMapping::input($import->getSubjectType(), $row->getData(), $mapping);
@@ -195,6 +218,8 @@ final readonly class ImportService implements ImportServiceInterface
                 $import->getCreatedAt(),
                 $import->getClaimedAt(),
                 $import->isAwaitingPerson(),
+                $import->getResumeAfter(),
+                $import->getErrorCode(),
             );
         });
     }
@@ -211,8 +236,13 @@ final readonly class ImportService implements ImportServiceInterface
                 throw InvalidInputException::field('mapping', 'import.error.mapping');
             }
             $token = $this->support->id();
+            $won   = $this->support->store->claimImport($context->tenant, $id, $expectedVersion, $token, json_encode($mapping, JSON_THROW_ON_ERROR), $policy->value, $context->now);
+            if ($won && $this->dispatcher instanceof ImportRunDispatcherInterface) {
+                // import.messenger.enabled: left unclaimed and due now; run() dispatches the background run.
+                $this->support->store->queueImport($id, $token, $context->now);
+            }
 
-            return $this->support->store->claimImport($context->tenant, $id, $expectedVersion, $token, json_encode($mapping, JSON_THROW_ON_ERROR), $policy->value, $context->now);
+            return $won;
         });
         if (!$won) {
             throw new ConflictException(ConflictException::IMPORT_RUNNING, $id);
@@ -229,6 +259,16 @@ final readonly class ImportService implements ImportServiceInterface
         if ($import->getStatus() !== ImportStatus::Running) {
             return $import->getStatus() === ImportStatus::Done;
         }
+        if ($this->dispatcher instanceof ImportRunDispatcherInterface && $import->getClaimToken() === null && $import->getResumeAfter() instanceof DateTimeImmutable) {
+            // 0.10.0: a queued (or time-paused) import runs in the background; one waiting for a person runs here.
+            $this->dispatcher->dispatch($context->tenant, $id, $import->getResumeAfter() > $context->now ? $import->getResumeAfter() : null);
+
+            return false;
+        }
+        if (!$import->getFormat()->isFile() && $maxChunks !== null) {
+            // 0.10.0: a web request settles at most `import.hubspot.pages_per_request` HubSpot pages.
+            $maxChunks = min($maxChunks, $this->pagesPerRequest);
+        }
 
         $token = $import->getClaimToken();
         if ($token === null) {
@@ -238,7 +278,40 @@ final readonly class ImportService implements ImportServiceInterface
         }
 
         // The rows of this run are attributed to the person who clicked (Continue), not to the uploader.
-        return $this->runClaimed($context->tenant, $id, (string) $token, $maxChunks, $context->actor->value);
+        return $this->runClaimed($context->tenant, $id, (string) $token, $maxChunks, $context->actor->value, true, $import->getFormat()) === 'done';
+    }
+
+    /**
+     * 0.10.0, the background run (`RunCrmImport`, no signed-in person): claims the import when it is unclaimed (queued
+     * or paused) or its claim is stale, runs up to `$maxChunks` units unattended and answers what follows: `more`
+     * (queued again, due now), `wait` (paused until the time), `done`, or `stop` (nothing to do: finished, claimed by
+     * another runner, or waiting for a person or a new token). A redelivered message finds the claim taken and stops.
+     *
+     * @return array{string, DateTimeImmutable|null}
+     */
+    public function runQueued(TenantRef $tenant, string $id, int $maxChunks): array
+    {
+        $now    = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
+        $import = $this->support->read(fn (): ?Import => RecordId::isValid($id) ? $this->support->store->import($tenant, $id) : null);
+        if (!$import instanceof Import || $import->getStatus() !== ImportStatus::Running || ($import->getResumeAfter() instanceof DateTimeImmutable && $import->getResumeAfter() > $now)) {
+            return [$import?->getStatus() === ImportStatus::Running && $import->getResumeAfter() instanceof DateTimeImmutable ? 'wait' : 'stop', $import?->getResumeAfter()];
+        }
+        $token = $this->support->id();
+        $won   = $this->support->write(fn (): bool => $import->getClaimToken() === null
+            ? ($import->getResumeAfter() instanceof DateTimeImmutable && $this->support->store->resumeImport($tenant, $id, $token, $now))
+            : $this->support->store->takeOverImport($tenant, $id, $token, $now, $this->staleBefore($now)));
+        if (!$won) {
+            return ['stop', null];
+        }
+        $state = $this->runClaimed($tenant, $id, $token, $maxChunks, null, false, $import->getFormat());
+        if ($state === 'more') {
+            $this->support->write(fn (): bool => $this->support->store->queueImport($id, $token, $this->clock->now()->setTimezone(new DateTimeZone('UTC'))));
+
+            return ['more', null];
+        }
+        $after = $this->support->read(fn (): ?Import => $this->support->store->import($tenant, $id));
+
+        return $state === 'done' ? ['done', null] : ($after?->getResumeAfter() instanceof DateTimeImmutable && $after->getStatus() === ImportStatus::Running ? ['wait', $after->getResumeAfter()] : ['stop', null]);
     }
 
     /**
@@ -273,7 +346,16 @@ final readonly class ImportService implements ImportServiceInterface
             $tenant = new TenantRef($stale['tenant']);
             $token  = $this->support->id();
             $won    = $this->support->write(fn (): bool => $this->support->store->takeOverImport($tenant, $stale['id'], $token, $now, $this->staleBefore($now)));
-            if ($won && $this->runClaimed($tenant, $stale['id'], $token, null, null, false)) {
+            if ($won && $this->runClaimed($tenant, $stale['id'], $token, null, null, false, $this->formatOf($tenant, $stale['id'])) === 'done') {
+                ++$finished;
+            }
+        }
+        // 0.10.0: paused HubSpot imports whose wait is over, and queued runs.
+        foreach ($this->support->read(fn (): array => $this->support->store->dueImports($now, $limit)) as $due) {
+            $tenant = new TenantRef($due['tenant']);
+            $token  = $this->support->id();
+            $won    = $this->support->write(fn (): bool => $this->support->store->resumeImport($tenant, $due['id'], $token, $now));
+            if ($won && $this->runClaimed($tenant, $due['id'], $token, null, null, false, $this->formatOf($tenant, $due['id'])) === 'done') {
                 ++$finished;
             }
         }
@@ -282,18 +364,37 @@ final readonly class ImportService implements ImportServiceInterface
     }
 
     /**
-     * Runs chunks while this claim holds the import.
+     * Runs chunks (HubSpot: pages) while this claim holds the import: the last state (`more` when `$maxChunks` ran
+     * out).
      */
-    private function runClaimed(TenantRef $tenant, string $id, string $token, ?int $maxChunks, ?string $actor = null, bool $attended = true): bool
+    private function runClaimed(TenantRef $tenant, string $id, string $token, ?int $maxChunks, ?string $actor, bool $attended, ImportFormat $format): string
     {
-        for ($chunk = 0; $maxChunks === null || $chunk < $maxChunks; ++$chunk) {
-            $state = $this->chunkOnceMore($tenant, $id, $token, $actor, $attended);
-            if ($state !== 'more') {
-                return $state === 'done';
-            }
+        $state = 'more';
+        for ($chunk = 0; $state === 'more' && ($maxChunks === null || $chunk < $maxChunks); ++$chunk) {
+            $state = $format->isFile() || !$this->hubspot instanceof HubSpotRunner
+                ? $this->chunkOnceMore($tenant, $id, $token, $actor, $attended)
+                : $this->hubspot->step($tenant, $id, $token, $actor ?? $this->support->read(fn (): string => self::runActor($this->import($tenant, $id))), $attended);
         }
 
-        return false;
+        return $state;
+    }
+
+    /**
+     * The format of an import of the tenant.
+     */
+    private function formatOf(TenantRef $tenant, string $id): ImportFormat
+    {
+        return $this->support->read(fn (): ImportFormat => $this->import($tenant, $id)->getFormat());
+    }
+
+    /**
+     * The actor of an unattended run: the uploader, unless anonymised or unknown, else {@see self::SYSTEM_ACTOR}.
+     */
+    public static function runActor(Import $import): string
+    {
+        $creator = $import->getCreatedById();
+
+        return $creator !== null && ExactId::isValid($creator) && !ActorRef::isReserved($creator) ? $creator : self::SYSTEM_ACTOR;
     }
 
     /**
@@ -327,7 +428,7 @@ final readonly class ImportService implements ImportServiceInterface
         $import = $this->import($tenant, $id);
         $now    = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
         // An anonymised uploader is no actor: the run is then the system's (audit VD2-3).
-        $actor ??= $import->getCreatedById() !== null && ExactId::isValid($import->getCreatedById()) && !ActorRef::isReserved($import->getCreatedById()) ? $import->getCreatedById() : self::SYSTEM_ACTOR;
+        $actor ??= self::runActor($import);
         $context = new CrmContext($tenant, new ActorRef($actor), $now);
         $type    = $import->getSubjectType();
         $fields  = $store->fields($tenant, $type, true);

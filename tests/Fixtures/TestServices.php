@@ -9,6 +9,8 @@ use Nowo\CrmKitBundle\Domain\Event\ConsentRecorded;
 use Nowo\CrmKitBundle\Domain\Event\ContactErased;
 use Nowo\CrmKitBundle\Domain\Event\HostLinkAdded;
 use Nowo\CrmKitBundle\Domain\Event\HostLinkRemoved;
+use Nowo\CrmKitBundle\Domain\Event\HubSpotConnected;
+use Nowo\CrmKitBundle\Domain\Event\HubSpotDisconnected;
 use Nowo\CrmKitBundle\Domain\Event\ImportCompleted;
 use Nowo\CrmKitBundle\Domain\Event\NoteAdded;
 use Nowo\CrmKitBundle\Domain\Event\RecordCreated;
@@ -40,7 +42,7 @@ final class TestServices
 
     public const USERS = ['ana' => ['password' => 'x', 'roles' => ['ROLE_USER']], 'root' => ['password' => 'x', 'roles' => ['ROLE_ADMIN']], 'leo' => ['password' => 'x', 'roles' => ['ROLE_USER']]];
 
-    public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, RecordsPurged::class, ActorAnonymised::class, TagsChanged::class, RolesChanged::class, HostLinkAdded::class, HostLinkRemoved::class];
+    public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, RecordsPurged::class, ActorAnonymised::class, TagsChanged::class, RolesChanged::class, HostLinkAdded::class, HostLinkRemoved::class, HubSpotConnected::class, HubSpotDisconnected::class];
 
     /** The bundle configuration that points every port at the test services. */
     public const PORTS = [

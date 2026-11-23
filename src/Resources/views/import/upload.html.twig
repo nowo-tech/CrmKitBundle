@@ -1,4 +1,12 @@
 {#
-  Import, step 1: upload a CSV or vCard file (contract section 9). Variables: page (FormPage).
+  Import, step 1: upload a CSV or vCard file (contract section 9), or **(0.10.0)** pick HubSpot. Variables: page
+  (FormPage), hubspot (bool: import.hubspot.enabled).
 #}
 {% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_content %}
+    {{ parent() }}
+    {% if hubspot|default(false) %}
+        <p data-testid="crm-import-source-hubspot"><a href="{{ path('nowo_crm_kit_hubspot') }}">{{ 'import.hubspot.source'|trans({}, 'NowoCrmKitBundle') }}</a></p>
+    {% endif %}
+{% endblock %}

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Domain\Model;
 
 use Nowo\CrmKitBundle\Domain\Enum\RowOutcome;
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 
 /**
  * One parsed row of an import (unique per import and row number); settled once by `UPDATE … WHERE outcome = 'pending'`.
+ * **(0.10.0)** A HubSpot row is stored already settled and holds only `{"object": …, "id": …}`: no property value.
  */
 class ImportRow
 {
@@ -26,7 +28,14 @@ class ImportRow
         private string $tenantId,
         private int $rowNo,
         private array $data,
+        private ?SubjectType $subjectType = null,
     ) {
+    }
+
+    /** 0.10.0: the record type of the row when it differs per row (HubSpot); null = the import's type. */
+    public function getSubjectType(): ?SubjectType
+    {
+        return $this->subjectType;
     }
 
     /**

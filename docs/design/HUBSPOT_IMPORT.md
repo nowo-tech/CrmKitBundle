@@ -1,6 +1,6 @@
 # HubSpot import source: design
 
-Status 2026-11-23: **design, not built.** For symfony-beacon spec `253-crm-hubspot-import` (block A, tasks T001–T003,
+Status 2026-11-23: **H1 built for 0.10.0** (see the revision at the end of CONTRACT §26: service keys, scope probing, `run_cursor`); H2 and H3 not built. Original status: design, not built. For symfony-beacon spec `253-crm-hubspot-import` (block A, tasks T001–T003,
 T020) and owner decision D-20261123-04. Nothing here is code yet; each slice gets its contract revision from this page
 (CONTRACT §26) before it is built. The open questions are in [section 15](#15-questions-for-the-owner-q-h); the build
 follows the recommended answers until the owner replies.

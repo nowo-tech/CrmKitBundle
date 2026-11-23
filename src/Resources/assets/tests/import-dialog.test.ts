@@ -503,4 +503,31 @@ describe('start and the steps', () => {
     modal.close();
     expect(dialogElement().querySelector('.nowo-ui-dialog__steps')).toBeNull();
   });
+
+  it('loads a link of the flow in the modal (0.10.0, the HubSpot source), once, and leaves other links alone', async () => {
+    const source = '<p><a href="/crm/import/hubspot" data-crm-import-link data-testid="hubspot">HubSpot</a><a href="/crm/contacts" data-testid="other">Contacts</a></p>';
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(fragment(step('file', source)))
+      .mockReturnValue(new Promise<Response>(() => undefined));
+    const stop = start(document, { fetcher });
+    document.querySelector<HTMLElement>('[data-testid="opener"]')?.click();
+    await flush();
+    const dialog = dialogElement();
+    const other = dialog.querySelector<HTMLAnchorElement>('[data-testid="other"]');
+    const otherClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+    other?.dispatchEvent(otherClick);
+    expect(otherClick.defaultPrevented).toBe(false);
+    const link = dialog.querySelector<HTMLAnchorElement>('[data-testid="hubspot"]');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link?.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    await flush();
+    expect(String(fetcher.mock.calls[1]?.[0])).toContain('/crm/import/hubspot');
+    // A second click while the first request is pending loads nothing more and never leaves the page.
+    const again = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link?.dispatchEvent(again);
+    expect(again.defaultPrevented).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    stop();
+  });
 });

@@ -10,10 +10,12 @@ use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotConnectionView;
 use Nowo\CrmKitBundle\Domain\Value\SealedSecret;
 use Nowo\CrmKitBundle\Domain\Value\SecretContext;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Crypto\SodiumCrmSecretBox;
+use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\FakeHubSpot;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Throwable;
@@ -59,36 +61,36 @@ final class HubSpotConnectionTest extends HubSpotTestCase
     {
         $fake             = $this->hubspot();
         $fake->introspect = false;
-        $fake->scopes     = [...$fake::REQUIRED];
+        $fake->scopes     = [...FakeHubSpot::REQUIRED];
         $view             = $this->connections()->connect($fake->token, null, null);
         self::assertSame('HubSpot 4242', $view->label);
-        self::assertSame($fake::REQUIRED, $view->scopes);
+        self::assertSame(FakeHubSpot::REQUIRED, $view->scopes);
         $probed = array_map(static fn (array $r): string => (string) parse_url($r[1], PHP_URL_PATH), $fake->requests);
         self::assertContains('/crm/v3/lists/search', $probed);
         self::assertContains('/account-info/v3/details', $probed);
         // A missing read scope found by a probe (403) is refused.
         $fake->scopes = ['crm.objects.companies.read'];
-        $this->expectInput(fn () => $this->connections()->connect($fake->token, null, $view->version), 'token', 'error.hubspot_scope_missing');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, $view->version), 'token', 'error.hubspot_scope_missing');
     }
 
     public function testWriteScopesMissingScopesAndRefusedTokensAreRefused(): void
     {
         $fake         = $this->hubspot(['import' => ['hubspot' => ['connect_rate_limit' => ['limit' => 20]]]]);
-        $fake->scopes = [...$fake::REQUIRED, 'crm.objects.contacts.write'];
-        $this->expectInput(fn () => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_scope_not_read_only');
+        $fake->scopes = [...FakeHubSpot::REQUIRED, 'crm.objects.contacts.write'];
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_scope_not_read_only');
         $fake->scopes = ['crm.objects.contacts.read'];
-        $this->expectInput(fn () => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_scope_missing');
-        $fake->scopes = [...$fake::REQUIRED, 'oauth'];
-        $this->expectInput(fn () => $this->connections()->connect('wrong-key-1234567', null, null), 'token', 'error.hubspot_token_invalid');
-        $this->expectInput(fn () => $this->connections()->connect('short', null, null), 'token', 'error.hubspot_token_invalid');
-        $this->expectInput(fn () => $this->connections()->connect($fake->token, str_repeat('L', 81), null), 'label', 'error.invalid');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_scope_missing');
+        $fake->scopes = [...FakeHubSpot::REQUIRED, 'oauth'];
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect('wrong-key-1234567', null, null), 'token', 'error.hubspot_token_invalid');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect('short', null, null), 'token', 'error.hubspot_token_invalid');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, str_repeat('L', 81), null), 'label', 'error.invalid');
         $fake->failNext('/account-info', 503);
-        $this->expectInput(fn () => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_unavailable');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_unavailable');
         $fake->failNext('/oauth/v2/private-apps', 502);
-        $this->expectInput(fn () => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_unavailable');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_unavailable');
         // Token info of another account than the credential's: refused.
         $fake->failNext('/oauth/v2/private-apps', 200, [], '{"hubId": 777, "scopes": []}');
-        $this->expectInput(fn () => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_token_invalid');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), 'token', 'error.hubspot_token_invalid');
         self::assertNull($this->connections()->status());
         self::assertContains('crm.hubspot.token_invalid', $this->recorder()->actions());
         self::assertSame(1, $this->connections()->connect($fake->token, null, null)->version);
@@ -98,10 +100,10 @@ final class HubSpotConnectionTest extends HubSpotTestCase
     {
         $fake    = $this->hubspot();
         $version = $this->connect($fake);
-        $this->expectConflict(fn () => $this->connections()->connect($fake->token, null, null), ConflictException::STALE);
-        $this->expectConflict(fn () => $this->connections()->connect($fake->token, null, $version + 5), ConflictException::STALE);
+        $this->expectConflict(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), ConflictException::STALE);
+        $this->expectConflict(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, $version + 5), ConflictException::STALE);
         $fake->account = '5151';
-        $this->expectInput(fn () => $this->connections()->connect($fake->token, null, $version), 'token', 'error.hubspot_account_changed');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, $version), 'token', 'error.hubspot_account_changed');
         $view = $this->connections()->connect($fake->token, 'Other', $version, true);
         self::assertSame(['5151', 'Other'], [$view->accountId, $view->label]);
         self::assertGreaterThan($version, $view->version);
@@ -116,9 +118,9 @@ final class HubSpotConnectionTest extends HubSpotTestCase
     public function testTokenChecksAreRateLimitedPerTenant(): void
     {
         $fake = $this->hubspot(['import' => ['hubspot' => ['connect_rate_limit' => ['limit' => 2, 'interval' => 60]]]]);
-        $this->expectInput(fn () => $this->connections()->connect('wrong-key-1234567', null, null), 'token', 'error.hubspot_token_invalid');
-        $this->expectInput(fn () => $this->connections()->connect('wrong-key-1234567', null, null), 'token', 'error.hubspot_token_invalid');
-        $this->expectConflict(fn () => $this->connections()->connect($fake->token, null, null), ConflictException::HUBSPOT_RATE_LIMITED);
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect('wrong-key-1234567', null, null), 'token', 'error.hubspot_token_invalid');
+        $this->expectInput(fn (): HubSpotConnectionView => $this->connections()->connect('wrong-key-1234567', null, null), 'token', 'error.hubspot_token_invalid');
+        $this->expectConflict(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null), ConflictException::HUBSPOT_RATE_LIMITED);
         // Another tenant has its own window; the window passes.
         $this->ctx()->tenant = 'globex';
         $this->actAs('ana', 'view', 'edit', 'manage');
@@ -134,11 +136,11 @@ final class HubSpotConnectionTest extends HubSpotTestCase
         $this->ctx()->grants = [];
         $this->actAs('ana', 'view', 'edit');
         self::assertNull($this->connections()->status());
-        $this->expectDenied(fn () => $this->connections()->connect($fake->token, null, null));
+        $this->expectDenied(fn (): HubSpotConnectionView => $this->connections()->connect($fake->token, null, null));
         $this->expectDenied(fn () => $this->connections()->disconnect(1));
         $this->ctx()->grants = [];
         $this->actAs('ana', 'view', 'manage');
-        $this->expectDenied(fn () => $this->connections()->status());
+        $this->expectDenied(fn (): ?\Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotConnectionView => $this->connections()->status());
     }
 
     public function testRotationReSealsUnderTheCurrentKeyAndInvalidatesWhatNoLongerOpens(): void
@@ -164,9 +166,13 @@ final class HubSpotConnectionTest extends HubSpotTestCase
         $this->connection()->executeStatement("UPDATE nowo_crm_hubspot_connection SET token_key_id = 'old', token_sealed = ?", [$k1]);
         $tester->execute(['--dry-run' => true]);
         self::assertStringContainsString('1 invalid', $tester->getDisplay());
-        self::assertSame(HubSpotConnectionStatus::Active, $this->connections()->status()?->status);
+        $before = $this->connections()->status();
+        self::assertNotNull($before);
+        self::assertSame(HubSpotConnectionStatus::Active, $before->status);
         $tester->execute([]);
-        self::assertSame(HubSpotConnectionStatus::Invalid, $this->connections()->status()?->status);
+        $after = $this->connections()->status();
+        self::assertNotNull($after);
+        self::assertSame(HubSpotConnectionStatus::Invalid, $after->status);
     }
 
     private function expectInput(Closure $call, string $field, string $key): void

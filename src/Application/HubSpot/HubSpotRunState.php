@@ -69,7 +69,7 @@ final readonly class HubSpotRunState
     /**
      * The first cursor of an import of the scope.
      *
-     * @param array<string, HubSpotObject|null> $listObjects list id => member kind
+     * @param array<array-key, HubSpotObject|null> $listObjects list id => member kind
      */
     public static function start(HubSpotAccountId $account, HubSpotImportScope $scope, array $listObjects): self
     {

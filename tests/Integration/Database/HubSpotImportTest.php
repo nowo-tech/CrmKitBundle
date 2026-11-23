@@ -15,6 +15,9 @@ use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotPropertyView;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotSchemaView;
+use Nowo\CrmKitBundle\Domain\Read\ImportView;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
@@ -44,10 +47,10 @@ final class HubSpotImportTest extends HubSpotTestCase
         $fake->owners                = ['501' => 'leo@owners.example', '502' => 'nobody@owners.example', '503' => 'not an address'];
         $fake->seedCompanies(12);
         $fake->seedContacts(15);
-        $fake->contacts['2001']['hubspot_owner_id'] = '501';
-        $fake->contacts['2002']['hubspot_owner_id'] = '502';
-        $fake->associations                         = ['2001' => [['1001', true], ['1002', false], ['9999', false]], '2002' => [['1003', false]]];
-        $fake->lists                                = ['77' => ['name' => 'Newsletter', 'type' => '0-1', 'members' => ['2001', '2003', '424242']], '78' => ['name' => 'Key accounts', 'type' => '0-2', 'members' => ['1001']]];
+        $fake->contacts[2001] = ['hubspot_owner_id' => '501'] + $fake->contacts[2001];
+        $fake->contacts[2002] = ['hubspot_owner_id' => '502'] + $fake->contacts[2002];
+        $fake->associations   = ['2001' => [['1001', true], ['1002', false], ['9999', false]], '2002' => [['1003', false]]];
+        $fake->lists          = ['77' => ['name' => 'Newsletter', 'type' => '0-1', 'members' => ['2001', '2003', '424242']], '78' => ['name' => 'Key accounts', 'type' => '0-2', 'members' => ['1001']]];
         $this->connect($fake);
         $existing = $this->service(TagServiceInterface::class)->create('Key accounts', 'red');
         $id       = $this->startAndConfirm([HubSpotObject::Contact], ['77', '78'], ['77' => HubSpotMapping::CREATE, '78' => $existing]);
@@ -93,14 +96,13 @@ final class HubSpotImportTest extends HubSpotTestCase
     {
         $fake = $this->hubspot();
         $fake->seedContacts(3);
-        $fake->contacts['2001']['jobtitle'] = 'Engineer';
+        $fake->contacts[2001] = ['jobtitle' => 'Engineer'] + $fake->contacts[2001];
         $this->connect($fake);
         $first = $this->startAndConfirm();
         self::assertTrue($this->imports()->run($first));
-        $fake->contacts['2001']['jobtitle']  = '';
-        $fake->contacts['2001']['firstname'] = 'Renamed';
-        $fake->contacts['2002']['lastname']  = str_repeat('L', 200);
-        $second                              = $this->startAndConfirm();
+        $fake->contacts[2001] = ['jobtitle' => '', 'firstname' => 'Renamed'] + $fake->contacts[2001];
+        $fake->contacts[2002] = ['lastname' => str_repeat('L', 200)] + $fake->contacts[2002];
+        $second               = $this->startAndConfirm();
         self::assertTrue($this->imports()->run($second));
         $view = $this->imports()->preview($second);
         self::assertSame(['created' => 0, 'updated' => 2, 'duplicate' => 0, 'invalid' => 1, 'limit' => 0], $view->counts);
@@ -115,7 +117,7 @@ final class HubSpotImportTest extends HubSpotTestCase
         $fake = $this->hubspot();
         $fake->seedContacts(2);
         $fake->seedCompanies(3);
-        $fake->companies['1003']['domain'] = 'shared.example';
+        $fake->companies[1003] = ['domain' => 'shared.example'] + $fake->companies[1003];
         $this->connect($fake);
         $mine = $this->contact('Old', 'Name', 'P2001@people.example');
         $this->company('Shared A', ['website' => 'https://shared.example']);
@@ -198,11 +200,11 @@ final class HubSpotImportTest extends HubSpotTestCase
         self::assertFalse($this->imports()->run($id, 5));
         self::assertSame('hubspot_token_invalid', $this->imports()->preview($id)->errorCode);
         self::assertSame('invalid', $this->connections()->status()?->status->value);
-        $this->expectRefused(fn () => $this->hubImports()->lists(), InvalidInputException::class);
+        $this->expectRefused(fn (): array => $this->hubImports()->lists(), InvalidInputException::class);
         $resume = new CommandTester((new Application($this->kernel))->find('nowo:crm-kit:import:resume'));
         $resume->execute([]);
         self::assertSame(ImportStatus::Running, $this->imports()->preview($id)->status, 'no resume without a new key');
-        $this->connections()->connect($fake->token, null, $this->connections()->status()?->version ?? $version);
+        $this->connections()->connect($fake->token, null, $this->connections()->status()->version ?? $version);
         // Daily limit: waits until the next UTC day.
         $fake->failNext('/crm/v3/owners', 429, [], '{"policyName":"DAILY"}');
         $resume->execute([]);
@@ -232,7 +234,7 @@ final class HubSpotImportTest extends HubSpotTestCase
         $fake->seedContacts(4);
         $this->connect($fake);
         $id = $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact]));
-        $this->expectRefused(fn () => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact])), ConflictException::class);
+        $this->expectRefused(fn (): string => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact])), ConflictException::class);
         $this->imports()->cancel($id);
         self::assertTrue($this->imports()->run($this->startAndConfirm()));
         $fake->seedContacts(10, 3001);
@@ -259,26 +261,26 @@ final class HubSpotImportTest extends HubSpotTestCase
     {
         $fake = $this->hubspot();
         $fake->seedContacts(1);
-        $this->expectRefused(fn () => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact])), InvalidInputException::class);
+        $this->expectRefused(fn (): string => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact])), InvalidInputException::class);
         $this->connect($fake);
         $fake->lists = ['77' => ['name' => str_repeat('N', 70), 'type' => '0-1', 'members' => []], '79' => ['name' => 'Deals list', 'type' => '0-3', 'members' => []]];
         self::assertCount(1, $this->hubImports()->lists());
-        $this->expectRefused(fn () => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact], [new HubSpotObjectId('79')])), InvalidInputException::class);
-        $this->expectRefused(fn () => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact], [new HubSpotObjectId('12345')])), InvalidInputException::class);
+        $this->expectRefused(fn (): string => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact], [new HubSpotObjectId('79')])), InvalidInputException::class);
+        $this->expectRefused(fn (): string => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact], [new HubSpotObjectId('12345')])), InvalidInputException::class);
         $id     = $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact], [new HubSpotObjectId('77')]));
         $schema = $this->hubImports()->schema($id);
         self::assertSame(['companies', 'contacts'], array_keys($schema->properties));
-        self::assertNotContains('secret_note', array_map(static fn ($p): string => $p->name, $schema->properties['companies']), 'sensitive properties are never offered');
+        self::assertNotContains('secret_note', array_map(static fn (HubSpotPropertyView $p): string => $p->name, $schema->properties['companies']), 'sensitive properties are never offered');
         $this->expectRefused(fn () => $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['secret_note' => 'phone']]), DuplicatePolicy::Skip, $schema->version), InvalidInputException::class);
         $this->expectRefused(fn () => $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['email' => 'custom.nope']]), DuplicatePolicy::Skip, $schema->version), InvalidInputException::class);
         $this->expectRefused(fn () => $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['email' => 'email']], ['78' => HubSpotMapping::CREATE]), DuplicatePolicy::Skip, $schema->version), InvalidInputException::class);
         $this->expectRefused(fn () => $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['email' => 'email']], ['77' => HubSpotMapping::CREATE]), DuplicatePolicy::Skip, $schema->version), InvalidInputException::class);
         $this->expectRefused(fn () => $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['email' => 'email']], ['77' => '01890000-0000-7000-8000-000000000000']), DuplicatePolicy::Skip, $schema->version), InvalidInputException::class);
-        $this->expectRefused(fn () => $this->hubImports()->schema('not-an-id'), NotAvailableException::class);
-        $this->expectRefused(fn () => $this->imports()->previewMapping($id, ['contacts' => 'email']), InvalidInputException::class);
+        $this->expectRefused(fn (): HubSpotSchemaView => $this->hubImports()->schema('not-an-id'), NotAvailableException::class);
+        $this->expectRefused(fn (): ImportView => $this->imports()->previewMapping($id, ['contacts' => 'email']), InvalidInputException::class);
         $this->service(FieldServiceInterface::class)->define(SubjectType::Contact, 'vip_level', 'VIP', FieldType::Text, [], false, 1);
         $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['email' => 'email', 'lastname' => 'last_name', 'vip_level' => 'custom.vip_level']]), DuplicatePolicy::Skip, $schema->version);
-        $this->expectRefused(fn () => $this->hubImports()->schema($id), ConflictException::class);
+        $this->expectRefused(fn (): HubSpotSchemaView => $this->hubImports()->schema($id), ConflictException::class);
         $this->expectRefused(fn () => $this->hubImports()->confirm($id, new HubSpotMapping([]), DuplicatePolicy::Skip, $schema->version), ConflictException::class);
     }
 

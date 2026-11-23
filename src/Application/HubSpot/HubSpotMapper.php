@@ -115,7 +115,7 @@ final class HubSpotMapper
      * The CRM values of one HubSpot record: core values and custom values (non-empty only), the HubSpot owner id
      * (null when not mapped or empty) and the row note (null, or {@see self::COUNTRY_UNKNOWN}).
      *
-     * @param array<string, string> $mapping property => target
+     * @param array<array-key, string> $mapping property => target
      *
      * @return array{values: array<string, string>, custom: array<string, string>, owner: string|null, note: string|null}
      */

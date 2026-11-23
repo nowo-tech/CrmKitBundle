@@ -33,11 +33,14 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+use function json_decode;
 use function print_r;
 use function serialize;
 use function str_contains;
 use function strlen;
 use function unserialize;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * The HubSpot values (0.10.0): anchored id rules (`/D`, no trailing newline, no zero-width characters), the
@@ -79,7 +82,7 @@ final class HubSpotValuesTest extends TestCase
         self::assertFalse(HubSpotKey::isValid('a|b'));
         self::assertTrue(HubSpotCursor::isValid('NTI1Cg=='));
         self::assertFalse(HubSpotCursor::isValid('https://evil.example/'));
-        foreach ([static fn () => new HubSpotKey('a b'), static fn () => new HubSpotCursor("x\n")] as $bad) {
+        foreach ([static fn (): HubSpotKey => new HubSpotKey('a b'), static fn (): HubSpotCursor => new HubSpotCursor("x\n")] as $bad) {
             try {
                 $bad();
                 self::fail('refused');
@@ -115,7 +118,7 @@ final class HubSpotValuesTest extends TestCase
     {
         $context = new SecretContext(SecretContext::HUBSPOT_TOKEN, new TenantRef('acme'), '01890000-0000-7000-8000-000000000001');
         self::assertSame('nowo-crm-kit|v1|hubspot.token|acme|01890000-0000-7000-8000-000000000001', $context->aad());
-        foreach ([static fn () => new SecretContext('other', new TenantRef('acme'), '01890000-0000-7000-8000-000000000001'), static fn () => new SecretContext(SecretContext::HUBSPOT_TOKEN, new TenantRef('acme'), 'x'), static fn () => new SealedSecret('BAD', 'AAAA'), static fn () => new SealedSecret('k1', 'not base64!'), static fn () => new SealedSecret('k1', '')] as $bad) {
+        foreach ([static fn (): SecretContext => new SecretContext('other', new TenantRef('acme'), '01890000-0000-7000-8000-000000000001'), static fn (): SecretContext => new SecretContext(SecretContext::HUBSPOT_TOKEN, new TenantRef('acme'), 'x'), static fn (): SealedSecret => new SealedSecret('BAD', 'AAAA'), static fn (): SealedSecret => new SealedSecret('k1', 'not base64!'), static fn (): SealedSecret => new SealedSecret('k1', '')] as $bad) {
             try {
                 $bad();
                 self::fail('refused');
@@ -134,7 +137,7 @@ final class HubSpotValuesTest extends TestCase
         self::assertEquals($scope, HubSpotImportScope::fromColumns($scope->columns()));
         self::assertTrue($scope->reads(HubSpotObject::Company));
         self::assertSame([HubSpotObject::Company], (new HubSpotImportScope([HubSpotObject::Company]))->objects);
-        foreach ([static fn () => new HubSpotImportScope([]), static fn () => new HubSpotImportScope([HubSpotObject::Company], [new HubSpotObjectId('1'), new HubSpotObjectId('1')]), static fn () => new HubSpotImportScope([HubSpotObject::Company], array_fill(0, 51, new HubSpotObjectId('1'))), static fn () => HubSpotImportScope::fromColumns(['deals'])] as $bad) {
+        foreach ([static fn (): HubSpotImportScope => new HubSpotImportScope([]), static fn (): HubSpotImportScope => new HubSpotImportScope([HubSpotObject::Company], [new HubSpotObjectId('1'), new HubSpotObjectId('1')]), static fn (): HubSpotImportScope => new HubSpotImportScope([HubSpotObject::Company], array_fill(0, 51, new HubSpotObjectId('1'))), static fn (): HubSpotImportScope => HubSpotImportScope::fromColumns(['deals'])] as $bad) {
             try {
                 $bad();
                 self::fail('refused');
@@ -151,7 +154,7 @@ final class HubSpotValuesTest extends TestCase
         self::assertFalse(HubSpotMapping::isTarget(HubSpotObject::Contact, 'domain'));
         self::assertFalse(HubSpotMapping::isTarget(HubSpotObject::Contact, 'custom.Bad'));
         self::assertFalse(HubSpotMapping::isTarget(HubSpotObject::Contact, 'name'));
-        foreach ([static fn () => new HubSpotMapping(['deals' => []]), static fn () => new HubSpotMapping(['contacts' => ['a b' => 'email']]), static fn () => new HubSpotMapping(['contacts' => ['a' => 'email', 'b' => 'email']]), static fn () => new HubSpotMapping([], ['7' => 'nope']), static fn () => HubSpotMapping::fromFlat(['plain' => 'x'])] as $bad) {
+        foreach ([static fn (): HubSpotMapping => new HubSpotMapping(['deals' => []]), static fn (): HubSpotMapping => new HubSpotMapping(['contacts' => ['a b' => 'email']]), static fn (): HubSpotMapping => new HubSpotMapping(['contacts' => ['a' => 'email', 'b' => 'email']]), static fn (): HubSpotMapping => new HubSpotMapping([], ['7' => 'nope']), static fn (): HubSpotMapping => HubSpotMapping::fromFlat(['plain' => 'x'])] as $bad) {
             try {
                 $bad();
                 self::fail('refused');
@@ -181,11 +184,11 @@ final class HubSpotValuesTest extends TestCase
         self::assertTrue($state->isDone());
         self::assertNull($state->currentList());
         self::assertSame(2, $state->tagged);
-        self::assertSame($state->json(), HubSpotRunState::fromArray(json_decode($state->json(), true))->json());
+        self::assertSame($state->json(), HubSpotRunState::fromArray($this->decoded($state->json()))->json());
         self::assertSame(['owners', 'companies'], HubSpotRunState::start(new HubSpotAccountId('42'), new HubSpotImportScope([HubSpotObject::Company]), [])->stages);
         $odd = HubSpotRunState::fromArray(['account' => '42', 'stages' => ['owners', 5], 'stage' => 'owners', 'owners' => ['o1' => 'a', 'o2' => 3], 'lists' => [['id' => 'x', 'object' => 'contacts'], 'no'], 'seen' => ['contacts' => 'x', 'companies' => 4]]);
         self::assertSame([['owners'], ['o1' => 'a'], [], ['companies' => 4]], [$odd->stages, $odd->owners, $odd->lists, $odd->seen]);
-        foreach ([static fn () => HubSpotRunState::fromArray(null), static fn () => HubSpotRunState::fromArray(['account' => 'x']), static fn () => new HubSpotRunState('42', ['owners'], 'owners', 'bad cursor')] as $bad) {
+        foreach ([static fn (): HubSpotRunState => HubSpotRunState::fromArray(null), static fn (): HubSpotRunState => HubSpotRunState::fromArray(['account' => 'x']), static fn (): HubSpotRunState => new HubSpotRunState('42', ['owners'], 'owners', 'bad cursor')] as $bad) {
             try {
                 $bad();
                 self::fail('refused');
@@ -240,5 +243,16 @@ final class HubSpotValuesTest extends TestCase
         self::assertTrue((new HubSpotException(HubSpotException::RATE_LIMITED, 429))->isTransient());
         self::assertFalse((new HubSpotException(HubSpotException::RATE_LIMITED, 429, null, true))->isTransient());
         self::assertSame('HubSpot: hubspot_bad_response (302).', (new HubSpotException(HubSpotException::BAD_RESPONSE, 302))->getMessage());
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function decoded(string $json): array
+    {
+        $data = json_decode($json, true, 32, JSON_THROW_ON_ERROR);
+        self::assertIsArray($data);
+
+        return $data;
     }
 }

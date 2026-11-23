@@ -1232,3 +1232,19 @@ decision D-20261123-04. It becomes this contract's revision for each slice befor
   single matching domain); a record, its ref, its associations and its taggings commit together, so no half
   association is ever stored.
 - **Open owner questions** Q-H1..Q-H13 with recommended answers are in section 15 of the design.
+
+**Revision for slice H1 (built for 0.10.0, 2026-11-23).** The owner accepted Q-H1..Q-H13 as recommended; numbers moved
+up by one (H1 0.10.0, H2 0.11.0, H3 0.12.0). Changes against the design, from the build and from Beacon's request of
+2026-11-23:
+
+- **Credential**: a HubSpot *service key* (new accounts can no longer create private apps) or a legacy private app
+  token, no prefix or shape rule. Account via `GET /account-info/v3/details`; scopes from the token-info endpoint when
+  HubSpot knows the credential, else by probing each required read endpoint with `limit=1` (403 = missing). Q-H2
+  (refuse write scopes) applies where HubSpot lists the scopes; a service key's write scopes cannot be seen (USAGE).
+- H1 scopes: `crm.objects.{companies,contacts,owners}.read`, `crm.schemas.{companies,contacts}.read`, plus
+  `crm.lists.read` to import lists; no sensitive variants (sensitive properties are never offered).
+- `crm_import.cursor` is `run_cursor` (`CURSOR` is reserved in MySQL). The token-check counter lives in two
+  `crm_counter` rows; `connect_rate_limit.interval` is in seconds.
+- Not in H1: the account-details call for currency (H2), per-input association paging (a contact's first page of
+  companies is read), English country names (only ISO alpha-2 codes are mapped), the 80-requests-per-10-seconds
+  token bucket (bursts are handled by the 429 backoff).

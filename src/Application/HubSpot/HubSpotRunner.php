@@ -30,6 +30,7 @@ use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotAssociation;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotIdPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotOwnerPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotPage;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotRecord;
 use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\EmailAddress;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotMapping;
@@ -162,7 +163,7 @@ final readonly class HubSpotRunner
         }
         $associations = [];
         if ($object === HubSpotObject::Contact && $page->records !== []) {
-            $ids = array_map(static fn ($r): HubSpotObjectId => $r->id, $page->records);
+            $ids = array_map(static fn (HubSpotRecord $r): HubSpotObjectId => $r->id, $page->records);
             /** @var list<HubSpotAssociation> $associations */
             $associations = $this->ask(fn (): array => $this->reader->associations($secret, $ids), $attended);
         }
@@ -265,7 +266,7 @@ final readonly class HubSpotRunner
     {
         $run = function (Effects $effects) use ($context, $import, $state, $token, $work): string { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $locked = $this->store->lockCursor($import->getId(), $token);
-            if ($locked === null || !is_string($locked['cursor']) || HubSpotRunState::fromArray(self::decode($locked['cursor']))->json() !== $state->json()) {
+            if ($locked === null || !is_string($locked['cursor']) || HubSpotRunState::fromArray($this->decode($locked['cursor']))->json() !== $state->json()) {
                 return self::LOST;
             }
             [$next, $rows, $counts] = $work($effects, $locked['rows']);
@@ -424,7 +425,7 @@ final readonly class HubSpotRunner
      *
      * @return array<array-key, mixed>|null
      */
-    private static function decode(string $json): ?array
+    private function decode(string $json): ?array
     {
         try {
             $data = json_decode($json, true, 32, JSON_THROW_ON_ERROR);

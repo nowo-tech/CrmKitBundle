@@ -8,6 +8,8 @@
 - [Tenant isolation and exact identifiers](#tenant-isolation-and-exact-identifiers)
 - [Forms, CSRF and output](#forms-csrf-and-output)
 - [Imports and exports](#imports-and-exports)
+- [HubSpot credential](#hubspot-credential)
+- [HubSpot import (0.10.0)](#hubspot-import-0100)
 - [GDPR](#gdpr)
 - [Host extension points](#host-extension-points)
 - [Shared entity manager](#shared-entity-manager)
@@ -117,6 +119,46 @@ record; another person's note needs `edit` on the record and `manage`.
   with `'` and quotes every cell (RFC 4180). The export needs `manage` (bulk personal data).
 - vCard output escapes `\`, `,`, `;` and line breaks and drops NUL bytes.
 - Downloads (CSV, vCard, GDPR JSON) are sent with `Cache-Control: no-store, private`.
+
+## HubSpot credential
+
+- One credential per tenant (a HubSpot service key or a legacy private app token), connected, replaced or removed
+  only with `import` + `manage`; every HubSpot route answers **404** on any denial (tenant, feature, actor,
+  permission), and the routes do not exist while `import.hubspot.enabled` is false.
+- **At rest**: sealed by `CrmSecretBoxInterface` with authenticated encryption bound to `nowo-crm-kit|v1|hubspot.token|
+  <tenant>|<connection id>` (the additional data): a copied value does not open for another tenant, row or purpose.
+  Default `SodiumCrmSecretBox` (XChaCha20-Poly1305, random 24-byte nonce, keys from the environment, key ids for
+  rotation); house option `DoctrineEncryptCrmSecretBox` (context inside the authenticated payload, MysqlAes refused).
+  Only the last four characters are stored in clear. A value that does not open marks the connection invalid.
+- **In use**: unsealed for one HubSpot call, sent only as `Authorization: Bearer` to `https://api.hubapi.com` by the
+  kit's own HttpClient (not the framework's `http_client`, so no profiler or HTTP-client log sees it). It is never put
+  in a URL, a property, a log, an exception, an audit entry or a page; the connect field is a password input, never
+  pre-filled or re-rendered. `HubSpotToken` hides its value from dumps and refuses serialisation; its parameters are
+  `#[\SensitiveParameter]`.
+- **Scopes**: read scopes only. Write scopes are refused when HubSpot lists the credential's scopes (private app
+  tokens). For a service key HubSpot offers no scope listing, so the required read scopes are probed (a 403 is a
+  missing scope) and write scopes cannot be seen: the manager must tick read scopes only (known limit, documented in
+  USAGE). Sensitive and highly sensitive properties are never offered or requested.
+- **Checks**: counted per tenant (`connect_rate_limit`), valid or not; answers are translation keys, never HubSpot's
+  text.
+
+## HubSpot import (0.10.0)
+
+- **SSRF**: one constant host; paths built from enums and validated ids, URL-encoded; `paging.next.link` ignored (only
+  the `after` token, validated); no redirects (`max_redirects: 0`, a 3xx is an error); peer and host verification on;
+  idle and total timeouts; bodies capped at `max_response_bytes` while streaming; JSON depth 32; unknown fields dropped.
+  Optional OutboundUrlGuard bridge: pins the resolved public address (private addresses never allowed, DNS always
+  resolved).
+- **Data**: only the mapped properties are requested; import rows keep the object kind and the HubSpot id only;
+  values go through the form's validation (too long ⇒ refused, never truncated); labels and list names are shown
+  escaped; logs (one `info` line per page) carry the import id, stage, page, result and duration only.
+- **GDPR**: an erased contact's references become tombstones (`erased`, no personal data) and the person is never
+  imported again (Q-H6); a purge deletes the references of purged records (tombstones stay).
+- **Authorisation of unattended runs**: the resume command and the Messenger handler run as the uploader (the system
+  actor when unknown) with the mapping and policy a person confirmed: policy `update` needs `edit` at confirm; the
+  per-record `edit` / `view` checks apply when a person runs the pages ("Continue"). Under `security.resource_scoping`
+  an unattended run may therefore update a record linked to HubSpot (or, with `update`, matched by e-mail or domain)
+  that the confirming person could not edit one by one. Audit point.
 
 ## GDPR
 

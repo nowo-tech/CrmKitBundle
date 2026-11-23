@@ -32,8 +32,8 @@ final readonly class HubSpotMapping
     private const SEPARATOR = '|';
 
     /**
-     * @param array<string, array<string, string>> $properties object value => (property => target)
-     * @param array<string, string> $lists list id => tag id or {@see self::CREATE}
+     * @param array<string, array<array-key, string>> $properties object value => (property => target)
+     * @param array<array-key, string> $lists list id => tag id or {@see self::CREATE} (numeric keys may be ints)
      */
     public function __construct(public array $properties, public array $lists = [])
     {
@@ -76,7 +76,7 @@ final readonly class HubSpotMapping
     /**
      * The property => target map of an object (empty when it is not mapped).
      *
-     * @return array<string, string>
+     * @return array<array-key, string>
      */
     public function of(HubSpotObject $object): array
     {

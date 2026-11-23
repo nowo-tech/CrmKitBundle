@@ -4,8 +4,13 @@ declare(strict_types=1);
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
 use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiTaskOperations;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 require_once __DIR__ . '/../vendor/autoload.php';
+
+// Loads the DI configurator functions (service(), param(), …) defined in the same file as ContainerConfigurator, so
+// static analysis finds them whatever the order it reads the tests in.
+class_exists(ContainerConfigurator::class);
 
 if (!class_exists(TaskApiTaskOperations::class)) {
     require_once __DIR__ . '/Stubs/TaskBoard/TaskBoard.php';

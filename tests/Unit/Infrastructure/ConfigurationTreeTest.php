@@ -32,6 +32,19 @@ final class ConfigurationTreeTest extends TestCase
         self::assertSame(['customer', 'distributor', 'r_2'], $this->process(['roles' => ['catalogue' => ['customer', 'distributor', 'r_2']]])['roles']['catalogue'] ?? null);
     }
 
+    public function testHubSpotIsOffByDefaultAndNeedsASecretBox(): void
+    {
+        $config = $this->process([]);
+        /** @var array{hubspot: array{enabled: bool}, messenger: array{enabled: bool}, max_rows: int} $import */
+        $import = $config['import'];
+        self::assertFalse($import['hubspot']['enabled']);
+        self::assertSame(5000, $import['max_rows'], 'the import keys stay');
+        self::assertFalse($import['messenger']['enabled']);
+        self::assertSame(['box' => null, 'keys' => [], 'current_key' => null], $config['secrets'] ?? null);
+        self::assertSame('my.box', $this->process(['import' => ['hubspot' => ['enabled' => true]], 'secrets' => ['box' => 'my.box']])['secrets']['box'] ?? null);
+        self::assertSame(['k1' => 'x'], $this->process(['import' => ['hubspot' => ['enabled' => true]], 'secrets' => ['keys' => ['k1' => 'x'], 'current_key' => 'k1']])['secrets']['keys'] ?? null);
+    }
+
     public function testTabIconsTakeOnlyTheAreasTheHostNames(): void
     {
         self::assertSame([], $this->process([])['ui']['tab_icons'] ?? null, 'the built-in set lives in UiOptions, not in the tree');
@@ -84,6 +97,12 @@ final class ConfigurationTreeTest extends TestCase
         yield 'tab icon uppercase' => [['ui' => ['tab_icons' => ['companies' => 'tabler:Building']]], 'ui.tab_icons'];
         yield 'tab icon markup' => [['ui' => ['tab_icons' => ['companies' => '"><script>']]], 'ui.tab_icons'];
         yield 'unknown' => [['nope' => true], 'nope'];
+        yield 'hubspot without a secret box' => [['import' => ['hubspot' => ['enabled' => true]]], 'needs a secret box'];
+        yield 'hubspot current key not listed' => [['import' => ['hubspot' => ['enabled' => true]], 'secrets' => ['keys' => ['k1' => 'x'], 'current_key' => 'k2']], 'needs a secret box'];
+        yield 'secret key id' => [['secrets' => ['keys' => ['Bad Id' => 'x']]], 'secrets.keys'];
+        yield 'secret key empty' => [['secrets' => ['keys' => ['k1' => '']]], 'secrets.keys'];
+        yield 'hubspot page size' => [['import' => ['hubspot' => ['page_size' => 500]]], 'page_size'];
+        yield 'hubspot guard' => [['import' => ['hubspot' => ['outbound_url_guard' => 'maybe']]], 'outbound_url_guard'];
     }
 
     /**

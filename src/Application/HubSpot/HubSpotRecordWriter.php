@@ -65,7 +65,7 @@ final readonly class HubSpotRecordWriter
      *
      * @param list<HubSpotRecord> $records
      * @param list<HubSpotAssociation> $associations contact ↔ company (contacts only)
-     * @param array<string, string> $mapping property => target
+     * @param array<array-key, string> $mapping property => target
      * @param array<string, string> $owners `o<HubSpot owner id>` => actor id
      *
      * @return array{rows: list<array{RowOutcome, string|null, string|null, string}>, skipped: int}

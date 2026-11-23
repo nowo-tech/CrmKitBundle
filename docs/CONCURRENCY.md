@@ -9,6 +9,7 @@
 - [Version checks](#version-checks)
 - [Merge](#merge)
 - [Import](#import)
+- [HubSpot import (0.10.0)](#hubspot-import-0100)
 - [Isolation and locks](#isolation-and-locks)
 - [Tests](#tests)
 
@@ -202,6 +203,26 @@ conditional `UPDATE … WHERE claim_token = ?`): a running import without a clai
 takeover); a person's "Continue" claims it at once with `UPDATE … SET claim_token = ? WHERE status = 'running' AND
 claim_token IS NULL` (one winner; a second "Continue" joins the winner's claim and the import row lock serialises
 their chunks), and "Cancel" ends it at once.
+
+## HubSpot import (0.10.0)
+
+| Write | Control |
+| --- | --- |
+| connect / replace | Credential checked with HubSpot **outside** any transaction (after the attempt counter's own unit); then one unit: `SELECT … FROM crm_hubspot_connection WHERE tenant_id=? FOR UPDATE`, version compared, sealed, saved. A racing first connect loses on the unique `tenant_id` key ⇒ 409 `crm_record_stale` |
+| attempt counter | two `crm_counter` rows per tenant (`hubspot_connect_at`, then `hubspot_connect`), inserted if missing and locked in that order, incremented in the same unit |
+| disconnect during a run | the run re-reads the connection at every page (not locked); a missing or different connection ends the import `failed` (`hubspot_disconnected`) |
+| two HubSpot imports of a tenant | `start()` checks "no import in preview / running" under the connection row's lock ⇒ 409 `crm_import_running` |
+| claim, counters | the CSV rules ([Import](#import)) |
+| a page | HubSpot is asked first, outside the unit. Then one unit: `SELECT status, claim_token, run_cursor, rows_done FROM crm_import WHERE id=? FOR UPDATE`; claim and cursor compared (decoded and re-encoded, so MySQL's JSON normalisation does not matter); records locked (references' targets and e-mail matches, contacts in id order, then companies in id order); per record: reference → duplicate key → create (plan counter) → reference insert → affiliations; rows inserted (`row_no` after `rows_done`); `run_cursor`, `rows_done` and the counters advanced; the last page finishes the import |
+| a racing reference / tagging / affiliation insert | the unique key refuses it; the page settles once more, where it finds the other writer's row (a second refusal ⇒ 409 `crm_write_conflict`) |
+| user edit vs run | records locked `FOR UPDATE`; the user's next save meets a new `version` ⇒ 409 stale |
+| merge vs run | the merge moves references in its own unit, under the records' locks; a run that reads a reference to a merged record follows `merged_into_id` and moves the reference |
+| pause / resume | a pause releases the claim with `resume_after` and the reason in one conditional `UPDATE … WHERE claim_token = ?`; the resume command (and the background handler) claim imports whose `resume_after` passed with `UPDATE … WHERE claim_token IS NULL` (one winner); a new credential sets `resume_after = now` on the tenant's imports paused for the old one |
+
+A page that fails (HubSpot error, deadlock, crash) commits nothing: the cursor still points at it, and settling it
+again is an upsert keyed by the reference. The entity manager is cleared after every unit (no host entity manager is
+reset). Race tests on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16: two runners on one import, a racing first connect,
+a racing start ([Tests](#tests)).
 
 ## Isolation and locks
 

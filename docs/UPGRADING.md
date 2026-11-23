@@ -20,6 +20,76 @@
 
 ## Unreleased
 
+Planned as **0.10.0**, from 0.9.x: `composer update nowo-tech/crm-kit-bundle`. No BC break in the public PHP API.
+
+**Schema (every host).** Nullable columns only; generate a migration from the mapping (`doctrine:migrations:diff`
+on the bundle's entity manager) or apply (default prefix `nowo_`):
+
+```sql
+-- MySQL 8.4
+ALTER TABLE nowo_crm_import ADD connection_id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+    ADD run_cursor JSON DEFAULT NULL, ADD resume_after DATETIME DEFAULT NULL, ADD error_code VARCHAR(40) DEFAULT NULL;
+CREATE INDEX nowo_crm_import_resume ON nowo_crm_import (status, resume_after);
+ALTER TABLE nowo_crm_import_row ADD subject_type VARCHAR(16) DEFAULT NULL;
+-- MariaDB 11.4: the same with utf8mb4_nopad_bin and run_cursor LONGTEXT DEFAULT NULL (JSON is an alias of LONGTEXT)
+-- PostgreSQL 16
+ALTER TABLE nowo_crm_import ADD connection_id VARCHAR(36) DEFAULT NULL, ADD run_cursor JSON DEFAULT NULL,
+    ADD resume_after TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL, ADD error_code VARCHAR(40) DEFAULT NULL;
+CREATE INDEX nowo_crm_import_resume ON nowo_crm_import (status, resume_after);
+ALTER TABLE nowo_crm_import_row ADD subject_type VARCHAR(16) DEFAULT NULL;
+-- SQLite
+ALTER TABLE nowo_crm_import ADD COLUMN connection_id VARCHAR(36) DEFAULT NULL;
+ALTER TABLE nowo_crm_import ADD COLUMN run_cursor CLOB DEFAULT NULL;
+ALTER TABLE nowo_crm_import ADD COLUMN resume_after DATETIME DEFAULT NULL;
+ALTER TABLE nowo_crm_import ADD COLUMN error_code VARCHAR(40) DEFAULT NULL;
+CREATE INDEX nowo_crm_import_resume ON nowo_crm_import (status, resume_after);
+ALTER TABLE nowo_crm_import_row ADD COLUMN subject_type VARCHAR(16) DEFAULT NULL;
+```
+
+**HubSpot (opt-in).** With `import.hubspot.enabled: true`:
+
+1. `composer require symfony/http-client` (and `nowo-tech/outbound-url-guard-bundle` to pin the host, recommended).
+2. A secret box: `secrets.keys` + `secrets.current_key` (32 random bytes from the environment) or
+   `secrets.box: Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox`
+   ([CONFIGURATION.md](CONFIGURATION.md#hubspot-import-0100)). The container refuses HubSpot without one.
+3. Two tables (mapping group `NowoCrmKitBundleHubSpot`; the binary collations come from the kit's listener). Generate
+   them with `doctrine:migrations:diff`, or on MySQL 8.4:
+
+   ```sql
+   CREATE TABLE nowo_crm_hubspot_connection (id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       tenant_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, kind VARCHAR(16) NOT NULL,
+       status VARCHAR(16) NOT NULL, account_id VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       label VARCHAR(80) NOT NULL, token_last4 VARCHAR(4) NOT NULL,
+       token_key_id VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, token_sealed LONGTEXT NOT NULL,
+       scopes JSON NOT NULL, validated_at DATETIME NOT NULL,
+       created_by_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL, created_at DATETIME NOT NULL,
+       updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL, updated_at DATETIME(6) NOT NULL,
+       version INT DEFAULT 1 NOT NULL, UNIQUE INDEX nowo_crm_hubspot_connection_tenant (tenant_id), PRIMARY KEY(id));
+   CREATE TABLE nowo_crm_external_ref (id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       tenant_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       source VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       account_id VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       object_type VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       external_id VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       target_type VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+       target_id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, erased TINYINT(1) NOT NULL,
+       created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
+       UNIQUE INDEX nowo_crm_external_ref_key (tenant_id, source, account_id, object_type, external_id),
+       INDEX nowo_crm_external_ref_target (tenant_id, target_type, target_id), PRIMARY KEY(id));
+   ```
+
+   MariaDB 11.4: `utf8mb4_nopad_bin`, `scopes LONGTEXT`. PostgreSQL 16: `TEXT` / `JSON` / `TIMESTAMP(0) WITHOUT TIME
+   ZONE` (`updated_at TIMESTAMP(6)`), `BOOLEAN` for `erased`. SQLite: the same columns with `CLOB` / `DATETIME` /
+   `BOOLEAN`.
+4. Grant `import` (run imports) and `manage` (connect / disconnect) to the right people; add the cron line of
+   `nowo:crm-kit:import:resume` (every minute) or turn on `import.messenger.enabled` and route `RunCrmImport` to an
+   async transport.
+5. Ask the CRM managers to create a **service key** with the read scopes of USAGE ("Credential and scopes").
+
+Hosts that override `import/_rows.html.twig`, `import/dialog.html.twig`, `import/show.html.twig` or
+`import/upload.html.twig`: the kit's versions gained the HubSpot rows (`object`, `id`), the pause notice
+(`import/_hubspot_state.html.twig`) and the HubSpot source link; merge them into your copies.
+
 ## To 0.8.1
 
 From **0.8.0**: `composer update nowo-tech/crm-kit-bundle`. No schema change, no BC break in the public PHP API, no

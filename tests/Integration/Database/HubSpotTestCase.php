@@ -14,11 +14,11 @@ use Nowo\CrmKitBundle\Domain\Value\HubSpotMapping;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotObjectId;
 use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\FakeHubSpot;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpClient\MockHttpClient;
 
 use function array_map;
 use function array_replace_recursive;
-use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 /**
  * Base of the HubSpot tests (0.10.0): the kit with `import.hubspot.enabled`, a sodium key made for the test, and the
@@ -36,9 +36,11 @@ abstract class HubSpotTestCase extends CrmTestCase
      */
     protected function hubspot(array $config = []): FakeHubSpot
     {
-        $this->bootWithUiKit(array_replace_recursive(['import' => ['hubspot' => ['enabled' => true, 'page_size' => 10]], 'secrets' => ['keys' => ['k1' => self::KEY], 'current_key' => 'k1']], $config), [], static function (ServicesConfigurator $s): void {
+        /** @var array<string, mixed> $merged */
+        $merged = array_replace_recursive(['import' => ['hubspot' => ['enabled' => true, 'page_size' => 10]], 'secrets' => ['keys' => ['k1' => self::KEY], 'current_key' => 'k1']], $config);
+        $this->bootWithUiKit($merged, [], static function (ServicesConfigurator $s): void {
             $s->set('test.hubspot', FakeHubSpot::class)->public();
-            $s->set('test.hubspot_client', MockHttpClient::class)->decorate('nowo_crm_kit.hubspot.http_client')->args([service('test.hubspot'), 'https://api.hubapi.com']);
+            $s->set('test.hubspot_client', MockHttpClient::class)->decorate('nowo_crm_kit.hubspot.http_client')->args([new Reference('test.hubspot'), 'https://api.hubapi.com']);
         });
         $this->admin();
         $fake = $this->kernel->getContainer()->get('test.hubspot');
@@ -75,7 +77,8 @@ abstract class HubSpotTestCase extends CrmTestCase
      *
      * @param list<HubSpotObject> $objects
      * @param list<string> $lists
-     * @param array<string, string> $listTags list id => tag id or create
+     * @param array<array-key, string> $listTags list id => tag id or create
+     * @param array<string, array<string, string>>|null $properties
      */
     protected function startAndConfirm(array $objects = [HubSpotObject::Contact], array $lists = [], array $listTags = [], DuplicatePolicy $policy = DuplicatePolicy::Skip, ?array $properties = null): string
     {

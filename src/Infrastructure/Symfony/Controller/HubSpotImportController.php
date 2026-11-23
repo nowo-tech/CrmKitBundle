@@ -11,6 +11,7 @@ use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotConnectionView;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotList;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotSchemaView;
 use Nowo\CrmKitBundle\Domain\Service\HubSpotConnectionServiceInterface;
@@ -83,7 +84,7 @@ final readonly class HubSpotImportController
             $this->ui->require(CrmPermission::Import);
             $this->ui->require(CrmPermission::Manage);
             $current = $this->connections->status();
-            $form    = $this->ui->form(HubSpotConnectType::class, ['version' => $current === null ? '' : (string) $current->version, 'label' => $current?->label], [], 'crm_hubspot_connect');
+            $form    = $this->ui->form(HubSpotConnectType::class, ['version' => $current instanceof HubSpotConnectionView ? (string) $current->version : '', 'label' => $current?->label], [], 'crm_hubspot_connect');
             $form->handleRequest($request);
             $status = Response::HTTP_OK;
             $alert  = null;

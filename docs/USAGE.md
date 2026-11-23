@@ -27,6 +27,11 @@
 - [Pages and routes](#pages-and-routes)
   - [Page layout options (0.6.0, 0.6.1, 0.7.0, 0.8.0)](#page-layout-options-060-061-070-080)
 - [Imports](#imports)
+- [HubSpot import (0.10.0)](#hubspot-import-0100)
+  - [Credential and scopes](#credential-and-scopes)
+  - [How the credential is checked](#how-the-credential-is-checked)
+  - [Steps and rules](#steps-and-rules)
+  - [Background runs (Messenger)](#background-runs-messenger)
 - [The API (0.3.0)](#the-api-030)
 - [SearchKit](#searchkit)
 - [UiKit context menus and focus mode](#uikit-context-menus-and-focus-mode)
@@ -874,7 +879,158 @@ expired notices link its page, and the lists show the person a notice linking th
    locks the existing contacts and the named companies of all its rows (contacts, then companies, each in id order),
    then settles the rows ([CONCURRENCY.md](CONCURRENCY.md#import)).
 
-No Messenger handler ships in 0.1.0: imports always run in requests and in the resume command.
+No Messenger handler ships in 0.1.0: imports always run in requests and in the resume command. **0.10.0**: an
+optional one does, for every format ([Background runs](#background-runs-messenger)).
+
+## HubSpot import (0.10.0)
+
+Opt-in: `import.hubspot.enabled: true` (needs a secret box and `symfony/http-client`;
+[CONFIGURATION.md](CONFIGURATION.md#hubspot-import-0100)). It adds a third source to the import modal and page
+("Import from HubSpot instead"). Slice H1 imports **companies, contacts, contact ↔ company associations, owners (as
+record owners, matched by e-mail) and lists (as tags)**. Deals and pipelines come with H2 (0.11.0), OAuth with H3
+(0.12.0). Nothing is ever written to HubSpot; there is no scheduled sync and no webhook.
+
+### Credential and scopes
+
+One credential per tenant, pasted by a CRM manager (`import` + `manage`): a HubSpot **service key** (HubSpot →
+Development → Keys → Service keys; new accounts can no longer create private apps) **or a legacy private app token**.
+Both are bearer tokens; the kit does not tell them apart by a prefix and refuses no format by its shape (only what an
+HTTP header cannot carry: spaces, control characters, fewer than 8 or more than 4096 characters).
+
+Tick only these read scopes. The **Endpoint** column is the call that needs the scope; associations need no scope of
+their own.
+
+| Scope | Needed from | Why | Endpoint |
+| --- | --- | --- | --- |
+| `crm.objects.companies.read` | H1 | Read companies | `GET /crm/v3/objects/companies`, `POST /crm/v3/objects/companies/search` (counts) |
+| `crm.objects.contacts.read` | H1 | Read contacts and their company associations | `GET /crm/v3/objects/contacts`, `POST /crm/v4/associations/contacts/companies/batch/read` |
+| `crm.objects.owners.read` | H1 | Owners and their e-mails, to set record owners | `GET /crm/v3/owners` |
+| `crm.schemas.companies.read` | H1 | The company properties offered in the mapping step | `GET /crm/v3/properties/companies` |
+| `crm.schemas.contacts.read` | H1 | The contact properties offered in the mapping step | `GET /crm/v3/properties/contacts` |
+| `crm.lists.read` | H1, only to import lists | Lists and their members (→ tags) | `POST /crm/v3/lists/search`, `GET /crm/v3/lists/{id}/memberships` |
+| `crm.objects.deals.read` | H2 | Deals | not called by H1 |
+| `crm.schemas.deals.read` | H2 | Deal properties | not called by H1 |
+
+Answers to the questions about the scopes. Source: HubSpot's developer documentation, read on 2026-11-23. Where
+HubSpot does not state the scope of an endpoint, this table says so.
+
+- **Required in H1:** the five scopes marked H1 above. `crm.lists.read` is needed only when an import reads lists;
+  without it the start step offers no lists.
+- **Schemas scopes:** they are needed. The mapping step reads the property list (Properties API), and HubSpot
+  describes `crm.schemas.<object>.read` as the scope for "property settings". The checks below probe these
+  endpoints directly, so a credential that can read properties passes whichever scope HubSpot actually checks.
+- **Lists → tags:** this uses `crm.lists.read` ("View details about contact lists"). `crm.object_tags.read` is not in
+  HubSpot's scope reference for these endpoints, and H1 does not need it.
+- **Owner e-mails:** HubSpot's owners page says the response returns "each user's name, email, ID values".
+  `crm.objects.owners.read` is the owners scope in the scope reference. The owners endpoint page does not show its
+  scope requirement, so it does not say whether `settings.users.read` changes what is returned. H1 never asks for
+  `settings.users.read`. An owner without an e-mail is simply not matched: the record keeps no owner on create, and
+  its owner on update.
+- **Deal pipelines and stages (H2):** HubSpot's pipelines page does not show the scope of `GET /crm/v3/pipelines/deals`
+  (not verified). H2 will probe it the same way before the slice is built. Ticking `crm.objects.deals.read` and
+  `crm.schemas.deals.read` now is harmless: they are read-only and H1 never calls a deal endpoint.
+- **Sensitive data:** H1 never needs and never asks for the `.sensitive.read` or `.highly_sensitive.read` variants.
+  Do not tick them (data minimisation). HubSpot answers 403 when a v3 request names a sensitive property without
+  those scopes. So the mapping step never offers a property whose `dataSensitivity` is not `non_sensitive`, and the
+  confirm refuses a mapping that names a property HubSpot does not offer.
+- **Write scopes:** a credential that HubSpot reports with any non-read scope (anything not ending in `.read`, except
+  `oauth`) is refused (Q-H2).
+
+### How the credential is checked
+
+Before anything is saved, outside any transaction, the same way for both kinds:
+
+1. **Account.** `GET /account-info/v3/details` gives the account (portal) id. A 401 here means the credential is
+   refused.
+2. **Scopes, from HubSpot's own list when HubSpot knows the credential.**
+   `POST /oauth/v2/private-apps/get/access-token-info` answers for a legacy private app token with its account and
+   its scope list. That list must name the same account as step 1. Write scopes are refused, and missing H1 scopes
+   are refused.
+3. **Scopes, by probing, when HubSpot does not know the credential** (a service key). HubSpot documents no endpoint
+   that lists a service key's scopes: they are shown only in HubSpot's UI. So each scope's endpoint is called once
+   with the smallest request (`limit=1`), and a 403 counts as "scope missing". A missing H1 scope is refused.
+   Probing cannot see write scopes, so the "read-only" rule (Q-H2) is enforced only where HubSpot lists the scopes.
+   For a service key, the manager must tick read scopes only; the help text and this page say so. This is a known
+   limit for the security audit.
+4. A credential of **another account** than the connected one needs an explicit confirmation ("The key may belong to
+   another HubSpot account"). An import that was running for the old account then fails with `hubspot_account_changed`.
+
+Token checks are counted per tenant, valid or not (`import.hubspot.connect_rate_limit`, default 5 per 10 minutes).
+Once that is exceeded the answer is 409 `crm_hubspot_rate_limited`. The credential is sealed (see
+[SECURITY.md](SECURITY.md#hubspot-credential)) and is shown only as `••••` + its last four characters, with the
+account id, the label, the scopes and when it was checked.
+
+### Steps and rules
+
+`/crm/import/hubspot` shows the connection card: Start / Replace / Disconnect, or Connect. Then:
+
+- **Start** (`/crm/import/hubspot/new`): pick objects (contacts bring their companies), lists (up to 50) and the
+  duplicate policy. HubSpot's counts become the progress total.
+- **Mapping** (`/crm/import/hubspot/{id}/mapping`): pick a CRM target for each property. The targets are the core
+  fields, `custom.<key>`, the owner (`hubspot_owner_id`, matched by e-mail), and for companies a website built from
+  the domain. Defaults are preselected; custom HubSpot properties default to skip. For each list, pick a tag: a new
+  tag named after the list, an existing tag, or skip. Only the mapped properties are requested from HubSpot (data
+  minimisation).
+- **Run**: the same queue as CSV. A web request settles at most `import.hubspot.pages_per_request` pages. After that,
+  "Continue", the resume command (`nowo:crm-kit:import:resume`, for example every minute from cron) or the
+  background handler carry the run.
+
+Each page is settled in one write unit ([CONCURRENCY.md](CONCURRENCY.md#hubspot-import-0100)). These rules apply to
+every record:
+
+- **Matching.** The HubSpot id first: a record imported earlier is updated, whatever the duplicate policy. A person
+  erased under GDPR is skipped (`error.record_erased`, a tombstone keeps the id). A trashed record is left alone. A
+  merged record leads to its survivor. Then the duplicate key: contacts by e-mail, companies by a domain that exactly
+  one active company has (several ⇒ `error.ambiguous_domain`). Under `update` such a record is updated and linked;
+  under `skip` it is a `duplicate` and gets no link. Otherwise the record is created, under the plan limit.
+- **An empty HubSpot value never clears a CRM value.** Associations and tags are only added. Too-long values make
+  the row `invalid` (nothing is truncated). A country that is not an ISO 3166 alpha-2 code is left unset, with the
+  row note `import.hubspot.country_unknown`. Lifecycle stages are not mapped in v1.
+- **Rows** keep only the object kind and the HubSpot id: never a property value, never a response body.
+- **Pauses.** HubSpot's answers pause the import with a reason (shown on the import page):
+  - 429: the resume command and the handler wait out `Retry-After` up to `rate_limit.max_retry_after`, retrying
+    `rate_limit.max_attempts` times. A web request never waits: it pauses until the given time. The daily limit
+    pauses until the next UTC day.
+  - 5xx or a timeout: the same backoff, then a pause of one minute.
+  - 401: the connection becomes invalid; saving a new credential resumes the import.
+  - 403: `hubspot_scope_missing`.
+  - A redirect, an oversized or malformed body: `hubspot_bad_response`.
+- **Failures.** A disconnect, an account change or more than `max_records` objects ends the import as `failed`, with
+  the reason.
+- **Permissions.** With `update`, the person who confirms needs `edit`. When a person runs the pages ("Continue"),
+  each existing record needs `edit` on it, and each company of an affiliation needs `view`. The resume command and
+  the handler run as the uploader with the confirmed mapping (see SECURITY).
+
+`HubSpotConnectionServiceInterface` (`status()`, `connect()`, `disconnect()`) and `HubSpotImportServiceInterface`
+(`lists()`, `start()`, `schema()`, `confirm()`) are public services. `ImportServiceInterface::run()`, `cancel()`,
+`preview()` and `unfinished()` serve HubSpot imports unchanged. Events (after commit, ids only): `HubSpotConnected`
+(account, replaced) and `HubSpotDisconnected`. Audit keys: `crm.hubspot.connected`, `.replaced`, `.disconnected`,
+`.token_invalid` (counts only), `.import_started`, `.import_confirmed`, and the existing `crm.import.*`.
+
+Optional host port `CrmActorEmailLookupInterface` (`actor_email_lookup`): the actors who may own records, keyed by
+e-mail. Without it the kit filters `CrmActorDirectoryInterface::owners()` by `ActorProfile::$email`. Returned keys are
+re-checked with `===` against the requested ones.
+
+### Background runs (Messenger)
+
+With `import.messenger.enabled: true` (any format, needs `symfony/messenger` with a default bus), a confirmed import is
+queued and "Continue" dispatches `Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImport` (import id and
+tenant only) instead of running in the request. An import that waits for a person still runs in the request. Route the
+message to an async transport:
+
+```yaml
+framework:
+    messenger:
+        transports:
+            async: '%env(MESSENGER_TRANSPORT_DSN)%'
+        routing:
+            Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImport: async
+```
+
+The handler claims the import like the resume command and runs `import.messenger.units` chunks or pages. It then
+dispatches the next message: at once when more is left, or with a `DelayStamp` until `resume_after` when HubSpot made
+it wait. It never throws for a pause, so Messenger retries are not needed. Keep a failure transport for real errors.
+A redelivered message finds the claim taken and stops. Without Messenger, keep the resume command in cron.
 
 ## The API (0.3.0)
 

@@ -14,6 +14,7 @@ use function count;
 use function explode;
 use function in_array;
 use function is_array;
+use function is_numeric;
 use function is_string;
 use function json_decode;
 use function json_encode;
@@ -46,28 +47,47 @@ final class FakeHubSpot
     /** @var list<string> */
     public array $scopes = [...self::REQUIRED, 'crm.lists.read'];
 
-    /** @var array<string, array<string, string|null>> */
+    /** @var array<array-key, array<string, string|null>> */
     public array $companies = [];
 
-    /** @var array<string, array<string, string|null>> */
+    /** @var array<array-key, array<string, string|null>> */
     public array $contacts = [];
 
-    /** @var array<string, string|null> owner id => e-mail */
+    /** @var array<array-key, string|null> owner id => e-mail */
     public array $owners = [];
 
-    /** @var array<string, array{name: string, type: string, members: list<string>}> */
+    /** @var array<array-key, array{name: string, type: string, members: list<string>}> */
     public array $lists = [];
 
-    /** @var array<string, list<array{string, bool}>> contact id => [company id, primary] */
+    /** @var array<array-key, list<array{string, bool}>> contact id => [company id, primary] */
     public array $associations = [];
 
     /** @var array<string, list<array{name: string, label: string, type: string, dataSensitivity?: string}>> */
-    public array $properties = [];
+    public array $properties = [
+        'companies' => [
+            ['name' => 'name', 'label' => 'Company name', 'type' => 'string'],
+            ['name' => 'domain', 'label' => 'Domain', 'type' => 'string'],
+            ['name' => 'website', 'label' => 'Website', 'type' => 'string'],
+            ['name' => 'city', 'label' => 'City', 'type' => 'string'],
+            ['name' => 'country', 'label' => 'Country', 'type' => 'string'],
+            ['name' => 'hubspot_owner_id', 'label' => 'Owner', 'type' => 'enumeration'],
+            ['name' => 'secret_note', 'label' => 'Secret', 'type' => 'string', 'dataSensitivity' => 'sensitive'],
+        ],
+        'contacts' => [
+            ['name' => 'firstname', 'label' => 'First name', 'type' => 'string'],
+            ['name' => 'lastname', 'label' => 'Last name', 'type' => 'string'],
+            ['name' => 'email', 'label' => 'E-mail', 'type' => 'string'],
+            ['name' => 'phone', 'label' => 'Phone <b>', 'type' => 'string'],
+            ['name' => 'jobtitle', 'label' => 'Job title', 'type' => 'string'],
+            ['name' => 'hubspot_owner_id', 'label' => 'Owner', 'type' => 'enumeration'],
+            ['name' => 'vip_level', 'label' => 'VIP level', 'type' => 'string'],
+        ],
+    ];
 
     /**
      * Forced answers, first match wins and is consumed: [path prefix, status, headers, body].
      *
-     * @var list<array{string, int, array<string, string>, string}>
+     * @var array<int, array{string, int, array<string, string>, string}>
      */
     public array $failures = [];
 
@@ -80,27 +100,7 @@ final class FakeHubSpot
     public function __construct()
     {
         // A fake credential, made at runtime: never a real one.
-        $this->token      = 'fake-key-' . bin2hex(random_bytes(12));
-        $this->properties = [
-            'companies' => [
-                ['name' => 'name', 'label' => 'Company name', 'type' => 'string'],
-                ['name' => 'domain', 'label' => 'Domain', 'type' => 'string'],
-                ['name' => 'website', 'label' => 'Website', 'type' => 'string'],
-                ['name' => 'city', 'label' => 'City', 'type' => 'string'],
-                ['name' => 'country', 'label' => 'Country', 'type' => 'string'],
-                ['name' => 'hubspot_owner_id', 'label' => 'Owner', 'type' => 'enumeration'],
-                ['name' => 'secret_note', 'label' => 'Secret', 'type' => 'string', 'dataSensitivity' => 'sensitive'],
-            ],
-            'contacts' => [
-                ['name' => 'firstname', 'label' => 'First name', 'type' => 'string'],
-                ['name' => 'lastname', 'label' => 'Last name', 'type' => 'string'],
-                ['name' => 'email', 'label' => 'E-mail', 'type' => 'string'],
-                ['name' => 'phone', 'label' => 'Phone <b>', 'type' => 'string'],
-                ['name' => 'jobtitle', 'label' => 'Job title', 'type' => 'string'],
-                ['name' => 'hubspot_owner_id', 'label' => 'Owner', 'type' => 'enumeration'],
-                ['name' => 'vip_level', 'label' => 'VIP level', 'type' => 'string'],
-            ],
-        ];
+        $this->token = 'fake-key-' . bin2hex(random_bytes(12));
     }
 
     /**
@@ -168,7 +168,7 @@ final class FakeHubSpot
             $path === '/account-info/v3/details'                                             => $this->json(['portalId' => (int) $this->account, 'timeZone' => 'UTC', 'companyCurrency' => 'EUR']),
             $path === '/oauth/v2/private-apps/get/access-token-info'                         => $this->introspect ? $this->json(['hubId' => (int) $this->account, 'scopes' => $this->scopes, 'userId' => 7]) : $this->json(['status' => 'error'], 400),
             preg_match('#\A/crm/v3/objects/(companies|contacts)/search\z#', $path, $m) === 1 => $this->scoped('crm.objects.' . $m[1] . '.read', fn (): MockResponse => $this->json(['total' => count($m[1] === 'companies' ? $this->companies : $this->contacts), 'results' => []])),
-            preg_match('#\A/crm/v3/objects/(companies|contacts)\z#', $path, $m) === 1        => $this->scoped('crm.objects.' . $m[1] . '.read', fn (): MockResponse => $this->page($m[1] === 'companies' ? $this->companies : $this->contacts, $query, true)),
+            preg_match('#\A/crm/v3/objects/(companies|contacts)\z#', $path, $m) === 1        => $this->scoped('crm.objects.' . $m[1] . '.read', fn (): MockResponse => $this->page($m[1] === 'companies' ? $this->companies : $this->contacts, $query)),
             preg_match('#\A/crm/v3/properties/(companies|contacts)\z#', $path, $m) === 1     => $this->scoped('crm.schemas.' . $m[1] . '.read', fn (): MockResponse => $this->json(['results' => $this->properties[$m[1]]])),
             $path === '/crm/v3/owners'                                                       => $this->scoped('crm.objects.owners.read', fn (): MockResponse => $this->owners($query)),
             $path === '/crm/v4/associations/contacts/companies/batch/read'                   => $this->scoped('crm.objects.contacts.read', fn (): MockResponse => $this->associationsOf($body)),
@@ -187,13 +187,13 @@ final class FakeHubSpot
     }
 
     /**
-     * @param array<string, array<string, string|null>> $rows
+     * @param array<array-key, array<string, string|null>> $rows
      * @param array<array-key, mixed> $query
      */
-    private function page(array $rows, array $query, bool $objects): MockResponse
+    private function page(array $rows, array $query): MockResponse
     {
-        $limit  = (int) ($query['limit'] ?? 100);
-        $offset = (int) ($query['after'] ?? 0);
+        $limit  = $this->int($query['limit'] ?? 100);
+        $offset = $this->int($query['after'] ?? 0);
         $wanted = is_string($query['properties'] ?? null) ? explode(',', $query['properties']) : [];
         $slice  = array_slice($rows, $offset, $limit, true);
         $out    = [];
@@ -216,8 +216,8 @@ final class FakeHubSpot
      */
     private function owners(array $query): MockResponse
     {
-        $limit  = (int) ($query['limit'] ?? 100);
-        $offset = (int) ($query['after'] ?? 0);
+        $limit  = $this->int($query['limit'] ?? 100);
+        $offset = $this->int($query['after'] ?? 0);
         $out    = [];
         foreach (array_slice($this->owners, $offset, $limit, true) as $id => $email) {
             $out[] = ['id' => (string) $id, 'email' => $email, 'firstName' => 'Owner', 'archived' => false];
@@ -272,8 +272,8 @@ final class FakeHubSpot
      */
     private function members(string $list, array $query): MockResponse
     {
-        $limit   = (int) ($query['limit'] ?? 100);
-        $offset  = (int) ($query['after'] ?? 0);
+        $limit   = $this->int($query['limit'] ?? 100);
+        $offset  = $this->int($query['after'] ?? 0);
         $members = $this->lists[$list]['members'] ?? [];
         $out     = [];
         foreach (array_slice($members, $offset, $limit) as $id) {
@@ -290,5 +290,10 @@ final class FakeHubSpot
     private function json(array $data, int $status = 200): MockResponse
     {
         return new MockResponse(json_encode($data, JSON_THROW_ON_ERROR), ['http_code' => $status, 'response_headers' => ['content-type' => 'application/json']]);
+    }
+
+    private function int(mixed $value): int
+    {
+        return is_numeric($value) ? (int) $value : 0;
     }
 }

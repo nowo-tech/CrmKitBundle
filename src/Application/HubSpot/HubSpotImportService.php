@@ -25,12 +25,14 @@ use Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection;
 use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\Tag;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotList;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotProperty;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotPropertyView;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotSchemaView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
 use Nowo\CrmKitBundle\Domain\Service\HubSpotImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotImportScope;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotMapping;
+use Nowo\CrmKitBundle\Domain\Value\HubSpotObjectId;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotToken;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\TagName;
@@ -212,7 +214,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
         try {
             foreach ($mapping->properties as $object => $map) {
                 // Only properties HubSpot offers (never a sensitive one: a page asking for it would answer 403).
-                $known = array_map(static fn ($p): string => $p->name->value, $this->reader->properties($token, HubSpotObject::from((string) $object)));
+                $known = array_map(static fn (HubSpotProperty $p): string => $p->name->value, $this->reader->properties($token, HubSpotObject::from((string) $object)));
                 foreach ($map as $property => $target) {
                     if ($target !== '' && !in_array((string) $property, $known, true)) {
                         throw InvalidInputException::field('mapping', 'import.error.mapping');
@@ -222,7 +224,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
         } catch (HubSpotException $e) {
             throw HubSpotErrors::input('mapping', $e);
         }
-        $chosen = array_map(static fn ($l): string => $l->value, $scope->lists);
+        $chosen = array_map(static fn (HubSpotObjectId $l): string => $l->value, $scope->lists);
         $names  = [];
         foreach ($mapping->lists as $list => $tag) {
             if (!in_array((string) $list, $chosen, true)) {

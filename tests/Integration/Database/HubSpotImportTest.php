@@ -30,7 +30,10 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Throwable;
 
+use function is_string;
 use function str_contains;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * HubSpot imports (0.10.0): start ⇒ mapping ⇒ confirm ⇒ pages; owners by e-mail, contact ↔ company affiliations,
@@ -78,7 +81,9 @@ final class HubSpotImportTest extends HubSpotTestCase
         foreach ($done->rows as $row) {
             self::assertEqualsCanonicalizing(['object', 'id'], array_keys($row->data), 'MySQL reorders JSON keys');
         }
-        self::assertFalse(str_contains($this->text("SELECT data FROM nowo_crm_import_row WHERE data LIKE '%people.example%'"), '@'));
+        foreach ($this->connection()->fetchFirstColumn('SELECT data FROM nowo_crm_import_row') as $data) {
+            self::assertFalse(str_contains(is_string($data) ? $data : '', '@'), 'no e-mail in a row');
+        }
         self::assertContains('ImportCompleted', $this->recorder()->eventNames());
         self::assertContains('crm.import.completed', $this->recorder()->actions());
         // No request ever followed paging.next.link, and every one went to the constant host with the bearer header.
@@ -89,7 +94,9 @@ final class HubSpotImportTest extends HubSpotTestCase
             self::assertSame('Authorization: Bearer ' . $fake->token, $auth);
         }
         // The token is nowhere in the import or its rows.
-        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_import WHERE run_cursor LIKE ? OR mapping LIKE ? OR file_name LIKE ?', ['%' . $fake->token . '%', '%' . $fake->token . '%', '%' . $fake->token . '%']));
+        foreach ($this->connection()->fetchAllAssociative('SELECT run_cursor, mapping, file_name FROM nowo_crm_import') as $row) {
+            self::assertFalse(str_contains(json_encode($row, JSON_THROW_ON_ERROR), $fake->token));
+        }
     }
 
     public function testAReRunUpdatesWithoutDuplicatesAndEmptyValuesNeverClear(): void

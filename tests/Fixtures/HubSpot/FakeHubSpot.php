@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Fixtures\HubSpot;
 
+use Closure;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
 use function array_key_exists;
@@ -91,6 +92,9 @@ final class FakeHubSpot
      */
     public array $failures = [];
 
+    /** @var (Closure(string): void)|null called with the path of every request (a test acting meanwhile) */
+    public ?Closure $onRequest = null;
+
     /** @var list<array{string, string}> method, URL of every request */
     public array $requests = [];
 
@@ -149,6 +153,9 @@ final class FakeHubSpot
         }
         $this->authorizations[] = $auth;
         $path                   = (string) parse_url($url, PHP_URL_PATH);
+        if ($this->onRequest instanceof Closure) {
+            ($this->onRequest)($path);
+        }
         foreach ($this->failures as $i => [$prefix, $status, $extra, $body]) {
             if ($path === $prefix || str_starts_with($path, $prefix . '?')) {
                 unset($this->failures[$i]);

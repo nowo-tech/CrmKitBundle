@@ -31,7 +31,6 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
-use Symfony\Component\HttpClient\HttpClient;
 
 use function class_exists;
 use function interface_exists;
@@ -103,16 +102,13 @@ final class CrmPortsPass implements CompilerPassInterface
     }
 
     /**
-     * The HubSpot import (0.10.0): symfony/http-client is required; the secret box is `secrets.box` (the
+     * The HubSpot import (0.10.0): the secret box is `secrets.box` (the
      * DoctrineEncrypt bridge is defined here when chosen and DoctrineEncrypt is installed) or the sodium default; the
      * OutboundUrlGuard pin follows `import.hubspot.outbound_url_guard`.
      */
     private function hubspot(ContainerBuilder $container): void
     {
-        $p = ServiceDefinitions::P;
-        if (!class_exists(HttpClient::class)) {
-            throw new LogicException('nowo_crm_kit.import.hubspot.enabled needs symfony/http-client: composer require symfony/http-client.');
-        }
+        $p   = ServiceDefinitions::P;
         $box = $container->getParameter($p . 'secrets.box');
         if ($box === DoctrineEncryptCrmSecretBox::class && !$container->has($box)) {
             if (!interface_exists(EncryptorRegistryInterface::class) || !$container->has(EncryptorRegistryInterface::class)) {

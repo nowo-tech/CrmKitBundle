@@ -110,16 +110,6 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
     /**
      * {@inheritDoc}
      */
-    public function lockConnectionById(TenantRef $tenant, string $id): ?HubSpotConnection
-    {
-        $connection = $this->lockConnection($tenant);
-
-        return $connection?->getId() === $id ? $connection : null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public function takeConnectAttempt(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval): bool
     {
         $minute = intdiv($now->getTimestamp(), 60);

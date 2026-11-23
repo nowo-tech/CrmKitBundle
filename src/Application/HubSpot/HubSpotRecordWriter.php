@@ -231,11 +231,8 @@ final readonly class HubSpotRecordWriter
         try {
             $values = RecordValidator::values($type, $mapped['values'], true);
             if ($type === SubjectType::Contact) {
+                // (An e-mail stored meanwhile by another writer is refused by its unique key: the page settles again.)
                 RecordValidator::contactName($values);
-                $email = $values['email'] ?? null;
-                if ($email !== null && $this->support->store->contactByEmailKey($context->tenant, mb_strtolower($email, 'UTF-8')) instanceof Contact) {
-                    return [RowOutcome::Invalid, null, 'error.email_taken'];
-                }
             }
             $custom = RecordValidator::custom($mapped['custom'], $fields, []);
         } catch (InvalidInputException $e) {

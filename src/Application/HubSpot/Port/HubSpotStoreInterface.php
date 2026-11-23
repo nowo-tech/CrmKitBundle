@@ -31,9 +31,6 @@ interface HubSpotStoreInterface
      */
     public function connections(?string $afterId, int $limit): array;
 
-    /** One connection by id, locked (the rotation command). */
-    public function lockConnectionById(TenantRef $tenant, string $id): ?HubSpotConnection;
-
     /**
      * Counts a token check of the tenant in the current window (`$interval` seconds); false once `$limit` checks were
      * made in it. Atomic under a row lock.

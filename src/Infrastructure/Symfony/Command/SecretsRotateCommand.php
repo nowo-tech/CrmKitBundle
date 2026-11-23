@@ -67,8 +67,9 @@ final class SecretsRotateCommand extends Command
      */
     private function rotate(TenantRef $tenant, string $id, bool $dry): string
     {
-        $connection = $this->store->lockConnectionById($tenant, $id);
-        if (!$connection instanceof HubSpotConnection || $connection->getToken()->keyId === $this->box->currentKeyId()) {
+        $connection = $this->store->lockConnection($tenant);
+        // Replaced by another connection since it was listed, or already sealed under the current key.
+        if (!$connection instanceof HubSpotConnection || $connection->getId() !== $id || $connection->getToken()->keyId === $this->box->currentKeyId()) {
             return 'current';
         }
         $now     = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));

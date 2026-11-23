@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
+use Closure;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Service\HubSpotConnectionServiceInterface;
@@ -13,6 +14,8 @@ use Nowo\CrmKitBundle\Domain\Value\HubSpotImportScope;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotMapping;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotObjectId;
 use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\FakeHubSpot;
+use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\TestEmailLookup;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -33,15 +36,17 @@ abstract class HubSpotTestCase extends CrmTestCase
      * Boots the kit with HubSpot on and every grant for `ana`; the fake account.
      *
      * @param array<string, mixed> $config
+     * @param (Closure(ContainerConfigurator): void)|null $extensions
      */
-    protected function hubspot(array $config = []): FakeHubSpot
+    protected function hubspot(array $config = [], ?Closure $extensions = null): FakeHubSpot
     {
         /** @var array<string, mixed> $merged */
         $merged = array_replace_recursive(['import' => ['hubspot' => ['enabled' => true, 'page_size' => 10]], 'secrets' => ['keys' => ['k1' => self::KEY], 'current_key' => 'k1']], $config);
         $this->bootWithUiKit($merged, [], static function (ServicesConfigurator $s): void {
             $s->set('test.hubspot', FakeHubSpot::class)->public();
+            $s->set('test.lookup', TestEmailLookup::class);
             $s->set('test.hubspot_client', MockHttpClient::class)->decorate('nowo_crm_kit.hubspot.http_client')->args([new Reference('test.hubspot'), 'https://api.hubapi.com']);
-        });
+        }, $extensions);
         $this->admin();
         $fake = $this->kernel->getContainer()->get('test.hubspot');
         self::assertInstanceOf(FakeHubSpot::class, $fake);

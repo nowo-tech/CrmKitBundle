@@ -15,6 +15,8 @@ use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\CrmSettings;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
+use Nowo\CrmKitBundle\Domain\Model\HubSpot\ExternalRef;
+use Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection;
 use Nowo\CrmKitBundle\Domain\Model\Pipeline\NextAction;
 use Nowo\CrmKitBundle\Domain\Model\Pipeline\PartyStage;
 use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
@@ -133,7 +135,11 @@ final class RaceInjector
             $object instanceof NextAction      => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'title' => 'Racer', 'due_at' => $at, 'status' => 'open', 'dedupe_key' => $object->getDedupeKey(), 'created_at' => $at, 'version' => 1],
             $object instanceof PartyStage      => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'funnel_id' => $object->getFunnelId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'stage_id' => $object->getStageId(), 'entered_at' => $at . '.000000', 'version' => 1],
             $object instanceof Tagging         => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'tag_id' => $object->getTagId(), 'subject_type' => $object->getSubjectType()->value, 'subject_id' => $object->getSubjectId(), 'created_at' => $at],
-            default                            => null,
+            // 0.10.0: another runner's reference of the same HubSpot object (its target: a record that is gone), and
+            // another manager's first connection of the tenant.
+            $object instanceof ExternalRef       => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'source' => $object->getSource(), 'account_id' => $object->getAccountId(), 'object_type' => $object->getObjectType(), 'external_id' => $object->getExternalId(), 'target_type' => $object->getTargetType(), 'target_id' => '01900000-0000-7000-8000-ffffffffffff', 'erased' => 0, 'created_at' => $at, 'updated_at' => $at],
+            $object instanceof HubSpotConnection => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'kind' => 'private_app', 'status' => 'active', 'account_id' => '1', 'label' => 'Racer', 'token_last4' => 'abcd', 'token_key_id' => 'k1', 'token_sealed' => 'AAAA', 'scopes' => '[]', 'validated_at' => $at, 'created_at' => $at, 'updated_at' => $at, 'version' => 1],
+            default                              => null,
         };
         if ($row !== null) {
             $em->getConnection()->insert($table, $row);

@@ -39,7 +39,6 @@ use Nowo\CrmKitBundle\Domain\Value\HubSpotToken;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
-use Throwable;
 
 use function array_map;
 use function array_values;
@@ -51,8 +50,6 @@ use function is_string;
 use function json_decode;
 use function method_exists;
 use function min;
-
-use const JSON_THROW_ON_ERROR;
 
 /**
  * Runs a HubSpot import one page at a time (0.10.0, design section 10). A step reads the import without a lock, asks
@@ -427,11 +424,7 @@ final readonly class HubSpotRunner
      */
     private function decode(string $json): ?array
     {
-        try {
-            $data = json_decode($json, true, 32, JSON_THROW_ON_ERROR);
-        } catch (Throwable) {
-            return null;
-        }
+        $data = json_decode($json, true, 32);
 
         return is_array($data) ? $data : null;
     }

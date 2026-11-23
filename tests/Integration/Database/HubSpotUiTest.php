@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
+use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotImportScope;
+use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\FakeHubSpot;
 use Symfony\Component\DomCrawler\Crawler;
 
 use function array_slice;
@@ -123,10 +125,17 @@ final class HubSpotUiTest extends HubSpotTestCase
         self::assertSame(204, $this->client->getResponse()->getStatusCode());
         $next = (string) $this->client->getResponse()->headers->get('X-Nowo-Crm-Dialog-Location');
         self::assertMatchesRegularExpression('#\A/crm/import/hubspot/[0-9a-f-]{36}/mapping\z#', $next);
+        // A list that vanished meanwhile: 422 in place.
+        $fake->lists = ['78' => ['name' => 'Other', 'type' => '0-1', 'members' => []]];
+        $this->client->request('POST', '/crm/import/hubspot/new', $values, [], self::DIALOG);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $fake->lists = ['77' => ['name' => 'Fans <script>', 'type' => '0-1', 'members' => ['2001']]];
         // A second start while one is open: 409 in place.
         $this->client->request('POST', '/crm/import/hubspot/new', $values, [], self::DIALOG);
         self::assertSame(409, $this->client->getResponse()->getStatusCode());
+        $this->service(TagServiceInterface::class)->create('Existing', 'red');
         $mapping = $this->dialog('GET', $next);
+        self::assertCount(1, $mapping->filter('option:contains("Existing")'));
         self::assertStringContainsString('Phone &lt;b&gt;', (string) $this->client->getResponse()->getContent());
         // The import page of a HubSpot import in preview sends to the mapping step.
         $id = substr($next, strlen('/crm/import/hubspot/'), 36);
@@ -172,6 +181,23 @@ final class HubSpotUiTest extends HubSpotTestCase
         $this->client->request('GET', '/crm/import/hubspot/' . $id . '/mapping');
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
         $page = $this->client->request('GET', '/crm/import/hubspot/' . $id . '/mapping');
+        $form = $page->filter('form#crm-hubspot-form')->form();
+        // HubSpot no longer offers a mapped property when the confirm asks again: 422 in place.
+        $calls           = 0;
+        $fake->onRequest = static function (string $path) use ($fake, &$calls): void {
+            if ($path === '/crm/v3/properties/contacts' && ++$calls === 2) {
+                $fake->properties['contacts'] = [];
+            }
+        };
+        $this->client->submit($form);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $fake->onRequest  = null;
+        $fake->properties = (new FakeHubSpot())->properties;
+        // A stale version: 409 in place.
+        $page = $this->client->request('GET', '/crm/import/hubspot/' . $id . '/mapping');
+        $form = $page->filter('form#crm-hubspot-form')->form();
+        $this->client->submit($form, ['crm_hubspot_mapping[version]' => '99']);
+        self::assertSame(409, $this->client->getResponse()->getStatusCode());
         $form = $page->filter('form#crm-hubspot-form')->form();
         // The policy "update" needs edit, so does any mapping that no longer exists at HubSpot.
         $fake->properties['contacts'] = [];

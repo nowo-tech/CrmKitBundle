@@ -93,6 +93,9 @@ final class HubSpotInfrastructureTest extends TestCase
         self::assertCount(1, $reader->lists($token, [new HubSpotObjectId('8')]));
         $members = $reader->members($token, new HubSpotObjectId('7'), null, 1);
         self::assertSame(['2001', '1'], [$members->ids[0]->value, $members->next?->value]);
+        self::assertSame(['2002', null], [$reader->members($token, new HubSpotObjectId('7'), new HubSpotCursor('1'), 1)->ids[0]->value, $reader->members($token, new HubSpotObjectId('7'), new HubSpotCursor('1'), 1)->next]);
+        $fake->failNext('/crm/v3/lists/search', 503);
+        $this->fails(static fn (): bool => $reader->probe($token, 'crm.lists.read'), HubSpotException::UNAVAILABLE);
         self::assertTrue($reader->probe($token, 'crm.lists.read'));
         self::assertTrue($reader->probe($token, 'crm.objects.owners.read'));
         $fake->scopes = ['crm.objects.companies.read'];

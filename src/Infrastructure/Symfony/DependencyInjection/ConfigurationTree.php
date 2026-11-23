@@ -11,10 +11,12 @@ use Nowo\CrmKitBundle\Domain\Value\RoleKey;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\UiOptions;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\NodeBuilder;
+use Symfony\Component\HttpClient\HttpClient;
 
 use function array_key_exists;
 use function array_keys;
 use function array_unique;
+use function class_exists;
 use function count;
 use function implode;
 use function in_array;
@@ -145,6 +147,7 @@ final class ConfigurationTree
         ->end();
         self::pipeline($children);
         self::api($children);
+        $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !class_exists(HttpClient::class))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs symfony/http-client: composer require symfony/http-client.')->end();
         $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !self::hasSecretBox($v))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs a secret box: set secrets.box, or secrets.keys with secrets.current_key one of them.')->end();
         foreach (self::LATER_PHASES as $phase => $release) {
             $children->arrayNode($phase)->addDefaultsIfNotSet()->children()

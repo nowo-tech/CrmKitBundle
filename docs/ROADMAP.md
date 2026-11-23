@@ -93,7 +93,7 @@ change. "Kit option" is the configuration switch; off means no tables mapped, no
 | **F-0** sending domains | — | Per-organisation sending domain, SPF / DKIM / DMARC verification before campaigns and daily for sequences | — | **MailKit `sending_domains`** (Q-254-6) | with F-2 |
 | **F-1** scoring (phase S) | 0.22.0 | Explainable rule scoring, hot / warm / cold bands, breakdown, worker-safe recompute | `scoring.enabled` | — | v1.182 |
 | **F-2** circulars (phase E2) | 0.23.0 | Informative and marketing circulars through MailKit's queue, only from a verified domain | `campaigns.enabled` | MailKit (`sending_domains`, tracking) | v1.183 |
-| **F-3** automation + sequences | 0.24.0 | CRM triggers and actions for AutomationKit; sequences (steps, windows, caps, stop rules) from the person's mailbox | `automation.enabled`, `sequences.enabled` | **new `nowo-tech/automation-kit-bundle`** 0.1.0 (Q-254-7: repo created, contract first; Workflow evaluated first); WorkflowBundle through an AutomationKit action (as is); UiKit rule builder; OutboundUrlGuard (as is) | v1.184 |
+| **F-3** automation + sequences | 0.24.0 | CRM triggers and actions for AutomationKit, the mailbox e-mail action and the sequence stop signals (reply, booking, unsubscribe); the sequences engine itself is AutomationKit's (Q-AK-1) | `automation.enabled` | **new `nowo-tech/automation-kit-bundle`** 0.1.0 (Q-254-7: repo created, contract first; Workflow evaluated first); WorkflowBundle through an AutomationKit action (as is); UiKit rule builder; OutboundUrlGuard (as is) | v1.184 |
 | **G** forecast, goals, teams | 0.25.0 | Forecast categories with override history, goals per rep / team and period; HubSpot goals and owners' teams | `forecast.enabled` | ReportKit (as is; CrmKit ships the report types in `Bridge/ReportKit`); TaskBoard teams (as is) | v1.185 (may swap with C or E) |
 | **H** knowledge base | — (bridge in 0.19.0) | Published spaces; suggestions in ticket replies | — | **WikiBundle `published_spaces`** (next Wiki minor) | with D-2 or alone |
 | **I** booking links | 0.26.0 | Booking pages, availability (free / busy only), signed cancel / reschedule, meeting + ICS, sequence stop | `booking.enabled` | TaskBoard (event source, as is); **TimeTrack: busy-window reader** (Google / Microsoft) | v1.186 |
@@ -121,7 +121,7 @@ created, README only).
 | E-mail templates and snippets | A-2 | MailKitBundle | Extend | Stored templates (personal / shared scope through a host owner port, locale, subject, body, snippets) and a closed placeholder resolver registry by service tag; CrmKit adds the CRM placeholders | 2.4.0 |
 | Sending, sent-mail log | A-2, C-2, D-2, E-2, F | MailKitBundle | Reuse as is | Nothing | — |
 | Personal Outlook mailboxes | B | MailKitBundle | Extend | Graph delegated mode for person mailboxes (read, send, delta sweep) with host-held tokens through a credential port | 2.5.0 |
-| OAuth connect for Microsoft / Google | B | TimeTrackBundle | Extend (Q-254-15) | OAuth helpers accept configurable extra scopes (mail next to calendar), one consent per person | 1.40.0 |
+| OAuth connect for Microsoft / Google | B | TimeTrackBundle | Extend (Q-254-15, decided) | PKCE OAuth helpers accept configurable extra mail scopes; one connection per person and provider in the host; MailKit has no OAuth flow or callback | 1.40.0 |
 | Gmail mailboxes | B | MailKitBundle | Extend | Gmail provider behind the same mailbox port, off until Google's review | 2.6.0 |
 | Open tracking | B | MailKitBundle | Reuse as is | Nothing: pixel, `MailOpenedEvent`, `MailMachineOpenedEvent`, `EmailTrackingPolicyInterface`, purge | ≥ 1.10 |
 | Click tracking | B | ShortLinkBundle 1.0.0 | Reuse as is | Nothing: `createMany()` kind `email`, `ShortLinkClickedEvent`, MailKit `link_rewriter` | ≥ 1.0 |
@@ -139,13 +139,13 @@ created, README only).
 | Ticket e-mail channel | D-2 | MailKitBundle | Reuse as is | Nothing: Graph inbound, plus-address tags, `GraphInboundHandlerInterface` (a tagged handler chain only if two kit handlers must coexist) | ≥ 1.9 |
 | Ticket chat channel | D-3 | ChatKitBundle | Extend (later, Q-254-8) | Customer-channel option for signed-in portal contacts | after phase F |
 | Knowledge base and suggestions | H, D-2 | WikiBundle 1.54.0 | Extend | `published_spaces`: public read-only published pages, search over them, no author names | 1.55.0 |
-| Static lists | E-1 | CrmKit tags | Reuse (Q-254-16) | `list` flag on tags | — |
+| Static lists | E-1 | CrmKit tags | Reuse (Q-254-16, decided) | `list` flag on tags | — |
 | Dynamic segments | E-1 | SearchKitBundle 1.12.0 | New in CrmKit | Nothing: SearchKit is free-text search over provider groups, no structured filters | — |
 | Rule / condition editor | E-1, F-3 | UiKitBundle 2.71.0 | Extend | Rule-builder component (field / operator / value rows on a FormKit collection) | 2.72.0 |
 | Public embeddable forms | E-2 | FormKitBundle 2.25.0 | Reuse + extend | Reuse `buildFormFromArray()` and `stateless_csrf`; add a honeypot field extension and an embed mode (signed form token bound to the form and an allowed-origins list) | 2.26.0 |
 | Anti-spam proof of work | E-2 | AltchaTypeBundle 1.5.0 | Reuse as is | Nothing | — |
 | Double opt-in | E-2 | — | New in CrmKit | UserKit / AuthKit verify account holders, not contacts without an account | — |
-| Rules engine | F-3 | WorkflowBundle 2.3.0 → AutomationKitBundle | New bundle (Q-254-7) | Workflow evaluated first, reused as is as an action; AutomationKit 0.1.0 (repo created, contract first) | AutomationKit 0.1.0 |
+| Rules and sequences engine | F-3 | WorkflowBundle 2.3.0 → AutomationKitBundle | New bundle (Q-254-7; Q-AK-1..17 decided) | Workflow evaluated first, reused as is as an action; AutomationKit 0.1.0 holds rules **and** sequences (steps, windows, caps, enrolments; Q-AK-1); CrmKit contributes triggers, the mailbox e-mail action and stop signals | AutomationKit 0.1.0 |
 | Failed automation runs | F-3 | MessengerMonitorKitBundle | Reuse as is | Nothing | — |
 | Webhooks | F-3 | OutboundUrlGuardBundle | Reuse as is | Nothing | — |
 | Sending domains (SPF / DKIM / DMARC) | F-0 | MailKitBundle | Extend | `sending_domains` (Resend domains API on Resend, DNS checks otherwise), refused sends with the reason | 2.7.0 |
@@ -221,11 +221,12 @@ created, README only).
 - **Reuse (owner rule).**
   - Personal Outlook mailboxes: **extend MailKit** with Graph delegated mode (MailKit 1.8 / 1.9 is app-only on shared
     mailboxes). Gmail: **extend MailKit** with a Gmail provider behind the same mailbox port.
-  - OAuth connect, refresh and revoke for Microsoft / Google: **extend TimeTrack** (Q-254-15). TimeTrack already has
+  - OAuth connect, refresh and revoke for Microsoft / Google: **extend TimeTrack** (Q-254-15, Decision 2026-11-23: (b)). TimeTrack already has
     PKCE OAuth helpers for both providers (`CalendarOAuthClients`, runtime OAuth apps, host-held tokens through
     `CalendarCredentialProviderInterface`); they gain configurable extra scopes so one consent per person covers the
     calendar and the mailbox. MailKit then reads host-held tokens through a credential port instead of running its
-    own OAuth flow.
+    own OAuth flow. MailKit B1 (Outlook) and B2 (Gmail) have **no OAuth flow or callback of their own**: they consume a token
+    port. The host keeps one connection per person and provider, with tokens encrypted by DoctrineEncrypt.
   - Open tracking: **reuse MailKit as is** (1.10+: pixel, `MailOpenedEvent`, `MailMachineOpenedEvent`,
     `EmailTrackingPolicyInterface`, purge command). Click tracking: **reuse ShortLink as is** (`createMany()` with kind
     `email`, `ShortLinkClickedEvent`, plugged in as MailKit's `link_rewriter`).
@@ -236,7 +237,7 @@ created, README only).
     MailKit's messages.
 - **Depends on.** **MailKit B1** (new minor): personal Outlook mailboxes through Graph *delegated* permissions (MailKit
   today reads and sends app-only on shared mailboxes, 1.8 / 1.9), with host-held tokens obtained through TimeTrack's
-  OAuth helpers (state + PKCE; Q-254-15), sealed by the host (DoctrineEncrypt in Beacon), revoked on unlink; delta
+  OAuth helpers (state + PKCE; Q-254-15, decided), sealed by the host (DoctrineEncrypt in Beacon), revoked on unlink; delta
   sweep per mailbox. **MailKit B2** (new minor, off by
   configuration): Gmail provider (OAuth, sealed tokens, revocation, push + history sweep). MailKit tracking (1.10:
   pixel + link rewriting; ShortLink for clicks). Block A (`email` activity kind). Spec 236 / 248 for Beacon wiring.
@@ -338,7 +339,7 @@ created, README only).
 ### Block E — segments and forms (E-1 0.20.0, E-2 0.21.0)
 
 - **Reuse (owner rule).**
-  - Static lists: **reuse CrmKit tags** (Q-254-16). A static list is a tag (H1 already maps HubSpot lists to tags);
+  - Static lists: **reuse CrmKit tags** (Q-254-16, Decision 2026-11-23: tags with a `list` flag). A static list is a tag (H1 already maps HubSpot lists to tags);
     tags gain a `list` flag so lists can be filtered apart.
   - Dynamic segments: **new in CrmKit** (rules and live counts), because SearchKit is a free-text header search over
     provider groups with no structured filter model, and ReportKit's non-goals exclude a query builder.
@@ -385,7 +386,10 @@ created, README only).
   - Delays: Symfony Messenger (`DelayStamp`) and Scheduler. Failed runs: **reuse MessengerMonitorKit as is**.
     Webhooks: **reuse OutboundUrlGuard as is**. Conditions UI: the UiKit rule builder of block E.
   - Sending domains: **extend MailKit** with `sending_domains` (F-0).
-  - Sequences send from the person's mailbox: **reuse MailKit as is** after block B.
+  - Sequences: **reuse AutomationKit** (Q-AK-1, Decision 2026-11-23): steps, delays, business-day windows, daily caps
+    and enrolments live in AutomationKit. CrmKit only contributes the *send from the person's mailbox* e-mail action
+    (MailKit as is after block B, plus the verified-domain check) and the stop signals (reply, booked meeting,
+    unsubscribe), which end an enrolment.
   - Scoring: **new in CrmKit**, because no bundle scores records.
 - **Depends on.** **New `nowo-tech/automation-kit-bundle`** (repo created, contract first; generic: trigger / condition / action registry by service
   tag, delays on Messenger, idempotency per event, loop depth, dry run, run log, audit, UiKit pages; no CRM dependency).
@@ -395,11 +399,12 @@ created, README only).
   the Resend transport is used, DNS lookups otherwise), refused sends with the reason. Block B (reply detection,
   personal mailboxes) and E-1 (segments) for F-3.
 - **New ports.** `CrmSendingDomainGuardInterface` — `check(TenantRef, EmailAddress $from): SendingDomainStatus` (MailKit
-  adapter); `CrmMailboxSenderInterface` — send a sequence step from the enrolling person's linked mailbox (MailKit B1 /
-  B2 adapter). CRM triggers and actions are AutomationKit services in `Bridge/AutomationKit`, not CrmKit ports.
+  adapter); `CrmMailboxSenderInterface` — send one e-mail from the enrolling person's linked mailbox (MailKit B1 /
+  B2 adapter), used by CrmKit's AutomationKit e-mail action. CRM triggers, the e-mail action and the stop signals are
+  AutomationKit services in `Bridge/AutomationKit`, not CrmKit ports.
 - **New VOs / enums.** `ScoreRule`, `ScoreBand` (hot / warm / cold, thresholds), `ScoreBreakdown`; `SendingDomainStatus`
-  (verified, failing checks with reasons, checked at); `SequenceStep`, `SendingWindow` (business days, hours, zone),
-  `DailyCap`, `EnrolmentStopReason` (reply, booking, unsubscribe, manual).
+  (verified, failing checks with reasons, checked at); `EnrolmentStopReason` (reply, booking, unsubscribe; the signal
+  CrmKit sends). Sequence steps, sending windows and daily caps are AutomationKit value objects (Q-AK-1), not CrmKit's.
 - **Immediate audit (F-2 / F-3: automation sending mail).** Mail sent by rules and sequences (verified domain checked
   before every campaign and daily for active sequences; daily cap per mailbox; stop on reply / booking / unsubscribe;
   marketing consent; unsubscribe one click); idempotency under two workers and loop depth (SC-005); webhooks only
@@ -480,7 +485,9 @@ a sunset date (to be re-checked in each block's build task). The H1 read-only ru
 ### Owner questions (Q-254)
 
 Q-254-1..14 were decided by the owner on 2026-11-23: every recommendation was accepted. The options stay listed for
-the record. Q-254-15 and Q-254-16 come from the owner's reuse rule of the same day and are **open**.
+the record. Q-254-15 and Q-254-16 come from the owner's reuse rule of the same day and were decided the same day as
+recommended. AutomationKit's own questions Q-AK-1..17 were all accepted as recommended (2026-11-23); Q-AK-1 puts the
+sequences engine in AutomationKit.
 
 | # | Question | Options | Recommendation and decision |
 | --- | --- | --- | --- |
@@ -498,8 +505,8 @@ the record. Q-254-15 and Q-254-16 come from the owner's reuse rule of the same d
 | Q-254-12 | Accepted quote moves the deal to won automatically (FR-034): also when the deal has other open quotes? | (a) yes, others become superseded; (b) only when it is the last open quote | Decision 2026-11-23: **(a)**, with the other quotes superseded in the same write unit |
 | Q-254-13 | Lead scoring (F-1) does not need blocks B or E: pull it forward if a release slot is free? | (a) keep the spec order; (b) allow it earlier | Decision 2026-11-23: **(b)**, only when no block of the agreed order is ready |
 | Q-254-14 | When is CrmKit 1.0.0 now that spec 254 adds nine blocks? | (a) after every block and phases D / F / G; (b) after blocks A–D are released and audited, later blocks as additive 1.x minors; (c) unchanged (after phase G) | Decision 2026-11-23: **(b)**: A–D settle the core schema; every later block is opt-in and additive |
-| Q-254-15 | Who runs the OAuth flow for personal mailboxes (block B) now that TimeTrack already connects Google / Microsoft calendars? | (a) MailKit runs its own OAuth flow and stores tokens; (b) extend TimeTrack's OAuth helpers with configurable extra scopes, Beacon keeps one connection per person and provider (host-held, sealed with DoctrineEncrypt), and MailKit reads tokens through a credential port; (c) extract the OAuth helpers into a new shared bundle | **Open.** Recommendation: **(b)**. It reuses tested PKCE code, gives one consent per person instead of two, and needs no new bundle; (c) only if a third bundle needs the helpers |
-| Q-254-16 | Static lists (FR-050): a new list object or CrmKit tags? | (a) a static list is a tag with a `list` flag (H1 already maps HubSpot lists to tags); (b) a separate `crm_list` table | **Open.** Recommendation: **(a)**. It reuses tags, bulk tagging and the tag filters, and needs no second membership model |
+| Q-254-15 | Who runs the OAuth flow for personal mailboxes (block B) now that TimeTrack already connects Google / Microsoft calendars? | (a) MailKit runs its own OAuth flow and stores tokens; (b) extend TimeTrack's OAuth helpers with configurable extra scopes, Beacon keeps one connection per person and provider (host-held, sealed with DoctrineEncrypt), and MailKit reads tokens through a credential port; (c) extract the OAuth helpers into a new shared bundle | Decision 2026-11-23: **(b)**. It reuses tested PKCE code, gives one consent per person instead of two, and needs no new bundle; (c) only if a third bundle needs the helpers |
+| Q-254-16 | Static lists (FR-050): a new list object or CrmKit tags? | (a) a static list is a tag with a `list` flag (H1 already maps HubSpot lists to tags); (b) a separate `crm_list` table | Decision 2026-11-23: **(a)**. It reuses tags, bulk tagging and the tag filters, and needs no second membership model |
 
 ### Sequencing
 
@@ -556,7 +563,7 @@ with spec 254, 1.0.0 comes once blocks A–D are released and audited, later blo
   H2 0.11.0, H3 0.12.0; numbers move up if another release lands first. Owner questions Q-H1..Q-H13 are listed there.
 - **HubSpot parity (Beacon spec 254)** adds nine blocks A–I after H3 (section below); its owner questions
   Q-254-1..Q-254-14 were decided on 2026-11-23 (all recommendations accepted). Q-254-15 (mailbox OAuth through TimeTrack) and Q-254-16
-  (static lists as tags) are open.
+  (static lists as tags) were decided the same day, as were AutomationKit's Q-AK-1..17.
 - **Phases left:** B2 tasks and agenda, C quotes, D invoices, F customer portal, S scoring, E1 lists and segments,
   E2 informative circulars, G reports; plus the configurable numbering and import key (QN-1..10). Each phase needs its
   own contract revision first. This is the large part of the distance to 1.0.0.

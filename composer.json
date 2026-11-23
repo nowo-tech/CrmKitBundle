@@ -95,6 +95,10 @@
     },
     "suggest": {
         "nowo-tech/search-kit-bundle": "^1.9 — header search groups for companies, contacts and deals (needs PHP >= 8.3)",
+        "symfony/http-client": "Required by the HubSpot import (import.hubspot.enabled, 0.10.0)",
+        "symfony/messenger": "Background import runs (import.messenger.enabled, 0.10.0)",
+        "nowo-tech/doctrine-encrypt-bundle": "Seal the HubSpot credential with DoctrineEncrypt (secrets.box: DoctrineEncryptCrmSecretBox)",
+        "nowo-tech/outbound-url-guard-bundle": "Pin api.hubapi.com to its resolved public address (import.hubspot.outbound_url_guard)",
         "symfony/security-bundle": "Default role-map access checker and actor directory",
         "symfony/flex": "Automatic recipe installation (declares the private entity manager)"
     },

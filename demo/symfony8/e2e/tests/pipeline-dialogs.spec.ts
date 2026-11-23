@@ -9,8 +9,8 @@ import { login, logout } from './helpers';
 test.describe.configure({ mode: 'serial' });
 
 test.describe('CRM Kit 0.9.0 pipeline dialogs', () => {
-  test('mia runs a funnel and a deal through the dialogs', async ({ page }) => {
-    await login(page, 'mia');
+  test('admin runs a funnel and a deal through the dialogs', async ({ page }) => {
+    await login(page, 'admin');
     const dialog = page.getByTestId('crm-pipeline-dialog');
 
     // New funnel: no form under the list, the header link opens it.
@@ -82,7 +82,7 @@ test.describe('CRM Kit 0.9.0 pipeline dialogs', () => {
   test('without JavaScript the links open the form pages', async ({ browser }) => {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
-    await login(page, 'mia');
+    await login(page, 'admin');
     await page.goto('/crm/admin/funnels');
     await page.getByTestId('crm-funnel-new').click();
     await expect(page).toHaveURL(/\/crm\/admin\/funnels\/new$/);

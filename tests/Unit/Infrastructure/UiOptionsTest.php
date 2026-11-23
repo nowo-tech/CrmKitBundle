@@ -50,6 +50,8 @@ final class UiOptionsTest extends TestCase
         $off = new UiOptions();
         self::assertFalse($off->perPageSelect());
         self::assertFalse($off->recordDialog());
+        self::assertFalse($off->pipelineDialogs(), '0.9.0: inline by default');
+        self::assertTrue((new UiOptions(pipelineForms: 'dialog'))->pipelineDialogs());
         self::assertSame([10, 15, 25, 50, 100], $off->allowedPerPage(15));
         self::assertSame([10, 25, 50, 100], $off->allowedPerPage(25));
         self::assertSame(15, $off->perPage('15', 15));

@@ -8,6 +8,10 @@ parameters:
         - tests
     bootstrapFiles:
         - tests/bootstrap.php
+    # The DI configurator functions (service(), param()…) live in this class file, not in an autoloaded file: a
+    # parallel worker that never loads the class reports function.notFound depending on how files are split.
+    scanFiles:
+        - vendor/symfony/dependency-injection/Loader/Configurator/ContainerConfigurator.php
     excludePaths:
         analyseAndScan:
             - demo/*

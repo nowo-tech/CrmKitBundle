@@ -23,6 +23,11 @@ nowo_crm_kit:
         # UiKit remote form dialog loaded on demand (the header link is the page without JavaScript).
         list_per_page: [10, 25, 50, 100]
         record_create: dialog
+        # 0.9.0: the funnel pages render no form they have not opened; each form loads on demand into one dialog.
+        pipeline_forms: dialog
+    # 0.3.0: deal funnels, lifecycle funnels, next actions (the built-in task list).
+    pipeline:
+        enabled: true
     roles:
         catalogue: [customer, supplier, partner, distributor]
     affiliations:

@@ -6,8 +6,10 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
 use Nowo\CrmKitBundle\Application\Pipeline\DealInput;
 use Nowo\CrmKitBundle\Application\Pipeline\DealService;
+use Nowo\CrmKitBundle\Application\Pipeline\FunnelReader;
 use Nowo\CrmKitBundle\Application\Pipeline\FunnelService;
 use Nowo\CrmKitBundle\Domain\Enum\FunnelKind;
+use Nowo\CrmKitBundle\Domain\Enum\StageKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Tests\Fixtures\StrictUxIcons;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
@@ -23,6 +25,7 @@ use function trim;
  * and next action done / cancel, `bi:chart` for the statistics), so under `icon_set: ux_icon` the funnel, board, deal
  * and record pages answered 500. With a strict `ux_icon()` (a missing icon throws, as symfony/ux-icons does with
  * Iconify off and `ignore_not_found: false`) every page with a kit action renders, and each action draws its icon.
+ * 0.9.0 (audit ZAG-8): the same under `ui.pipeline_forms: dialog`, with the forms' own pages and dialog fragments.
  */
 final class ActionIconsTest extends CrmTestCase
 {
@@ -85,6 +88,61 @@ final class ActionIconsTest extends CrmTestCase
         self::assertStringContainsString($this->drawing('bar-chart'), $board->html(), 'statistics');
         $stats = $this->client->request('GET', '/crm/funnels/' . $funnel . '/stats');
         self::assertStringContainsString($this->drawing('kanban'), $stats->html(), 'board');
+    }
+
+    public function testTheDialogModeRendersUnderAStrictUxIconToo(): void
+    {
+        // Audit ZAG-8 (0.9.0): with `ui.pipeline_forms: dialog` the funnel pages draw openers instead of forms, and each
+        // form is its own page and dialog fragment; all of them render under the strict ux_icon() as well.
+        $this->bootWithUiKit(
+            ['pipeline' => ['enabled' => true], 'ui' => ['tab_icons' => self::NO_TAB_ICONS, 'pipeline_forms' => 'dialog']],
+            ['icon_set' => 'ux_icon', 'action_icons' => ['create' => 'bi:plus-lg']],
+            static function (ServicesConfigurator $services): void {
+                $services->set(StrictUxIcons::class)->tag('twig.extension');
+            },
+        );
+        $this->admin();
+        $acme = $this->company('Acme');
+        $ada  = $this->contact('Ada', 'L');
+        $this->records()->affiliate($ada, $acme, null, true);
+        $funnels = $this->service(FunnelService::class);
+        $funnel  = $funnels->create(FunnelKind::Deal, null, 'Sales');
+        $funnels->addStage($funnels->create(FunnelKind::Party, SubjectType::Company, 'Accounts'), 'Customer', StageKind::Open, 50, null);
+        $deal  = $this->service(DealService::class)->create(new DealInput('Engines', $funnel, companyId: $acme));
+        $stage = $this->service(FunnelReader::class)->funnel($funnel)->stages[0]->id;
+
+        foreach (['/crm/deals/' . $deal, '/crm/companies/' . $acme] as $path) {
+            // The next action's own page (the no-JS fallback of the dialog), so the pages below show Done / Cancel.
+            $page = $this->client->request('GET', $path . '/next-actions');
+            self::assertSame(200, $this->client->getResponse()->getStatusCode(), $path);
+            $this->client->submit($page->filter('form[name="crm_next_action"]')->form(), ['crm_next_action[title]' => 'Call', 'crm_next_action[due_at]' => '2026-11-20T09:00']);
+            self::assertSame(303, $this->client->getResponse()->getStatusCode(), $path);
+        }
+
+        $pages = [
+            '/crm/companies/' . $acme, '/crm/contacts/' . $ada, '/crm/deals/' . $deal, '/crm/funnels/' . $funnel . '/board',
+            '/crm/funnels/' . $funnel . '/stats', '/crm/admin/funnels', '/crm/admin/funnels/' . $funnel,
+        ];
+        $forms = [
+            '/crm/deals/' . $deal . '/stage', '/crm/deals/' . $deal . '/next-actions', '/crm/deals/' . $deal . '/trash',
+            '/crm/companies/' . $acme . '/lifecycle', '/crm/companies/' . $acme . '/next-actions',
+            '/crm/admin/funnels/new', '/crm/admin/funnels/' . $funnel . '/stages/new', '/crm/admin/stages/' . $stage . '?funnel=' . $funnel,
+        ];
+        foreach ([...$pages, ...$forms] as $path) {
+            $this->client->request('GET', $path);
+            self::assertSame(200, $this->client->getResponse()->getStatusCode(), $path);
+        }
+        foreach ($forms as $path) {
+            $this->client->request('GET', $path, [], [], ['HTTP_X_NOWO_DIALOG' => '1']);
+            self::assertSame(200, $this->client->getResponse()->getStatusCode(), 'fragment ' . $path);
+        }
+
+        $page = $this->client->request('GET', '/crm/deals/' . $deal);
+        self::assertCount(1, $page->filter('[data-testid="crm-deal-move-open"]'), 'the dialog mode is on');
+        self::assertCount(1, $page->filter('[data-testid="crm-next-action"] .nowo-ui-action--mark_done'));
+        $company = $this->client->request('GET', '/crm/companies/' . $acme);
+        self::assertStringContainsString($this->drawing('union'), $company->html(), 'merge');
+        self::assertMatchesRegularExpression('/' . preg_quote($this->drawing('person-check'), '/') . '|' . preg_quote($this->drawing('person-dash'), '/') . '/', $company->html(), 'primary contact');
     }
 
     public function testAMissingIconStillFailsLoudlyInTheTests(): void

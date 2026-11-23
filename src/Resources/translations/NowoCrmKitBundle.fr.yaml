@@ -663,6 +663,7 @@ stage:
     add: 'Nouvelle étape'
     save: 'Enregistrer'
     edit: 'Modifier'
+    edit_title: 'Modifier l’étape %name%'
     created: 'Étape ajoutée.'
     saved: 'Étape enregistrée.'
     move_up: 'Monter'

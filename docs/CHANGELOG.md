@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.9.0] - 2026-11-23](#090---2026-11-23)
 - [[0.8.1] - 2026-11-23](#081---2026-11-23)
 - [[0.8.0] - 2026-11-23](#080---2026-11-23)
 - [[0.7.0] - 2026-11-23](#070---2026-11-23)
@@ -24,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Planned as 0.10.0 (0.9.0 is the pipeline dialogs, PR #22).
+Planned as 0.10.0.
 
 ### Added
 
@@ -68,6 +69,25 @@ Planned as 0.10.0 (0.9.0 is the pipeline dialogs, PR #22).
   `crm_external_ref` only with `import.hubspot.enabled` (UPGRADING, "Unreleased").
 - `ImportServiceInterface::upload()` refuses the `hubspot` format (a HubSpot import starts from its connection).
 - A paused import's "Continue" clears its reason and wait time.
+
+## [0.9.0] - 2026-11-23
+
+### Added
+
+- `ui.pipeline_forms: dialog` (0.9.0, Beacon request 2026-11-23, owner rule D-20261123-01 "every dialog loads on demand"): the funnel pages render no form they have not opened. *Move to a stage* and *Add a next action* (deal page), *Set stage* (lifecycle) and *Add a next action* (360° page), *New funnel* (funnels), *New stage* and each stage's *Edit* (funnel page), and the *Move to trash* / *Delete for good* confirms of a deal are each their own page — `GET` on `nowo_crm_kit_deal_move`, `…_next_action_add`, `…_lifecycle`, `…_stage_edit` (`?funnel=`), `…_deal_trash`, `…_deal_purge`, and the new routes `nowo_crm_kit_funnel_new` (`<ui.path>/admin/funnels/new`) and `nowo_crm_kit_stage_new` (`<ui.path>/admin/funnels/{id}/stages/new`) — opened by real `<a href>` links with UiKit's remote form opener attributes into one `remote_form_dialog` per page (`dialog#crm-pipeline-dialog`): `X-Nowo-Dialog: 1` answers the fragment (`_dialog_form.html.twig`), an invalid submission 422 in place, a stale version or a refused task 422 with its message in place, success 204 + `X-Nowo-Redirect` (generated from the route); the page answers the full form page (no-JS fallback, deep link; a stale version 409, success 303). Same access checks (`edit` on the deal / record, `delete` / `manage` for trash / purge, `manage` for funnels and stages; 404 outside the tenant or hidden), CSRF tokens and version checks as the inline forms; lock conflicts keep their 409. Default `inline`: the 0.8 pages unchanged.
+- Audit ZAG-1: the *Add a next action* and *Set stage* pages and dialog fragments of a company or contact that is not active (trashed, merged, erased) answer 404 (`GET`, and with `dialog` their `POST`; the inline `POST` keeps its 0.8 refusal), like a deal in the trash; the record's page never offers these forms there, and before the fix a deep link showed a form whose submit could only be refused.
+- `_dialog_form.html.twig`: `intro` (a confirm's question) and `variant` (the submit's slot; `btn_danger` also gives Cancel the first focus) — optional, the 0.8 fragments are unchanged.
+- `stage.edit_title` (*Edit stage %name%*) in the seven locales.
+
+### Deprecated
+
+- `ui.pipeline_forms: inline` keeps the forms in the funnel pages (deprecated: `dialog` becomes the default in 1.0), and with it the template variables `forms.move` / `forms.action` (`pipeline/deal.html.twig`), `pipeline.forms` (`pipeline/_record.html.twig`), `form` (`pipeline/funnels.html.twig`), `stages[].form` and `add` (`pipeline/funnel.html.twig`). With `dialog` they are empty / null and the templates render the openers (`openers`, `stages[].edit`, `add_opener`) and `crm_dialog` instead. See UPGRADING, "To 0.9.0".
+
+### Fixed
+
+- Docs (audit ZAC-L1): the 0.8.0 entry for `ui.record_create: dialog` names the dialog fragment
+  `record/_form_dialog.html.twig`; the template is `@NowoCrmKit/_dialog_form.html.twig` (the 0.8.0 section is left as
+  released).
 
 ## [0.8.1] - 2026-11-23
 

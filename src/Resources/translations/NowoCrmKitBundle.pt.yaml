@@ -663,6 +663,7 @@ stage:
     add: 'Nova etapa'
     save: 'Guardar'
     edit: 'Editar'
+    edit_title: 'Editar a etapa %name%'
     created: 'Etapa adicionada.'
     saved: 'Etapa guardada.'
     move_up: 'Subir'

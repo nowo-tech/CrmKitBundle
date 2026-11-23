@@ -1,8 +1,13 @@
 {#
-  The funnels of the tenant (manage, 0.3.0): the list and the create form. Variables: page (ListPage), form (FormView).
+  The funnels of the tenant (manage, 0.3.0): the list and the create form. Variables: page (ListPage), form (FormView);
+  0.9.0, with `ui.pipeline_forms: dialog`: form is null, "New funnel" is a header action that loads its own page into
+  crm_dialog (see pipeline/_dialog.html.twig).
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
 
 {% block nowo_ui_list_after %}
-    {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'funnel.add', submit: 'funnel.save', action: null, testid: 'crm-funnel-form'}) }}
+    {% if form|default(null) is not null %}
+        {{ include('@NowoCrmKit/_form.html.twig', {form: form, title: 'funnel.add', submit: 'funnel.save', action: null, testid: 'crm-funnel-form'}) }}
+    {% endif %}
+    {{ include('@NowoCrmKit/pipeline/_dialog.html.twig', {crm_dialog: crm_dialog|default(null)}, false) }}
 {% endblock %}

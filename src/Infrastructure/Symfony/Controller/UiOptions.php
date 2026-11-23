@@ -20,7 +20,7 @@ use function sort;
  * header layout, the list tabs on records and the filters card; 0.6.1: the area tabs of the other pages, create in a
  * dialog on Tags and Custom fields, the Settings width; 0.7.0: the icon of each area tab. The defaults keep the previous
  * behaviour except the pure visual fixes. 0.8.0: the "Rows per page" choices of the lists and the "New company / contact"
- * dialog. Immutable: the tab icons are resolved from the configured map on every call,
+ * dialog; 0.9.0: the funnel pages' forms on demand. Immutable: the tab icons are resolved from the configured map on every call,
  * nothing is memoised (FrankenPHP worker, REQ-RUNTIME-002).
  *
  * @internal
@@ -59,6 +59,7 @@ final readonly class UiOptions
      *                                             `''` or null = no icon (the tab shows its label in every tab style)
      * @param list<int> $listPerPage 0.8.0: the "Rows per page" choices of the lists; [] = no select
      * @param string $recordCreate 0.8.0: `page` | `dialog` ("New company / contact" in a remote form dialog)
+     * @param string $pipelineForms 0.9.0: `inline` | `dialog` (the forms and confirms of the funnel pages on demand)
      */
     public function __construct(
         public string $rowActions = 'buttons',
@@ -73,6 +74,7 @@ final readonly class UiOptions
         public array $tabIcons = [],
         public array $listPerPage = [],
         public string $recordCreate = 'page',
+        public string $pipelineForms = 'inline',
     ) {
     }
 
@@ -110,6 +112,15 @@ final readonly class UiOptions
     public function recordDialog(): bool
     {
         return $this->recordCreate === 'dialog';
+    }
+
+    /**
+     * Whether the forms and confirms of the funnel pages (move a deal, next action, lifecycle stage, new funnel, new /
+     * edit stage, trash / purge a deal) load on demand into a remote form dialog (0.9.0, `ui.pipeline_forms: dialog`).
+     */
+    public function pipelineDialogs(): bool
+    {
+        return $this->pipelineForms === 'dialog';
     }
 
     /**

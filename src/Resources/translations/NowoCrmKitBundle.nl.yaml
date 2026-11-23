@@ -663,6 +663,7 @@ stage:
     add: 'Nieuwe fase'
     save: 'Opslaan'
     edit: 'Bewerken'
+    edit_title: 'Fase %name% bewerken'
     created: 'Fase toegevoegd.'
     saved: 'Fase opgeslagen.'
     move_up: 'Omhoog'

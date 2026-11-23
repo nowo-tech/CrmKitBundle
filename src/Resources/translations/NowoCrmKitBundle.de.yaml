@@ -663,6 +663,7 @@ stage:
     add: 'Neue Phase'
     save: 'Speichern'
     edit: 'Bearbeiten'
+    edit_title: 'Phase %name% bearbeiten'
     created: 'Phase hinzugefügt.'
     saved: 'Phase gespeichert.'
     move_up: 'Nach oben'

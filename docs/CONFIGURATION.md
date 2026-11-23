@@ -103,6 +103,7 @@ nowo_crm_kit:
         tab_icons: {}              # 0.7.0: area => icon name, merged over the built-in Tabler set (see "Area tab icons")
         list_per_page: []          # 0.8.0: "Rows per page" choices, e.g. [10, 25, 50, 100]; [] = no select (see "Rows per page")
         record_create: page        # 0.8.0: page | dialog ("New company / contact" in a UiKit remote form dialog, on demand)
+        pipeline_forms: inline     # 0.9.0: inline (deprecated) | dialog (the funnel pages' forms and confirms on demand)
     pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
     api:                           # 0.3.0: see API.md
         enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)
@@ -332,6 +333,14 @@ on demand (nothing of the form is in the list page); `page` (default) keeps the 
 `ui.admin_create: dialog` (Tags, Custom fields) loads its form on demand the same way; the 0.6.1 in-page dialog is
 `dialog_inline`, deprecated. See USAGE, "Page layout
 options".
+
+`ui.pipeline_forms: dialog` (0.9.0, with `pipeline.enabled`) does the same for the funnel pages: *Move to a stage*, the
+next action and lifecycle forms, *New funnel*, *New stage*, each stage's *Edit* and the trash / purge confirms of a deal
+become their own pages, opened on demand into one remote form dialog per page; the pages render none of those forms.
+Why a key of its own and not `record_create` / `admin_create`: those two name one action on one page each, while this
+switches every form of the funnel pages together (the 360° page's other forms — notes, tags, links, affiliations,
+consent — are not covered yet, so a general `ui.forms` would promise more than it does). `inline` (default) keeps the
+0.8 pages and is deprecated (`dialog` becomes the default in 1.0). See UPGRADING, "To 0.9.0".
 
 ### Area tab icons
 

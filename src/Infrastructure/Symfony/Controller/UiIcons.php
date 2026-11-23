@@ -10,7 +10,9 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
  * A name is a canonical UiKit icon (`sort_asc`, `sort_desc`) or a bare Bootstrap Icons name (UiKit's default set; with
  * `icon_set: ux_icon` it is drawn as `bi:<name>`). Names that exist in no icon set (`custom`, `chart`, `merge`) made
  * `ux_icon` throw, so the page answered 500; tests/Unit/Infrastructure/UiIconsTest checks every name below against
- * the Bootstrap Icons drawings in tests/Fixtures/icons/bi and the pages render with a strict `ux_icon`.
+ * the Bootstrap Icons drawings in tests/Fixtures/icons/bi and the pages render with a strict `ux_icon`. UiKit has no
+ * kind for the five Bootstrap names, so `tabler-icons` draws an empty glyph and `svg_inline` the generic eye for them
+ * (UPGRADING, "To 0.8.1").
  */
 final class UiIcons
 {

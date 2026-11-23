@@ -258,6 +258,22 @@ final class PipelineUiTest extends CrmTestCase
         self::assertSame(1, substr_count((string) $this->client->getResponse()->getContent(), 'A deal needs a company or a contact.'), 'once, at the company field');
     }
 
+    public function testTheFormsOwnErrorsAreAnAlert(): void
+    {
+        // ZAG-7: an error of the form itself (here Symfony's CSRF error, which has no field) shows above the fields in
+        // a flash_error box with role="alert", so screen readers announce it (as the pipeline forms of 0.9 do).
+        $this->boot();
+        $this->admin();
+        $funnel = $this->service(FunnelService::class)->create(FunnelKind::Deal, null, 'Sales');
+        $page   = $this->client->request('GET', '/crm/deals/new?funnel=' . $funnel);
+        self::assertCount(0, $page->filter('[data-testid="crm-deal-form"] [role="alert"]'), 'no empty alert box');
+        $this->client->submit($page->filter('[data-testid="crm-deal-form"] form')->form(), ['crm_deal[title]' => 'Engines', 'crm_deal[_token]' => 'nope']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $alert = $this->client->getCrawler()->filter('[data-testid="crm-deal-form"] [role="alert"]');
+        self::assertCount(1, $alert);
+        self::assertStringContainsString('CSRF', $alert->text());
+    }
+
     public function testFormEdgesOfTheDealPages(): void
     {
         $this->boot(['pipeline' => ['enabled' => true, 'task_port' => 'test.task_port']]);

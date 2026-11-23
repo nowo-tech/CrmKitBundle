@@ -6,16 +6,19 @@
   moves into the dialog footer; Cancel is a `type="button"` that closes the dialog. The form is named by the dialog
   title (`<dialog id>-title`).
   Variables: form (FormView), action (the URL the form posts to), dialog (the dialog id), testid, submit (translation
-  key, default form.save).
+  key, default form.save); 0.9.0: intro (text above the fields, e.g. the question of a confirm, or null), variant
+  (the submit's theme slot, default btn_primary; btn_danger for a destructive confirm, whose Cancel takes `autofocus`:
+  the safe action gets the first focus).
 #}
 {%- set _b = 'NowoCrmKitBundle' -%}
 <div data-testid="{{ testid }}">
     {{ form_start(form, {action: action, attr: {class: nowo_ui_class('form', _b), 'aria-labelledby': dialog ~ '-title', id: dialog ~ '-form'}}) }}
+    {% if intro|default(null) %}<p data-testid="{{ testid }}-intro">{{ intro }}</p>{% endif %}
     {% if form.vars.errors|length > 0 %}<div class="{{ nowo_ui_class('flash_error', _b) }}" role="alert" data-testid="{{ testid }}-errors">{{ form_errors(form) }}</div>{% endif %}
     {% for child in form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
     <div class="{{ nowo_ui_class('form_actions', _b) }}" data-nowo-ui-dialog-actions>
-        <button type="submit" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="{{ testid }}-submit">{{ (submit ?? 'form.save')|trans({}, _b) }}</button>
-        <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-nowo-ui-dialog-close data-testid="{{ testid }}-cancel">{{ 'form.cancel'|trans({}, _b) }}</button>
+        <button type="submit" class="{{ nowo_ui_class(variant|default('btn_primary'), _b) }}" data-testid="{{ testid }}-submit">{{ (submit ?? 'form.save')|trans({}, _b) }}</button>
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-nowo-ui-dialog-close data-testid="{{ testid }}-cancel"{% if variant|default('btn_primary') == 'btn_danger' %} autofocus{% endif %}>{{ 'form.cancel'|trans({}, _b) }}</button>
     </div>
     {{ form_end(form) }}
 </div>

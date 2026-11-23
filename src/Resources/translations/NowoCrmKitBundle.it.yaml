@@ -585,6 +585,7 @@ stage:
     add: 'Nuova fase'
     save: 'Salva'
     edit: 'Modifica'
+    edit_title: 'Modifica la fase %name%'
     created: 'Fase aggiunta.'
     saved: 'Fase salvata.'
     move_up: 'Sposta su'

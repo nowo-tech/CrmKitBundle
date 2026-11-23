@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.9.0](#to-090)
 - [To 0.8.1](#to-081)
 - [To 0.8.0](#to-080)
 - [To 0.7.0](#to-070)
@@ -19,6 +20,42 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.9.0
+
+From **0.8.x**: `composer update nowo-tech/crm-kit-bundle`. No schema change, no BC break in the public PHP API.
+Routes: `GET` added to `nowo_crm_kit_deal_move`, `…_deal_trash`, `…_deal_purge`, `…_next_action_add`,
+`…_lifecycle` and `…_stage_edit` (their `POST` is unchanged); new `nowo_crm_kit_funnel_new` and `nowo_crm_kit_stage_new`
+(`GET`, `POST`). A host that lists the CRM routes (breadcrumbs, denial tests) adds them; they are form pages, and with
+`X-Nowo-Dialog: 1` dialog fragments.
+
+**Opt in to the pipeline dialogs** (owner rule "every dialog loads on demand"; needs UiKit's remote form dialog runtime,
+UiKit ≥ 2.28, `js/nowo-ui-dialog.js` on the page, as for `ui.record_create: dialog`):
+
+```yaml
+nowo_crm_kit:
+    ui:
+        pipeline_forms: dialog   # default inline (deprecated: dialog becomes the default in 1.0)
+```
+
+What changes with `dialog`:
+
+- The deal page has no *Move to a stage* and no next action form, and no confirm dialog for *Move to trash* /
+  *Delete for good*: links (`crm-deal-move-open`, `crm-next-action-open`, `crm-deal-trash`, `crm-deal-purge`) open
+  those pages in `dialog#crm-pipeline-dialog`. The 360° page: `crm-lifecycle-open`, `crm-next-action-open`. Funnels:
+  the header action `crm-funnel-new` replaces the form under the list. A funnel: one `crm-stage-edit-open` link per
+  stage replaces the `<details>` edit forms, `crm-stage-new` the add form (the rename / archive form stays).
+- In the dialog: an invalid submission, a stale version (*Someone changed this record at the same moment*) or a task the
+  task service refuses answer **422** with the message in place; success **204** + `X-Nowo-Redirect` (the flash shows on
+  the page it lands on). Without JavaScript the link opens the form page; there a stale version answers **409**, an
+  invalid form 422, success 303. A `POST` to these routes without its form answers 422 (inline mode: the 0.8 flash +
+  303).
+- Template overrides: with `dialog` the variables of the inline forms are empty / null (`forms`, `pipeline.forms`,
+  `form`, `stages[].form`, `add`); the 0.9 templates read `openers` (deal), `pipeline.openers` (360°), `stages[].edit` /
+  `add_opener` (funnel), `crm_dialog` (all four) and include `pipeline/_dialog.html.twig`. An override of a 0.8
+  template keeps working with `inline` (the default).
+- Beacon tests and host checks: no `form[name="crm_stage_move"]`, `crm_next_action`, `crm_lifecycle`, `crm_funnel`
+  (funnels list) or `crm_stage` in those pages any more; fetch the fragments instead.
 
 ## To 0.8.1
 

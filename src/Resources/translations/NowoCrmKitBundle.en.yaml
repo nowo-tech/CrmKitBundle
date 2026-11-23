@@ -585,6 +585,7 @@ stage:
     add: 'New stage'
     save: 'Save'
     edit: 'Edit'
+    edit_title: 'Edit stage %name%'
     created: 'Stage added.'
     saved: 'Stage saved.'
     move_up: 'Move up'

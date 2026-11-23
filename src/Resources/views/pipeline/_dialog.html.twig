@@ -1,0 +1,9 @@
+{#
+  The one remote form dialog of a funnel page (0.9.0, `ui.pipeline_forms: dialog`): an empty UiKit shell that the
+  page's openers (real links to the forms' own pages) fill on demand with the fragment (`_dialog_form.html.twig`,
+  `X-Nowo-Dialog: 1`). Nothing of a form is in the page before it opens. Variables: crm_dialog ({id, title} or null).
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{% if crm_dialog|default(null) is not null %}
+    {{ include(nowo_ui_partial('remote_form_dialog', _d), {id: crm_dialog.id, title: crm_dialog.title, size: 'md', attr: {'data-testid': crm_dialog.id}, bundle: _d}, false) }}
+{% endif %}

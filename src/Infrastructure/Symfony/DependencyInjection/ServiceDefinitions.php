@@ -110,6 +110,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\AdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ImportController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineAdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineDialogs;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineForms;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineRecordBlock;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordController;
@@ -438,9 +439,10 @@ final class ServiceDefinitions
         $s = $container->services();
         $p = self::P;
         $s->set(PipelineForms::class)->args([service(RecordForms::class), service(CrmReaderInterface::class), param($p . 'pipeline.lost_reasons')]);
-        $s->set(PipelineController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(DealService::class), service(NextActionService::class), service(PartyStageService::class), service(PipelineForms::class), service(CrmAccess::class), service(CrmApiCursorCodec::class)])->public()->tag('controller.service_arguments');
-        $s->set(PipelineAdminController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(FunnelService::class), service(FunnelStatistics::class), service(PipelineForms::class), service(CrmAccess::class)])->public()->tag('controller.service_arguments');
-        $s->set(PipelineRecordBlock::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(PartyStageService::class), service(NextActionService::class), service(PipelineForms::class)]);
+        $s->set(PipelineController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(DealService::class), service(NextActionService::class), service(PartyStageService::class), service(PipelineForms::class), service(CrmAccess::class), service(CrmApiCursorCodec::class), service(PipelineDialogs::class), service(CrmReaderInterface::class)])->public()->tag('controller.service_arguments');
+        $s->set(PipelineAdminController::class)->args([service(UiSupport::class), service(FunnelReader::class), service(FunnelService::class), service(FunnelStatistics::class), service(PipelineForms::class), service(CrmAccess::class), service(PipelineDialogs::class)])->public()->tag('controller.service_arguments');
+        $s->set(PipelineDialogs::class)->args([service(UiSupport::class), service(RemoteDialogResponder::class)->nullOnInvalid()]);
+        $s->set(PipelineRecordBlock::class)->args([service(UiSupport::class), service(FunnelReader::class), service(DealReader::class), service(PartyStageService::class), service(NextActionService::class), service(PipelineForms::class), service(PipelineDialogs::class)]);
         foreach ([DealFilterType::class, DealType::class, FunnelType::class, StageType::class, StageMoveType::class, NextActionType::class, StatsFilterType::class, LifecycleType::class] as $type) {
             $s->set($type)->tag('form.type');
         }
@@ -472,7 +474,7 @@ final class ServiceDefinitions
     {
         $s = $container->services();
         $p = self::P;
-        $s->set(UiOptions::class)->args([param($p . 'ui.row_actions'), param($p . 'ui.header_actions'), param($p . 'ui.record_actions'), param($p . 'ui.record_tabs'), param($p . 'ui.filters_fold'), param($p . 'ui.filters_slot'), param($p . 'ui.list_tabs'), param($p . 'ui.admin_create'), param($p . 'ui.settings_width'), $tabIcons, param($p . 'ui.list_per_page'), param($p . 'ui.record_create')]);
+        $s->set(UiOptions::class)->args([param($p . 'ui.row_actions'), param($p . 'ui.header_actions'), param($p . 'ui.record_actions'), param($p . 'ui.record_tabs'), param($p . 'ui.filters_fold'), param($p . 'ui.filters_slot'), param($p . 'ui.list_tabs'), param($p . 'ui.admin_create'), param($p . 'ui.settings_width'), $tabIcons, param($p . 'ui.list_per_page'), param($p . 'ui.record_create'), param($p . 'ui.pipeline_forms')]);
         $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size'), param($p . 'pipeline.enabled'), service(UiOptions::class)]);
         $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid()]);

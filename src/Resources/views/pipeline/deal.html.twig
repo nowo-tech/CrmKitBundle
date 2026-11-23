@@ -1,13 +1,17 @@
 {#
   One deal (0.3.0): details, stage move, stage history, next actions. Variables: page (ShowPage), deal (DealView),
-  funnel (FunnelView), forms (move, action), buttons (next action id => list of View\Action).
+  funnel (FunnelView), forms (move, action), buttons (next action id => list of View\Action); 0.9.0, with
+  `ui.pipeline_forms: dialog`: forms is empty, openers (move, action: View\Action links to the forms' own pages) and
+  crm_dialog (the page's remote form dialog, see pipeline/_dialog.html.twig).
 #}
 {% extends '@NowoUiKit/page/show.html.twig' %}
 
 {% block nowo_ui_show_after %}
     {%- set _d = 'NowoCrmKitBundle' -%}
     {%- set _b = page.bundle -%}
-    {% if forms.move is defined %}
+    {% if openers.move|default(null) %}
+        <div class="{{ nowo_ui_class('toolbar', _b) }}" data-testid="crm-deal-move">{{ include(nowo_ui_partial('action', _b), {action: openers.move, context: 'toolbar', bundle: _b}) }}</div>
+    {% elseif forms.move is defined %}
         {{ include('@NowoCrmKit/_form.html.twig', {form: forms.move, title: 'deal.move.title', submit: 'deal.move.save', action: path('nowo_crm_kit_deal_move', {id: deal.id}), testid: 'crm-deal-move'}) }}
     {% endif %}
     <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-deal-history">
@@ -22,5 +26,6 @@
             </ol>
         </div>
     </section>
-    {{ include('@NowoCrmKit/pipeline/_next_actions.html.twig', {actions: deal.nextActions, buttons: buttons, form: forms.action ?? null, action: path('nowo_crm_kit_next_action_add', {type: 'deals', id: deal.id})}) }}
+    {{ include('@NowoCrmKit/pipeline/_next_actions.html.twig', {actions: deal.nextActions, buttons: buttons, form: forms.action ?? null, action: path('nowo_crm_kit_next_action_add', {type: 'deals', id: deal.id}), opener: openers.action|default(null)}) }}
+    {{ include('@NowoCrmKit/pipeline/_dialog.html.twig', {crm_dialog: crm_dialog|default(null)}, false) }}
 {% endblock %}

@@ -1,6 +1,7 @@
 {#
   The funnels' block of the 360° page (0.3.0). Variables: pipeline (deals, lifecycle, actions, buttons, forms), record
-  (RecordView), segment.
+  (RecordView), segment. 0.9.0, with `ui.pipeline_forms: dialog`: pipeline.forms is empty, pipeline.openers
+  (lifecycle, action: View\Action links to the forms' own pages) and pipeline.crm_dialog (the remote form dialog).
 #}
 {%- set _d = 'NowoCrmKitBundle' -%}
 {%- set _b = 'NowoCrmKitBundle' -%}
@@ -18,10 +19,12 @@
         <div class="{{ nowo_ui_class('card_body', _b) }}">
             <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ 'lifecycle.title'|trans({}, _d) }}</h2>
             <ul>{% for l in pipeline.lifecycle %}<li>{{ l.funnel.name }}: {{ l.stage ? l.stage.name : 'lifecycle.none'|trans({}, _d) }}{% if l.since %} · {{ l.since|date('Y-m-d') }}{% endif %}</li>{% endfor %}</ul>
+            {% if pipeline.openers.lifecycle|default(null) %}<div class="{{ nowo_ui_class('toolbar', _b) }}">{{ include(nowo_ui_partial('action', _b), {action: pipeline.openers.lifecycle, context: 'toolbar', bundle: _b}) }}</div>{% endif %}
         </div>
     </section>
     {% if pipeline.forms.lifecycle is defined %}
         {{ include('@NowoCrmKit/_form.html.twig', {form: pipeline.forms.lifecycle, title: null, submit: 'lifecycle.save', action: path('nowo_crm_kit_lifecycle', {type: segment, id: record.id}), testid: 'crm-lifecycle-form', variant: 'btn_secondary'}) }}
     {% endif %}
 {% endif %}
-{{ include('@NowoCrmKit/pipeline/_next_actions.html.twig', {actions: pipeline.actions, buttons: pipeline.buttons, form: pipeline.forms.action ?? null, action: path('nowo_crm_kit_next_action_add', {type: segment, id: record.id})}) }}
+{{ include('@NowoCrmKit/pipeline/_next_actions.html.twig', {actions: pipeline.actions, buttons: pipeline.buttons, form: pipeline.forms.action ?? null, action: path('nowo_crm_kit_next_action_add', {type: segment, id: record.id}), opener: pipeline.openers.action|default(null)}) }}
+{{ include('@NowoCrmKit/pipeline/_dialog.html.twig', {crm_dialog: pipeline.crm_dialog|default(null)}, false) }}

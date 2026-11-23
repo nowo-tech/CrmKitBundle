@@ -95,7 +95,8 @@ final class UiRouteLoader extends Loader
     }
 
     /**
-     * The funnel pages (0.3.0, `pipeline.enabled`).
+     * The funnel pages (0.3.0, `pipeline.enabled`). 0.9.0: the forms' own pages (GET on move, trash, purge, next action,
+     * lifecycle and stage edit; new funnel, new stage) for `ui.pipeline_forms: dialog`.
      *
      * @param array<string, string> $id
      */
@@ -107,19 +108,21 @@ final class UiRouteLoader extends Loader
         $this->add($routes, 'deal_new', $base . '/deals/new', $d . 'create', ['GET', 'POST']);
         $this->add($routes, 'deal_show', $base . '/deals/{id}', $d . 'show', ['GET'], $id);
         $this->add($routes, 'deal_edit', $base . '/deals/{id}/edit', $d . 'edit', ['GET', 'POST'], $id);
-        $this->add($routes, 'deal_move', $base . '/deals/{id}/stage', $d . 'move', ['POST'], $id);
-        $this->add($routes, 'deal_trash', $base . '/deals/{id}/trash', $d . 'trash', ['POST'], $id);
+        $this->add($routes, 'deal_move', $base . '/deals/{id}/stage', $d . 'move', ['GET', 'POST'], $id);
+        $this->add($routes, 'deal_trash', $base . '/deals/{id}/trash', $d . 'trash', ['GET', 'POST'], $id);
         $this->add($routes, 'deal_restore', $base . '/deals/{id}/restore', $d . 'restore', ['POST'], $id);
-        $this->add($routes, 'deal_purge', $base . '/deals/{id}/purge', $d . 'purge', ['POST'], $id);
+        $this->add($routes, 'deal_purge', $base . '/deals/{id}/purge', $d . 'purge', ['GET', 'POST'], $id);
         $this->add($routes, 'deal_board', $base . '/funnels/{id}/board', $d . 'board', ['GET'], $id);
-        $this->add($routes, 'next_action_add', $base . '/{type}/{id}/next-actions', $d . 'addNextAction', ['POST'], ['type' => 'companies|contacts|deals'] + $id);
+        $this->add($routes, 'next_action_add', $base . '/{type}/{id}/next-actions', $d . 'addNextAction', ['GET', 'POST'], ['type' => 'companies|contacts|deals'] + $id);
         $this->add($routes, 'next_action_close', $base . '/next-actions/{id}/{action}', $d . 'closeNextAction', ['POST'], $id + ['action' => 'done|cancel']);
-        $this->add($routes, 'lifecycle', $base . '/{type}/{id}/lifecycle', $d . 'lifecycle', ['POST'], ['type' => SubjectType::SEGMENT_REQUIREMENT] + $id);
+        $this->add($routes, 'lifecycle', $base . '/{type}/{id}/lifecycle', $d . 'lifecycle', ['GET', 'POST'], ['type' => SubjectType::SEGMENT_REQUIREMENT] + $id);
         $this->add($routes, 'funnel_stats', $base . '/funnels/{id}/stats', $f . 'stats', ['GET'], $id);
         $this->add($routes, 'funnel_stats_csv', $base . '/funnels/{id}/stats.csv', $f . 'statsCsv', ['GET'], $id);
         $this->add($routes, 'funnels', $base . '/admin/funnels', $f . 'funnels', ['GET', 'POST']);
+        $this->add($routes, 'funnel_new', $base . '/admin/funnels/new', $f . 'funnelNew', ['GET', 'POST']);
         $this->add($routes, 'funnel_edit', $base . '/admin/funnels/{id}', $f . 'funnel', ['GET', 'POST'], $id);
-        $this->add($routes, 'stage_edit', $base . '/admin/stages/{id}', $f . 'stage', ['POST'], $id);
+        $this->add($routes, 'stage_new', $base . '/admin/funnels/{id}/stages/new', $f . 'stageNew', ['GET', 'POST'], $id);
+        $this->add($routes, 'stage_edit', $base . '/admin/stages/{id}', $f . 'stage', ['GET', 'POST'], $id);
         $this->add($routes, 'stage_move', $base . '/admin/stages/{id}/move/{direction}', $f . 'moveStage', ['POST'], $id + ['direction' => 'up|down']);
     }
 

@@ -36,6 +36,7 @@ final readonly class PipelineRecordBlock
         private PartyStageService $lifecycle,
         private NextActionService $actions,
         private PipelineForms $forms,
+        private ?PipelineDialogs $dialogs = null,
     ) {
     }
 
@@ -72,6 +73,16 @@ final readonly class PipelineRecordBlock
                     $buttons[$action->id][] = new Action($kind === 'done' ? 'mark_done' : 'cancel', UiSupport::label('next_action.' . $kind), $this->ui->url('nowo_crm_kit_next_action_close', ['id' => $action->id, 'action' => $kind, 'back_type' => $view->type->segment(), 'back' => $view->id]), method: 'POST', csrfToken: $token, csrfField: 'crm_action[_token]');
                 }
             }
+        }
+        $dialogs = $this->dialogs instanceof PipelineDialogs && $this->dialogs->enabled() ? $this->dialogs : null;
+        $openers = [];
+        if ($edit && $dialogs instanceof PipelineDialogs) {
+            // 0.9.0: links to the forms' own pages instead of the forms (D-20261123-01).
+            $openers['action'] = $dialogs->opener('create', 'next_action.add', 'nowo_crm_kit_next_action_add', ['type' => $view->type->segment(), 'id' => $view->id], 'crm-next-action-open', 'secondary');
+            if ($choices !== []) {
+                $openers['lifecycle'] = $dialogs->opener('edit', 'lifecycle.save', 'nowo_crm_kit_lifecycle', ['type' => $view->type->segment(), 'id' => $view->id], 'crm-lifecycle-open', 'secondary');
+            }
+        } elseif ($edit) {
             $forms['action'] = $this->ui->form(NextActionType::class, ['dedupe' => PipelineForms::dedupe(), 'due_at' => new DateTimeImmutable('tomorrow 09:00', new DateTimeZone('UTC'))], ['owners' => $this->forms->owners()], 'crm_next_action')->createView();
             if ($choices !== []) {
                 $forms['lifecycle'] = $this->ui->form(LifecycleType::class, null, ['stages' => $choices], 'crm_lifecycle')->createView();
@@ -84,6 +95,9 @@ final readonly class PipelineRecordBlock
             'actions'   => $actions,
             'buttons'   => $buttons,
             'forms'     => $forms,
+            // 0.9.0 (`ui.pipeline_forms: dialog`): the openers of the lifecycle and next action dialogs and the shell.
+            'openers'    => $openers,
+            'crm_dialog' => $openers === [] ? null : $dialogs?->shell('next_action.add'),
         ];
     }
 }

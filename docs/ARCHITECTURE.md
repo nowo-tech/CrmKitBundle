@@ -68,8 +68,8 @@ to no layer fails the build.
 
 The translation domain and the FormKit profile are read from `Domain\TranslationDomain::NAME` and
 `Infrastructure\Symfony\Form\FormProfile::NAME` (the bundle constants keep the same values), so no layer depends on
-the bundle class. One legacy dependency is listed in `skip_violations` until 1.0.0: `NextActionService::set()`
-re-throws transaction-doctrine's `ConcurrencyConflict` as committed (`CONFLICT_002`). The list may only shrink.
+the bundle class. `skip_violations` is empty since 0.10.1: `NextActionService::set()` names transaction-contract 1.1's
+`ConcurrencyConflict` (transaction-doctrine 1.10 aliases its old name to it). The list may only shrink.
 
 ## Request flow
 

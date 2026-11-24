@@ -148,9 +148,6 @@ deptrac:
       - NowoBundles
       - BridgedPackages
   # Legacy public API that cannot change before 1.0.0 (REQ-ARCH-002 rule 3). This list must shrink, never grow.
-  skip_violations:
-    # set() re-throws transaction-doctrine's ConcurrencyConflict with `committed: true` after a host task port
-    # committed (REQ-RUNTIME-003 rule 9, CONFLICT_002), and documents it in @throws. Moving that to a port of
-    # TransactionRunnerInterface changes a public constructor / interface. Removed in 1.0.0.
-    Nowo\CrmKitBundle\Application\Pipeline\NextActionService:
-      - Nowo\TransactionDoctrine\WriteUnit\ConcurrencyConflict
+  # Empty since 0.10.1: NextActionService names transaction-contract 1.1's ConcurrencyConflict (the same class that
+  # transaction-doctrine 1.10 aliases).
+  skip_violations: {}

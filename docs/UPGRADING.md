@@ -41,6 +41,13 @@ the 0.10.0 notes below.
 - **A key id no longer configured** (sodium or DoctrineEncrypt) no longer invalidates the connection on use: the
   import refuses with `error.hubspot_key_unavailable` and the token is kept. A host-written `CrmSecretBoxInterface`
   may throw the new `SecretKeyUnavailableException` for the same case; throwing `SecretUnsealException` still works.
+- **Dependency floors.** `nowo-tech/form-kit-bundle` ^2.25.1, `nowo-tech/transaction-contract` ^1.1,
+  `nowo-tech/transaction-doctrine` ^1.10.1 and `nowo-tech/ui-kit-bundle` ^2.71; `composer update` brings them. A host
+  that catches `Nowo\TransactionDoctrine\WriteUnit\ConcurrencyConflict` from `NextActionService::set()` keeps working:
+  transaction-doctrine 1.10 aliases it to `Nowo\TransactionContract\ConcurrencyConflict`.
+- **Messenger workers** (`import.messenger.enabled`): the kit's entity manager is now cleared after every handled or
+  failed message. Restart the workers after the update, and see CONFIGURATION "Timeouts" for the web limits.
+- **Assets:** run `assets:install` so the new `nowo-crm-import.js` (the "script loaded" console line) is served.
 - **`import.hubspot.browse_rate_limit`** (60 per 600 s by default) limits the HubSpot reads of the start and mapping
   pages per tenant. Raise it if many people prepare imports in the same tenant at once.
 
@@ -72,10 +79,11 @@ WHERE CAST(source AS BINARY) NOT IN ('form', 'import', 'manual', 'portal', 'api'
 If it returns rows, normalise the ones that become valid, then check again:
 
 ```sql
+-- MySQL / MariaDB: compare in binary, or an accent variant such as 'Ímport' would pass the IN
 UPDATE nowo_crm_consent SET source = LOWER(TRIM(source))
-WHERE LOWER(TRIM(source)) IN ('form', 'import', 'manual', 'portal', 'api')
-  AND CAST(source AS BINARY) <> LOWER(TRIM(source));
--- PostgreSQL / SQLite: the same without CAST(… AS BINARY)
+WHERE CAST(LOWER(TRIM(source)) AS BINARY) IN ('form', 'import', 'manual', 'portal', 'api')
+  AND CAST(source AS BINARY) <> CAST(LOWER(TRIM(source)) AS BINARY);
+-- PostgreSQL / SQLite: the same without the CAST(… AS BINARY)
 ```
 
 Rows that are still returned cannot be normalised this way. Examples are accent variants such as `Ímport`, which the

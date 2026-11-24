@@ -50,6 +50,54 @@ describe('announceScript', () => {
     expect(String(log.mock.calls[1]?.[0])).toContain('[crm-kit/other] script loaded');
   });
 
+  it('never throws when page HTML clobbers the registry global, and still announces once', () => {
+    document.body.innerHTML =
+      '<img id="__nowoScriptBanners" name="crm-kit/clobbered"><img id="__nowoScriptBanners" name="crm-kit/clobbered">';
+    Object.defineProperty(window, '__nowoScriptBanners', {
+      get: () => document.getElementsByName('crm-kit/clobbered'),
+      set: () => {
+        throw new TypeError('read-only');
+      },
+      configurable: true,
+    });
+    try {
+      expect(() => announceScript('crm-kit/clobbered')).not.toThrow();
+      expect(() => announceScript('crm-kit/clobbered')).not.toThrow();
+      expect(log).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (window as { __nowoScriptBanners?: unknown }).__nowoScriptBanners;
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('never throws when reading the global throws (a cross-origin frame), or a write is ignored', () => {
+    Object.defineProperty(window, '__nowoScriptBanners', {
+      get: () => {
+        throw new DOMException('Blocked a frame', 'SecurityError');
+      },
+      configurable: true,
+    });
+    try {
+      expect(() => announceScript('crm-kit/cross-origin')).not.toThrow();
+      expect(() => announceScript('crm-kit/cross-origin')).not.toThrow();
+    } finally {
+      delete (window as { __nowoScriptBanners?: unknown }).__nowoScriptBanners;
+    }
+    // A setter that silently ignores the write: the global stays a non-object, the module set decides.
+    Object.defineProperty(window, '__nowoScriptBanners', {
+      get: () => 'clobbered',
+      set: () => undefined,
+      configurable: true,
+    });
+    try {
+      announceScript('crm-kit/ignored');
+      announceScript('crm-kit/ignored');
+    } finally {
+      delete (window as { __nowoScriptBanners?: unknown }).__nowoScriptBanners;
+    }
+    expect(log).toHaveBeenCalledTimes(2);
+  });
+
   it('prints nothing with <html data-nowo-console="quiet">', () => {
     document.documentElement.dataset.nowoConsole = 'quiet';
     announceScript('crm-kit/import', 'x');

@@ -10,6 +10,7 @@ use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotConnectionStatus;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
+use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotConnectionView;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotSchemaView;
@@ -28,7 +29,8 @@ use function str_repeat;
 use function str_starts_with;
 
 /**
- * The 0.10.1 follow-ups of audit ZAM: the start and mapping pages' HubSpot reads are rate-limited per tenant (ZAM-9);
+ * The 0.10.1 follow-ups of audit ZAM: the start and mapping pages' HubSpot reads are rate-limited per tenant (ZAM-9),
+ * and so is a confirm once its local checks passed (ZAW-L2);
  * a token whose key is not available is never taken for a bad value: the import refuses or pauses, the connection
  * and its sealed token are kept, and a new token resumes the import; a rotation racing a running import keeps the
  * token (ZAM-D2).
@@ -48,7 +50,8 @@ final class HubSpotHardeningTest extends HubSpotTestCase
         $this->expectBrowseLimited(fn (): array => $this->hubImports()->lists());
         $this->expectBrowseLimited(fn (): string => $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact], [])));
         self::assertSame($calls, $fake->requests, 'HubSpot is not asked beyond the limit');
-        // The confirm is not counted; another tenant has its own window; the window passes.
+        // The window passes (a confirm counts too); another tenant has its own window.
+        $this->clock()->modify('+61 seconds');
         $map = [];
         foreach ($schema->properties as $object => $rows) {
             foreach ($rows as $row) {
@@ -67,6 +70,51 @@ final class HubSpotHardeningTest extends HubSpotTestCase
         $this->clock()->modify('+61 seconds');
         $this->hubImports()->lists();
         self::assertSame(1, $this->int("SELECT value FROM nowo_crm_counter WHERE tenant_id = 'acme' AND resource = 'hubspot_browse'"));
+    }
+
+    public function testRepeatedStaleOrInvalidConfirmsDoNotReachHubSpotBeyondTheLimit(): void
+    {
+        $fake = $this->hubspot(['import' => ['hubspot' => ['browse_rate_limit' => ['limit' => 3, 'interval' => 60]]]]);
+        $fake->seedContacts(1);
+        $this->connect($fake);
+        $id     = $this->hubImports()->start(new HubSpotImportScope([HubSpotObject::Contact], []));
+        $schema = $this->hubImports()->schema($id);
+        $calls  = $fake->requests;
+        // Audit ZAW-L2: a stale version is refused before HubSpot is asked, and costs no slot.
+        for ($i = 0; $i < 5; ++$i) {
+            try {
+                $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['email' => 'email']]), DuplicatePolicy::Skip, $schema->version - 1);
+                self::fail('stale');
+            } catch (ConflictException $e) {
+                self::assertSame(ConflictException::IMPORT_RUNNING, $e->errorCode);
+            }
+        }
+        self::assertSame($calls, $fake->requests, 'no HubSpot call for a stale confirm');
+        // A property HubSpot does not offer is found by asking HubSpot: that confirm takes the last slot, the next one
+        // is refused without asking.
+        $unknown = new HubSpotMapping(['contacts' => ['not_offered' => 'email']]);
+        $confirm = function () use ($id, $unknown, $schema): void {
+            $this->hubImports()->confirm($id, $unknown, DuplicatePolicy::Skip, $schema->version);
+        };
+        $this->expectInput($confirm, 'mapping', 'import.error.mapping');
+        $calls = $fake->requests;
+        $this->expectBrowseLimited($confirm);
+        self::assertSame($calls, $fake->requests, 'HubSpot is not asked beyond the limit');
+        $this->clock()->modify('+61 seconds');
+        // The import changes while HubSpot answers (another person's confirm): the claim under its version still loses.
+        $fake->onRequest = function () use ($id): void {
+            $this->connection()->executeStatement('UPDATE nowo_crm_import SET version = version + 1 WHERE id = ?', [$id]);
+        };
+
+        try {
+            $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['email' => 'email']]), DuplicatePolicy::Skip, $schema->version);
+            self::fail('lost claim');
+        } catch (ConflictException $e) {
+            self::assertSame(ConflictException::IMPORT_RUNNING, $e->errorCode);
+        }
+        $fake->onRequest = null;
+        $this->hubImports()->confirm($id, new HubSpotMapping(['contacts' => ['email' => 'email']]), DuplicatePolicy::Skip, $schema->version + 1);
+        self::assertSame(ImportStatus::Running, $this->imports()->preview($id)->status);
     }
 
     public function testAKeyThatIsNotAvailableKeepsTheTokenAndRefusesTheImport(): void

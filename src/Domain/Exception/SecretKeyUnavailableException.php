@@ -25,4 +25,17 @@ final class SecretKeyUnavailableException extends RuntimeException implements Cr
     {
         parent::__construct('The key "' . $keyId . '" of a sealed secret is not available.', 0, $previous);
     }
+
+    /**
+     * What may be logged (0.10.1, audit ZAW-I2): the key id and the class of the cause, never its message or trace (an
+     * encryptor's trace can hold the value it was given).
+     *
+     * @return array{key_id: string, cause: class-string<Throwable>|null}
+     */
+    public function logContext(): array
+    {
+        $previous = $this->getPrevious();
+
+        return ['key_id' => $this->keyId, 'cause' => $previous instanceof Throwable ? $previous::class : null];
+    }
 }

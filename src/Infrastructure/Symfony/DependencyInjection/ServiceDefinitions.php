@@ -478,11 +478,11 @@ final class ServiceDefinitions
             param($p . 'import.hubspot.rate_limit.max_attempts'),
             param($p . 'import.hubspot.rate_limit.max_retry_after'),
         ]);
-        $s->set(HubSpotConnectionService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(CrmSecretBoxInterface::class), param($p . 'import.hubspot.connect_rate_limit.limit'), param($p . 'import.hubspot.connect_rate_limit.interval')]);
+        $s->set(HubSpotConnectionService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(CrmSecretBoxInterface::class), param($p . 'import.hubspot.connect_rate_limit.limit'), param($p . 'import.hubspot.connect_rate_limit.interval'), service('logger')->nullOnInvalid()]);
         $s->alias(HubSpotConnectionServiceInterface::class, HubSpotConnectionService::class)->public();
-        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled'), param($p . 'import.hubspot.browse_rate_limit.limit'), param($p . 'import.hubspot.browse_rate_limit.interval')]);
+        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled'), param($p . 'import.hubspot.browse_rate_limit.limit'), param($p . 'import.hubspot.browse_rate_limit.interval'), service('logger')->nullOnInvalid()]);
         $s->alias(HubSpotImportServiceInterface::class, HubSpotImportService::class)->public();
-        $s->set(SecretsRotateCommand::class)->args([service(HubSpotStoreInterface::class), service(CrmSecretBoxInterface::class), service(TransactionRunnerInterface::class), $clock])->tag('console.command');
+        $s->set(SecretsRotateCommand::class)->args([service(HubSpotStoreInterface::class), service(CrmSecretBoxInterface::class), service(TransactionRunnerInterface::class), $clock, service('logger')->nullOnInvalid()])->tag('console.command');
     }
 
     /**

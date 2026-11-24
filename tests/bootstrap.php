@@ -20,6 +20,14 @@ if (!interface_exists(EncryptorRegistryInterface::class)) {
     require_once __DIR__ . '/Stubs/DoctrineEncrypt/DoctrineEncrypt.php';
 }
 
+if (!class_exists('ParagonIE\\Halite\\Alerts\\HaliteAlert')) {
+    require_once __DIR__ . '/Stubs/Crypto/Halite.php';
+}
+
+if (!class_exists('Defuse\\Crypto\\Exception\\CryptoException')) {
+    require_once __DIR__ . '/Stubs/Crypto/Defuse.php';
+}
+
 if (!class_exists(OutboundUrlGuard::class)) {
     require_once __DIR__ . '/Stubs/OutboundUrlGuard/OutboundUrlGuard.php';
 }

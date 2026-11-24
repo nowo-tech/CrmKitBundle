@@ -54,9 +54,10 @@ interface HubSpotImportServiceInterface
      * unit. Needs `edit` too (whatever the policy, a re-run updates the records an earlier run linked); unattended
      * pages then run as the person who confirmed.
      *
-     * @throws InvalidInputException `mapping`: error.mapping; `_`: error.hubspot_key_unavailable (0.10.1; confirm
-     *                               is not counted against `import.hubspot.browse_rate_limit`)
-     * @throws ConflictException crm_import_running
+     * @throws InvalidInputException `mapping`: error.mapping; `_`: error.hubspot_key_unavailable,
+     *                               error.hubspot_browse_limited (0.10.1: counted after the checks made without
+     *                               HubSpot, audit ZAW-L2)
+     * @throws ConflictException crm_import_running (also a stale `$expectedVersion`, refused before HubSpot is asked)
      */
     public function confirm(string $importId, HubSpotMapping $mapping, DuplicatePolicy $policy, int $expectedVersion): void;
 }

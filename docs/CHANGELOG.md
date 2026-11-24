@@ -42,6 +42,18 @@ the new keys have defaults that keep 0.10.0's behaviour.
 - ZAM-D2: the DoctrineEncrypt box can now be rotated without losing tokens. Add a DoctrineEncrypt profile with the new
   key, seal with it under a new `key_id`, and list the old key id and profile under `previous`. The old tokens keep
   working, and `nowo:crm-kit:secrets:rotate` re-seals them.
+- ZAW-L1: the DoctrineEncrypt box loads the key in its own step before it decrypts (it encrypts a constant,
+  non-secret probe value). A key that is missing, unreadable, malformed or of the wrong length (Halite `InvalidKey`,
+  `CannotPerformOperation`, a bad Defuse key) is now "key not available": the connection stays active. Only the
+  value failures (Halite `InvalidMessage` / `InvalidSignature` / `InvalidDigestLength` / `InvalidType`, Defuse
+  `WrongKeyOrModifiedCiphertextException` / `BadFormatException`, `DecryptionFailedException`, `SodiumException`,
+  an encoder's `RangeException`) still mark a token as not opening. CONFIGURATION says the key id must change whenever
+  the key or profile does.
+- ZAW-I5: `secrets:rotate` reports connections that are already invalid and whose token does not open on their own
+  line. They no longer fail the run.
+- UPGRADING (docs, ZAW-I1, ZAW-I3): the rotation steps now say to restart every worker, consumer and cron host, and
+  to rotate once more before removing the old key. The consent normalisation only rewrites values that become valid,
+  says what to do with the rest, and warns that the ALTERs rebuild the tables.
 - UPGRADING (docs): the 0.10.0 schema notes missed `nowo_crm_consent.source`. That column became a binary exact key on
   MySQL / MariaDB when `source` joined `CrmMetadataListener::EXACT_COLUMNS`. The notes also gave `utf8mb4_bin`
   instead of `utf8mb4_0900_bin` for the new MySQL 8.4 columns. UPGRADING "Unreleased" now has the check query and the
@@ -61,8 +73,14 @@ the new keys have defaults that keep 0.10.0's behaviour.
   are kept. A connect whose seal fails stores nothing. Saving a new token resumes such paused imports.
 - ZAM-D4: the DoctrineEncrypt profiles that the kit wires (`profile` and `previous`) must use Halite or Defuse and
   must exist. Otherwise the container build fails; before, the refusal came at the first seal.
+- ZAW-L2: `confirm()` checks the import's version, the mapping's keys and its lists before it asks HubSpot, then
+  counts against `browse_rate_limit`. Repeated stale or invalid confirms no longer reach HubSpot.
+- ZAW-I2: an unavailable secret key is logged at error level with the key id and the class of the cause, never its
+  message or trace. This applies to the import, the runner, connect and `secrets:rotate`; the services take an
+  optional PSR logger.
 - ZAM-9: once `browse_rate_limit` is reached, the start and mapping pages answer `error.hubspot_browse_limited` and
-  do not ask HubSpot. Reloads can no longer burn the portal's shared daily API quota. The confirm step is not counted.
+  do not ask HubSpot. Reloads can no longer burn the portal's shared daily API quota. The confirm step counts too
+  (audit ZAW-L2), after its local checks: a stale version or an invalid mapping is refused before any HubSpot call.
 
 ### Internal
 

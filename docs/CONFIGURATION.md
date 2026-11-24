@@ -263,17 +263,33 @@ nowo_crm_kit:
 Rotation never loses a token (0.10.1). `nowo:crm-kit:secrets:rotate` re-seals each token under the current key in its
 own unit under the connection's row lock, and writes the new seal only after it opened again to the same token. A
 token that does not open, whose key is not available or that cannot be re-sealed is left exactly as it is, and the
-command exits with 1: keep the old key until a run ends with `0 left unchanged`. `--dry-run` does the same in memory
+command exits with 1: keep the old key until a run ends with `0 left unchanged`. A connection that is already invalid
+and whose token does not open is reported on its own line and never fails the run: it waits for a new token whatever
+the keys (disconnect it or let a manager paste a new token). `--dry-run` does the same in memory
 (it also proves the new key seals) and writes nothing. Tokens sealed before the rotation keep working all along: every
 configured key opens. Running imports are not stopped (an import that read the old value opens it with the old key).
 
 If an import meets a token whose key is not configured (dropped too early, or a DoctrineEncrypt profile or key file
 that fails), it refuses with `error.hubspot_key_unavailable` (a running import pauses with `hubspot_key_unavailable`).
 Nothing is marked invalid and the sealed token is kept: configure the key again and press "Continue", or let a manager
-paste the token again (that resumes the paused imports).
+paste the token again (that resumes the paused imports). The log says which key id and the class of the failure
+(never its message). A key that is missing, unreadable, malformed or of the wrong length counts as "not available":
+the DoctrineEncrypt box loads the key on its own before it decrypts (0.10.1). A wrong but well-formed key cannot be
+told apart from tampering, though: the token does not open and the connection is marked invalid. So **change the key
+id whenever the key or the DoctrineEncrypt profile behind it changes**: a token sealed under the old id then finds
+its old key (or is reported as "not available") instead of being opened with the new one.
 
-**Sodium box.** Add the new key, make it `current_key`, keep the old one listed, deploy, run
-`php bin/console nowo:crm-kit:secrets:rotate --dry-run`, then `nowo:crm-kit:secrets:rotate`, then drop the old key.
+**Every rotation, both boxes:**
+
+1. Deploy the new configuration and restart **every** process that runs the kit: FrankenPHP workers, Messenger
+   consumers and cron hosts. A process still on the old container keeps sealing new tokens (connect, replace) under
+   the old key id.
+2. Run `nowo:crm-kit:secrets:rotate --dry-run`, then `nowo:crm-kit:secrets:rotate`, until it exits with 0.
+3. Just before removing the old key, run `nowo:crm-kit:secrets:rotate` once more and expect `0 left unchanged` (it
+   catches tokens a late process sealed meanwhile). Then remove the old key, and deploy and restart again.
+
+**Sodium box.** Add the new key, make it `current_key` and keep the old one listed, then follow the steps above and
+drop the old key at the end.
 
 **DoctrineEncrypt box.** A DoctrineEncrypt profile holds one key, and `doctrine:encrypt:rotate-keys` re-encrypts only
 `#[Encrypted]` columns, never the CRM's sealed tokens. So rotate through a second profile:
@@ -300,8 +316,9 @@ paste the token again (that resumes the paused imports).
                    doctrine_encrypt: default    # 0.10.0 sealed under the key id "doctrine_encrypt"
    ```
 
-3. Deploy, then run `nowo:crm-kit:secrets:rotate --dry-run` and `nowo:crm-kit:secrets:rotate` until it exits with 0.
-4. Remove `previous.doctrine_encrypt`. Keep the old DoctrineEncrypt profile while other columns use it.
+3. Follow the steps above (restart everything, rotate until it exits with 0, rotate once more).
+4. Remove `previous.doctrine_encrypt`. Keep the old DoctrineEncrypt profile while other columns use it. Never point
+   an existing key id at another profile: give the new profile a new `key_id`.
 
 Name the profiles explicitly in `previous`: `~` means "the default profile", which moves if `default_profile` changes.
 The container build fails when `profile` or a `previous` profile does not exist or does not use Halite or Defuse
@@ -315,7 +332,9 @@ Never paste a production credential with the Symfony profiler or the debug toolb
 `import.hubspot.browse_rate_limit` (0.10.1, default 60 per 600 seconds) counts, per tenant, each view of the start
 and mapping pages and each start: every one asks HubSpot (lists, counts, properties), and the portal's daily API quota
 is shared with the tenant's other HubSpot apps. Beyond it the page answers `error.hubspot_browse_limited` without
-asking HubSpot; the confirm step and the import's own pages are not counted.
+asking HubSpot. The confirm step counts too, but only after the checks it can make without HubSpot (the import's
+version, the mapping's keys and lists), so a stale or invalid retry costs nothing; the import's own pages are not
+counted.
 
 There is no base-URL key: the HubSpot host is the constant `https://api.hubapi.com`. In a demo or an end-to-end test,
 decorate the kit's client service `nowo_crm_kit.hubspot.http_client` with a fake (a `MockHttpClient` or a local fake

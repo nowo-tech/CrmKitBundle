@@ -56,8 +56,22 @@ final readonly class DoctrineEncryptCrmSecretBox implements CrmSecretBoxInterfac
     /** The authenticated encryptors of DoctrineEncryptBundle. */
     public const AUTHENTICATED = ['Nowo\\DoctrineEncryptBundle\\Encryptors\\HaliteEncryptor', 'Nowo\\DoctrineEncryptBundle\\Encryptors\\DefuseEncryptor'];
 
-    /** What a value that does not decrypt throws (Halite, Defuse, DoctrineEncrypt, libsodium). */
-    public const DECRYPTION_FAILURES = ['ParagonIE\\Halite\\Alerts\\HaliteAlert', 'Defuse\\Crypto\\Exception\\WrongKeyOrModifiedCiphertextException', 'Defuse\\Crypto\\Exception\\BadFormatException', 'Nowo\\DoctrineEncryptBundle\\Exception\\DecryptionFailedException', 'SodiumException'];
+    /**
+     * What a value that does not decrypt throws once the key loaded (Halite, Defuse, DoctrineEncrypt, libsodium). Since
+     * 0.10.1 (audit ZAW-L1) only the value failures: Halite's key errors (`InvalidKey`, `CannotPerformOperation`) and
+     * every failure while the key loads are "key not available" (see {@see self::PROBE}). Defuse's
+     * `BadFormatException` and the encoders' `RangeException` stay here: once the key loaded, they mean a malformed
+     * ciphertext.
+     */
+    public const DECRYPTION_FAILURES = ['ParagonIE\\Halite\\Alerts\\InvalidMessage', 'ParagonIE\\Halite\\Alerts\\InvalidSignature', 'ParagonIE\\Halite\\Alerts\\InvalidDigestLength', 'ParagonIE\\Halite\\Alerts\\InvalidType', 'RangeException', 'Defuse\\Crypto\\Exception\\WrongKeyOrModifiedCiphertextException', 'Defuse\\Crypto\\Exception\\BadFormatException', 'Nowo\\DoctrineEncryptBundle\\Exception\\DecryptionFailedException', 'SodiumException'];
+
+    /**
+     * A constant, non-secret value encrypted before each decryption (0.10.1, audit ZAW-L1): the encryptor loads its key
+     * there, in its own try, so a key that is missing, malformed or of the wrong length is told apart from a value that
+     * does not decrypt. (A wrong but well-formed key still loads: it cannot be told apart from tampering, so the
+     * key id must change whenever the profile does.).
+     */
+    private const PROBE = 'nowo-crm-kit|key-probe';
 
     /**
      * @param string|null $profile DoctrineEncrypt profile that seals (null: the default one)
@@ -117,6 +131,13 @@ final readonly class DoctrineEncryptCrmSecretBox implements CrmSecretBoxInterfac
             throw new SecretUnsealException();
         }
         $encryptor = $this->encryptor($sealed->keyId === $this->keyId ? $this->profile : $this->previous[$sealed->keyId], $sealed->keyId);
+
+        try {
+            // The key loads here: any failure is the key's, never the value's.
+            $encryptor->encrypt(self::PROBE);
+        } catch (Throwable $e) {
+            throw new SecretKeyUnavailableException($sealed->keyId, $e);
+        }
 
         try {
             $payload = $encryptor->decrypt($raw);

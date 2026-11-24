@@ -129,8 +129,10 @@ final readonly class HubSpotRunner
         }
         try {
             $secret = $connection->isActive() ? $this->tokens->open($tenant, $connection, $now) : null;
-        } catch (SecretKeyUnavailableException) {
+        } catch (SecretKeyUnavailableException $e) {
             // 0.10.1 (audit ZAM-D2): the key is not configured; the token is kept, a person continues once it is back.
+            $this->logger?->error('nowo_crm_kit: the HubSpot token\'s secret key is not available', ['import' => $id] + $e->logContext());
+
             return $this->pause($id, $token, $now, null, HubSpotTokenOpener::KEY_UNAVAILABLE);
         }
         if (!$secret instanceof HubSpotToken) {

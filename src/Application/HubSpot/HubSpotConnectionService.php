@@ -23,6 +23,7 @@ use Nowo\CrmKitBundle\Domain\Service\HubSpotConnectionServiceInterface;
 use Nowo\CrmKitBundle\Domain\Value\ExactId;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotToken;
 use Nowo\CrmKitBundle\Domain\Value\SecretContext;
+use Psr\Log\LoggerInterface;
 use SensitiveParameter;
 
 use function array_diff;
@@ -54,6 +55,8 @@ final readonly class HubSpotConnectionService implements HubSpotConnectionServic
 
     /**
      * Wires the collaborators.
+     *
+     * @param LoggerInterface|null $logger where an unavailable sealing key is reported (0.10.1, audit ZAW-I2)
      */
     public function __construct(
         private WriteSupport $support,
@@ -62,6 +65,7 @@ final readonly class HubSpotConnectionService implements HubSpotConnectionServic
         private CrmSecretBoxInterface $box,
         private int $connectLimit = 5,
         private int $connectInterval = 600,
+        private ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -109,8 +113,9 @@ final readonly class HubSpotConnectionService implements HubSpotConnectionServic
                 $id = $current?->getId() ?? $this->support->id();
                 try {
                     $sealed = $this->box->seal($secret->reveal(), new SecretContext(SecretContext::HUBSPOT_TOKEN, $context->tenant, $id));
-                } catch (SecretKeyUnavailableException) {
+                } catch (SecretKeyUnavailableException $e) {
                     // 0.10.1 (audit ZAM-D2): the sealing key is misconfigured; the stored connection stays as it was.
+                    $this->logger?->error('nowo_crm_kit: the secret key that seals HubSpot tokens is not available', $e->logContext());
                     throw InvalidInputException::field('token', 'error.' . HubSpotTokenOpener::KEY_UNAVAILABLE);
                 }
                 $name = $label ?? 'HubSpot ' . $info->accountId->value;

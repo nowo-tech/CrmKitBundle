@@ -133,7 +133,8 @@ record; another person's note needs `edit` on the record and `manage`.
   explicit opt-in, MysqlAes never). Only the last four characters are stored in clear. A value that does not open
   marks the connection invalid, only while the connection still holds that sealed value (a token replaced meanwhile
   stays active). A key that is not available (a key id no longer configured, an unknown DoctrineEncrypt profile, a
-  missing key file) is never taken for a bad value (0.10.1): the import refuses with `hubspot_key_unavailable` and the
+  missing, malformed or wrong-length key, which the DoctrineEncrypt box loads in its own step) is never taken for a bad
+  value (0.10.1; a wrong but well-formed key is: change the key id with the key): the import refuses with `hubspot_key_unavailable` and the
   sealed token is kept. Rotation (`nowo:crm-kit:secrets:rotate`, both boxes since 0.10.1) writes a new seal only after
   it opened again to the same token, and leaves every token it cannot re-seal unchanged. The sodium keys come from the
   environment only: they are never container parameters (only the box's own service definition receives them).

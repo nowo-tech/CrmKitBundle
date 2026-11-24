@@ -35,7 +35,8 @@ the 0.10.0 notes below.
   defined by the kit, the build fails when the profile does not exist or is not Halite / Defuse (before, the first
   seal failed).
 - **`nowo:crm-kit:secrets:rotate`** no longer marks connections invalid. It leaves any token it cannot re-seal
-  unchanged and exits with 1 (scripts that ran it should check the exit code). The summary line now reads
+  unchanged and exits with 1 (scripts that ran it should check the exit code). Connections that are already invalid
+  and whose token does not open are listed apart and do not fail the run. The summary line now reads
   `secrets: N re-sealed, N already current, N left unchanged (…)`.
 - **A key id no longer configured** (sodium or DoctrineEncrypt) no longer invalidates the connection on use: the
   import refuses with `error.hubspot_key_unavailable` and the token is kept. A host-written `CrmSecretBoxInterface`
@@ -68,9 +69,22 @@ SELECT source, COUNT(*) FROM nowo_crm_consent
 WHERE CAST(source AS BINARY) NOT IN ('form', 'import', 'manual', 'portal', 'api') GROUP BY source;
 ```
 
-If it returns rows, normalise them, then check again:
-`UPDATE nowo_crm_consent SET source = LOWER(TRIM(source)) WHERE CAST(source AS BINARY) <> LOWER(TRIM(source));`
-(on PostgreSQL and SQLite, drop the `CAST … AS BINARY`).
+If it returns rows, normalise the ones that become valid, then check again:
+
+```sql
+UPDATE nowo_crm_consent SET source = LOWER(TRIM(source))
+WHERE LOWER(TRIM(source)) IN ('form', 'import', 'manual', 'portal', 'api')
+  AND CAST(source AS BINARY) <> LOWER(TRIM(source));
+-- PostgreSQL / SQLite: the same without CAST(… AS BINARY)
+```
+
+Rows that are still returned cannot be normalised this way. Examples are accent variants such as `Ímport`, which the
+old collation matched, and values the kit never writes. Map each one to the source it stands for with an `UPDATE …
+WHERE id = …`, or ask us if you do not know where they came from. Do not run the ALTER until the check returns no
+rows.
+
+On MySQL and MariaDB, `MODIFY … COLLATE` rebuilds the table (a copy), and so do the ALTERs below on indexed and
+primary-key columns. On large tables, run them in a maintenance window.
 
 ```sql
 -- MySQL 8.4

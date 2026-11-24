@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Tests\Unit\Infrastructure;
 
 use Closure;
 use DateTimeImmutable;
+use Defuse\Crypto\Exception\BadFormatException;
 use InvalidArgumentException;
 use LogicException;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotException;
@@ -39,11 +40,16 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImportHandler;
 use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\FakeHubSpot;
 use Nowo\DoctrineEncryptBundle\Encryptors\DefuseEncryptor;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorInterface;
+use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistry;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
 use Nowo\DoctrineEncryptBundle\Encryptors\HaliteEncryptor;
 use Nowo\DoctrineEncryptBundle\Encryptors\MysqlAesEncryptor;
 use Nowo\OutboundUrlGuardBundle\Exception\UnsafeOutboundUrlException;
 use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
+use ParagonIE\Halite\Alerts\CannotPerformOperation;
+use ParagonIE\Halite\Alerts\InvalidKey;
+use ParagonIE\Halite\Alerts\InvalidMessage;
+use ParagonIE\Halite\Alerts\InvalidSignature;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use RuntimeException;
@@ -54,6 +60,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
+use Throwable;
 
 use function base64_encode;
 use function str_repeat;
@@ -320,6 +327,44 @@ final class HubSpotInfrastructureTest extends TestCase
                 self::addToAssertionCount(1);
             }
         }
+        // Audit ZAW-L1: the key loads in its own step, so a key error is "not available" and only a value error does
+        // not open. A wrong-length Halite key (InvalidKey), an unreadable one (CannotPerformOperation) and a bad Defuse
+        // key string (BadFormatException while the key loads) keep the token; a tampered value or a malformed
+        // ciphertext (BadFormatException once the key loaded) does not open.
+        $failing = static fn (?Throwable $load, ?Throwable $value): EncryptorInterface => new class($load, $value) implements EncryptorInterface {
+            public function __construct(private ?Throwable $load, private ?Throwable $value)
+            {
+            }
+
+            public function encrypt(string $data): string
+            {
+                return $this->load instanceof Throwable ? throw $this->load : 'E:' . $data;
+            }
+
+            public function decrypt(string $data): string
+            {
+                if ($this->load instanceof Throwable) {
+                    throw $this->load;
+                }
+
+                return $this->value instanceof Throwable ? throw $this->value : substr($data, 2);
+            }
+        };
+        $cases = [[new InvalidKey('wrong length'), null], [new CannotPerformOperation('unreadable'), null], [new BadFormatException('bad key string'), null], [null, new InvalidMessage('tampered')], [null, new BadFormatException('bad ciphertext')], [null, new InvalidSignature('tampered')]];
+        foreach ($cases as [$load, $value]) {
+            $faulty = new DoctrineEncryptCrmSecretBox(new EncryptorRegistry(['default' => $failing($load, $value)]), null, true);
+
+            try {
+                $faulty->unseal($sealed, $context);
+                self::fail('refused');
+            } catch (SecretKeyUnavailableException $e) {
+                self::assertInstanceOf(Throwable::class, $load, 'a key error');
+                self::assertSame(['key_id' => DoctrineEncryptCrmSecretBox::KEY_ID, 'cause' => $load::class], $e->logContext());
+            } catch (SecretUnsealException) {
+                self::assertNull($load, 'a value error');
+            }
+        }
+        self::assertSame(['key_id' => 'k9', 'cause' => null], (new SecretKeyUnavailableException('k9'))->logContext());
         // 0.10.1 (ZAM-D2): rotation through a second profile; values sealed before it keep opening.
         $rotated = new DoctrineEncryptCrmSecretBox($registry, 'crm_2026', false, 'de2026', [DoctrineEncryptCrmSecretBox::KEY_ID => null]);
         self::assertSame('fake-credential', $rotated->unseal($sealed, $context), 'sealed before the rotation');

@@ -221,13 +221,13 @@ final class ServiceDefinitions
     public const SEARCH_DEFINITION_TAG = 'nowo_search_kit.entity_definition';
 
     /** Prefix of the bundle's service ids and parameters. */
+    public const P = NowoCrmKitBundle::ALIAS . '.';
+
     /** Messenger's event after a worker handled a message (its class name). */
     public const WORKER_MESSAGE_HANDLED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent';
 
     /** Messenger's event after a worker failed to handle a message (its class name). */
     public const WORKER_MESSAGE_FAILED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent';
-
-    public const P = NowoCrmKitBundle::ALIAS . '.';
 
     /**
      * Registers the services.

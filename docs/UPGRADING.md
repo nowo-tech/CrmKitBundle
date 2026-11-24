@@ -22,8 +22,9 @@
 
 ## Unreleased
 
-Planned as **0.10.1**, from 0.10.0: `composer update nowo-tech/crm-kit-bundle`. No schema change and no BC break in the
-public PHP API or config; the new keys default to 0.10.0's behaviour.
+Planned as **0.10.1**, from 0.10.0: `composer update nowo-tech/crm-kit-bundle`. No BC break in the public PHP API or
+config; the new keys default to 0.10.0's behaviour. No new schema change; the only schema step is the correction of
+the 0.10.0 notes below.
 
 - **DoctrineEncrypt box: key rotation.** Tokens sealed by 0.10.0 carry the key id `doctrine_encrypt` and keep opening
   with the default settings (`secrets.doctrine_encrypt.key_id: doctrine_encrypt`, `profile: ~`). To rotate the
@@ -41,6 +42,72 @@ public PHP API or config; the new keys default to 0.10.0's behaviour.
   may throw the new `SecretKeyUnavailableException` for the same case; throwing `SecretUnsealException` still works.
 - **`import.hubspot.browse_rate_limit`** (60 per 600 s by default) limits the HubSpot reads of the start and mapping
   pages per tenant. Raise it if many people prepare imports in the same tenant at once.
+
+**Schema correction for 0.10.0. It also applies to hosts that already upgraded to 0.10.0.** The "To 0.10.0" DDL
+missed one column change and used the wrong collation on MySQL 8.4:
+
+- **Missing: `nowo_crm_consent.source`.** In 0.10.0 `source` joined the kit's exact-key columns
+  (`CrmMetadataListener::EXACT_COLUMNS`, added for `crm_external_ref.source`). The listener matches column names in
+  every kit table, so the consent column also became binary on MySQL / MariaDB. Its type stays `VARCHAR(16) NOT NULL`.
+  A table created on 0.9 keeps `utf8mb4_unicode_ci`, so `doctrine:schema:validate` and `migrations:diff` report it.
+  PostgreSQL and SQLite already compare exactly: they need no change.
+- **Wrong collation on MySQL 8.4.** The kit maps identifier columns to `utf8mb4_0900_bin` on MySQL 8 (NO PAD, as in
+  "To 0.7.0" and later), but the 0.10.0 DDL said `utf8mb4_bin`. If you applied it as written, convert those columns.
+  MariaDB (`utf8mb4_nopad_bin`), PostgreSQL and SQLite were right.
+
+Check first. Only the kit writes `source`, always as one of `form`, `import`, `manual`, `portal` or `api`, and no
+unique key includes it. Under the old case- and accent-insensitive, PAD SPACE collation, a hand-written `Import` or
+`import ` would still have matched; under the binary collation it no longer does, and the row fails to load. Run this
+on every platform; it must return no rows:
+
+```sql
+SELECT source, COUNT(*) FROM nowo_crm_consent
+WHERE source NOT IN ('form', 'import', 'manual', 'portal', 'api') GROUP BY source;
+-- MySQL / MariaDB before the ALTER: compare in binary, or 'Import' and 'import ' pass the check
+SELECT source, COUNT(*) FROM nowo_crm_consent
+WHERE CAST(source AS BINARY) NOT IN ('form', 'import', 'manual', 'portal', 'api') GROUP BY source;
+```
+
+If it returns rows, normalise them, then check again:
+`UPDATE nowo_crm_consent SET source = LOWER(TRIM(source)) WHERE CAST(source AS BINARY) <> LOWER(TRIM(source));`
+(on PostgreSQL and SQLite, drop the `CAST … AS BINARY`).
+
+```sql
+-- MySQL 8.4
+ALTER TABLE nowo_crm_consent MODIFY source VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL;
+-- MariaDB 11.4
+ALTER TABLE nowo_crm_consent MODIFY source VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin NOT NULL;
+-- PostgreSQL 16, SQLite: nothing to change (the check above still applies)
+
+-- MySQL 8.4 only, when the 0.10.0 DDL was applied with utf8mb4_bin. Going from PAD SPACE to NO PAD can only make values
+-- more distinct, so no unique key can fail.
+ALTER TABLE nowo_crm_import
+    MODIFY connection_id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin DEFAULT NULL,
+    MODIFY confirmed_by_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin DEFAULT NULL;
+-- With import.hubspot.enabled (the two HubSpot tables):
+ALTER TABLE nowo_crm_hubspot_connection
+    MODIFY id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY tenant_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY account_id VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY token_key_id VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY created_by_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin DEFAULT NULL,
+    MODIFY updated_by_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin DEFAULT NULL;
+ALTER TABLE nowo_crm_external_ref
+    MODIFY id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY tenant_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY source VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY account_id VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY object_type VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY external_id VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY target_type VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    MODIFY target_id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL;
+```
+
+The rest of the 0.9.0 → 0.10.0 mapping diff only adds things, and UPGRADING covers all of it: the `crm_import`
+columns and index, `crm_import_row.subject_type` (not an exact key), and the two HubSpot tables. The other new
+exact-key names (`object_type`, `target_type`, `token_key_id`, `external_id`) exist only in the HubSpot tables. With
+the prefix and the entity manager of your installation, `doctrine:schema:validate` (or an empty `migrations:diff`)
+confirms the result.
 
 ## To 0.10.0
 

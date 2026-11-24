@@ -42,6 +42,10 @@ the new keys have defaults that keep 0.10.0's behaviour.
 - ZAM-D2: the DoctrineEncrypt box can now be rotated without losing tokens. Add a DoctrineEncrypt profile with the new
   key, seal with it under a new `key_id`, and list the old key id and profile under `previous`. The old tokens keep
   working, and `nowo:crm-kit:secrets:rotate` re-seals them.
+- UPGRADING (docs): the 0.10.0 schema notes missed `nowo_crm_consent.source`. That column became a binary exact key on
+  MySQL / MariaDB when `source` joined `CrmMetadataListener::EXACT_COLUMNS`. The notes also gave `utf8mb4_bin`
+  instead of `utf8mb4_0900_bin` for the new MySQL 8.4 columns. UPGRADING "Unreleased" now has the check query and the
+  ALTERs for MySQL 8.4, MariaDB 11.4, PostgreSQL 16 and SQLite, which also apply to hosts already on 0.10.0.
 - ZAM-D1: SECURITY.md now says where `HubSpotToken` keeps the plaintext: in a suspended generator's frame owned by the
   object.
 

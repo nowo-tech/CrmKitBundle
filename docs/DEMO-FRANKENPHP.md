@@ -110,8 +110,11 @@ The shell is UiKit's admin layout with UiKit's default theme and only `nowo-ui.c
 
 ## Timeouts
 
-The demo runs no blocking work (no document conversion, external HTTP or subprocess), so the REQ-RUNTIME-001 timeout
-hierarchy does not apply; FrankenPHP and PHP defaults are kept.
+The demo leaves the HubSpot import off (`import.hubspot.enabled: false`), so it makes no external HTTP call and runs no
+document conversion or subprocess; FrankenPHP and PHP defaults are kept. A host that turns the HubSpot import on makes
+outbound calls to `api.hubapi.com` from web requests: it must set the REQ-RUNTIME-001 hierarchy (HubSpot
+`http.max_duration` × calls < PHP `max_execution_time` < Caddy write timeout, plus FrankenPHP `max_wait_time`) described
+in [CONFIGURATION.md](CONFIGURATION.md#timeouts).
 
 ## Troubleshooting
 

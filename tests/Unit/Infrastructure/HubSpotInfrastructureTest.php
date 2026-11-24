@@ -7,6 +7,7 @@ namespace Nowo\CrmKitBundle\Tests\Unit\Infrastructure;
 use Closure;
 use DateTimeImmutable;
 use Defuse\Crypto\Exception\BadFormatException;
+use Generator;
 use InvalidArgumentException;
 use LogicException;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotException;
@@ -183,6 +184,16 @@ final class HubSpotInfrastructureTest extends TestCase
         $client = new MockHttpClient(static fn (): MockResponse => throw new TransportException('down: secret'));
         $reader = new HttpHubSpotReader($client);
         $this->fails(static fn (): HubSpotOwnerPage => $reader->owners(new HubSpotToken('fake-key-12345678'), null, 10), HubSpotException::UNAVAILABLE);
+        // REQ-RUNTIME-001: a HubSpot answer that stalls past the idle timeout, or that runs past max_duration, ends the
+        // call as hubspot_unavailable (no HubSpot text), so it never pins a PHP worker.
+        $stalled = new MockHttpClient(static fn (): MockResponse => new MockResponse((static function (): Generator {
+            yield '';
+            yield '{"portalId": 1}';
+        })()));
+        $this->fails(static fn (): HubSpotAccountId => (new HttpHubSpotReader($stalled))->accountId(new HubSpotToken('fake-key-12345678')), HubSpotException::UNAVAILABLE);
+        $tooLong = new MockHttpClient(static fn (string $method, string $url): MockResponse => throw new TransportException('Max duration was reached for "' . $url . '".'));
+        $e       = $this->fails(static fn (): HubSpotAccountId => (new HttpHubSpotReader($tooLong))->accountId(new HubSpotToken('fake-key-12345678')), HubSpotException::UNAVAILABLE);
+        self::assertStringNotContainsString('Max duration', $e->getMessage());
         $seen   = [];
         $client = new MockHttpClient(static function (string $method, string $url, array $options) use (&$seen): MockResponse {
             $seen[] = $options['resolve'] ?? null;

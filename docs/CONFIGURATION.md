@@ -9,6 +9,7 @@
 - [Doctrine](#doctrine)
 - [Fields, import and GDPR](#fields-import-and-gdpr)
 - [HubSpot import (0.10.0)](#hubspot-import-0100)
+  - [Timeouts](#timeouts)
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Search](#search)
 - [UI](#ui)
@@ -341,6 +342,37 @@ decorate the kit's client service `nowo_crm_kit.hubspot.http_client` with a fake
 server); never use a real credential in tests. `outbound_url_guard: auto` pins the resolved public address of the host
 when nowo-tech/outbound-url-guard-bundle is installed (`required` fails the build without it; `off` never pins).
 `import.messenger.*` and the scopes to tick: [USAGE.md](USAGE.md#hubspot-import-0100).
+
+### Timeouts
+
+REQ-RUNTIME-001. HubSpot is the kit's only outbound HTTP, and every call has two deadlines from
+`import.hubspot.http`: `timeout` (idle, default 10 s) and `max_duration` (total, default 30 s). A call that stalls or
+runs past them ends as `hubspot_unavailable`: a web request answers it, and a run pauses and retries later. A web request
+never waits on HubSpot's `Retry-After` (only the resume command and the Messenger handler wait, up to
+`rate_limit.max_attempts` × `rate_limit.max_retry_after`, and they run without `max_execution_time`).
+
+A web request can make several calls in a row, so size the outer layers on the request that makes the most:
+
+| Request | HubSpot calls (at most) |
+| --- | --- |
+| Connect / replace | 2 + one probe per required read scope for a service key (8 in all) |
+| Start page / start | 1 / 5 |
+| Mapping page / confirm | 3 / 3 |
+| A run page ("Continue", the confirm's first pages) | 2 per HubSpot page × `pages_per_request` |
+
+Keep the hierarchy, innermost first, and raise the outer layers in the same change when you raise an inner one:
+
+1. Operation: `calls × max_duration` of the largest request above, for example 8 × 10 s = 80 s with
+   `http.max_duration: 10` (the default 30 s gives 240 s for a connect: lower `max_duration` on hosts with a short
+   PHP limit).
+2. PHP `max_execution_time` (and `max_input_time`): strictly greater, for example 120 s.
+3. Caddy / reverse proxy write timeout (`servers { timeouts { write … } }`): strictly greater than PHP, for example
+   150 s.
+4. FrankenPHP `max_wait_time` (worker mode): caps how long a request waits for a free thread, for example 30 s, so
+   slow HubSpot calls cannot queue every request behind them.
+
+Imports with `import.messenger.enabled` run in the Messenger worker, outside these web limits; the per-call deadlines
+still apply there.
 
 ## Roles and affiliation purposes
 

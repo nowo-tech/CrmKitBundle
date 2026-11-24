@@ -7,6 +7,7 @@
 - [Permission matrix](#permission-matrix)
 - [Tenant isolation and exact identifiers](#tenant-isolation-and-exact-identifiers)
 - [Forms, CSRF and output](#forms-csrf-and-output)
+- [Content-Security-Policy](#content-security-policy)
 - [Imports and exports](#imports-and-exports)
 - [HubSpot credential](#hubspot-credential)
 - [HubSpot import (0.10.0)](#hubspot-import-0100)
@@ -109,6 +110,18 @@ record; another person's note needs `edit` on the record and `manage`.
   host timeline URLs must be local paths (`/`, not `//`).
 - The website field accepts only http(s) URLs; e-mail links are `mailto:` of a validated address.
 
+## Content-Security-Policy
+
+For integrators with a strict CSP (REQ-UX-001). The kit's only browser script is `nowo-crm-import.js`, the import
+modal of the lists. It is a self-hosted file served by `assets:install` through the `nowo_crm_kit` asset package and
+loaded with `<script src defer>`, so `script-src 'self'` is enough: no inline script, no inline event handler, no
+`eval` or `new Function`, no third-party origin. It sets no inline style and assigns no HTML strings: step fragments
+are parsed with `DOMParser`, cleaned (only same-origin URL attributes are kept) and moved as nodes, and every other
+string goes through `textContent`. Its `fetch` calls go only to the kit's same-origin import routes (`connect-src
+'self'`). On close it aborts its pending request and removes its listeners. It exposes one global, `NowoCrmImport`
+(the IIFE's exports), and logs one "script loaded" line (USAGE, "Browser console"). The kit's pages use UiKit's
+stylesheet and `nowo-crm-kit.css`, both self-hosted (`style-src 'self'`).
+
 ## Imports and exports
 
 - Uploads are parsed in memory before any transaction: UTF-8 only, at most `import.max_bytes` bytes and
@@ -160,7 +173,9 @@ record; another person's note needs `edit` on the record and `manage`.
 
 - **SSRF**: one constant host; paths built from enums and validated ids, URL-encoded; `paging.next.link` ignored (only
   the `after` token, validated); no redirects (`max_redirects: 0`, a 3xx is an error); peer and host verification on;
-  idle and total timeouts; bodies capped at `max_response_bytes` while streaming; JSON depth 32; unknown fields dropped.
+  idle and total timeouts on every call (`http.timeout`, `http.max_duration`; a stalled HubSpot cannot pin a PHP
+  worker, and the PHP, proxy and `max_wait_time` limits are layered above them, CONFIGURATION "Timeouts"); bodies
+  capped at `max_response_bytes` while streaming; JSON depth 32; unknown fields dropped.
   Optional OutboundUrlGuard bridge: pins the resolved public address (private addresses never allowed, DNS always
   resolved).
 - **Data**: only the mapped properties are requested; import rows keep the object kind and the HubSpot id only;

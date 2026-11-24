@@ -27,6 +27,7 @@
 - [Pages and routes](#pages-and-routes)
   - [Page layout options (0.6.0, 0.6.1, 0.7.0, 0.8.0)](#page-layout-options-060-061-070-080)
 - [Imports](#imports)
+  - [Browser console](#browser-console)
 - [HubSpot import (0.10.0)](#hubspot-import-0100)
   - [Credential and scopes](#credential-and-scopes)
   - [How the credential is checked](#how-the-credential-is-checked)
@@ -886,6 +887,19 @@ expired notices link its page, and the lists show the person a notice linking th
 
 No Messenger handler ships in 0.1.0: imports always run in requests and in the resume command. **0.10.0**: an
 optional one does, for every format ([Background runs](#background-runs-messenger)).
+
+### Browser console
+
+0.10.1 (REQ-ASSETS-005): `nowo-crm-import.js` logs one line when it loads, once per page even if a template loads it
+twice, so you can tell which build a page runs (a stale `assets:install`, a CDN or the browser cache):
+
+```
+📦 [crm-kit/import] script loaded, build: 2026-11-24 08:55 UTC
+```
+
+The build time comes from the committed `build-info.json` (it changes only when the TypeScript sources or the lock
+file change). Turn the line off with `<html data-nowo-console="quiet">` or `globalThis.NOWO_CONSOLE = 'quiet'` set
+before the script runs. The script prints nothing else to the console.
 
 ## HubSpot import (0.10.0)
 

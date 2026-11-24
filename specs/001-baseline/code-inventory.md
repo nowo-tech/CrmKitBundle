@@ -4,7 +4,7 @@
 **Package**: `nowo-tech/crm-kit-bundle`  
 **Last audited**: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped)
 
-Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **503** (428 PHP files, 26 Doctrine XML
+Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **506** (428 PHP files, 26 Doctrine XML
 mappings, 36 Twig views, 7 translation files, assets and CSS). Sections headed `0.3.0-0.6.0` were added by the
 2026-11-22 refresh, sections headed `0.7.0-0.10.x` by the 2026-11-24 refresh.
 
@@ -329,8 +329,11 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/assets/README.md` | FR-UI-002 |
 | `src/Resources/assets/src/iife.ts` | FR-UI-002 |
 | `src/Resources/assets/src/import-dialog.ts` | FR-UI-002 |
+| `src/Resources/assets/src/logger.ts` (0.10.1, the "script loaded" line) | FR-UI-002 |
+| `src/Resources/assets/src/script-banner.ts` (0.10.1, once per page) | FR-UI-002 |
 | `src/Resources/assets/tests/import-dialog.test.ts` | FR-UI-002 |
-| `src/Resources/public/js/nowo-crm-import.js` (Vite build of the two sources above) | FR-UI-002 |
+| `src/Resources/assets/tests/script-banner.test.ts` | FR-UI-002 |
+| `src/Resources/public/js/nowo-crm-import.js` (Vite build of the sources above) | FR-UI-002 |
 
 ### Resources: translations (7)
 
@@ -703,5 +706,5 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/views/pipeline/_dialog.html.twig` | FR-UI-003 |
 | `src/Resources/views/pipeline/form.html.twig` | FR-UI-003 |
 
-**Total production sources**: 503 (every file under `src/`; the `0.7.0-0.10.x` sections were added by the 2026-11-24
+**Total production sources**: 506 (every file under `src/`; the `0.7.0-0.10.x` sections were added by the 2026-11-24
 refresh, 85 files)

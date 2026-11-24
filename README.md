@@ -161,7 +161,7 @@ make release-check      # every gate, demo included
 ```
 
 - PHP: 100 % of `src/` (gate in CI).
-- TS/JS: 94.65 % (lowest of statements / branches / functions / lines; Vitest gate 90 %, `make test-ts`).
+- TS/JS: 95.09 % (lowest of statements / branches / functions / lines; Vitest gate 90 %, `make test-ts`).
 - Python: N/A. Database suite on SQLite, MySQL 8.4, MariaDB 11.4 and PostgreSQL 16 in CI,
   two-connection race tests included ([docs/CONCURRENCY.md](docs/CONCURRENCY.md)).
 

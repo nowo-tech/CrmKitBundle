@@ -187,7 +187,7 @@ tables on a private entity manager and never flushes the host's work.
 - **SC-004**: after an erasure nothing the GDPR export returned remains readable.
 - **SC-005**: the worker test (120 requests, two tenants, two actors) shows no crossed data, no managed entity after a
   request and < 8 MiB memory growth.
-- **SC-006**: `code-inventory.md` lists every file of `src/`: 503 files mapped at 0.10.1 (`find src -type f | wc -l`).
+- **SC-006**: `code-inventory.md` lists every file of `src/`: 506 files mapped at 0.10.1 (`find src -type f | wc -l`).
 
 ## Key entities
 

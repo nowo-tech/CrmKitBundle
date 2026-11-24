@@ -66,9 +66,9 @@ final readonly class DoctrineEncryptCrmSecretBox implements CrmSecretBoxInterfac
     public const DECRYPTION_FAILURES = ['ParagonIE\\Halite\\Alerts\\InvalidMessage', 'ParagonIE\\Halite\\Alerts\\InvalidSignature', 'ParagonIE\\Halite\\Alerts\\InvalidDigestLength', 'ParagonIE\\Halite\\Alerts\\InvalidType', 'RangeException', 'Defuse\\Crypto\\Exception\\WrongKeyOrModifiedCiphertextException', 'Defuse\\Crypto\\Exception\\BadFormatException', 'Nowo\\DoctrineEncryptBundle\\Exception\\DecryptionFailedException', 'SodiumException'];
 
     /**
-     * A constant, non-secret value encrypted before each decryption (0.10.1, audit ZAW-L1): the encryptor loads its key
-     * there, in its own try, so a key that is missing, malformed or of the wrong length is told apart from a value that
-     * does not decrypt. (A wrong but well-formed key still loads: it cannot be told apart from tampering, so the
+     * A constant, non-secret value encrypted after a decryption failed with a value failure (0.10.1, audits ZAW-L1 and
+     * ZAWF-I2): the encryptor loads its key there, in its own try, so a key that is missing, malformed or of the wrong
+     * length is told apart from a value that does not decrypt. (A wrong but well-formed key still loads: it cannot be told apart from tampering, so the
      * key id must change whenever the profile does.).
      */
     private const PROBE = 'nowo-crm-kit|key-probe';
@@ -133,22 +133,9 @@ final readonly class DoctrineEncryptCrmSecretBox implements CrmSecretBoxInterfac
         $encryptor = $this->encryptor($sealed->keyId === $this->keyId ? $this->profile : $this->previous[$sealed->keyId], $sealed->keyId);
 
         try {
-            // The key loads here: any failure is the key's, never the value's.
-            $encryptor->encrypt(self::PROBE);
-        } catch (Throwable $e) {
-            throw new SecretKeyUnavailableException($sealed->keyId, $e);
-        }
-
-        try {
             $payload = $encryptor->decrypt($raw);
         } catch (Throwable $e) {
-            foreach (self::DECRYPTION_FAILURES as $failure) {
-                if ($e instanceof $failure) {
-                    throw new SecretUnsealException();
-                }
-            }
-
-            throw new SecretKeyUnavailableException($sealed->keyId, $e);
+            throw $this->failure($encryptor, $sealed->keyId, $e);
         }
         $prefix = $context->aad() . self::SEPARATOR;
         if (!str_starts_with($payload, $prefix) || strlen($payload) === strlen($prefix)) {
@@ -164,6 +151,30 @@ final readonly class DoctrineEncryptCrmSecretBox implements CrmSecretBoxInterfac
     public function currentKeyId(): string
     {
         return $this->keyId;
+    }
+
+    /**
+     * What a failed decryption means (audit ZAW-L1): a value failure is {@see SecretUnsealException} only when the key
+     * loads on its own (the probe, run only after a failure: Defuse derives its key on every call, audit ZAWF-I2);
+     * anything else is {@see SecretKeyUnavailableException}.
+     */
+    private function failure(EncryptorInterface $encryptor, string $keyId, Throwable $e): SecretUnsealException|SecretKeyUnavailableException
+    {
+        $value = false;
+        foreach (self::DECRYPTION_FAILURES as $failure) {
+            $value = $value || $e instanceof $failure;
+        }
+        if (!$value) {
+            return new SecretKeyUnavailableException($keyId, $e);
+        }
+
+        try {
+            $encryptor->encrypt(self::PROBE);
+        } catch (Throwable $probe) {
+            return new SecretKeyUnavailableException($keyId, $probe);
+        }
+
+        return new SecretUnsealException();
     }
 
     /**

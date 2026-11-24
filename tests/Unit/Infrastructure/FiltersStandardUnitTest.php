@@ -66,6 +66,11 @@ final class FiltersStandardUnitTest extends TestCase
         foreach (['2026-02-30', '2026-2-3', '', null, ['2026-01-01'], '2026-01-01T00:00'] as $bad) {
             self::assertNull(ListFilters::day($bad));
         }
+        // audit ZBF-L1: page numbers are clamped to 1 .. ListQuery::MAX_PAGE
+        foreach (['99999999999999999999' => 10000, '9223372036854775807' => 10000, '1e300' => 10000, '3' => 3, '0' => 1, '-4' => 1, 'x' => 1, '2.7' => 2] as $raw => $page) {
+            self::assertSame($page, ListFilters::page((string) $raw), (string) $raw);
+        }
+        self::assertSame(1, ListFilters::page(null));
         self::assertFalse(ListFilters::any([]));
         self::assertFalse(ListFilters::any(['page' => '2', 'per_page' => '10', 'sort' => 'name', 'direction' => 'asc', 'after' => 'x', 'status' => 'active', 'q' => '']));
         self::assertTrue(ListFilters::any(['q' => 'a']));

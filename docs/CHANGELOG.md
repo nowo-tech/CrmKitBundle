@@ -47,8 +47,7 @@ UPGRADING lists the visible changes of the filter bars.
   `DealQuery::forActor()` resolve *Mine*; an unresolved *Mine* matches nothing.
 - Sortable column headers: *Created* on Companies and Contacts; *Title*, *Amount*, *Expected close* and *Updated* on
   Deals, both directions (`DealQuery::SORT_TITLE`, `DealQuery::SORTS`, `DealQuery::$direction`; rows without an
-  amount or a close date stay last). Deals get the *N per page* select too (always in the filters: Deals has no
-  numbered pager).
+  amount or a close date stay last). Deals get the *N per page* select too and numbered pages (below).
 - Empty states (§11): on the list defaults the message says why the list is empty and offers create with **Import**
   next to it; with `import.hubspot.enabled` the hint mentions HubSpot. With a filter set: *Nothing matches these
   filters* and **Clear filters**. The bundle prepends its own UiKit `empty` partial for the NowoCrmKitBundle domain
@@ -82,7 +81,7 @@ UPGRADING lists the visible changes of the filter bars.
   list. A search on Tags / Custom fields now reads *Nothing matches these filters* (was *Nothing matches the
   search*).
 - Funnel statistics: the filters use the standard bar (icon-only Filter / Clear filters); `at` is a native date and
-  the snapshot is taken at the end of that day (UTC).
+  the snapshot is taken at the end of that day in the application's time zone (now, for today).
 - Demo (Symfony 8): UiKit's built-in SVG icons, icon-only filter buttons and the phone filter sheet, as Beacon draws
   them; screenshots `docs/images/demo/crm-filters-after-*.webp`.
 

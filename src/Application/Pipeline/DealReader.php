@@ -25,6 +25,7 @@ use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealPage;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealView;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\NextActionView;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\StageChangeView;
+use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 
@@ -161,8 +162,9 @@ final readonly class DealReader
             $this->pipeline->support->access->require($context, CrmPermission::AmountsView);
         }
         $perPage = max(1, min(self::MAX_PAGE, $perPage));
-        $offset  = (max(1, $page) - 1) * $perPage;
-        $query   = $query->forActor($context->actor->value);
+        // Audit ZBF-L1: the page is capped like the record lists, so the offset stays an integer.
+        $offset = (min(ListQuery::MAX_PAGE, max(1, $page)) - 1) * $perPage;
+        $query  = $query->forActor($context->actor->value);
 
         return $this->pipeline->support->read(function () use ($context, $query, $offset, $perPage): DealListResult { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$rows, $total] = $this->pipeline->store->dealsPage($context->tenant, $query, $this->pipeline->support->access->visibleOwners($context), $offset, $perPage, $this->cutoffs($context, $query->funnelId), $context->now);

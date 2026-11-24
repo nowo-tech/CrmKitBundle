@@ -32,6 +32,8 @@ use function sprintf;
 use function str_repeat;
 use function trim;
 
+use const PHP_INT_MAX;
+
 /**
  * 0.10.2 (Beacon request 2026-11-24, filter standard): the list filter bars of Companies, Contacts and Deals — the
  * search one column wide, "More filters" for the rarer filters, "Rows per page" compact before Filter / Clear, owner
@@ -237,6 +239,13 @@ final class FiltersStandardTest extends CrmTestCase
         self::assertSame(['Deal 02', 'Deal 01'], $next->filter('[data-testid="crm-deals"] tbody tr td:first-child')->each(static fn (Crawler $c): string => trim($c->text())));
         $past = $this->client->request('GET', '/crm/deals?sort=title&direction=desc&page=9');
         self::assertSame(['Deal 02', 'Deal 01'], $past->filter('[data-testid="crm-deals"] tbody tr td:first-child')->each(static fn (Crawler $c): string => trim($c->text())), 'a page past the end shows the last page');
+        // audit ZBF-L1: a huge or exponent page is capped (the last page), never an offset overflow (500)
+        foreach (['99999999999999999999', '9223372036854775807', '1e300'] as $huge) {
+            $capped = $this->client->request('GET', '/crm/deals?sort=title&direction=desc&page=' . $huge);
+            self::assertSame(200, $this->client->getResponse()->getStatusCode(), $huge);
+            self::assertSame(['Deal 02', 'Deal 01'], $capped->filter('[data-testid="crm-deals"] tbody tr td:first-child')->each(static fn (Crawler $c): string => trim($c->text())), $huge);
+        }
+        self::assertSame([], $this->service(DealReader::class)->page(new DealQuery(), PHP_INT_MAX, 10)->deals);
         // the keyset reader (API) follows the direction too
         $reader = $this->service(DealReader::class);
         $first  = $reader->deals(new DealQuery(sort: DealQuery::SORT_TITLE, direction: 'desc'), null, 10);

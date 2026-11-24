@@ -150,7 +150,7 @@ final readonly class PipelineController
             $perPage = $this->ui->options->perPage($q['per_page'] ?? null, $this->ui->pageSize);
             // 0.10.2: numbered pages with the total ("Showing 1–25 of N"), like the company and contact lists; a page
             // past the end shows the last page.
-            $number = is_numeric($q['page'] ?? null) ? max(1, (int) $q['page']) : 1;
+            $number = ListFilters::page($q['page'] ?? null); // audit ZBF-L1: 1 to ListQuery::MAX_PAGE
             $page   = $this->reader->page($query, $number, $perPage);
             if ($page->deals === [] && $number > 1 && $page->total > 0) {
                 $number = intdiv($page->total - 1, $perPage) + 1;

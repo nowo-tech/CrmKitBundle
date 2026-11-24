@@ -45,7 +45,7 @@ test('filter bars, sheet, More filters and empty states (desktop and phone)', as
       await shot(page, `${type}-empty-desktop`);
     }
   }
-  // Then rows: a deal funnel, two deals, two tags and a custom field (no-JS form pages, stable in a screenshot run).
+  // Then rows: a deal funnel, two deals, two tags (no-JS form pages) and a custom field (its dialog).
   await page.goto('/crm/admin/funnels');
   if ((await page.locator('[data-testid="crm-funnels"] tbody tr').count()) === 0) {
     await page.goto('/crm/admin/funnels/new');
@@ -71,6 +71,16 @@ test('filter bars, sheet, More filters and empty states (desktop and phone)', as
       await page.locator('form[name="crm_tag"] button[type="submit"]').first().click();
       await expect(page.getByTestId('crm-tags')).toContainText(tag);
     }
+  }
+
+  await page.goto('/crm/admin/fields');
+  if ((await page.locator('[data-testid="crm-fields"] tbody tr').count()) === 0) {
+    await page.getByTestId('crm-field-new-company').click();
+    const dialog = page.getByTestId('crm-field-dialog');
+    await dialog.locator('input[name="crm_field[key]"]').fill('tier');
+    await dialog.locator('input[name="crm_field[label]"]').fill('Customer tier');
+    await dialog.getByTestId('crm-field-form-company-dialog-form-submit').click();
+    await expect(page.getByTestId('crm-fields')).toContainText('Customer tier');
   }
 
   // 0.10.2 (Beacon scope note): every list of the kit — Companies, Contacts, Deals, Tags, Custom fields, Funnels.

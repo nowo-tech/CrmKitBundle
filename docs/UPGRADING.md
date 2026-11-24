@@ -39,8 +39,8 @@ nowo_crm_kit:
   host that styles or tests those fields by their place in the bar should look for them in
   `details.nowo-ui-filters-more`.
 - **Rows per page** is compact (*25 per page*), first in the filter actions, its label visually hidden (*Results per
-  page*). With `per_page_position: pagination` the filter form has no `per_page` field (Deals keeps it: no numbered
-  pager there).
+  page*). With `per_page_position: pagination` the filter form has no `per_page` field and the select sits in UiKit's
+  compact pager (Deals included: it has numbered pages since 0.10.2).
 - **Contacts:** `primary_contact` is a checkbox; the query value is still `1`.
 - **Deals:** the *Sort* select is gone; the column headers sort (`sort` = `updated` | `expected_close` | `amount` |
   `title`, `direction` = `asc` | `desc`). Old links keep working. `DealFilterType`'s `sorts` option is ignored
@@ -59,8 +59,8 @@ nowo_crm_kit:
 - **Header and empty state.** Import is a secondary button with an icon, right after create. On an empty, unfiltered
   list the header has no create button: the empty state carries create and Import. The bundle prepends
   `theme.bundles.NowoCrmKitBundle.partials.empty` (its own partial); a host entry for that key wins.
-- **Funnel statistics:** `at` is a date (`YYYY-MM-DD`, the end of that day in UTC); an old `at` with a time is
-  ignored like any invalid filter.
+- **Funnel statistics:** `at` is a date (`YYYY-MM-DD`, the end of that day in the application's time zone; now for
+  today); an old `at` with a time is ignored like any invalid filter.
 - **UiKit host options** stay the host's: Beacon-like icon-only Filter / Clear filters need
   `nowo_ui_kit.theme.pages.list.filters.display: icon` and an icon set other than `none`; the phone sheet needs
   `nowo_ui_kit.theme.pages.list.filters.sheet: true`.

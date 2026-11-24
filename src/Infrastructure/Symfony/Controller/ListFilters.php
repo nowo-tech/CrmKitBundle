@@ -6,11 +6,13 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 
 use function array_diff_key;
 use function array_filter;
 use function array_flip;
 use function in_array;
+use function is_numeric;
 use function is_string;
 use function preg_match;
 
@@ -43,6 +45,23 @@ final class ListFilters
         $day = DateTimeImmutable::createFromFormat('!Y-m-d', $value, new DateTimeZone('UTC'));
 
         return $day instanceof DateTimeImmutable && $day->format('Y-m-d') === $value ? $day : null;
+    }
+
+    /**
+     * A page number of the query (audit ZBF-L1): 1 to `ListQuery::MAX_PAGE`; anything else (not numeric, below 1, a
+     * huge or exponent value that would overflow an offset) is clamped, never cast blindly.
+     */
+    public static function page(mixed $value): int
+    {
+        if (!is_numeric($value)) {
+            return 1;
+        }
+        $page = (float) $value;
+        if ($page >= ListQuery::MAX_PAGE) {
+            return ListQuery::MAX_PAGE;
+        }
+
+        return $page < 1 ? 1 : (int) $page;
     }
 
     /**

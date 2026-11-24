@@ -11,10 +11,10 @@ use Nowo\CrmKitBundle\Application\CrmContext;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
+use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
-use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\SearchKitBundle\Model\SearchQuery;
 use Nowo\SearchKitBundle\Model\SearchReference;
 use Nowo\SearchKitBundle\Provider\Entity\EntitySearchDefinition;
@@ -203,7 +203,7 @@ abstract class CrmSearchDefinition extends EntitySearchDefinition
      */
     protected function trans(string $key, SearchQuery $query, string $fallback): string
     {
-        return $this->translator?->trans($key, [], NowoCrmKitBundle::TRANSLATION_DOMAIN, $query->locale) ?? $fallback;
+        return $this->translator?->trans($key, [], TranslationDomain::NAME, $query->locale) ?? $fallback;
     }
 
     /**

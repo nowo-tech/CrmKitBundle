@@ -8,7 +8,7 @@ use Nowo\CrmKitBundle\Domain\Enum\FieldType;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Model\RecordFields;
 use Nowo\CrmKitBundle\Domain\Read\FieldView;
-use Nowo\CrmKitBundle\NowoCrmKitBundle;
+use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
@@ -32,7 +32,7 @@ use function array_combine;
  *
  * @extends AbstractType<mixed>
  */
-#[FormKitConfig(NowoCrmKitBundle::FORM_PROFILE)]
+#[FormKitConfig(FormProfile::NAME)]
 final class RecordType extends AbstractType
 {
     use FormOptionsTrait;
@@ -97,7 +97,7 @@ final class RecordType extends AbstractType
             'csrf_protection'    => true,
             'csrf_token_id'      => 'nowo_crm_kit_record',
             'allow_extra_fields' => false,
-            'translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN,
+            'translation_domain' => TranslationDomain::NAME,
             'versioned'          => false,
             'owners'             => [],
             'tags'               => [],

@@ -1,0 +1,156 @@
+# REQ-ARCH-002: layer dependencies of src/ checked by Deptrac (strict ruleset; skipped violations only for public API
+# that cannot change before 1.0.0, each with its reason below).
+# Run: composer deptrac / make deptrac. Layers follow REQ-ARCH-001; docs/ARCHITECTURE.md explains them.
+deptrac:
+  paths:
+    - ./src
+  exclude_files:
+    - '#.*/src/Resources/.*#'
+  layers:
+    # --- Bundle layers -------------------------------------------------------------------------------------------
+    - name: Domain
+      collectors:
+        - type: classLike
+          value: '^Nowo\\CrmKitBundle\\Domain\\'
+    # Application: use cases (src/Application) and the framework-free API operation layer (src/Api).
+    - name: Application
+      collectors:
+        - type: classLike
+          value: '^Nowo\\CrmKitBundle\\(Application|Api)\\'
+    # UI: the HTTP / console edge inside Infrastructure\Symfony (not re-laid out): controllers, forms, route loaders,
+    # console commands, kernel listeners, the JSON API edge (authenticator, tenant resolver, controller) and the
+    # security guard / access checkers with their events.
+    # SecurityActorDirectory (Symfony\Port) reads the logged-in user through the Security resolvers, so it is part of
+    # the security edge; EntityManagerHygieneListener (Symfony\Http) is a Doctrine adapter on kernel events.
+    - name: UI
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^Nowo\\CrmKitBundle\\Infrastructure\\Symfony\\((Controller|Form|Routing|Command|Http|Security|Api|Event)\\|Port\\SecurityActorDirectory$)'
+          must_not:
+            - type: classLike
+              value: '^Nowo\\CrmKitBundle\\Infrastructure\\Symfony\\Http\\EntityManagerHygieneListener$'
+    # DependencyInjection: the composition root (bundle class, extension, compiler passes). It wires every layer.
+    - name: DependencyInjection
+      collectors:
+        - type: classLike
+          value: '^Nowo\\CrmKitBundle\\(Infrastructure\\Symfony\\DependencyInjection\\|NowoCrmKitBundle$)'
+    # Infrastructure: Doctrine, HubSpot client, crypto, Messenger and the Symfony adapters of the ports.
+    - name: Infrastructure
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^Nowo\\CrmKitBundle\\Infrastructure\\'
+          must_not:
+            - type: classLike
+              value: '^Nowo\\CrmKitBundle\\Infrastructure\\Symfony\\((Controller|Form|Routing|Command|Http|Security|Api|Event|DependencyInjection)\\|Port\\SecurityActorDirectory$)'
+        - type: classLike
+          value: '^Nowo\\CrmKitBundle\\Infrastructure\\Symfony\\Http\\EntityManagerHygieneListener$'
+    - name: Bridge
+      collectors:
+        - type: classLike
+          value: '^Nowo\\CrmKitBundle\\Bridge\\'
+    # --- Vendor layers -------------------------------------------------------------------------------------------
+    # Framework-free contract packages, listed by name (Domain and Application may use them).
+    - name: Psr
+      collectors:
+        - type: classLike
+          value: '^Psr\\(Clock|Log|EventDispatcher)\\'
+    - name: TransactionContract
+      collectors:
+        - type: classLike
+          value: '^Nowo\\TransactionContract\\'
+    # Framework and library code: Infrastructure, UI, Bridge and DependencyInjection only.
+    - name: SymfonyContracts
+      collectors:
+        - type: classLike
+          value: '^Symfony\\Contracts\\'
+    - name: Symfony
+      collectors:
+        - type: classLike
+          value: '^Symfony\\(Component|Bundle|Bridge)\\'
+    - name: Doctrine
+      collectors:
+        - type: classLike
+          value: '^Doctrine\\'
+    - name: Twig
+      collectors:
+        - type: classLike
+          value: '^Twig\\'
+    - name: TransactionDoctrine
+      collectors:
+        - type: classLike
+          value: '^Nowo\\TransactionDoctrine\\'
+    - name: NowoBundles
+      collectors:
+        - type: classLike
+          value: '^Nowo\\(UiKitBundle|FormKitBundle)\\'
+    # Bridged packages (optional).
+    - name: BridgedPackages
+      collectors:
+        - type: classLike
+          value: '^Nowo\\(SearchKitBundle|TaskBoardBundle|DoctrineEncryptBundle|OutboundUrlGuardBundle)\\'
+  ruleset:
+    Domain:
+      - Psr
+      - TransactionContract
+    Application:
+      - Domain
+      - Psr
+      - TransactionContract
+    Infrastructure:
+      - Domain
+      - Application
+      - Psr
+      - TransactionContract
+      - SymfonyContracts
+      - Symfony
+      - Doctrine
+      - Twig
+      - TransactionDoctrine
+      - NowoBundles
+    UI:
+      - Domain
+      - Application
+      - Psr
+      - TransactionContract
+      - SymfonyContracts
+      - Symfony
+      - Twig
+      - TransactionDoctrine
+      - NowoBundles
+    Bridge:
+      - Domain
+      - Application
+      - Infrastructure
+      - Psr
+      - TransactionContract
+      - SymfonyContracts
+      - Symfony
+      - Doctrine
+      - TransactionDoctrine
+      - BridgedPackages
+    DependencyInjection:
+      - Domain
+      - Application
+      - Infrastructure
+      - UI
+      - Bridge
+      - Psr
+      - TransactionContract
+      - SymfonyContracts
+      - Symfony
+      - Doctrine
+      - Twig
+      - TransactionDoctrine
+      - NowoBundles
+      - BridgedPackages
+  # Legacy public API that cannot change before 1.0.0 (REQ-ARCH-002 rule 3). This list must shrink, never grow.
+  skip_violations:
+    # set() re-throws transaction-doctrine's ConcurrencyConflict with `committed: true` after a host task port
+    # committed (REQ-RUNTIME-003 rule 9, CONFLICT_002), and documents it in @throws. Moving that to a port of
+    # TransactionRunnerInterface changes a public constructor / interface. Removed in 1.0.0.
+    Nowo\CrmKitBundle\Application\Pipeline\NextActionService:
+      - Nowo\TransactionDoctrine\WriteUnit\ConcurrencyConflict

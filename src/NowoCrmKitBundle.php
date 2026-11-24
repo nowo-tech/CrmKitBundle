@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle;
 
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
+use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\CrmKitWebUiSecurityPass;
@@ -14,6 +15,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler\Privat
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ConfigurationTree;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ParameterFlattener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FormProfile;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -38,10 +40,10 @@ final class NowoCrmKitBundle extends AbstractBundle
     public const ALIAS = 'nowo_crm_kit';
 
     /** Translation domain (REQ-I18N-003) and Twig namespace (REQ-TWIG-002). */
-    public const TRANSLATION_DOMAIN = 'NowoCrmKitBundle';
+    public const TRANSLATION_DOMAIN = TranslationDomain::NAME;
 
     /** FormKit profile of the bundle's forms (REQ-TWIG-005 rule 11). */
-    public const FORM_PROFILE = 'crm_kit';
+    public const FORM_PROFILE = FormProfile::NAME;
 
     /** Doctrine mapping name of phase A. */
     public const MAPPING_NAME = 'NowoCrmKitBundle';

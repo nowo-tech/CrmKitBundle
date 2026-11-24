@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Form;
 
-use Nowo\CrmKitBundle\NowoCrmKitBundle;
+use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
@@ -18,7 +18,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  *
  * @extends AbstractType<mixed>
  */
-#[FormKitConfig(NowoCrmKitBundle::FORM_PROFILE)]
+#[FormKitConfig(FormProfile::NAME)]
 final class SettingsType extends AbstractType
 {
     use FormOptionsTrait;
@@ -49,7 +49,7 @@ final class SettingsType extends AbstractType
             'csrf_protection'    => true,
             'csrf_token_id'      => 'nowo_crm_kit_settings',
             'allow_extra_fields' => false,
-            'translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN,
+            'translation_domain' => TranslationDomain::NAME,
         ]);
     }
 

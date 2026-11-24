@@ -11,10 +11,10 @@ use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
+use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\CrmKitBundle\Domain\Value\HostTypeLabel;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
-use Nowo\CrmKitBundle\NowoCrmKitBundle;
 use Nowo\UiKitBundle\View\AreaNav;
 use Nowo\UiKitBundle\View\AreaNavItem;
 use Nowo\UiKitBundle\View\FilterField;
@@ -50,7 +50,7 @@ use function substr;
 final readonly class UiSupport
 {
     /** Translation domain. */
-    public const DOMAIN = NowoCrmKitBundle::TRANSLATION_DOMAIN;
+    public const DOMAIN = TranslationDomain::NAME;
 
     /**
      * Wires the collaborators.

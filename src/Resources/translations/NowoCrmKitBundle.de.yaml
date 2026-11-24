@@ -496,6 +496,8 @@ error:
     hubspot_bad_response: 'HubSpot hat etwas geantwortet, das das CRM nicht lesen kann. Der Import pausiert.'
     hubspot_disconnected: 'HubSpot wurde getrennt: der Import wurde beendet.'
     hubspot_too_many: 'Das HubSpot-Konto enthält mehr Datensätze als der Import erlaubt: er wurde beendet.'
+    hubspot_key_unavailable: 'Der HubSpot-Schlüssel kann mit den konfigurierten geheimen Schlüsseln weder geöffnet noch versiegelt werden. Es wurde nichts geändert: Ein Administrator muss den Schlüssel wieder konfigurieren (siehe Anleitung zur Schlüsselrotation).'
+    hubspot_browse_limited: 'Zu viele HubSpot-Abfragen für diese Organisation. Warten Sie einige Minuten.'
     record_erased: 'Die Person wurde gelöscht (DSGVO): kein erneuter Import.'
     record_trashed: 'Der Datensatz ist im Papierkorb: unverändert.'
     record_merged: 'Der Datensatz wurde inzwischen zusammengeführt: erneut versuchen.'

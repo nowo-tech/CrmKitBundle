@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Crypto;
 
 use LogicException;
+use Nowo\CrmKitBundle\Domain\Exception\SecretKeyUnavailableException;
 use Nowo\CrmKitBundle\Domain\Exception\SecretUnsealException;
 use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
 use Nowo\CrmKitBundle\Domain\Value\SealedSecret;
@@ -30,7 +31,8 @@ use const SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES;
  * The default {@see CrmSecretBoxInterface} (0.10.0, design section 8): XChaCha20-Poly1305 (libsodium, `ext-sodium`)
  * with a random 24-byte nonce per seal and the context's {@see SecretContext::aad()} as additional data, so a value
  * copied to another tenant, row or purpose does not open. Keys come from `secrets.keys` (32 bytes each, from the
- * environment); `current_key` seals, every listed key opens (rotation). The stored value is base64 of nonce ‖
+ * environment); `current_key` seals, every listed key opens (rotation); a key id that is not listed is
+ * {@see SecretKeyUnavailableException} (0.10.1), never a bad value. The stored value is base64 of nonce ‖
  * ciphertext. Copies of the plaintext are wiped after use; the keys are the container's, never logged.
  */
 final readonly class SodiumCrmSecretBox implements CrmSecretBoxInterface
@@ -67,12 +69,19 @@ final readonly class SodiumCrmSecretBox implements CrmSecretBoxInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @throws SecretUnsealException the value does not open (wrong key, tampering, another context)
+     * @throws SecretKeyUnavailableException the key id is not in `secrets.keys` (0.10.1: a key dropped before
+     *                                       `nowo:crm-kit:secrets:rotate` re-sealed its values keeps them, audit ZAM-D2)
      */
     public function unseal(SealedSecret $sealed, SecretContext $context): string
     {
         $key = $this->keys[$sealed->keyId] ?? null;
+        if ($key === null) {
+            throw new SecretKeyUnavailableException($sealed->keyId);
+        }
         $raw = base64_decode($sealed->ciphertext, true);
-        if ($key === null || !is_string($raw) || strlen($raw) <= SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES) {
+        if (!is_string($raw) || strlen($raw) <= SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES) {
             throw new SecretUnsealException();
         }
 

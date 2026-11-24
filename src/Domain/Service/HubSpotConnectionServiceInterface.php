@@ -26,8 +26,9 @@ interface HubSpotConnectionServiceInterface
      *
      * @throws InvalidInputException `token`: error.hubspot_token_invalid | error.hubspot_scope_missing |
      *                               error.hubspot_scope_not_read_only | error.hubspot_unavailable |
-     *                               error.hubspot_account_changed (repeat with `$confirmAccountChange`); never
-     *                               HubSpot's text
+     *                               error.hubspot_account_changed (repeat with `$confirmAccountChange`) |
+     *                               error.hubspot_key_unavailable (0.10.1: the secret box cannot seal, nothing is
+     *                               stored); never HubSpot's text
      * @throws ConflictException crm_record_stale (another manager saved first), crm_hubspot_rate_limited (too many
      *                           token checks for the tenant)
      */

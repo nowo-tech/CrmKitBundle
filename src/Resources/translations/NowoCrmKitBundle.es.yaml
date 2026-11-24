@@ -496,6 +496,8 @@ error:
     hubspot_bad_response: 'HubSpot respondió algo que el CRM no puede leer. La importación se pausó.'
     hubspot_disconnected: 'HubSpot se desconectó: la importación se detuvo.'
     hubspot_too_many: 'La cuenta de HubSpot tiene más registros de los que permite la importación: se detuvo.'
+    hubspot_key_unavailable: 'La clave de HubSpot no se puede abrir ni sellar con las claves secretas configuradas. No se ha cambiado nada: un administrador debe volver a configurar la clave (consulta la guía de rotación de claves).'
+    hubspot_browse_limited: 'Demasiadas consultas a HubSpot para esta organización. Espera unos minutos y vuelve a intentarlo.'
     record_erased: 'La persona fue borrada (RGPD): no se vuelve a importar.'
     record_trashed: 'El registro está en la papelera: se deja igual.'
     record_merged: 'El registro se fusionó mientras tanto: vuelve a intentarlo.'

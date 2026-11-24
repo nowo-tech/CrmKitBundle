@@ -51,8 +51,14 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
     /** Counter row: start of the current window (Unix minutes). */
     public const WINDOW = 'hubspot_connect_at';
 
+    /** Counter row: HubSpot reads of the start and mapping pages in the current window (0.10.1, audit ZAM-9). */
+    public const BROWSE = 'hubspot_browse';
+
+    /** Counter row: start of the current browse window (Unix minutes). */
+    public const BROWSE_WINDOW = 'hubspot_browse_at';
+
     /** Reasons a new token clears. */
-    private const TOKEN_REASONS = ['hubspot_token_invalid', 'hubspot_scope_missing'];
+    private const TOKEN_REASONS = ['hubspot_token_invalid', 'hubspot_scope_missing', 'hubspot_key_unavailable'];
 
     /**
      * Wires the runner.
@@ -111,22 +117,15 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
      */
     public function takeConnectAttempt(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval): bool
     {
-        $minute = intdiv($now->getTimestamp(), 60);
-        // Always the window row first, then the attempts row: one order, so two checks never deadlock.
-        $start = $this->lockedCounter($tenant, self::WINDOW);
-        $count = $this->lockedCounter($tenant, self::ATTEMPTS);
-        if ($start === null || $minute - $start >= intdiv($interval + 59, 60)) {
-            $this->setCounter($tenant, self::WINDOW, $minute);
-            $this->setCounter($tenant, self::ATTEMPTS, 1);
+        return $this->take($tenant, $now, $limit, $interval, self::WINDOW, self::ATTEMPTS);
+    }
 
-            return true;
-        }
-        if ($count >= $limit) {
-            return false;
-        }
-        $this->setCounter($tenant, self::ATTEMPTS, ($count ?? 0) + 1);
-
-        return true;
+    /**
+     * {@inheritDoc}
+     */
+    public function takeBrowseCall(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval): bool
+    {
+        return $this->take($tenant, $now, $limit, $interval, self::BROWSE_WINDOW, self::BROWSE);
     }
 
     /**
@@ -296,6 +295,30 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
         $this->db()->fetchOne($sql, [$tenant->value, $resource]);
 
         return null;
+    }
+
+    /**
+     * Counts one call in a fixed window of `$interval` seconds (rounded up to minutes) under the two counter rows' locks;
+     * false once `$limit` calls were counted in it.
+     */
+    private function take(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval, string $window, string $counter): bool
+    {
+        $minute = intdiv($now->getTimestamp(), 60);
+        // Always the window row first, then the count row: one order, so two checks never deadlock.
+        $start = $this->lockedCounter($tenant, $window);
+        $count = $this->lockedCounter($tenant, $counter);
+        if ($start === null || $minute - $start >= intdiv($interval + 59, 60)) {
+            $this->setCounter($tenant, $window, $minute);
+            $this->setCounter($tenant, $counter, 1);
+
+            return true;
+        }
+        if ($count >= $limit) {
+            return false;
+        }
+        $this->setCounter($tenant, $counter, ($count ?? 0) + 1);
+
+        return true;
     }
 
     private function setCounter(TenantRef $tenant, string $resource, int $value): void

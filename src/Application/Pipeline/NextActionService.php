@@ -32,7 +32,7 @@ use Nowo\CrmKitBundle\Domain\Value\CrmTaskRef;
 use Nowo\CrmKitBundle\Domain\Value\CrmTaskRequest;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
-use Nowo\TransactionDoctrine\WriteUnit\ConcurrencyConflict;
+use Nowo\TransactionContract\ConcurrencyConflict;
 
 use function array_map;
 use function in_array;

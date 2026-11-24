@@ -26,7 +26,96 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as 0.10.1 (patch): the follow-ups of audit ZAM and its delta. No BC break in the public PHP API or config;
+the new keys have defaults that keep 0.10.0's behaviour.
+
+### Added
+
+- `import.hubspot.browse_rate_limit` (`limit: 60`, `interval: 600`): HubSpot reads of the start and mapping pages
+  per tenant (ZAM-9).
+- `secrets.doctrine_encrypt` (`profile`, `key_id`, `previous`): the DoctrineEncrypt box's profiles, so its key can be
+  rotated (ZAM-D2). `DoctrineEncryptCrmSecretBox` takes two optional constructor arguments, `$keyId` and `$previous`.
+- `SecretKeyUnavailableException`: the key a sealed value names is not configured or cannot be used.
+- REQ-ASSETS-005: `nowo-crm-import.js` logs one `📦 [crm-kit/import] script loaded, build: …` line per page (once-guard,
+  build time from the committed `build-info.json`). Silence it with `<html data-nowo-console="quiet">` or
+  `globalThis.NOWO_CONSOLE = 'quiet'` (USAGE, "Browser console").
+- REQ-MSG-001: `RunCrmImportHandler` is declared with `#[AsMessageHandler]` and takes an optional PSR logger. It logs
+  the message type, the import id and the outcome, and a warning when it drops a message whose tenant id is not valid.
+
+### Changed
+
+- Dependencies: `nowo-tech/form-kit-bundle` ^2.25.1, `nowo-tech/transaction-contract` ^1.1,
+  `nowo-tech/transaction-doctrine` ^1.10.1, `nowo-tech/ui-kit-bundle` ^2.71 (twig 3.31 in the locks; the demo's lock
+  follows).
+- `NextActionService::set()` names transaction-contract's `ConcurrencyConflict`. transaction-doctrine 1.10 aliases
+  its old class name to it, so callers catch the same class. Deptrac's last `skip_violations` entry is gone.
+- REQ-RUNTIME-002: with `import.messenger.enabled`, the entity-manager hygiene listener also runs on Messenger's
+  `WorkerMessageHandledEvent` / `WorkerMessageFailedEvent`, so every message in a worker starts with an empty manager.
+- The DoctrineEncrypt box probes its key only after a decryption failed (audit ZAWF-I2: Defuse no longer derives its
+  key twice per successful unseal); the classification is unchanged.
+
+### Fixed
+
+- ZAWD-L1: the "script loaded" once-guard of `nowo-crm-import.js` is UiKit 2.71+'s: a clobbered, read-only or
+  cross-origin `window.__nowoScriptBanners` (DOM named access) falls back to a module set and can no longer throw
+  before the import modal starts.
+- ZAM-D2: the DoctrineEncrypt box can now be rotated without losing tokens. Add a DoctrineEncrypt profile with the new
+  key, seal with it under a new `key_id`, and list the old key id and profile under `previous`. The old tokens keep
+  working, and `nowo:crm-kit:secrets:rotate` re-seals them.
+- ZAW-L1: when a decryption fails, the DoctrineEncrypt box loads the key in its own step (it encrypts a constant,
+  non-secret probe value). A key that is missing, unreadable, malformed or of the wrong length (Halite `InvalidKey`,
+  `CannotPerformOperation`, a bad Defuse key) is now "key not available": the connection stays active. Only the
+  value failures (Halite `InvalidMessage` / `InvalidSignature` / `InvalidDigestLength` / `InvalidType`, Defuse
+  `WrongKeyOrModifiedCiphertextException` / `BadFormatException`, `DecryptionFailedException`, `SodiumException`,
+  an encoder's `RangeException`) still mark a token as not opening. CONFIGURATION says the key id must change whenever
+  the key or profile does.
+- ZAW-I5: `secrets:rotate` reports connections that are already invalid and whose token does not open on their own
+  line. They no longer fail the run.
+- UPGRADING (docs, ZAW-I1, ZAW-I3): the rotation steps now say to restart every worker, consumer and cron host, and
+  to rotate once more before removing the old key. The consent normalisation only rewrites values that become valid,
+  says what to do with the rest, and warns that the ALTERs rebuild the tables.
+- Docs: CONFIGURATION "Timeouts" (REQ-RUNTIME-001: HubSpot calls per request, the hierarchy up to PHP, the proxy write
+  timeout and FrankenPHP `max_wait_time`), DEMO-FRANKENPHP "Timeouts", SECURITY "Content-Security-Policy"
+  (REQ-UX-001), an up-to-date FRANKENPHP-WORKER-AUDIT (0.10.1), PER-CS in PSR.md and the agent rules, the README
+  status and TS coverage, the SPEC-DRIVEN-DEVELOPMENT scope through 0.10.1, and the binary comparison in the UPGRADING
+  consent normalisation (ZAWF-I1).
+- UPGRADING (docs): the 0.10.0 schema notes missed `nowo_crm_consent.source`. That column became a binary exact key on
+  MySQL / MariaDB when `source` joined `CrmMetadataListener::EXACT_COLUMNS`. The notes also gave `utf8mb4_bin`
+  instead of `utf8mb4_0900_bin` for the new MySQL 8.4 columns. UPGRADING "Unreleased" now has the check query and the
+  ALTERs for MySQL 8.4, MariaDB 11.4, PostgreSQL 16 and SQLite, which also apply to hosts already on 0.10.0.
+- ZAM-D1: SECURITY.md now says where `HubSpotToken` keeps the plaintext: in a suspended generator's frame owned by the
+  object.
+
+### Security
+
+- ZAM-D2: `nowo:crm-kit:secrets:rotate` never loses a token. It writes a new seal only after the seal opens again to
+  the same token. It leaves unchanged any token that does not open, whose key is not available, or that cannot be
+  re-sealed. It no longer marks connections invalid, and it exits with 1 while any token is left unchanged.
+  `--dry-run` re-seals in memory, so it also proves that the new key works.
+- ZAM-D2: if a token's key is not configured (in the sodium or DoctrineEncrypt box), or a DoctrineEncrypt profile or
+  key file fails, the token is no longer taken for a bad value. The import refuses with
+  `error.hubspot_key_unavailable`, or a run pauses with `hubspot_key_unavailable`. The connection and its sealed token
+  are kept. A connect whose seal fails stores nothing. Saving a new token resumes such paused imports.
+- ZAM-D4: the DoctrineEncrypt profiles that the kit wires (`profile` and `previous`) must use Halite or Defuse and
+  must exist. Otherwise the container build fails; before, the refusal came at the first seal.
+- ZAW-L2: `confirm()` checks the import's version, the mapping's keys and its lists before it asks HubSpot, then
+  counts against `browse_rate_limit`. Repeated stale or invalid confirms no longer reach HubSpot.
+- ZAW-I2: an unavailable secret key is logged at error level with the key id and the class of the cause, never its
+  message or trace. This applies to the import, the runner, connect and `secrets:rotate`; the services take an
+  optional PSR logger.
+- ZAM-9: once `browse_rate_limit` is reached, the start and mapping pages answer `error.hubspot_browse_limited` and
+  do not ask HubSpot. Reloads can no longer burn the portal's shared daily API quota. The confirm step counts too
+  (audit ZAW-L2), after its local checks: a stale version or an invalid mapping is refused before any HubSpot call.
+
 ### Internal
+
+- REQ-GH-002 / REQ-GH-003: Dependabot watches the npm toolchain in two groups, and `dependabot-assets.yml` rebuilds the
+  committed import script and `build-info.json` on those PRs. Hardened before release (audit ZAWD-M1): the build job
+  is read-only (no persisted credentials, `pnpm install --ignore-scripts`) and the commit job, the only one with write
+  access, never installs or builds. The commit job then dispatches `ci.yml` (now `workflow_dispatch`-able) so the
+  required checks run on the rebuilt head (ZAWD-L2).
+- REQ-CS-009: PHP-CS-Fixer uses `@PER-CS` and `@PER-CS:risky` instead of `@PSR12`.
+- REQ-SPECKIT-001 / 003: the code inventory lists every file under `src/` (506 at 0.10.1).
 
 - **Deptrac layer check** (REQ-ARCH-002): `deptrac.yaml` with a strict ruleset (Domain / Application framework-free,
   uncovered dependencies and unassigned classes fail), `composer deptrac`, `make deptrac`, part of

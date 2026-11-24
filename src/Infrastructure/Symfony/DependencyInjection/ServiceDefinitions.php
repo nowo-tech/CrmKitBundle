@@ -223,6 +223,12 @@ final class ServiceDefinitions
     /** Prefix of the bundle's service ids and parameters. */
     public const P = NowoCrmKitBundle::ALIAS . '.';
 
+    /** Messenger's event after a worker handled a message (its class name). */
+    public const WORKER_MESSAGE_HANDLED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent';
+
+    /** Messenger's event after a worker failed to handle a message (its class name). */
+    public const WORKER_MESSAGE_FAILED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent';
+
     /**
      * Registers the services.
      *
@@ -372,8 +378,13 @@ final class ServiceDefinitions
         }
         if ($messenger) {
             $s->set(ImportRunDispatcherInterface::class, MessengerImportRunDispatcher::class)->args([service('messenger.default_bus'), $clock]);
-            $s->set(RunCrmImportHandler::class)->args([service(ImportService::class), service(ImportRunDispatcherInterface::class), param($p . 'import.messenger.units')])
+            $s->set(RunCrmImportHandler::class)->args([service(ImportService::class), service(ImportRunDispatcherInterface::class), param($p . 'import.messenger.units'), service('logger')->nullOnInvalid()])
                 ->tag('messenger.message_handler', ['handles' => RunCrmImport::class]);
+            // REQ-RUNTIME-002 rule 7: a Messenger worker is a kept-alive process too; the bundle's entity manager is
+            // cleared (or reset after a failure) once each message is handled or failed.
+            $s->get(EntityManagerHygieneListener::class)
+                ->tag('kernel.event_listener', ['event' => self::WORKER_MESSAGE_HANDLED, 'method' => 'clear', 'priority' => -2048])
+                ->tag('kernel.event_listener', ['event' => self::WORKER_MESSAGE_FAILED, 'method' => 'clear', 'priority' => -2048]);
         }
         if ($api) {
             self::api($container, $pipeline);
@@ -478,11 +489,11 @@ final class ServiceDefinitions
             param($p . 'import.hubspot.rate_limit.max_attempts'),
             param($p . 'import.hubspot.rate_limit.max_retry_after'),
         ]);
-        $s->set(HubSpotConnectionService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(CrmSecretBoxInterface::class), param($p . 'import.hubspot.connect_rate_limit.limit'), param($p . 'import.hubspot.connect_rate_limit.interval')]);
+        $s->set(HubSpotConnectionService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(CrmSecretBoxInterface::class), param($p . 'import.hubspot.connect_rate_limit.limit'), param($p . 'import.hubspot.connect_rate_limit.interval'), service('logger')->nullOnInvalid()]);
         $s->alias(HubSpotConnectionServiceInterface::class, HubSpotConnectionService::class)->public();
-        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled')]);
+        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled'), param($p . 'import.hubspot.browse_rate_limit.limit'), param($p . 'import.hubspot.browse_rate_limit.interval'), service('logger')->nullOnInvalid()]);
         $s->alias(HubSpotImportServiceInterface::class, HubSpotImportService::class)->public();
-        $s->set(SecretsRotateCommand::class)->args([service(HubSpotStoreInterface::class), service(CrmSecretBoxInterface::class), service(TransactionRunnerInterface::class), $clock])->tag('console.command');
+        $s->set(SecretsRotateCommand::class)->args([service(HubSpotStoreInterface::class), service(CrmSecretBoxInterface::class), service(TransactionRunnerInterface::class), $clock, service('logger')->nullOnInvalid()])->tag('console.command');
     }
 
     /**

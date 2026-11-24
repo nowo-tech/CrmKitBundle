@@ -1244,7 +1244,8 @@ up by one (H1 0.10.0, H2 0.11.0, H3 0.12.0). Changes against the design, from th
 - H1 scopes: `crm.objects.{companies,contacts,owners}.read`, `crm.schemas.{companies,contacts}.read`, plus
   `crm.lists.read` to import lists; no sensitive variants (sensitive properties are never offered).
 - `crm_import.cursor` is `run_cursor` (`CURSOR` is reserved in MySQL). The token-check counter lives in two
-  `crm_counter` rows; `connect_rate_limit.interval` is in seconds.
+  `crm_counter` rows; `connect_rate_limit.interval` is in seconds. 0.10.1: the start and mapping pages' HubSpot reads
+  are counted in two more (`browse_rate_limit`, audit ZAM-9).
 - Not in H1: the account-details call for currency (H2), per-input association paging (a contact's first page of
   companies is read), English country names (only ISO alpha-2 codes are mapped), the 80-requests-per-10-seconds
   token bucket (bursts are handled by the 429 backoff).

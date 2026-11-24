@@ -39,6 +39,9 @@ Every phase updates the baseline spec, the code inventory and the integrator doc
 | US-05 | **As a** CRM user, **I want** to import CSV / vCard files and merge duplicates **so that** existing address books move in without double entries. | Import, duplicate hints, merge | [USAGE.md](USAGE.md#imports) |
 | US-06 | **As a** data controller, **I want** consent per purpose, a contact export, an erasure and a retention purge **so that** I meet GDPR requests. | Consent, export, erasure, purge | [SECURITY.md](SECURITY.md#gdpr) |
 | US-07 | **As an** operator, **I want** concurrent writes and worker mode to be safe **so that** no data is lost, doubled or leaked between tenants. | Write units, 409 codes, worker hygiene | [CONCURRENCY.md](CONCURRENCY.md), [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md) |
+| US-08 | **As a** CRM user, **I want** to import my companies, contacts, owners and lists from HubSpot with a read-only credential **so that** I leave HubSpot without retyping anything and re-runs update instead of duplicating. | HubSpot connection, sealed token, mapping, paged runs, Messenger, key rotation (0.10.0, 0.10.1) | [USAGE.md](USAGE.md#hubspot-import-0100), [CONFIGURATION.md](CONFIGURATION.md#hubspot-import-0100), [SECURITY.md](SECURITY.md) |
+| US-09 | **As a** sales team, **I want** deal funnels and party lifecycle funnels with stages, statistics and next actions **so that** we see where every deal and customer stands. | Pipeline: funnels, stages, deals, next actions through `CrmTaskPort`, pipeline pages and dialogs (0.3.0, 0.9.0) | [USAGE.md](USAGE.md), [CONFIGURATION.md](CONFIGURATION.md) |
+| US-10 | **As an** integrator, **I want** a versioned JSON API and framework-free operations **so that** my front end, MCP tools and other services use the CRM without the UI. | `Api\Operation` layer, idempotent writes, `/crm/v1` HTTP edge (0.3.0) | [API.md](API.md), [USAGE.md](USAGE.md) |
 
 ## Bundle functional scope
 
@@ -47,12 +50,24 @@ pipeline, C quotes, D invoices, E campaigns, F customer portal, G reports), tena
 private entity manager with a UiKit + FormKit UI and bridges to the Nowo bundles. The full design is
 [CONTRACT.md](CONTRACT.md).
 
-**Phase A scope (0.1.0):** companies, contacts, affiliations, owners, tags, custom fields, notes, timeline, host links
-and panels, CSV / vCard import and export, duplicate hints and merging, GDPR, trash, plan-limit counters, SearchKit
-providers, the UI. Baseline: [`specs/001-baseline/spec.md`](../specs/001-baseline/spec.md).
+**Shipped through 0.10.1:**
+
+- **Phase A (0.1.0, 0.2.x):** companies, contacts, affiliations (roles, purposes, the company's primary contact),
+  owners, tags, custom fields, notes, timeline, host links and panels, CSV / vCard import and export, duplicate hints
+  and merging, GDPR, trash, plan-limit counters, SearchKit providers, the UiKit + FormKit UI.
+- **Phase B (0.3.0):** the pipeline (deal and party funnels, stages, deals, statistics, next actions through
+  `CrmTaskPort` with the TaskBoard bridge), the framework-free `Api\Operation` layer and the public JSON API `/crm/v1`.
+- **UI and reader releases (0.4.0 to 0.9.0):** the import modal, note search, list and create-dialog options, area
+  tab icons and the host object picker, rows per page, pipeline dialogs on demand.
+- **HubSpot import H1 (0.10.0, 0.10.1):** a per-tenant read-only credential sealed by the secret box (sodium or
+  DoctrineEncrypt, with key rotation), companies, contacts, associations, owners and lists on the import queue,
+  rate limits, optional Messenger runs.
+
+Baseline: [`specs/001-baseline/spec.md`](../specs/001-baseline/spec.md) (US-01..US-08, the `FR-*` list) and the code
+inventory of every file under `src/`.
 
 **Explicit non-goals (all phases):** telephony (CTI), social media inboxes, AI scoring, multi-step marketing journeys,
-an accounting ledger, payment card processing, native apps. Phase A ships no public JSON API and no attachments. Not
+an accounting ledger, payment card processing, native apps. No attachments yet. Not
 legal advice.
 
 ## Validating the functional spec

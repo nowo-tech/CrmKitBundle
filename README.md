@@ -13,9 +13,10 @@ FormKit UI.**
 interfaces and value objects with no Symfony, Doctrine or HTTP types, the bundle-owned tables are mapped in XML and
 referenced by id, and the bundle never flushes your EntityManager.
 
-> **Status: 0.1.0 released (companies and contacts); 0.2.0 in progress (party roles, the company's primary contact
-> and affiliation purposes).** Funnels, tasks and agenda, quotes, invoices, a customer portal, scoring, segments,
-> informative circulars and reports follow phase by phase from [docs/CONTRACT.md](docs/CONTRACT.md)
+> **Status: 0.10.x.** Companies and contacts with roles, purposes and affiliations (phase A), the pipeline with deal
+> and party funnels and the JSON API (phase B, 0.3.0), and the HubSpot import (0.10.0) are released. Tasks and
+> agenda, quotes, invoices, a customer portal, scoring, segments, informative circulars and reports follow phase by
+> phase from [docs/CONTRACT.md](docs/CONTRACT.md)
 > ([docs/ROADMAP.md](docs/ROADMAP.md)). Usage: [docs/USAGE.md](docs/USAGE.md).
 
 > **Compatible with Symfony 7.4, 8.0 and 8.1** · PHP 8.2+ (Symfony 8.x requires PHP 8.4+)
@@ -159,7 +160,9 @@ make test-with-db       # Database suite on MySQL 8.4, MariaDB 11.4 and PostgreS
 make release-check      # every gate, demo included
 ```
 
-- PHP: 100 % of `src/` (gate in CI). Database suite on SQLite, MySQL 8.4, MariaDB 11.4 and PostgreSQL 16 in CI,
+- PHP: 100 % of `src/` (gate in CI).
+- TS/JS: 95.23 % (lowest of statements / branches / functions / lines; Vitest gate 90 %, `make test-ts`).
+- Python: N/A. Database suite on SQLite, MySQL 8.4, MariaDB 11.4 and PostgreSQL 16 in CI,
   two-connection race tests included ([docs/CONCURRENCY.md](docs/CONCURRENCY.md)).
 
 ## License

@@ -17,13 +17,18 @@ use Nowo\CrmKitBundle\Infrastructure\Crypto\SodiumCrmSecretBox;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImport;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImportHandler;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestServices;
+use Nowo\DoctrineEncryptBundle\Encryptors\DefuseEncryptor;
+use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistry;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
+use Nowo\DoctrineEncryptBundle\Encryptors\HaliteEncryptor;
+use Nowo\DoctrineEncryptBundle\Encryptors\MysqlAesEncryptor;
 use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 
 use function str_repeat;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 /**
  * The HubSpot container (0.10.0): the mapping group and services only while enabled, the secret box choices (sodium
@@ -59,6 +64,23 @@ final class HubSpotKernelTest extends KernelTestCase
             $services->set('test.box', SodiumCrmSecretBox::class)->args([['k9' => str_repeat('z', 32)], 'k9'])->public();
         }))->getContainer();
         self::assertSame('k9', $this->box($host)->currentKeyId());
+    }
+
+    public function testTheDoctrineEncryptProfilesAreCheckedAtBuild(): void
+    {
+        $config = static fn (array $doctrine): array => TestServices::PORTS + ['import' => ['hubspot' => ['enabled' => true]], 'secrets' => ['box' => DoctrineEncryptCrmSecretBox::class, 'doctrine_encrypt' => $doctrine]];
+        $box    = $this->box($this->bootKernel($config(['profile' => 'crm_2026', 'key_id' => 'de2026', 'previous' => ['doctrine_encrypt' => null, 'de2025' => 'defuse']]), $this->registry())->getContainer());
+        self::assertInstanceOf(DoctrineEncryptCrmSecretBox::class, $box);
+        self::assertSame('de2026', $box->currentKeyId());
+        // Audit ZAM-D4: an unauthenticated or unknown profile fails the build, not the first seal.
+        foreach ([['profile' => 'aes'], ['previous' => ['old' => 'aes']], ['profile' => 'synthetic'], ['profile' => 'nope']] as $doctrine) {
+            try {
+                $this->bootKernel($config($doctrine), $this->registry(true));
+                self::fail('refused at build');
+            } catch (LogicException $e) {
+                self::assertStringContainsString('nowo_crm_kit.secrets.doctrine_encrypt', $e->getMessage());
+            }
+        }
     }
 
     public function testTheDoctrineEncryptBridgeNeedsTheBundle(): void
@@ -108,6 +130,26 @@ final class HubSpotKernelTest extends KernelTestCase
         self::assertInstanceOf(CrmSecretBoxInterface::class, $box);
 
         return $box;
+    }
+
+    /**
+     * DoctrineEncrypt's own registry with a Halite, a Defuse and a MysqlAes profile (stand-ins), and a profile whose
+     * encryptor has no class (a synthetic service; the container is then only built, never used).
+     */
+    private function registry(bool $synthetic = false): Closure
+    {
+        return $this->host(static function (ServicesConfigurator $services) use ($synthetic): void {
+            $services->set('test.enc.halite', HaliteEncryptor::class);
+            $services->set('test.enc.defuse', DefuseEncryptor::class);
+            $services->set('test.enc.aes', MysqlAesEncryptor::class);
+            $profiles = ['default' => service('test.enc.halite'), 'crm_2026' => service('test.enc.halite'), 'defuse' => service('test.enc.defuse'), 'aes' => service('test.enc.aes')];
+            if ($synthetic) {
+                $services->set('test.enc.synthetic')->synthetic();
+                $profiles['synthetic'] = service('test.enc.synthetic');
+            }
+            $services->set('test.enc_registry', EncryptorRegistry::class)->args([$profiles, 'default']);
+            $services->alias(EncryptorRegistryInterface::class, 'test.enc_registry')->public();
+        });
     }
 
     /**

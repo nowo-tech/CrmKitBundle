@@ -32,6 +32,27 @@ interface EncryptorRegistryInterface
     public function getDefault(): EncryptorInterface;
 }
 
+/** The registry DoctrineEncrypt's extension defines (map of profile => encryptor, the default profile's name). */
+final class EncryptorRegistry implements EncryptorRegistryInterface
+{
+    /**
+     * @param array<string, EncryptorInterface> $encryptors
+     */
+    public function __construct(private array $encryptors, private readonly string $defaultName = 'default')
+    {
+    }
+
+    public function get(string $name): EncryptorInterface
+    {
+        return $this->encryptors[$name] ?? throw new \InvalidArgumentException('Unknown encryptor config "' . $name . '".');
+    }
+
+    public function getDefault(): EncryptorInterface
+    {
+        return $this->get($this->defaultName);
+    }
+}
+
 /** Authenticated stand-in: `E:` + data; anything else fails like Halite (DecryptionFailedException). */
 final class HaliteEncryptor implements EncryptorInterface
 {

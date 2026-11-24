@@ -12,7 +12,7 @@ Target this bundle compatibility by default: PHP >=8.2 (<8.6); mandatory Symfony
 
 Prefer:
 - modern PHP with strict typing and explicit return types
-- PSR-12 coding style
+- PER Coding Style (`@PER-CS`, successor of PSR-12)
 - final classes by default
 - readonly where appropriate
 - constructor injection

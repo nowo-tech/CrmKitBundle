@@ -19,6 +19,7 @@ use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
+use Nowo\CrmKitBundle\Domain\Exception\SecretKeyUnavailableException;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\ExternalRef;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection;
@@ -37,6 +38,7 @@ use Nowo\CrmKitBundle\Domain\Value\HubSpotToken;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\TagName;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
+use Psr\Log\LoggerInterface;
 
 use function array_filter;
 use function array_map;
@@ -63,6 +65,10 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
      *
      * @param bool $queued `import.messenger.enabled`: a confirmed import is left unclaimed and due now, for the
      *                     background run
+     * @param int $browseLimit `import.hubspot.browse_rate_limit.limit` (0.10.1, audit ZAM-9): HubSpot reads of the
+     *                         start and mapping pages per tenant in a window
+     * @param int $browseInterval `import.hubspot.browse_rate_limit.interval`: the window in seconds
+     * @param LoggerInterface|null $logger where an unavailable secret key is reported (0.10.1, audit ZAW-I2)
      */
     public function __construct(
         private WriteSupport $support,
@@ -70,6 +76,9 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
         private HubSpotReaderInterface $reader,
         private HubSpotTokenOpener $tokens,
         private bool $queued = false,
+        private int $browseLimit = 60,
+        private int $browseInterval = 600,
+        private ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -79,7 +88,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
     public function lists(): array
     {
         $context              = $this->support->access->context(CrmPermission::Import);
-        [$connection, $token] = $this->open($context);
+        [$connection, $token] = $this->open($context, true);
         if (!in_array(self::LISTS_SCOPE, $connection->getScopes(), true)) {
             return [];
         }
@@ -99,7 +108,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
     public function start(HubSpotImportScope $scope, DuplicatePolicy $policy = DuplicatePolicy::Skip): string
     {
         $context              = $this->support->access->context(CrmPermission::Import);
-        [$connection, $token] = $this->open($context);
+        [$connection, $token] = $this->open($context, true);
         $scopes               = [];
         foreach ($scope->objects as $object) {
             $scopes = [...$scopes, ...$object->scopes()];
@@ -163,7 +172,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
     {
         $context         = $this->support->access->context(CrmPermission::Import);
         $import          = $this->support->read(fn (): Import => $this->import($context->tenant, $importId));
-        [, $token]       = $this->open($context);
+        [, $token]       = $this->open($context, true);
         $scope           = $this->scope($import);
         $mapping         = $this->mapping($import);
         [$fields, $tags] = $this->support->read(fn (): array => [$this->customKeys($context->tenant, $scope), array_map(static fn (Tag $t): TagView => new TagView($t->getId(), $t->getName(), $t->getColour(), $t->getVersion()), $this->support->store->tags($context->tenant))]);
@@ -200,15 +209,26 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
         // as the person who confirms: that person may edit.
         $this->support->access->require($context, CrmPermission::Edit);
         $import = $this->support->read(fn (): Import => $this->import($context->tenant, $importId));
-        $scope  = $this->scope($import);
-        $keys   = $this->support->read(fn (): array => $this->customKeys($context->tenant, $scope));
+        // Audit ZAW-L2: everything that can be checked here is checked before HubSpot is asked, so a stale or invalid
+        // retry costs no HubSpot call; then the confirm counts against the browse limit like the pages before it.
+        if ($import->getVersion() !== $expectedVersion) {
+            throw new ConflictException(ConflictException::IMPORT_RUNNING, $import->getId());
+        }
+        $scope = $this->scope($import);
+        $keys  = $this->support->read(fn (): array => $this->customKeys($context->tenant, $scope));
         foreach ($mapping->properties as $object => $map) {
             $kind = HubSpotObject::from((string) $object);
             if (!$scope->reads($kind) || !$mapping->customKnown($kind, $keys[$kind->value] ?? [])) {
                 throw InvalidInputException::field('mapping', 'import.error.mapping');
             }
         }
-        [, $token] = $this->open($context);
+        $chosen = array_map(static fn (HubSpotObjectId $l): string => $l->value, $scope->lists);
+        foreach ($mapping->lists as $list => $tag) {
+            if (!in_array((string) $list, $chosen, true)) {
+                throw InvalidInputException::field('mapping', 'import.error.mapping');
+            }
+        }
+        [, $token] = $this->open($context, true);
 
         try {
             foreach ($mapping->properties as $object => $map) {
@@ -223,13 +243,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
         } catch (HubSpotException $e) {
             throw HubSpotErrors::input('mapping', $e);
         }
-        $chosen = array_map(static fn (HubSpotObjectId $l): string => $l->value, $scope->lists);
-        $names  = [];
-        foreach ($mapping->lists as $list => $tag) {
-            if (!in_array((string) $list, $chosen, true)) {
-                throw InvalidInputException::field('mapping', 'import.error.mapping');
-            }
-        }
+        $names = [];
         if (in_array(HubSpotMapping::CREATE, $mapping->lists, true)) {
             try {
                 foreach ($this->reader->lists($token, $scope->lists) as $list) {
@@ -309,18 +323,30 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
     }
 
     /**
-     * The tenant's connection and its token, or the input error when there is none, it is invalid or its token does
-     * not open.
+     * The tenant's connection and its token, or the input error when there is none, it is invalid, its token does not
+     * open or its key is not available (0.10.1: nothing is changed, audit ZAM-D2). `$browse`: a read of the start or
+     * mapping page, counted against `import.hubspot.browse_rate_limit` in its own unit before HubSpot is asked (audit
+     * ZAM-9: reloads cannot burn the portal's shared daily quota).
      *
      * @return array{HubSpotConnection, HubSpotToken}
      */
-    private function open(CrmContext $context): array
+    private function open(CrmContext $context, bool $browse = false): array
     {
         $connection = $this->support->read(fn (): ?HubSpotConnection => $this->store->connection($context->tenant));
         if (!$connection instanceof HubSpotConnection) {
             throw InvalidInputException::field('_', 'error.hubspot_not_connected');
         }
-        $token = $connection->isActive() ? $this->tokens->open($context->tenant, $connection, $context->now) : null;
+        if ($browse && !$this->support->write(fn (): bool => $this->store->takeBrowseCall($context->tenant, $context->now, $this->browseLimit, $this->browseInterval))) {
+            throw InvalidInputException::field('_', 'error.hubspot_browse_limited');
+        }
+
+        try {
+            $token = $connection->isActive() ? $this->tokens->open($context->tenant, $connection, $context->now) : null;
+        } catch (SecretKeyUnavailableException $e) {
+            $this->logger?->error('nowo_crm_kit: the HubSpot token\'s secret key is not available', $e->logContext());
+
+            throw InvalidInputException::field('_', 'error.' . HubSpotTokenOpener::KEY_UNAVAILABLE);
+        }
         if (!$token instanceof HubSpotToken) {
             throw InvalidInputException::field('_', 'error.hubspot_token_invalid');
         }

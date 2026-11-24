@@ -40,7 +40,8 @@ final class ConfigurationTreeTest extends TestCase
         self::assertFalse($import['hubspot']['enabled']);
         self::assertSame(5000, $import['max_rows'], 'the import keys stay');
         self::assertFalse($import['messenger']['enabled']);
-        self::assertSame(['box' => null, 'keys' => [], 'current_key' => null], $config['secrets'] ?? null);
+        self::assertSame(['box' => null, 'keys' => [], 'current_key' => null, 'doctrine_encrypt' => ['profile' => null, 'key_id' => 'doctrine_encrypt', 'previous' => []]], $config['secrets'] ?? null);
+        self::assertSame(['profile' => 'crm_2026', 'key_id' => 'de2026', 'previous' => ['doctrine_encrypt' => null, 'de2025' => 'crm_2025']], $this->process(['secrets' => ['doctrine_encrypt' => ['profile' => 'crm_2026', 'key_id' => 'de2026', 'previous' => ['doctrine_encrypt' => null, 'de2025' => 'crm_2025']]]])['secrets']['doctrine_encrypt'] ?? null);
         self::assertSame('my.box', $this->process(['import' => ['hubspot' => ['enabled' => true]], 'secrets' => ['box' => 'my.box']])['secrets']['box'] ?? null);
         self::assertSame(['k1' => 'x'], $this->process(['import' => ['hubspot' => ['enabled' => true]], 'secrets' => ['keys' => ['k1' => 'x'], 'current_key' => 'k1']])['secrets']['keys'] ?? null);
     }
@@ -108,6 +109,11 @@ final class ConfigurationTreeTest extends TestCase
         yield 'hubspot current key not listed' => [['import' => ['hubspot' => ['enabled' => true]], 'secrets' => ['keys' => ['k1' => 'x'], 'current_key' => 'k2']], 'needs a secret box'];
         yield 'secret key id' => [['secrets' => ['keys' => ['Bad Id' => 'x']]], 'secrets.keys'];
         yield 'secret key empty' => [['secrets' => ['keys' => ['k1' => '']]], 'secrets.keys'];
+        yield 'doctrine encrypt key id' => [['secrets' => ['doctrine_encrypt' => ['key_id' => 'Bad Id']]], 'secrets.doctrine_encrypt.key_id'];
+        yield 'doctrine encrypt previous key id' => [['secrets' => ['doctrine_encrypt' => ['previous' => ['Bad Id' => 'old']]]], 'secrets.doctrine_encrypt.previous'];
+        yield 'doctrine encrypt previous profile' => [['secrets' => ['doctrine_encrypt' => ['previous' => ['old' => '']]]], 'secrets.doctrine_encrypt.previous'];
+        yield 'doctrine encrypt sealing key listed as previous' => [['secrets' => ['doctrine_encrypt' => ['key_id' => 'de2026', 'previous' => ['de2026' => 'old']]]], 'cannot also be listed'];
+        yield 'hubspot browse limit' => [['import' => ['hubspot' => ['browse_rate_limit' => ['limit' => 0]]]], 'browse_rate_limit'];
         yield 'hubspot page size' => [['import' => ['hubspot' => ['page_size' => 500]]], 'page_size'];
         yield 'hubspot guard' => [['import' => ['hubspot' => ['outbound_url_guard' => 'maybe']]], 'outbound_url_guard'];
     }

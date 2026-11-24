@@ -8,8 +8,9 @@ use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
 
 /**
  * Worker mode (contract section 16, REQ-RUNTIME-002): clears the bundle's entity manager at the end of every request
- * and console command (and resets it when a failure closed it), so no managed entity and no broken manager survive
- * into the next request of a kept-alive kernel.
+ * and console command, and after every Messenger message a worker handled or failed (0.10.1, with
+ * `import.messenger.enabled`), and resets it when a failure closed it, so no managed entity and no broken manager
+ * survive into the next request or message of a kept-alive process.
  */
 final readonly class EntityManagerHygieneListener
 {
@@ -21,7 +22,8 @@ final readonly class EntityManagerHygieneListener
     }
 
     /**
-     * `kernel.terminate`, `kernel.finish_request` (main request) and `console.terminate`.
+     * `kernel.terminate`, `kernel.finish_request` (main request), `console.terminate` and the Messenger worker's
+     * `WorkerMessageHandledEvent` / `WorkerMessageFailedEvent`.
      */
     public function clear(): void
     {

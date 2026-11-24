@@ -6,8 +6,11 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
 use Closure;
 use DateTimeImmutable;
+use Doctrine\ORM\EntityManagerInterface;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotRunner;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotRunState;
+use Nowo\CrmKitBundle\Application\ImportService;
+use Nowo\CrmKitBundle\Application\Port\ImportRunDispatcherInterface;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Enum\ImportFormat;
@@ -17,6 +20,7 @@ use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Import\ImportFileException;
+use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotSchemaView;
 use Nowo\CrmKitBundle\Domain\Read\ImportRowView;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
@@ -28,12 +32,20 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImport;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImportHandler;
 use Nowo\CrmKitBundle\Tests\Fixtures\HubSpot\FakeHubSpot;
+use Psr\Log\AbstractLogger;
+use RuntimeException;
+use Stringable;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Throwable;
 
+use function array_intersect_key;
 use function json_encode;
 
 use const JSON_THROW_ON_ERROR;
@@ -256,6 +268,35 @@ final class HubSpotEdgeTest extends HubSpotTestCase
         $transport->reset();
         $handler(new RunCrmImport($id, 'acme'));
         self::assertCount(1, $transport->getSent(), 'paused by HubSpot: dispatched again with the wait');
+        // REQ-MSG-001: the handler logs the message type, the import id and the outcome; a bad tenant id is a warning.
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{mixed, array<mixed>}> */
+            public array $records = [];
+
+            public function log($level, string|Stringable $message, array $context = []): void
+            {
+                $this->records[] = [$level, $context];
+            }
+        };
+        $logged = new RunCrmImportHandler($this->service(ImportService::class), $this->service(ImportRunDispatcherInterface::class), 2, $logger);
+        $logged(new RunCrmImport($id, ' bad tenant '));
+        $logged(new RunCrmImport($id, 'acme'));
+        self::assertSame(['warning', ['message' => RunCrmImport::class, 'import' => $id]], $logger->records[0]);
+        self::assertSame('info', $logger->records[1][0]);
+        self::assertSame(['message' => RunCrmImport::class, 'import' => $id], array_intersect_key($logger->records[1][1], ['message' => 1, 'import' => 1]));
+        self::assertArrayHasKey('outcome', $logger->records[1][1]);
+        // REQ-RUNTIME-002 rule 7: after a handled or failed message the worker's entity manager is empty.
+        $manager = $this->kernel->getContainer()->get('nowo_crm_kit.entity_manager');
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+        $events = $this->kernel->getContainer()->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $events);
+        $envelope = new Envelope(new RunCrmImport($id, 'acme'));
+        foreach ([new WorkerMessageHandledEvent($envelope, 'memory'), new WorkerMessageFailedEvent($envelope, 'memory', new RuntimeException('failed'))] as $event) {
+            self::assertNotNull($manager->find(Import::class, $id));
+            self::assertGreaterThan(0, $manager->getUnitOfWork()->size());
+            $events->dispatch($event);
+            self::assertSame(0, $manager->getUnitOfWork()->size());
+        }
         // A CSV import is queued too.
         $csv = $this->imports()->upload(SubjectType::Contact, ImportFormat::Csv, 'a.csv', "email,last_name\na@x.test,A\n");
         $this->imports()->confirm($csv, ['email' => 'email', 'last_name' => 'last_name'], DuplicatePolicy::Skip, 1);

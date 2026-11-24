@@ -7,6 +7,7 @@
 - [Permission matrix](#permission-matrix)
 - [Tenant isolation and exact identifiers](#tenant-isolation-and-exact-identifiers)
 - [Forms, CSRF and output](#forms-csrf-and-output)
+- [Content-Security-Policy](#content-security-policy)
 - [Imports and exports](#imports-and-exports)
 - [HubSpot credential](#hubspot-credential)
 - [HubSpot import (0.10.0)](#hubspot-import-0100)
@@ -109,6 +110,18 @@ record; another person's note needs `edit` on the record and `manage`.
   host timeline URLs must be local paths (`/`, not `//`).
 - The website field accepts only http(s) URLs; e-mail links are `mailto:` of a validated address.
 
+## Content-Security-Policy
+
+For integrators with a strict CSP (REQ-UX-001). The kit's only browser script is `nowo-crm-import.js`, the import
+modal of the lists. It is a self-hosted file served by `assets:install` through the `nowo_crm_kit` asset package and
+loaded with `<script src defer>`, so `script-src 'self'` is enough: no inline script, no inline event handler, no
+`eval` or `new Function`, no third-party origin. It sets no inline style and assigns no HTML strings: step fragments
+are parsed with `DOMParser`, cleaned (only same-origin URL attributes are kept) and moved as nodes, and every other
+string goes through `textContent`. Its `fetch` calls go only to the kit's same-origin import routes (`connect-src
+'self'`). On close it aborts its pending request and removes its listeners. It exposes one global, `NowoCrmImport`
+(the IIFE's exports), and logs one "script loaded" line (USAGE, "Browser console"). The kit's pages use UiKit's
+stylesheet and `nowo-crm-kit.css`, both self-hosted (`style-src 'self'`).
+
 ## Imports and exports
 
 - Uploads are parsed in memory before any transaction: UTF-8 only, at most `import.max_bytes` bytes and
@@ -129,19 +142,23 @@ record; another person's note needs `edit` on the record and `manage`.
   <tenant>|<connection id>` (the additional data): a copied value does not open for another tenant, row or purpose.
   Default `SodiumCrmSecretBox` (XChaCha20-Poly1305, random 24-byte nonce, keys from the environment, key ids for
   rotation); house option `DoctrineEncryptCrmSecretBox` (context inside the authenticated payload; only the Halite and
-  Defuse encryptors, another class only with an explicit opt-in, MysqlAes never; a configuration error of the
-  encryptor is thrown, never taken for a bad value). Only the last four characters are stored in clear. A value that
-  does not open marks the connection invalid, only while the connection still holds that sealed value (a token
-  replaced meanwhile stays active). The sodium keys come from the environment only: they are never container
-  parameters (only the box's own service definition receives them).
+  Defuse encryptors, checked at container build for the profiles the kit wires (0.10.1), another class only with an
+  explicit opt-in, MysqlAes never). Only the last four characters are stored in clear. A value that does not open
+  marks the connection invalid, only while the connection still holds that sealed value (a token replaced meanwhile
+  stays active). A key that is not available (a key id no longer configured, an unknown DoctrineEncrypt profile, a
+  missing, malformed or wrong-length key, which the DoctrineEncrypt box loads in its own step) is never taken for a bad
+  value (0.10.1; a wrong but well-formed key is: change the key id with the key): the import refuses with `hubspot_key_unavailable` and the
+  sealed token is kept. Rotation (`nowo:crm-kit:secrets:rotate`, both boxes since 0.10.1) writes a new seal only after
+  it opened again to the same token, and leaves every token it cannot re-seal unchanged. The sodium keys come from the
+  environment only: they are never container parameters (only the box's own service definition receives them).
 - **In use**: unsealed for one HubSpot call, sent only as `Authorization: Bearer` to `https://api.hubapi.com` by the
   kit's own HttpClient (not the framework's `http_client`, so no profiler or HTTP-client log sees it). It is never put
   in a URL, a property, a log, an exception, an audit entry or a page; the connect field is a password input, never
-  pre-filled or re-rendered. `HubSpotToken` keeps its plaintext out of its own properties (a class-private map entry
-  removed when the object is destroyed), so `var_dump()`, `print_r()`, Symfony's VarDumper (`dump()`, the profiler,
-  Twig's `dump`), `(array)` casts and traces show no value; it refuses cloning and serialisation; its parameters are
-  `#[\SensitiveParameter]`. Still, never paste a production credential into a page served with the Symfony profiler
-  or the debug toolbar on (the request's form data is collected there).
+  pre-filled or re-rendered. `HubSpotToken` keeps its plaintext out of its own properties (in the local frame of a
+  suspended generator that only the object holds, collected with it), so `var_dump()`, `print_r()`, Symfony's
+  VarDumper (`dump()`, the profiler, Twig's `dump`), `(array)` casts and traces show no value; it refuses cloning and
+  serialisation; its parameters are `#[\SensitiveParameter]`. Still, never paste a production credential into a page
+  served with the Symfony profiler or the debug toolbar on (the request's form data is collected there).
 - **Scopes**: read scopes only. Write scopes are refused when HubSpot lists the credential's scopes (private app
   tokens); the check fails closed: an entry the kit cannot read, or one past the 200th, counts as a write scope, and
   only HubSpot's "unknown token" answer (400 / 404) leads to probing, any other failure refuses the credential. For a
@@ -149,13 +166,16 @@ record; another person's note needs `edit` on the record and `manage`.
   write scopes cannot be seen: the connection card says "write scopes not verified" and the manager must tick read
   scopes only (known limit, documented in USAGE). Sensitive and highly sensitive properties are never offered or requested.
 - **Checks**: counted per tenant (`connect_rate_limit`), valid or not; answers are translation keys, never HubSpot's
-  text.
+  text. The HubSpot reads of the start and mapping pages are counted per tenant too (`browse_rate_limit`, 0.10.1), so
+  reloads cannot burn the portal's shared daily API quota.
 
 ## HubSpot import (0.10.0)
 
 - **SSRF**: one constant host; paths built from enums and validated ids, URL-encoded; `paging.next.link` ignored (only
   the `after` token, validated); no redirects (`max_redirects: 0`, a 3xx is an error); peer and host verification on;
-  idle and total timeouts; bodies capped at `max_response_bytes` while streaming; JSON depth 32; unknown fields dropped.
+  idle and total timeouts on every call (`http.timeout`, `http.max_duration`; a stalled HubSpot cannot pin a PHP
+  worker, and the PHP, proxy and `max_wait_time` limits are layered above them, CONFIGURATION "Timeouts"); bodies
+  capped at `max_response_bytes` while streaming; JSON depth 32; unknown fields dropped.
   Optional OutboundUrlGuard bridge: pins the resolved public address (private addresses never allowed, DNS always
   resolved).
 - **Data**: only the mapped properties are requested; import rows keep the object kind and the HubSpot id only;

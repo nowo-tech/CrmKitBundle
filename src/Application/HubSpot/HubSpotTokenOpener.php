@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 use Nowo\CrmKitBundle\Application\HubSpot\Port\HubSpotStoreInterface;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
+use Nowo\CrmKitBundle\Domain\Exception\SecretKeyUnavailableException;
 use Nowo\CrmKitBundle\Domain\Exception\SecretUnsealException;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection;
 use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
@@ -16,14 +17,20 @@ use Nowo\CrmKitBundle\Domain\Value\SecretContext;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 
 /**
- * Opens a connection's sealed token for one call (0.10.0). A token that no longer opens (key lost or rotated away,
- * tampering) marks the connection invalid in its own unit and answers null, so a manager is asked for a new token and
- * no run loops on it (design T14). The plaintext is never kept: the caller uses the returned token for one HTTP call.
+ * Opens a connection's sealed token for one call (0.10.0). A token that no longer opens (wrong key, tampering) marks
+ * the connection invalid in its own unit and answers null, so a manager is asked for a new token and no run loops on
+ * it (design T14). A key that is not available (0.10.1, audit ZAM-D2: dropped before the rotation re-sealed the token,
+ * or misconfigured) is {@see SecretKeyUnavailableException}: the connection and its sealed token are kept and the
+ * caller refuses the import with `hubspot_key_unavailable`. The plaintext is never kept: the caller uses the returned
+ * token for one HTTP call.
  *
  * @internal
  */
 final readonly class HubSpotTokenOpener
 {
+    /** Why an import refuses or pauses when the token's key is not available (0.10.1, `error.` + it is the message). */
+    public const KEY_UNAVAILABLE = 'hubspot_key_unavailable';
+
     /**
      * Wires the collaborators.
      */
@@ -33,6 +40,8 @@ final readonly class HubSpotTokenOpener
 
     /**
      * The connection's token, or null when it does not open (the connection is then invalid).
+     *
+     * @throws SecretKeyUnavailableException the key the token was sealed with is not available (nothing is changed)
      */
     public function open(TenantRef $tenant, HubSpotConnection $connection, DateTimeImmutable $now): ?HubSpotToken
     {

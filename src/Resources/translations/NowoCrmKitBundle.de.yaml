@@ -22,6 +22,7 @@ form:
     save: Speichern
     cancel: Abbrechen
 list:
+    empty_hint_hubspot: 'Legen Sie einen an oder importieren Sie aus einer Datei oder HubSpot.'
     next: 'Nächste Seite'
     title:
         company: Unternehmen
@@ -31,11 +32,25 @@ list:
         contact: Noch keine Kontakte.
     empty_hint: Legen Sie einen an oder importieren Sie eine CSV- oder vCard-Datei.
     no_match: 'Nichts entspricht der Suche.'
+    no_match_filters: 'Nichts entspricht diesen Filtern.'
     export: CSV exportieren
     import: 'Importieren'
     col:
+        created: 'Erstellt'
         updated: Aktualisiert
     filter:
+        owner_me: 'Meine'
+        owner_none: 'Ohne Verantwortliche'
+        primary_contacts_only: 'Nur Hauptkontakte'
+        company: 'Firma'
+        any_company: 'Alle Firmen'
+        created_from: 'Erstellt ab'
+        created_to: 'Erstellt bis'
+        updated_from: 'Geändert ab'
+        updated_to: 'Geändert bis'
+        results_per_page: 'Ergebnisse pro Seite'
+        per_page_option: '%count% pro Seite'
+        clear: 'Filter zurücksetzen'
         apply: 'Anwenden'
         role: 'Rolle'
         purpose: 'Ansprechpartner für'
@@ -483,6 +498,7 @@ flash:
         crm_settings_stale: Jemand hat die Einstellungen gleichzeitig geändert. Prüfen Sie sie und speichern Sie erneut.
         crm_write_conflict: 'Eine andere Änderung derselben Daten kam im selben Moment an. Versuchen Sie es erneut.'
 error:
+    owner_filter: 'Wähle Meine oder Ohne Verantwortliche, nicht beides.'
     hubspot_needs_person: 'Eine Person muss diesen Import fortsetzen: er hat Datensätze anderer Personen erreicht.'
     hubspot_token_invalid: 'HubSpot hat diesen Service Key (oder Private-App-Token) abgelehnt, oder er gehört zu einem anderen Konto. Fügen Sie einen gültigen ein.'
     hubspot_scope_missing: 'Dem Schlüssel fehlt ein Lese-Scope, den der Import braucht. Fügen Sie die dokumentierten Scopes hinzu und versuchen Sie es erneut.'
@@ -555,6 +571,14 @@ deals:
     title: 'Deals'
     empty: 'Noch keine Deals.'
 deal:
+    filter:
+        any_funnel: 'Alle Trichter'
+        any_stage: 'Alle Phasen'
+        any_contact: 'Alle Kontakte'
+        expected_close_from: 'Erwarteter Abschluss ab'
+        expected_close_to: 'Erwarteter Abschluss bis'
+        q_placeholder: 'Deals nach Titel suchen'
+        q_aria: 'Deals suchen'
     new: 'Neuer Deal'
     edit: 'Bearbeiten'
     edit_title: '%name% bearbeiten'

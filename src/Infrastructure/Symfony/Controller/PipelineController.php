@@ -33,6 +33,7 @@ use Nowo\CrmKitBundle\Domain\Read\Pipeline\StageView;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Value\DateImmutable;
 use Nowo\CrmKitBundle\Domain\Value\Money;
+use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ActionType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\DealFilterType;
@@ -109,22 +110,46 @@ final readonly class PipelineController
             foreach ($funnels as $f) {
                 $choices[$f->name] = $f->id;
             }
-            $filters = $this->ui->form(DealFilterType::class, null, ['funnels' => $choices, 'sorts' => ['deal.sort.updated' => 'updated', 'deal.sort.expected_close' => 'expected_close'] + ($amount ? ['deal.sort.amount' => 'amount'] : [])], '');
+            $stages = [];
+            foreach ($funnels as $f) {
+                foreach ($f->stages as $st) {
+                    if (!$st->archived) {
+                        $stages[$f->name . ' · ' . $st->name] = $st->id;
+                    }
+                }
+            }
+            $owners = $this->ui->ownerChoices($this->forms->owners());
+            // 0.10.2 (Beacon filter standard): owner, stage, company, contact, expected close range, rows per page;
+            // the order comes from the sortable column headers.
+            $filters = $this->ui->form(DealFilterType::class, null, ['funnels' => $choices, 'owners' => $owners, 'stages' => $stages, 'companies' => $this->forms->records(SubjectType::Company), 'contacts' => $this->forms->records(SubjectType::Contact), 'per_page' => $this->ui->options->listPerPage], '');
             $filters->handleRequest($request);
-            $status = DealStatus::tryFrom((string) $request->query->get('status', ''));
-            $sort   = (string) $request->query->get('sort', DealQuery::SORT_UPDATED);
-            $sort   = $sort === DealQuery::SORT_EXPECTED_CLOSE || ($sort === DealQuery::SORT_AMOUNT && $amount) ? $sort : DealQuery::SORT_UPDATED;
-            $funnel = (string) $request->query->get('funnel', '');
+            $q      = $request->query->all();
+            $status = DealStatus::tryFrom(is_string($q['status'] ?? null) ? $q['status'] : '');
+            $sort   = is_string($q['sort'] ?? null) && isset(DealQuery::SORTS[$q['sort']]) ? $q['sort'] : DealQuery::SORT_UPDATED;
+            $sort   = $sort === DealQuery::SORT_AMOUNT && !$amount ? DealQuery::SORT_UPDATED : $sort;
+            $funnel = is_string($q['funnel'] ?? null) ? $q['funnel'] : '';
+            $owner  = is_string($q['owner'] ?? null) ? $q['owner'] : '';
+            $pick   = static fn (string $key, array $allowed): ?string => is_string($q[$key] ?? null) && in_array($q[$key], $allowed, true) ? $q[$key] : null;
             $query  = new DealQuery(
                 funnelId: $funnel === '' ? null : $funnel,
+                stageIds: ($stage = $pick('stage', $stages)) === null ? null : [$stage],
                 status: $status,
-                text: trim((string) $request->query->get('q', '')),
-                staleOnly: $request->query->get('stale') === '1',
+                ownerId: $owner === '' || in_array($owner, [ListFilters::OWNER_ME, ListFilters::OWNER_NONE], true) ? null : $owner,
+                companyId: is_string($q['company'] ?? null) && RecordId::isValid($q['company']) ? $q['company'] : null,
+                contactId: is_string($q['contact'] ?? null) && RecordId::isValid($q['contact']) ? $q['contact'] : null,
+                text: trim(is_string($q['q'] ?? null) ? $q['q'] : ''),
+                staleOnly: ($q['stale'] ?? null) === '1',
                 sort: $sort,
+                direction: is_string($q['direction'] ?? null) ? $q['direction'] : null,
+                ownerMe: $owner === ListFilters::OWNER_ME,
+                ownerNone: $owner === ListFilters::OWNER_NONE,
+                expectedCloseFrom: ListFilters::day($q['expected_close_from'] ?? null),
+                expectedCloseTo: ListFilters::day($q['expected_close_to'] ?? null),
             );
-            $keyed = ['funnel' => $query->funnelId, 'status' => $query->status?->value, 'q' => $query->text, 'stale' => $query->staleOnly, 'sort' => $query->sort];
-            $page  = $this->reader->deals($query, $this->after((string) $request->query->get('after', ''), $keyed), $this->ui->pageSize);
-            $names = [];
+            $perPage = $this->ui->options->perPage($q['per_page'] ?? null, $this->ui->pageSize);
+            $keyed   = ['funnel' => $query->funnelId, 'status' => $query->status?->value, 'q' => $query->text, 'stale' => $query->staleOnly, 'sort' => $query->sort, 'direction' => $query->direction, 'owner' => $owner, 'stage' => $query->stageIds, 'company' => $query->companyId, 'contact' => $query->contactId, 'close_from' => $query->expectedCloseFrom?->format('Y-m-d'), 'close_to' => $query->expectedCloseTo?->format('Y-m-d'), 'per_page' => $perPage];
+            $page    = $this->reader->deals($query, $this->after(is_string($q['after'] ?? null) ? $q['after'] : '', $keyed), $perPage);
+            $names   = [];
             foreach ($funnels as $f) {
                 foreach ($f->stages as $s) {
                     $names[$s->id] = $s->name;
@@ -141,31 +166,40 @@ final readonly class PipelineController
                     'owner'   => $deal->ownerName ?? $deal->ownerId ?? '',
                     'amount'  => $deal->amount === null ? '' : $deal->amount->amount . ' ' . $deal->amount->currency,
                     'close'   => $deal->expectedClose === null ? '' : $deal->expectedClose->value,
+                    'updated' => $deal->updatedAt->format('Y-m-d'),
                     'stale'   => $deal->stale ? $this->ui->trans('deal.stale') : '',
                 ];
             }
-            $columns = [new Column('title', UiSupport::label('deal.form.title'), required: true), new Column('stage', UiSupport::label('deal.form.stage')), new Column('company', UiSupport::label('deal.form.company'), priority: 2), new Column('contact', UiSupport::label('deal.form.contact'), priority: 3), new Column('owner', UiSupport::label('deal.form.owner'), priority: 3)];
+            // 0.10.2: title, amount, expected close and updated sort from their headers (server side, both directions).
+            $columns = [new Column('title', UiSupport::label('deal.form.title'), true, required: true, sortKey: DealQuery::SORT_TITLE), new Column('stage', UiSupport::label('deal.form.stage')), new Column('company', UiSupport::label('deal.form.company'), priority: 2), new Column('contact', UiSupport::label('deal.form.contact'), priority: 3), new Column('owner', UiSupport::label('deal.form.owner'), priority: 3)];
             if ($amount) {
-                $columns[] = new Column('amount', UiSupport::label('deal.form.amount'), align: 'end', priority: 2);
+                $columns[] = new Column('amount', UiSupport::label('deal.form.amount'), true, align: 'end', priority: 2, sortKey: DealQuery::SORT_AMOUNT, sortFirst: 'desc');
             }
-            $columns[] = new Column('close', UiSupport::label('deal.form.expected_close'), priority: 3);
+            $columns[] = new Column('close', UiSupport::label('deal.form.expected_close'), true, priority: 3, sortKey: DealQuery::SORT_EXPECTED_CLOSE);
+            $columns[] = new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: DealQuery::SORT_UPDATED, sortFirst: 'desc');
             $columns[] = new Column('stale', UiSupport::label('deal.stale'), priority: 3);
-            $actions   = $this->ui->can(CrmPermission::Create) && $funnels !== [] ? [Action::create($this->ui->url('nowo_crm_kit_deal_new'), UiSupport::label('deal.new'))] : [];
-            $next      = $page->next === null ? null : $this->ui->url('nowo_crm_kit_deals', ['after' => $this->cursor($page->next, $keyed)] + $request->query->all());
+            $create    = $this->ui->can(CrmPermission::Create) && $funnels !== [] ? Action::create($this->ui->url('nowo_crm_kit_deal_new'), UiSupport::label('deal.new')) : null;
+            // 0.10.2 (Beacon UI-PATTERNS §11): one create button — the empty state's on an empty, unfiltered list.
+            $actions = $create instanceof Action && ($rows !== [] || ListFilters::any($q) || $request->query->has('after')) ? [$create] : [];
+            $next    = $page->next === null ? null : $this->ui->url('nowo_crm_kit_deals', ['after' => $this->cursor($page->next, $keyed)] + $request->query->all());
 
             return $this->ui->render('@NowoCrmKit/pipeline/deals.html.twig', [
                 'page' => new ListPage(
                     new PageHeader(UiSupport::label('deals.title'), null, $actions, tabs: $this->ui->tabs('deals')),
                     $columns,
                     $rows,
-                    $filters->createView(),
+                    $this->ui->filterView($filters, $perPage),
                     fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::view($this->ui->url('nowo_crm_kit_deal_show', ['id' => $row['id']]), UiSupport::label('record.open'))] : [],
-                    empty: new EmptyState(UiSupport::label('deals.empty')),
+                    empty: ListFilters::any($q) ? new EmptyState(null, UiSupport::label('list.no_match_filters'), new Action('custom', UiSupport::label('list.filter.clear'), $this->ui->url('nowo_crm_kit_deals'), icon: 'filter_off', variant: 'secondary', attributes: ['data-testid' => 'crm-list-clear-filters'])) : new EmptyState(null, UiSupport::label('deals.empty'), $create),
                     filtersClearHref: $this->ui->url('nowo_crm_kit_deals'),
+                    sort: $query->sort === DealQuery::SORT_EXPECTED_CLOSE ? 'close' : $query->sort,
+                    direction: $query->direction,
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-deals'],
+                    filterFields: $this->ui->filterFields('deals', UiSupport::label('deal.filter.q_placeholder'), ['aria-label' => $this->ui->trans('deal.filter.q_aria')], keyset: true),
                     responsive: 'cards',
+                    filtersFold: $this->ui->options->filtersFold ? true : null,
                 ),
                 'funnels' => $funnels,
                 'next'    => $next,

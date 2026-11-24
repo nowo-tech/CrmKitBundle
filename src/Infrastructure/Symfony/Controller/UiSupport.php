@@ -271,7 +271,53 @@ final readonly class UiSupport
         $query = $request->query->all();
         unset($query['page']);
 
-        return Pagination::fromTotal($total, $page, $perPage, $this->options->allowedPerPage($this->pageSize), $this->pageSize, $route, $query);
+        // 0.10.2: with ui.per_page_position: pagination the compact pager carries the "Rows per page" select.
+        return Pagination::fromTotal($total, $page, $perPage, $this->options->allowedPerPage($this->pageSize), $this->pageSize, $route, $query, variant: $this->options->perPageInPagination() ? Pagination::VARIANT_COMPACT : Pagination::VARIANT_FULL);
+    }
+
+    /**
+     * The `per_page` choices of a list's filter form (0.10.2): the configured ones when the select sits in the filter
+     * actions, none when it sits in the pagination bar (or there are none).
+     *
+     * @return list<int>
+     */
+    public function filterPerPage(): array
+    {
+        return $this->options->perPageInFilters() ? $this->options->listPerPage : [];
+    }
+
+    /**
+     * The UiKit options of a list's filter fields (0.10.2, Beacon filter standard): the search one grid column wide
+     * (`ui.search_width`), the list's `ui.filters_more` fields under "More filters", the "Rows per page" select compact
+     * before Filter / Clear, and any field options of the page.
+     *
+     * @param string|null $list `companies` | `contacts` | `deals` (null: no fold, e.g. the admin lists)
+     * @param array<string, bool|float|int|string|null> $searchAttributes widget attributes of the search (aria-label…)
+     * @param bool $keyset a keyset list (Deals: no numbered pager), whose "Rows per page" stays in the filters whatever
+     *                     `ui.per_page_position` says
+     *
+     * @return list<FilterField>
+     */
+    public function filterFields(?string $list, Label|string|null $searchPlaceholder, array $searchAttributes = [], string $search = 'q', bool $keyset = false): array
+    {
+        $fields = [new FilterField($search, $searchPlaceholder, $this->options->searchWidth, attributes: $searchAttributes)];
+        foreach ($list === null ? [] : $this->options->filtersMoreOf($list) as $name) {
+            $fields[] = new FilterField($name, more: true);
+        }
+
+        return [...$fields, ...$this->perPageField($keyset)];
+    }
+
+    /**
+     * Owner filter choices (0.10.2): "Mine" and "No owner" first, then the people (name ⇒ id).
+     *
+     * @param array<string, string> $owners
+     *
+     * @return array<string, string>
+     */
+    public function ownerChoices(array $owners): array
+    {
+        return [$this->trans('list.filter.owner_me') => ListFilters::OWNER_ME, $this->trans('list.filter.owner_none') => ListFilters::OWNER_NONE] + $owners;
     }
 
     /**
@@ -292,13 +338,17 @@ final readonly class UiSupport
     }
 
     /**
-     * The UiKit options of the "Rows per page" filter (0.8.0): a narrow field, none without `ui.list_per_page`.
+     * The UiKit options of the "Rows per page" filter (0.8.0): none without `ui.list_per_page` or with
+     * `ui.per_page_position: pagination`; 0.10.2: compact, right before Filter / Clear.
+     *
+     * @param bool $keyset a keyset list (Deals), whose select stays in the filters with `per_page_position: pagination`
      *
      * @return list<FilterField>
      */
-    public function perPageField(): array
+    public function perPageField(bool $keyset = false): array
     {
-        return $this->options->perPageSelect() ? [new FilterField('per_page', null, 'sm', rowAttributes: ['data-testid' => 'crm-per-page'])] : [];
+        // 0.10.2: compact, the first item of the filter actions (UiKit FilterField pager), with the host's row class.
+        return ($keyset ? $this->options->perPageSelect() : $this->options->perPageInFilters()) ? [new FilterField('per_page', rowClass: $this->options->perPageRowClass, rowAttributes: ['data-testid' => 'crm-per-page'], pager: true)] : [];
     }
 
     /**

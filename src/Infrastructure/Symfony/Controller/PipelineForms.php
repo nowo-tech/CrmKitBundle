@@ -8,11 +8,9 @@ use Nowo\CrmKitBundle\Domain\Enum\StageKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\FunnelView;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
-use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 
 use function bin2hex;
 use function random_bytes;
-use function substr;
 
 /**
  * Choices of the funnel pages (0.3.0): the visible companies and contacts (at most 100 each, by name), the owners, the
@@ -36,12 +34,7 @@ final readonly class PipelineForms
      */
     public function records(SubjectType $type): array
     {
-        $choices = [];
-        foreach ($this->reader->list(new ListQuery($type, perPage: 100))->rows as $view) {
-            $choices[$view->label . ' · ' . substr($view->id, -6)] = $view->id;
-        }
-
-        return $choices;
+        return $this->records->records($type);
     }
 
     /**

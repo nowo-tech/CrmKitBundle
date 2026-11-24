@@ -16,6 +16,7 @@ use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Read\TagView;
 use Nowo\CrmKitBundle\Domain\Service\CrmCatalogueInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
+use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Service\RecordInput;
 use Nowo\CrmKitBundle\Domain\Value\ActorProfile;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\RecordType;
@@ -29,6 +30,7 @@ use function is_array;
 use function is_bool;
 use function is_scalar;
 use function is_string;
+use function substr;
 
 /**
  * Builds the record form from a view and turns its data into a {@see RecordInput}. Stateless.
@@ -197,6 +199,22 @@ final readonly class RecordForms
     public function fields(SubjectType $type): array
     {
         return $this->reader->fields($type);
+    }
+
+    /**
+     * Label ⇒ id of the active records of a type the actor may see (at most 100; 0.10.2: also the company filter of
+     * the contacts list).
+     *
+     * @return array<string, string>
+     */
+    public function records(SubjectType $type): array
+    {
+        $choices = [];
+        foreach ($this->reader->list(new ListQuery($type, perPage: 100))->rows as $view) {
+            $choices[$view->label . ' · ' . substr($view->id, -6)] = $view->id;
+        }
+
+        return $choices;
     }
 
     /**

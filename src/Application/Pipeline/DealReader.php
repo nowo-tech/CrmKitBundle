@@ -105,6 +105,8 @@ final readonly class DealReader
             $this->pipeline->support->access->require($context, CrmPermission::AmountsView);
         }
         $limit = max(1, min(self::MAX_PAGE, $limit));
+        // 0.10.2: "Mine" is the acting person's deals.
+        $query = $query->forActor($context->actor->value);
 
         return $this->pipeline->support->read(function () use ($context, $query, $after, $limit): DealPage { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $owners  = $this->pipeline->support->access->visibleOwners($context);
@@ -169,6 +171,7 @@ final readonly class DealReader
         return ['v' => match ($sort) {
             DealQuery::SORT_AMOUNT         => $deal->getAmount()?->amount,
             DealQuery::SORT_EXPECTED_CLOSE => $deal->getExpectedClose()?->value,
+            DealQuery::SORT_TITLE          => $deal->getTitle(),
             default                        => $deal->getUpdatedAt()->format('Y-m-d H:i:s.u'),
         }, 'id' => $deal->getId()];
     }

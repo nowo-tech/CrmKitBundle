@@ -54,3 +54,11 @@
     align-items: center;
     gap: 0.25rem;
 }
+
+/* 0.10.2: the empty state of a list offers create and Import side by side (partials/_empty.html.twig). */
+[data-testid^='crm-list-'] .nowo-ui-empty__action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}

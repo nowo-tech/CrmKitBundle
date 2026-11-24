@@ -1,10 +1,12 @@
 # REQ-DEMO-014: UiKit's default theme, unchanged (no CSS framework, no CDN, no token override). The demo platform shell
 # (templates/base.html.twig) is the admin and guest layout: the bundle's pages extend it, the shell carries the
-# navigation.
+# navigation. 0.10.2: the kit's built-in SVG icons (no CDN), so the filter bars show their icon-only buttons; row
+# actions keep their text labels.
 nowo_ui_kit:
     css_framework: custom
     base_stylesheet: true
-    icon_set: none
+    icon_set: svg_inline
+    row_actions_display: text
     layouts:
         admin: base.html.twig
         guest: base.html.twig

@@ -474,7 +474,7 @@ final readonly class AdminController
      */
     private function filters(Request $request): FormInterface
     {
-        $form = $this->ui->form(AdminFilterType::class, null, ['per_page' => $this->ui->options->listPerPage], '');
+        $form = $this->ui->form(AdminFilterType::class, null, ['per_page' => $this->ui->filterPerPage()], '');
         $form->handleRequest($request);
 
         return $form;
@@ -487,7 +487,7 @@ final readonly class AdminController
      */
     private function filterFields(): array
     {
-        return [new FilterField('q', UiSupport::label('list.filter.name_placeholder'), 'lg'), ...$this->ui->perPageField()];
+        return $this->ui->filterFields(null, UiSupport::label('list.filter.name_placeholder'));
     }
 
     /**

@@ -22,6 +22,7 @@ form:
     save: Guardar
     cancel: Cancelar
 list:
+    empty_hint_hubspot: 'Crea una o importa desde un archivo o HubSpot.'
     next: 'Página siguiente'
     title:
         company: Empresas
@@ -31,11 +32,25 @@ list:
         contact: Aún no hay contactos.
     empty_hint: Crea una o importa un archivo CSV o vCard.
     no_match: 'Nada coincide con la búsqueda.'
+    no_match_filters: 'Nada coincide con estos filtros.'
     export: Exportar CSV
     import: 'Importar'
     col:
+        created: 'Creado'
         updated: Actualizado
     filter:
+        owner_me: 'Míos'
+        owner_none: 'Sin responsable'
+        primary_contacts_only: 'Solo contactos principales'
+        company: 'Empresa'
+        any_company: 'Cualquier empresa'
+        created_from: 'Creado desde'
+        created_to: 'Creado hasta'
+        updated_from: 'Modificado desde'
+        updated_to: 'Modificado hasta'
+        results_per_page: 'Resultados por página'
+        per_page_option: '%count% por página'
+        clear: 'Limpiar filtros'
         apply: 'Aplicar'
         role: 'Rol'
         purpose: 'Contacto para'
@@ -483,6 +498,7 @@ flash:
         crm_settings_stale: Alguien ha modificado los ajustes al mismo tiempo. Revísalos y vuelve a guardar.
         crm_write_conflict: 'Otro cambio de los mismos datos llegó al mismo tiempo. Inténtalo de nuevo.'
 error:
+    owner_filter: 'Elige Míos o Sin responsable, no ambos.'
     hubspot_needs_person: 'Una persona debe continuar esta importación: llegó a registros de otra persona.'
     hubspot_token_invalid: 'HubSpot rechazó esta clave de servicio (o token de app privada), o es de otra cuenta. Pega una válida.'
     hubspot_scope_missing: 'A la clave le falta un permiso de lectura que la importación necesita. Añade los permisos de la documentación y vuelve a intentarlo.'
@@ -555,6 +571,14 @@ deals:
     title: 'Oportunidades'
     empty: 'Todavía no hay oportunidades.'
 deal:
+    filter:
+        any_funnel: 'Cualquier embudo'
+        any_stage: 'Cualquier etapa'
+        any_contact: 'Cualquier contacto'
+        expected_close_from: 'Cierre previsto desde'
+        expected_close_to: 'Cierre previsto hasta'
+        q_placeholder: 'Buscar oportunidades por título'
+        q_aria: 'Buscar oportunidades'
     new: 'Nueva oportunidad'
     edit: 'Editar'
     edit_title: 'Editar %name%'

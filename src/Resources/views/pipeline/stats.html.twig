@@ -1,5 +1,5 @@
 {#
-  The statistics of a deal funnel (0.3.0): filters, a funnel chart (bars by count), the table per stage and currency,
+  The statistics of a deal funnel (0.3.0): filters (0.10.2: the standard filter bar), a funnel chart (bars by count), the table per stage and currency,
   the win rate and the deals closed in the period. Variables: page (ShowPage), funnel, stats (FunnelStats), max (largest
   count), filters (FormView).
 #}
@@ -8,7 +8,15 @@
 {% block nowo_ui_show_after %}
     {%- set _d = 'NowoCrmKitBundle' -%}
     {%- set _b = page.bundle -%}
-    {{ include('@NowoCrmKit/_form.html.twig', {form: filters, title: null, submit: 'list.filter.apply', action: path('nowo_crm_kit_funnel_stats', {id: funnel.id}), testid: 'crm-stats-filters', variant: 'btn_secondary'}) }}
+    {#- 0.10.2 (Beacon filter standard): the standard filter bar — the fields in one row, icon-only Filter / Clear filters
+        (UiKit _filter_actions) as tall as the fields. -#}
+    {%- set _stats_url = path('nowo_crm_kit_funnel_stats', {id: funnel.id}) -%}
+    {{ form_start(filters, {action: _stats_url, attr: {class: (nowo_ui_class('filters', _b) ~ ' nowo-ui-filter-bar')|trim, role: 'search', 'data-testid': 'crm-stats-filters'}}) }}
+        {% for _child in filters %}
+            {% if not _child.rendered %}{{ form_row(_child, {row_attr: {class: 'nowo-ui-filter-bar__field'}}) }}{% endif %}
+        {% endfor %}
+        {{ include('@NowoUiKitBundle/partials/_filter_actions.html.twig', {clear_href: _stats_url, submit_label: 'filters.filter'|trans({}, 'NowoUiKitBundle'), clear_label: 'filters.clear_filters'|trans({}, 'NowoUiKitBundle'), submit_icon: 'filter', clear_icon: 'filter_off', icon_only: true}, false) }}
+    {{ form_end(filters) }}
     <section class="{{ nowo_ui_class('card', _b) }}" data-testid="crm-stats-chart">
         <div class="{{ nowo_ui_class('card_body', _b) }}">
             <h2 class="{{ nowo_ui_class('card_title', _b) }}">{{ (stats.past ? 'stats.at' : 'stats.now')|trans({'%at%': stats.at|date('Y-m-d H:i')}, _d) }}</h2>

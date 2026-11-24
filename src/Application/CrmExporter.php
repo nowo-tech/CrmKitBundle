@@ -43,6 +43,7 @@ final readonly class CrmExporter implements CrmExporterInterface
     public function csv(ListQuery $query): iterable
     {
         $context = $this->support->access->context(CrmPermission::Export);
+        $query   = $query->forActor($context->actor->value);
         $fields  = $this->support->read(fn (): array => $this->support->store->fields($context->tenant, $query->type, false));
         $owners  = $this->support->access->visibleOwners($context);
         $keys    = array_map(static fn (FieldDefinition $f): string => $f->getFieldKey(), $fields);

@@ -1335,6 +1335,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     icon_set?: "bootstrap-icons"|"tabler-icons"|"ux_icon"|"svg_inline"|"none"|Param, // Icon rendering: bootstrap-icons|tabler-icons|ux_icon|svg_inline|none. // Default: "bootstrap-icons"
  *     row_actions_display?: "icon"|"text"|"icon_text"|Param, // Table/list row actions: icon (glyph only) | text (label only) | icon_text (both). // Default: "icon"
  *     row_actions_confirm?: "inline"|"native"|"dialog"|Param, // confirm_message of 1.x row_actions POST hashes (2.22, REQ-UI-003): inline = onsubmit="return confirm(…)" (default, unchanged markup); native | dialog = no inline handler, the confirm-submit Stimulus peer asks (window.confirm or the kit <dialog>). native / dialog need the confirm-submit peer registered. // Default: "inline"
+ *     table_confirm?: "per_row"|"shared"|Param, // Row actions with a Confirm in the `table` partial (2.68): per_row = one confirm <dialog> (title, message, POST form + CSRF) per row (default, deprecated: the default becomes shared in 3.0); shared = ONE dialog per table filled when it opens, each row keeps only its toggle and a hidden POST form. The `table` partial option confirm_shared wins. // Default: "per_row"
  *     action_icons?: array<string, scalar|Param|null>,
  *     action_variants?: array<string, scalar|Param|null>,
  *     panel_path_rewrites?: array<string, scalar|Param|null>,
@@ -1427,9 +1428,22 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     auth_panel?: array{ // 2.44: the auth scaffold (page/auth.html.twig) panel (Twig global nowo_ui_kit_auth_panel).
  *         brand?: "auto"|"none"|Param, // auto (default, the 2.43 markup): the panel brand region prints the appearance logo lockup, else AuthPage::brand as text; none: the panel prints no brand region (a host guest layout that prints its own brand). A render variable nowo_ui_auth_brand (auto | none) wins over it. // Default: "auto"
  *     },
+ *     dialogs?: array{ // 2.70: the runtime that drives the on-demand dialogs (the remote_form_dialog shell, confirm_dialog with dialog_src, the shared confirm dialog of confirm_shared / table_confirm: shared).
+ *         runtime?: "iife"|"stimulus"|Param, // iife (default, unchanged markup): js/nowo-ui-dialog.js and js/nowo-ui-confirm.js drive them. stimulus: the shells also carry the Stimulus peers (remote-form-dialog in delegated mode, confirm-shared), for pages that load only the peers; the openers keep their markup, and with both runtimes loaded the peers win (the IIFE runtimes leave a dialog claimed by a peer alone). The partial option `runtime` (or `stimulus: true` on confirm_dialog) wins. // Default: "iife"
+ *     },
  *     remote_dialog?: array{ // 2.28 remote form dialog (X-Nowo-Dialog requests).
  *         convert_redirects?: bool|Param, // Turn a RedirectResponse answered to a dialog request (X-Nowo-Dialog: 1, main request) into 204 + X-Nowo-Redirect when its Location is a same-origin path, so redirectToRoute() controllers work in the dialog without code changes. // Default: false
  *         step_routes?: list<scalar|Param|null>,
+ *         direct_get?: array{ // 2.73: remote dialog content opened directly (address bar, bookmark, a link from another site). A top-level GET of a route listed here (Sec-Fetch-Mode: navigate, no dialog header, not from a page of this origin unless redirect_same_origin) answered 200 is redirected (302) to its owning page with a reopen query (`<query_parameter>[route]` + `[params]`), and the owning page opens the dialog on that route. Opt-in per route, empty by default; a kit prepends its own routes. Denied requests (403/404) are never redirected.
+ *             query_parameter?: scalar|Param|null, // Name of the reopen query parameter on the owning page. // Default: "_dialog"
+ *             routes?: array<string, bool|array{ // Default: []
+ *                 enabled?: bool|Param, // false (or the entry itself set to false) unmarks a route a kit marked. // Default: true
+ *                 page?: scalar|Param|null, // Default: null
+ *                 dialog?: scalar|Param|null, // Default: null
+ *                 page_parameters?: list<scalar|Param|null>,
+ *                 redirect_same_origin?: bool|Param, // Also redirect a navigation started from a page of this origin (Sec-Fetch-Site: same-origin: a link followed without JavaScript or opened in a new tab). Default false: those keep the route's own page (the no-JS fallback). // Default: false
+ *             }>,
+ *         },
  *         request_header?: scalar|Param|null, // 2.33: request header the dialog sends with "1" (both drivers, RemoteDialogResponder, the redirect listener, nowo_ui_dialog_request()). // Default: "X-Nowo-Dialog"
  *         redirect_header?: scalar|Param|null, // 2.33: response header of the success answer (204 + <path>: the dialog closes and the page goes there). // Default: "X-Nowo-Redirect"
  *         location_header?: scalar|Param|null, // 2.33: response header of the step answer (204 + <path>: the dialog stays open and loads the next step). // Default: "X-Nowo-Dialog-Location"
@@ -1442,6 +1456,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         tokens?: array<string, mixed>,
  *         tokens_dark?: array<string, mixed>,
  *         confirm_message_in_header?: bool|Param, // Confirm dialogs and the full-page confirm render the message inside the header, under the title (hosts whose dialog header is title + message). View\Confirm::messageInHeader wins when set. // Default: false
+ *         form_actions_order?: "cancel_first"|"primary_first"|Param, // 2.66: order of the form actions row (form scaffold, `form_actions` partial). primary_first (default; 2.66.1 restores the 2.65 order) = the primary first, secondary actions, Cancel last; cancel_first (opt-in) = Cancel, secondary actions, then the primary last, on the right. Dialog footers, dialog form fragments (Cancel closes the dialog), the full-page confirm and the wizard always keep Cancel / Back first. The DOM order is the visual and focus order (never reversed with CSS). // Default: "primary_first"
  *         popover_menus?: bool|Param, // 2.4: menu / kebab / row-action menus render their panel as a native [popover] (browser top layer: never clipped by table scrollers or cards; nowo-ui-popover.js places it). The partial option `popover` wins. // Default: false
  *         context_menus?: bool|Param, // 2.54: kebab / row-action menus also open as the context menu of the row or card around them (right-click, the ContextMenu key, Shift+F10, long press on touch), with the same items. Loads the opt-in context-menu runtime through the scripts partial. The partial option `context_menu` wins; data-nowo-ui-context-menu="off" opts a row out. // Default: false
  *         form_errors_after_widget?: bool|Param, // 2.10: the UiKit form theme (form/nowo_ui_layout.html.twig) prints a field's errors after its widget (and before the help), instead of Symfony's order (label, errors, widget, help). // Default: false
@@ -1492,6 +1507,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *                     testids?: bool|Param, // data-testid filters-collapse-toggle / filters-collapse-summary. // Default: false
  *                     morph?: bool|Param, // Add the <morph-icon> of assets/morphicons to the toggle. // Default: false
  *                 },
+ *                 sheet?: bool|Param, // 2.65: below 48rem the filters card folds behind a "Filters (n)" button that opens it in a native modal <dialog> bottom sheet (the filter_bar sheet: macros/filter_sheet.html.twig, runtime filter-sheet, appended to the scripts partial by itself). false = the 2.64 output. // Default: false
  *             },
  *         }>,
  *     },
@@ -1688,6 +1704,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     messenger_middleware?: bool|Param, // Register nowo_transaction_doctrine.write_unit_middleware (add it to your buses before doctrine_transaction). // Default: true
  *     commit_detection?: bool|Param, // Count commits through a DBAL middleware (doctrine.middleware tag): a failed attempt that already committed is never replayed, and a conflict after a commit earlier in the same request answers CONFLICT_002 (request watermark taken at kernel.request). // Default: true
  *     worker_hygiene?: bool|Param, // Reset closed entity managers per request and repair connections after a DBAL / ORM failure. // Default: true
+ *     unit_of_work_boundaries?: bool|Param, // At every unit-of-work boundary (main request, Messenger message, outermost console command), reset the host-flush probe and every private entity manager (services tagged nowo_transaction_doctrine.private_entity_manager), kernel reset off included. // Default: true
  *     conflict_response?: bool|array{ // The answer to a lock conflict the client may retry (409 + Retry-After by default; 503 keeps the 1.2 behaviour).
  *         enabled?: bool|Param, // Default: true
  *         status?: int|Param, // Default: 409
@@ -1814,6 +1831,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     actor_directory?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
  *     audit_sink?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
  *     clock?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
+ *     actor_email_lookup?: scalar|Param|null, // Service id of the host implementation; null = the bundle default. // Default: null
  *     security?: array{ // REQ-UI-002: who may use the CRM. Each *_roles list grants its area to any of its roles; an empty list (access, manage, amounts, campaigns only) means any authenticated user.
  *         access_roles?: list<scalar|Param|null>,
  *         access_checker?: scalar|Param|null, // Service id of a host CrmKitAccessCheckerInterface; null = ConfigurableCrmKitAccessChecker (these role lists). // Default: null
@@ -1848,6 +1866,44 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         sync_rows?: int|Param, // Default: 500
  *         chunk_rows?: int|Param, // Default: 100
  *         stale_claim_seconds?: int|Param, // Default: 600
+ *         hubspot?: array{ // 0.10.0: import companies, contacts, owners and lists from HubSpot (a private app token per tenant, read-only scopes).
+ *             enabled?: bool|Param, // Needs a secret box (secrets.box, or secrets.keys + current_key) and symfony/http-client; maps the HubSpot tables and routes. // Default: false
+ *             page_size?: int|Param, // Objects per HubSpot page (HubSpot's maximum is 100). // Default: 100
+ *             pages_per_request?: int|Param, // Pages a web request settles before "Continue", the resume command or the background run. // Default: 2
+ *             max_records?: int|Param, // Most objects per kind per run; beyond, the import fails with hubspot_too_many. // Default: 50000
+ *             outbound_url_guard?: "auto"|"required"|"off"|Param, // Pin api.hubapi.com to the public address OutboundUrlGuard resolves: auto = when nowo-tech/outbound-url-guard-bundle is installed, required = fail the build without it, off. // Default: "auto"
+ *             http?: array{
+ *                 timeout?: int|Param, // Idle timeout in seconds. // Default: 10
+ *                 max_duration?: int|Param, // Seconds per request. // Default: 30
+ *                 max_response_bytes?: int|Param, // Largest body read; a larger one is hubspot_bad_response. // Default: 8388608
+ *             },
+ *             rate_limit?: array{
+ *                 max_attempts?: int|Param, // Attempts per request on 429 / 5xx in the resume command and the background run (a web request never waits). // Default: 5
+ *                 max_retry_after?: int|Param, // Longest wait in seconds; a longer one (the daily limit) pauses the import until then. // Default: 60
+ *             },
+ *             connect_rate_limit?: array{ // Token checks per tenant (valid or not).
+ *                 limit?: int|Param, // Default: 5
+ *                 interval?: int|Param, // Window in seconds. // Default: 600
+ *             },
+ *             browse_rate_limit?: array{ // 0.10.1: HubSpot reads of the start and mapping pages per tenant (each view and each start asks HubSpot; the portal's daily quota is shared). Beyond it the page says to wait.
+ *                 limit?: int|Param, // Default: 60
+ *                 interval?: int|Param, // Window in seconds. // Default: 600
+ *             },
+ *         },
+ *         messenger?: array{ // 0.10.0 (REQ-MSG-001): run imports (any format) in the background with Symfony Messenger.
+ *             enabled?: bool|Param, // true: confirm and "Continue" dispatch RunCrmImport instead of running in the request (route it to an async transport). // Default: false
+ *             units?: int|Param, // Chunks (HubSpot: pages) per message; the handler dispatches the next message. // Default: 20
+ *         },
+ *     },
+ *     secrets?: array{ // 0.10.0: the box that seals the kit's secrets (the HubSpot token).
+ *         box?: scalar|Param|null, // Service id of a CrmSecretBoxInterface (e.g. Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox); null = SodiumCrmSecretBox with the keys below. // Default: null
+ *         keys?: array<string, scalar|Param|null>,
+ *         current_key?: scalar|Param|null, // The key id that seals; the other keys only open (rotation: nowo:crm-kit:secrets:rotate). // Default: null
+ *         doctrine_encrypt?: array{ // 0.10.1: profiles of the DoctrineEncrypt box (secrets.box: DoctrineEncryptCrmSecretBox, when the kit defines it). Rotation: CONFIGURATION, "Key rotation".
+ *             profile?: scalar|Param|null, // DoctrineEncrypt profile that seals (null: its default profile). Halite or Defuse; anything else fails the build. // Default: null
+ *             key_id?: scalar|Param|null, // Key id stored with new seals (1-16 of a-z, 0-9, "_", "-"); a new one with each new profile. // Default: "doctrine_encrypt"
+ *             previous?: array<string, scalar|Param|null>,
+ *         },
  *     },
  *     gdpr?: array{
  *         purposes?: list<scalar|Param|null>,
@@ -1878,6 +1934,14 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         list_per_page?: list<int|Param>,
  *         record_create?: "page"|"dialog"|Param, // 0.8.0: how "New company" / "New contact" open. page = the form page (as before); dialog = the header action (a real link to the form page, the no-JS fallback) loads that page on demand into a UiKit remote form dialog (X-Nowo-Dialog: 1 answers the fragment, an invalid submission 422 in the dialog, success 204 + X-Nowo-Redirect to the new record). Same access checks and CSRF token as the page. // Default: "page"
  *         pipeline_forms?: "inline"|"dialog"|Param, // 0.9.0 (pipeline.enabled): how the funnel pages offer their forms and confirms. inline = as in 0.3 - 0.8: the move-to-stage and next action forms in the deal page, the lifecycle and next action forms in the 360° page, the new funnel form under the funnels, a stage edit form per stage and the new stage form in the funnel page, the trash / purge confirms of a deal in the page (deprecated: dialog becomes the default in 1.0); dialog = every one of them is its own page (GET; the no-JS fallback and a deep link) opened on demand into one UiKit remote form dialog per page by a real link (X-Nowo-Dialog: 1 answers the fragment, an invalid submission 422 in the dialog, success 204 + X-Nowo-Redirect), so a page renders no form it has not opened. Same access checks, tenant, CSRF tokens and version checks as the inline forms. // Default: "inline"
+ *         filters_more?: array{ // 0.10.2 (Beacon filter standard): per list, the filter fields folded under the "More filters" disclosure after the Filter / Clear buttons (UiKit FilterField more; it shows how many of them are set and stays open while one is). Lists: companies, contacts, deals; [] for a list = no fold there. Fields: companies tag, role, owner, status, created_from, created_to, updated_from, updated_to; contacts tag, role, purpose, primary_contact, company, owner, status, created_from, created_to, updated_from, updated_to; deals funnel, status, owner, stage, company, contact, stale, expected_close_from, expected_close_to. Defaults: the request's (rarer filters folded).
+ *             companies?: list<scalar|Param|null>,
+ *             contacts?: list<scalar|Param|null>,
+ *             deals?: list<scalar|Param|null>,
+ *         },
+ *         per_page_position?: "filters"|"pagination"|Param, // 0.10.2 (with list_per_page): where the "Rows per page" select goes. filters = compact, the first item of the filter actions, right before Filter / Clear (UiKit FilterField pager); pagination = in the UiKit pagination bar instead (the filter form has no per_page field). // Default: "filters"
+ *         search_width?: "xs"|"sm"|"md"|"lg"|"full"|Param, // 0.10.2: the width of the search field in the filter grid (UiKit FilterField width). null (default) = one grid column like the other fields; lg = two columns (0.10.1 and before); full = the whole row. // Default: null
+ *         per_page_row_class?: scalar|Param|null, // 0.10.2: extra CSS classes on the row of the compact "Rows per page" select (UiKit FilterField rowClass), e.g. a host pager class ("issue-filters__pager"). null = none. // Default: null
  *         tab_icons?: array<string, scalar|Param|null>,
  *     },
  *     pipeline?: array{ // 0.3.0: funnels with per-stage statistics, deals and next actions (tables and routes only while enabled).

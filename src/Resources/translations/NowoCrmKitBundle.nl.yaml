@@ -22,6 +22,7 @@ form:
     save: Opslaan
     cancel: Annuleren
 list:
+    empty_hint_hubspot: 'Maak er een aan of importeer uit een bestand of HubSpot.'
     next: 'Volgende pagina'
     title:
         company: Bedrijven
@@ -31,11 +32,25 @@ list:
         contact: Nog geen contacten.
     empty_hint: Maak er een aan of importeer een CSV- of vCard-bestand.
     no_match: 'Niets komt overeen met de zoekopdracht.'
+    no_match_filters: 'Niets komt overeen met deze filters.'
     export: CSV exporteren
     import: 'Importeren'
     col:
+        created: 'Aangemaakt'
         updated: Bijgewerkt
     filter:
+        owner_me: 'Van mij'
+        owner_none: 'Zonder eigenaar'
+        primary_contacts_only: 'Alleen hoofdcontacten'
+        company: 'Bedrijf'
+        any_company: 'Elk bedrijf'
+        created_from: 'Aangemaakt vanaf'
+        created_to: 'Aangemaakt tot'
+        updated_from: 'Gewijzigd vanaf'
+        updated_to: 'Gewijzigd tot'
+        results_per_page: 'Resultaten per pagina'
+        per_page_option: '%count% per pagina'
+        clear: 'Filters wissen'
         apply: 'Toepassen'
         role: 'Rol'
         purpose: 'Contact voor'
@@ -483,6 +498,7 @@ flash:
         crm_settings_stale: Iemand heeft de instellingen op hetzelfde moment gewijzigd. Controleer ze en sla opnieuw op.
         crm_write_conflict: 'Een andere wijziging van dezelfde gegevens kwam op hetzelfde moment binnen. Probeer het opnieuw.'
 error:
+    owner_filter: 'Kies Van mij of Zonder eigenaar, niet beide.'
     hubspot_needs_person: 'Een persoon moet deze import voortzetten: hij kwam bij records van iemand anders.'
     hubspot_token_invalid: 'HubSpot heeft deze servicesleutel (of privé-app-token) geweigerd, of hij hoort bij een ander account. Plak een geldige.'
     hubspot_scope_missing: 'De sleutel mist een leesrecht dat de import nodig heeft. Voeg de gedocumenteerde scopes toe en probeer opnieuw.'
@@ -555,6 +571,14 @@ deals:
     title: 'Deals'
     empty: 'Nog geen deals.'
 deal:
+    filter:
+        any_funnel: 'Elke trechter'
+        any_stage: 'Elke fase'
+        any_contact: 'Elk contact'
+        expected_close_from: 'Verwachte afsluiting vanaf'
+        expected_close_to: 'Verwachte afsluiting tot'
+        q_placeholder: 'Deals zoeken op titel'
+        q_aria: 'Deals zoeken'
     new: 'Nieuwe deal'
     edit: 'Bewerken'
     edit_title: '%name% bewerken'

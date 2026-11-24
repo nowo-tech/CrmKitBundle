@@ -14,6 +14,7 @@
 - [Search](#search)
 - [UI](#ui)
   - [Rows per page and the create dialog (0.8.0)](#rows-per-page-and-the-create-dialog-080)
+  - [Filter bars (0.10.2)](#filter-bars-0102)
   - [Area tab icons](#area-tab-icons)
 - [Later phases](#later-phases)
 - [Per-tenant settings](#per-tenant-settings)
@@ -110,6 +111,10 @@ nowo_crm_kit:
         list_per_page: []          # 0.8.0: "Rows per page" choices, e.g. [10, 25, 50, 100]; [] = no select (see "Rows per page")
         record_create: page        # 0.8.0: page | dialog ("New company / contact" in a UiKit remote form dialog, on demand)
         pipeline_forms: inline     # 0.9.0: inline (deprecated) | dialog (the funnel pages' forms and confirms on demand)
+        filters_more: { ... }      # 0.10.2: per list, the filters folded under "More filters" (see "Filter bars")
+        per_page_position: filters # 0.10.2: filters (compact, before Filter / Clear) | pagination (UiKit compact pager)
+        search_width: null         # 0.10.2: null = one grid column | xs | sm | md | lg (two columns) | full
+        per_page_row_class: null   # 0.10.2: extra classes on the "N per page" row, e.g. issue-filters__pager
     pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
     api:                           # 0.3.0: see API.md
         enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)
@@ -422,9 +427,10 @@ configuration) switch it off or reorder it; the number of results per page and t
 
 ### Rows per page and the create dialog (0.8.0)
 
-`ui.list_per_page` adds a **Rows per page** select (`select[name=per_page]`, a visible label) to the filter card of the
-company and contact lists, Tags and Custom fields. Default `[]`: no select, so the filter card of an existing host is
-unchanged (a new field moves the grid of a host that styles it); opt in with the values you offer:
+`ui.list_per_page` adds a **Rows per page** select (`select[name=per_page]`; 0.10.2: compact, see "Filter bars") to
+the filter card of the company and contact lists, Tags and Custom fields (0.10.2: Deals too). Default `[]`: no
+select, so the filter card of an existing host is unchanged (a new field moves the grid of a host that styles it); opt
+in with the values you offer:
 
 ```yaml
 nowo_crm_kit:
@@ -452,6 +458,45 @@ Why a key of its own and not `record_create` / `admin_create`: those two name on
 switches every form of the funnel pages together (the 360° page's other forms — notes, tags, links, affiliations,
 consent — are not covered yet, so a general `ui.forms` would promise more than it does). `inline` (default) keeps the
 0.8 pages and is deprecated (`dialog` becomes the default in 1.0). See UPGRADING, "To 0.9.0".
+
+### Filter bars (0.10.2)
+
+The Companies, Contacts and Deals lists follow Beacon's filter standard (UI-PATTERNS §8) through UiKit 2.72+: the
+search one grid column wide with a placeholder and an `aria-label`, the main filters in the bar, the rarer ones
+folded under **More filters** (a `<details>` after the actions that shows how many of them are set and stays open
+while one is), and with `list_per_page` a compact *N per page* select first in the actions, then Filter / Clear
+filters.
+
+```yaml
+nowo_crm_kit:
+    ui:
+        list_per_page: [10, 25, 50, 100]
+        per_page_position: filters          # or pagination: the select in UiKit's compact pager (Companies, Contacts)
+        per_page_row_class: issue-filters__pager
+        search_width: null                  # lg = two columns, as in 0.10.1
+        filters_more:                       # [] for a list = no fold
+            companies: [role, created_from, created_to, updated_from, updated_to]
+            contacts: [role, purpose, primary_contact, company, created_from, created_to, updated_from, updated_to]
+            deals: [stage, company, contact, stale, expected_close_from, expected_close_to]
+```
+
+The fields a list can fold: Companies `tag, role, owner, status, created_from, created_to, updated_from,
+updated_to`; Contacts the same plus `purpose, primary_contact, company`; Deals `funnel, status, owner, stage,
+company, contact, stale, expected_close_from, expected_close_to`. A name a list does not have, or a name twice, fails
+the container build. Deals always keeps its select in the filters (it pages by cursor, without a numbered pager).
+
+Filters: the owner select starts with **Mine** (`owner=me`, the person the actor resolver returns) and **No owner**
+(`owner=none`); dates are native date fields (`YYYY-MM-DD`, whole UTC days, both ends included). Column headers sort
+on the server: name, created and updated on Companies and Contacts; title, amount (with the amounts permission),
+expected close and updated on Deals.
+
+Empty states: on a list's defaults the message says why it is empty, with create and **Import** (the hint names
+HubSpot when `import.hubspot.enabled`); with a filter set it says nothing matches and offers **Clear filters**. While
+the list is empty and unfiltered the header shows no create button (one create button, UI-PATTERNS §11).
+
+The look of the buttons is UiKit's host configuration: icon-only Filter / Clear filters with
+`nowo_ui_kit.theme.pages.list.filters.display: icon` (an icon set other than `none`), and the phone bottom sheet with
+`nowo_ui_kit.theme.pages.list.filters.sheet: true`.
 
 ### Area tab icons
 

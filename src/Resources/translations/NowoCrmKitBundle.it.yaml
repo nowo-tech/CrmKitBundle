@@ -22,6 +22,7 @@ form:
     save: Salva
     cancel: Annulla
 list:
+    empty_hint_hubspot: 'Creane uno o importa da un file o da HubSpot.'
     next: 'Pagina successiva'
     title:
         company: Aziende
@@ -31,11 +32,25 @@ list:
         contact: Nessun contatto per ora.
     empty_hint: Creane uno oppure importa un file CSV o vCard.
     no_match: 'Nessun risultato per la ricerca.'
+    no_match_filters: 'Nessun risultato per questi filtri.'
     export: Esporta CSV
     import: 'Importa'
     col:
+        created: 'Creato'
         updated: Aggiornato
     filter:
+        owner_me: 'Miei'
+        owner_none: 'Senza responsabile'
+        primary_contacts_only: 'Solo contatti principali'
+        company: 'Azienda'
+        any_company: 'Qualsiasi azienda'
+        created_from: 'Creato dal'
+        created_to: 'Creato fino al'
+        updated_from: 'Modificato dal'
+        updated_to: 'Modificato fino al'
+        results_per_page: 'Risultati per pagina'
+        per_page_option: '%count% per pagina'
+        clear: 'Cancella filtri'
         apply: 'Applica'
         role: 'Ruolo'
         purpose: 'Contatto per'
@@ -483,6 +498,7 @@ flash:
         crm_settings_stale: Qualcuno ha modificato le impostazioni nello stesso momento. Controllale e salva di nuovo.
         crm_write_conflict: 'Un''altra modifica degli stessi dati è arrivata nello stesso momento. Riprova.'
 error:
+    owner_filter: 'Scegli Miei o Senza responsabile, non entrambi.'
     hubspot_needs_person: 'Una persona deve proseguire questa importazione: ha raggiunto record di altre persone.'
     hubspot_token_invalid: 'HubSpot ha rifiutato questa chiave di servizio (o token di app privata), oppure appartiene a un altro account. Incollane una valida.'
     hubspot_scope_missing: 'Alla chiave manca un permesso di lettura necessario all’importazione. Aggiungi i permessi indicati nella documentazione e riprova.'
@@ -555,6 +571,14 @@ deals:
     title: 'Trattative'
     empty: 'Ancora nessuna trattativa.'
 deal:
+    filter:
+        any_funnel: 'Qualsiasi funnel'
+        any_stage: 'Qualsiasi fase'
+        any_contact: 'Qualsiasi contatto'
+        expected_close_from: 'Chiusura prevista dal'
+        expected_close_to: 'Chiusura prevista fino al'
+        q_placeholder: 'Cerca trattative per titolo'
+        q_aria: 'Cerca trattative'
     new: 'Nuova trattativa'
     edit: 'Modifica'
     edit_title: 'Modifica %name%'

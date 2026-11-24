@@ -131,6 +131,9 @@ final readonly class CrmReader implements CrmReaderInterface
     {
         $context = $this->support->access->context(CrmPermission::View);
 
+        // 0.10.2: "Mine" is the acting person's records.
+        $query = $query->forActor($context->actor->value);
+
         return $this->support->read(function () use ($context, $query): ListResult { // @igor-ignore - the runner calls this closure at once and keeps nothing
             [$records, $total] = $this->support->store->list($context->tenant, $query, $this->support->access->visibleOwners($context));
             // 0.3.0: a record a nowo_crm_kit.record_access_check listener denies is left out of the page, and out of

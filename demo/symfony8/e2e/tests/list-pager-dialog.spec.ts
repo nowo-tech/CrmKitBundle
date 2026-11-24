@@ -50,7 +50,9 @@ test.describe('CRM Kit 0.8.0 lists and create dialog', () => {
     await page.goto('/crm/companies?per_page=10');
     const select = page.locator('[data-nowo-ui-region="filters"] select[name="per_page"]');
     await expect(select).toHaveValue('10');
-    await expect(page.getByLabel('Rows per page')).toBeVisible();
+    // 0.10.2: compact ("10 per page"), named "Results per page" by a visually hidden label.
+    await expect(page.getByLabel('Results per page')).toBeVisible();
+    await expect(select.locator('option:checked')).toHaveText('10 per page');
     await select.selectOption('25');
     await expect(page).toHaveURL(/per_page=10/);
     await page.locator('[data-nowo-ui-region="filters"] button[type="submit"]').first().click();

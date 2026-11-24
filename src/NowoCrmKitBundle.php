@@ -176,9 +176,13 @@ final class NowoCrmKitBundle extends AbstractBundle
                 $menu = $config['ui']['row_actions'] === 'menu';
             }
         }
+        // 0.10.2: the empty state of the lists offers Import next to create (UiKit's View\EmptyState holds one action):
+        // the bundle's `empty` partial prints UiKit's and the request's extra actions. A host entry for the bundle wins.
+        $partials = ['empty' => '@NowoCrmKit/partials/_empty.html.twig'];
         if ($menu) {
-            $builder->prependExtensionConfig('nowo_ui_kit', ['theme' => ['bundles' => [self::TRANSLATION_DOMAIN => ['partials' => ['row_actions' => '@NowoCrmKit/partials/_row_actions.html.twig']]]]]);
+            $partials['row_actions'] = '@NowoCrmKit/partials/_row_actions.html.twig';
         }
+        $builder->prependExtensionConfig('nowo_ui_kit', ['theme' => ['bundles' => [self::TRANSLATION_DOMAIN => ['partials' => $partials]]]]);
     }
 
     /**

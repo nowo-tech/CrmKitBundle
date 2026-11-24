@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
 use DateInterval;
 use DateTimeImmutable;
+use DateTimeZone;
 use Nowo\CrmKitBundle\Application\CrmAccess;
 use Nowo\CrmKitBundle\Application\Pipeline\FunnelReader;
 use Nowo\CrmKitBundle\Application\Pipeline\FunnelService;
@@ -279,6 +280,18 @@ final readonly class PipelineAdminController
     }
 
     /**
+     * The snapshot instant of a statistics day (0.10.2, `at` is a date): the end of that day in UTC, or now for today
+     * (the end of today is still in the future); a later day stays in the future and is refused as before.
+     */
+    private function endOfDay(DateTimeImmutable $day): DateTimeImmutable
+    {
+        $end = new DateTimeImmutable($day->format('Y-m-d') . ' 23:59:59', new DateTimeZone('UTC'));
+        $now = $this->access->context(CrmPermission::View)->now;
+
+        return $end > $now && $day->format('Y-m-d') === $now->format('Y-m-d') ? $now : $end;
+    }
+
+    /**
      * The funnel, its statistics and the filter form of a request.
      *
      * @return array{FunnelView, FunnelStats, FormInterface<mixed>}
@@ -299,7 +312,7 @@ final readonly class PipelineAdminController
         try {
             $stats = $this->statistics->stats(
                 $id,
-                $at instanceof DateTimeImmutable ? $at : null,
+                $at instanceof DateTimeImmutable ? $this->endOfDay($at) : null,
                 $valid && $this->text($filters, 'owner') !== '' ? $this->text($filters, 'owner') : null,
                 $role === '' ? null : $role,
                 $valid && $this->text($filters, 'tag') !== '' ? $this->text($filters, 'tag') : null,

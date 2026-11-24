@@ -221,6 +221,12 @@ final class ServiceDefinitions
     public const SEARCH_DEFINITION_TAG = 'nowo_search_kit.entity_definition';
 
     /** Prefix of the bundle's service ids and parameters. */
+    /** Messenger's event after a worker handled a message (its class name). */
+    public const WORKER_MESSAGE_HANDLED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent';
+
+    /** Messenger's event after a worker failed to handle a message (its class name). */
+    public const WORKER_MESSAGE_FAILED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent';
+
     public const P = NowoCrmKitBundle::ALIAS . '.';
 
     /**
@@ -372,8 +378,13 @@ final class ServiceDefinitions
         }
         if ($messenger) {
             $s->set(ImportRunDispatcherInterface::class, MessengerImportRunDispatcher::class)->args([service('messenger.default_bus'), $clock]);
-            $s->set(RunCrmImportHandler::class)->args([service(ImportService::class), service(ImportRunDispatcherInterface::class), param($p . 'import.messenger.units')])
+            $s->set(RunCrmImportHandler::class)->args([service(ImportService::class), service(ImportRunDispatcherInterface::class), param($p . 'import.messenger.units'), service('logger')->nullOnInvalid()])
                 ->tag('messenger.message_handler', ['handles' => RunCrmImport::class]);
+            // REQ-RUNTIME-002 rule 7: a Messenger worker is a kept-alive process too; the bundle's entity manager is
+            // cleared (or reset after a failure) once each message is handled or failed.
+            $s->get(EntityManagerHygieneListener::class)
+                ->tag('kernel.event_listener', ['event' => self::WORKER_MESSAGE_HANDLED, 'method' => 'clear', 'priority' => -2048])
+                ->tag('kernel.event_listener', ['event' => self::WORKER_MESSAGE_FAILED, 'method' => 'clear', 'priority' => -2048]);
         }
         if ($api) {
             self::api($container, $pipeline);

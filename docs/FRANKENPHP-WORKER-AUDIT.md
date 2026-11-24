@@ -12,8 +12,9 @@
 
 ## Scope
 
-REQ-RUNTIME-002; contract section 18. Audited revision: phase A (0.1.0, not tagged; set to the tag at release,
-[RELEASE.md](RELEASE.md)). The bundle must work in FrankenPHP worker mode with the kernel kept alive and **not reset**
+REQ-RUNTIME-002; contract section 18. Audited revision: **0.10.1** (refreshed 2026-11-24 for everything shipped since
+phase A: the pipeline, the JSON API, the HubSpot import with its HTTP client, secret boxes and throttles, and the
+Messenger handler; set to the tag at release, [RELEASE.md](RELEASE.md)). The bundle must work in FrankenPHP worker mode with the kernel kept alive and **not reset**
 between requests (`kernel.reset` false, no services resetter relied on): nothing a request learns may reach the next
 one.
 
@@ -33,8 +34,15 @@ run with alternating tenants and actors.
 | `DoctrineTransactionRunner`, `DoctrineCrmStore` | none | the entity manager is fetched from the registry per call (and reset when closed) |
 | `CrmMetadataListener` | none | the table prefix only; collation chosen from the platform per class load |
 | Controllers, forms, route loader, HTTP listeners | none | `final readonly`; forms are built per request |
-| `CrmSearchProvider` (SearchKit bridge) | none | the reader per call |
-| Caches | none | phase A has no cache |
+| SearchKit bridge (`CrmSearchDefinition`, `CrmRecordSearchDefinition`, `CrmDealSearchDefinition`) | none | the reader per call |
+| Pipeline (`FunnelService`, `DealService`, `PartyStageService`, `NextActionService`, `FunnelStatistics`, readers, `BuiltInCrmTaskPort`, TaskBoard bridge) | none | `final readonly`; funnels, stages and deals are read per call; the TaskBoard bridge asks TaskBoard's API operations per call |
+| JSON API (`Api\Operation\*`, `ApiIdempotency`, `CrmApiCursorCodec`, HTTP edge controller, authenticator, tenant resolver) | none | operations are `final readonly`; the idempotency claim and replay live in the database; the cursor codec holds `kernel.secret` only; the authenticator reads the security token per request |
+| HubSpot client (`HubSpotHttpClientFactory`, `HttpHubSpotReader`, `GuardedHubSpotRequestOptions`) | the `HttpClientInterface` instance | stateless per request: the bearer header is built per call from a token that lives for that call; no cookie jar, no cached response; the OutboundUrlGuard pin is resolved per call |
+| HubSpot services (`HubSpotConnectionService`, `HubSpotImportService`, `HubSpotRunner`, `HubSpotRecordWriter`, `HubSpotTokenOpener`, `DoctrineHubSpotStore`) | none | `final readonly`; the connect and browse throttles are counter rows in the database, never memory; the run cursor lives in `crm_import.run_cursor` |
+| `HubSpotToken` | its own plaintext, for the object's life | the plaintext sits in a suspended generator's frame owned by the object, created per call and collected with it; never a service property |
+| Secret boxes (`SodiumCrmSecretBox`, `DoctrineEncryptCrmSecretBox`) | the configured keys / the encryptor registry | configuration only; no plaintext and no per-tenant state between calls; `secrets:rotate` works one connection per unit |
+| `RunCrmImportHandler`, `MessengerImportRunDispatcher` | none | ids only in the messages; the handler claims the import like the resume command and dispatches the next message |
+| Caches | none | the kit keeps no cache |
 
 Host ports (tenant resolver, access checker, directory, panels, resolvers) are host code: they must be stateless too
 ([USAGE.md](USAGE.md#ports-to-implement)).
@@ -45,6 +53,9 @@ Host ports (tenant resolver, access checker, directory, panels, resolvers) are h
   success and on failure. On a shared manager (`entity_manager: null`) it detaches only the bundle's entities.
 - `EntityManagerHygieneListener` clears it again at `kernel.finish_request`, `kernel.terminate` and
   `console.terminate` (priority −2048), so nothing survives a request or a command even when a unit was skipped.
+  With `import.messenger.enabled` (0.10.1) it also listens to Messenger's `WorkerMessageHandledEvent` and
+  `WorkerMessageFailedEvent`, so a long-running worker starts every message with an empty manager
+  (`HubSpotEdgeTest::testTheBackgroundRunThroughMessenger`).
 - A manager closed by a failed flush is reset through `ManagerRegistry::resetManager()` before the next unit.
 - Transactions open and close inside the call; no lock survives it.
 

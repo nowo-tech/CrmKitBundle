@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Form;
 
-use Nowo\CrmKitBundle\NowoCrmKitBundle;
+use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
@@ -21,7 +21,7 @@ use function array_map;
  *
  * @extends AbstractType<mixed>
  */
-#[FormKitConfig(NowoCrmKitBundle::FORM_PROFILE)]
+#[FormKitConfig(FormProfile::NAME)]
 final class FilterType extends AbstractType
 {
     use FormOptionsTrait;
@@ -76,7 +76,7 @@ final class FilterType extends AbstractType
             'data_class'         => null,
             'csrf_protection'    => false,
             'allow_extra_fields' => true,
-            'translation_domain' => NowoCrmKitBundle::TRANSLATION_DOMAIN,
+            'translation_domain' => TranslationDomain::NAME,
             'method'             => 'GET',
             'tags'               => [],
             'owners'             => [],

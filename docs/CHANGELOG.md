@@ -26,6 +26,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Internal
+
+- **Deptrac layer check** (REQ-ARCH-002): `deptrac.yaml` with a strict ruleset (Domain / Application framework-free,
+  uncovered dependencies and unassigned classes fail), `composer deptrac`, `make deptrac`, part of
+  `make release-check` and of the CI PHPStan job; it complements `LayerDependencyTest`. See
+  [ARCHITECTURE.md](ARCHITECTURE.md#architecture-checks).
+- Fixes from the first run, behaviour unchanged: forms, the UI support class and the SearchKit bridge read the
+  translation domain from `Domain\TranslationDomain::NAME` and the FormKit profile from
+  `Infrastructure\Symfony\Form\FormProfile::NAME` (`NowoCrmKitBundle::TRANSLATION_DOMAIN` / `FORM_PROFILE` keep the
+  same values).
+- One legacy dependency stays in `skip_violations` until 1.0.0 (`NextActionService` on transaction-doctrine's
+  `ConcurrencyConflict`).
+
 ## [0.10.0] - 2026-11-23
 
 Planned as 0.10.0.

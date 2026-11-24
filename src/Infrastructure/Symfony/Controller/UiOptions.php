@@ -10,6 +10,7 @@ use function array_key_exists;
 use function array_unique;
 use function array_values;
 use function in_array;
+use function is_array;
 use function is_int;
 use function is_string;
 use function preg_match;
@@ -43,6 +44,24 @@ final readonly class UiOptions
     ];
 
     /**
+     * 0.10.2: the filter fields of each list that may fold under "More filters" (`ui.filters_more`).
+     */
+    public const FILTER_FIELDS = [
+        'companies' => ['tag', 'role', 'owner', 'status', 'created_from', 'created_to', 'updated_from', 'updated_to'],
+        'contacts'  => ['tag', 'role', 'purpose', 'primary_contact', 'company', 'owner', 'status', 'created_from', 'created_to', 'updated_from', 'updated_to'],
+        'deals'     => ['funnel', 'status', 'owner', 'stage', 'company', 'contact', 'stale', 'expected_close_from', 'expected_close_to'],
+    ];
+
+    /**
+     * 0.10.2: the folded fields by default (Beacon filter standard request 2026-11-24): the rarer filters of each list.
+     */
+    public const DEFAULT_FILTERS_MORE = [
+        'companies' => ['role', 'created_from', 'created_to', 'updated_from', 'updated_to'],
+        'contacts'  => ['role', 'purpose', 'primary_contact', 'company', 'created_from', 'created_to', 'updated_from', 'updated_to'],
+        'deals'     => ['stage', 'company', 'contact', 'stale', 'expected_close_from', 'expected_close_to'],
+    ];
+
+    /**
      * An icon name `[prefix:]name` as UiKit takes it (lowercase letters, digits and single hyphens).
      */
     public const ICON_PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)?$/D';
@@ -60,6 +79,10 @@ final readonly class UiOptions
      * @param list<int> $listPerPage 0.8.0: the "Rows per page" choices of the lists; [] = no select
      * @param string $recordCreate 0.8.0: `page` | `dialog` ("New company / contact" in a remote form dialog)
      * @param string $pipelineForms 0.9.0: `inline` | `dialog` (the forms and confirms of the funnel pages on demand)
+     * @param array<string, list<string>> $filtersMore 0.10.2: list (`companies` | `contacts` | `deals`) => folded fields
+     * @param string $perPagePosition 0.10.2: `filters` (compact, before Filter / Clear) | `pagination`
+     * @param string|null $searchWidth 0.10.2: UiKit FilterField width of the search field (null = one column)
+     * @param string|null $perPageRowClass 0.10.2: extra classes of the "Rows per page" row
      */
     public function __construct(
         public string $rowActions = 'buttons',
@@ -75,7 +98,61 @@ final readonly class UiOptions
         public array $listPerPage = [],
         public string $recordCreate = 'page',
         public string $pipelineForms = 'inline',
+        public array $filtersMore = self::DEFAULT_FILTERS_MORE,
+        public string $perPagePosition = 'filters',
+        public ?string $searchWidth = null,
+        public ?string $perPageRowClass = null,
     ) {
+    }
+
+    /**
+     * Whether a `ui.filters_more` map only names fields of its list, each once (0.10.2).
+     *
+     * @param array<mixed> $map
+     */
+    public static function filtersMoreValid(array $map): bool
+    {
+        foreach ($map as $list => $fields) {
+            if (!is_string($list) || !isset(self::FILTER_FIELDS[$list]) || !is_array($fields)) {
+                return false;
+            }
+            $seen = [];
+            foreach ($fields as $field) {
+                if (!is_string($field) || !in_array($field, self::FILTER_FIELDS[$list], true) || isset($seen[$field])) {
+                    return false;
+                }
+                $seen[$field] = true;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * The folded filter fields of a list (0.10.2; `companies` | `contacts` | `deals`).
+     *
+     * @return list<string>
+     */
+    public function filtersMoreOf(string $list): array
+    {
+        return array_values($this->filtersMore[$list] ?? []);
+    }
+
+    /**
+     * Whether the "Rows per page" select sits in the filter actions (0.10.2): with choices and `per_page_position:
+     * filters`.
+     */
+    public function perPageInFilters(): bool
+    {
+        return $this->perPageSelect() && $this->perPagePosition === 'filters';
+    }
+
+    /**
+     * Whether the "Rows per page" select sits in the pagination bar instead (0.10.2, `per_page_position: pagination`).
+     */
+    public function perPageInPagination(): bool
+    {
+        return $this->perPageSelect() && $this->perPagePosition === 'pagination';
     }
 
     /**

@@ -1,6 +1,7 @@
 {#
-  The deals (0.3.0): UiKit list scaffold with its filters (funnel, status, text, stale, order), the boards of the deal
-  funnels and the keyset "next page" link. Variables: page (ListPage), funnels (list of FunnelView), next (URL or null).
+  The deals (0.3.0): UiKit list scaffold with its filters and the boards of the deal funnels. 0.10.2: numbered pages
+  (UiKit pager, "Showing x–y of N") instead of the keyset "next page" link; `next` stays for a host template that
+  overrides this one and is always null. Variables: page (ListPage), funnels (list of FunnelView), next (null).
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
 

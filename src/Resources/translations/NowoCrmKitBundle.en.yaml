@@ -22,6 +22,7 @@ form:
     save: Save
     cancel: Cancel
 list:
+    empty_hint_hubspot: 'Create one, or import from a file or HubSpot.'
     next: 'Next page'
     title:
         company: Companies
@@ -31,11 +32,25 @@ list:
         contact: No contacts yet.
     empty_hint: Create one, or import a CSV or vCard file.
     no_match: 'Nothing matches the search.'
+    no_match_filters: 'Nothing matches these filters.'
     export: Export CSV
     import: 'Import'
     col:
+        created: 'Created'
         updated: Updated
     filter:
+        owner_me: 'Mine'
+        owner_none: 'No owner'
+        primary_contacts_only: 'Primary contacts only'
+        company: 'Company'
+        any_company: 'Any company'
+        created_from: 'Created from'
+        created_to: 'Created to'
+        updated_from: 'Changed from'
+        updated_to: 'Changed to'
+        results_per_page: 'Results per page'
+        per_page_option: '%count% per page'
+        clear: 'Clear filters'
         apply: 'Apply'
         role: 'Role'
         purpose: 'Contact for'
@@ -120,6 +135,7 @@ fields:
     title: Custom fields
     intro: Fields of your own for companies and contacts. Archived fields keep their values.
     empty: No custom fields yet.
+    empty_hint: 'No custom fields yet: they add your own data to companies and contacts.'
     define_for: 'Define a field for:'
     col:
         subject: For
@@ -211,6 +227,7 @@ tags:
     title_record: Tags
     intro: Tags group companies and contacts; lists filter by them.
     empty: No tags yet.
+    empty_hint: 'No tags yet: they group companies and contacts.'
     save: Save tags
     saved: The tags were saved.
     form:
@@ -483,6 +500,7 @@ flash:
         crm_settings_stale: Someone changed the settings at the same moment. Check them and save again.
         crm_write_conflict: 'Another change of the same data arrived at the same moment. Try again.'
 error:
+    owner_filter: 'Choose Mine or No owner, not both.'
     hubspot_needs_person: 'A person must continue this import: it reached records owned by someone else.'
     hubspot_token_invalid: 'HubSpot refused this service key (or private app token), or it belongs to another account. Paste a valid one.'
     hubspot_scope_missing: 'The key lacks a read scope the import needs. Add the scopes listed in the documentation and try again.'
@@ -554,7 +572,18 @@ purpose:
 deals:
     title: 'Deals'
     empty: 'No deals yet.'
+    empty_hint: 'No deals yet: create one to follow it through its funnel.'
+    empty_no_funnel: 'No deals yet: deals move through a deal funnel, so create one first.'
+    open_funnels: 'Open the funnels'
 deal:
+    filter:
+        any_funnel: 'Any funnel'
+        any_stage: 'Any stage'
+        any_contact: 'Any contact'
+        expected_close_from: 'Expected close from'
+        expected_close_to: 'Expected close to'
+        q_placeholder: 'Search deals by title'
+        q_aria: 'Search deals'
     new: 'New deal'
     edit: 'Edit'
     edit_title: 'Edit %name%'
@@ -648,6 +677,7 @@ funnels:
     title: 'Funnels'
     intro: 'Deal funnels and lifecycle funnels of companies and contacts.'
     empty: 'No funnels yet.'
+    empty_hint: 'No funnels yet: a funnel holds the stages a deal or a customer goes through.'
 funnel:
     add: 'New funnel'
     save: 'Create'

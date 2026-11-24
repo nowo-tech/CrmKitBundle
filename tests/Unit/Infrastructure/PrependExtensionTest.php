@@ -70,22 +70,24 @@ final class PrependExtensionTest extends TestCase
 
     public function testTheRowActionsPartialIsPrependedOnlyForTheMenu(): void
     {
+        // 0.10.2: the empty-state partial always (Import next to create); the row actions one only for the menu.
+        $empty   = ['empty' => '@NowoCrmKit/partials/_empty.html.twig'];
         $default = $this->builder([]);
         $default->registerExtension(new NowoUiKitExtension());
         $this->prepend($default);
-        self::assertSame([], $default->getExtensionConfig('nowo_ui_kit'));
+        self::assertSame([['theme' => ['bundles' => [NowoCrmKitBundle::TRANSLATION_DOMAIN => ['partials' => $empty]]]]], $default->getExtensionConfig('nowo_ui_kit'));
 
         $menu = $this->builder(['ui' => ['row_actions' => 'menu']]);
         $menu->registerExtension(new NowoUiKitExtension());
         $this->prepend($menu);
         $config = $menu->getExtensionConfig('nowo_ui_kit');
         self::assertCount(1, $config);
-        self::assertSame(['theme' => ['bundles' => [NowoCrmKitBundle::TRANSLATION_DOMAIN => ['partials' => ['row_actions' => '@NowoCrmKit/partials/_row_actions.html.twig']]]]], $config[0]);
+        self::assertSame(['theme' => ['bundles' => [NowoCrmKitBundle::TRANSLATION_DOMAIN => ['partials' => $empty + ['row_actions' => '@NowoCrmKit/partials/_row_actions.html.twig']]]]], $config[0]);
 
         $buttons = $this->builder(['ui' => ['row_actions' => 'buttons']]);
         $buttons->registerExtension(new NowoUiKitExtension());
         $this->prepend($buttons);
-        self::assertSame([], $buttons->getExtensionConfig('nowo_ui_kit'));
+        self::assertSame([['theme' => ['bundles' => [NowoCrmKitBundle::TRANSLATION_DOMAIN => ['partials' => $empty]]]]], $buttons->getExtensionConfig('nowo_ui_kit'));
     }
 
     public function testWithoutUiKitNothingIsPrependedForTheMenu(): void

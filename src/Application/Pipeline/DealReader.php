@@ -20,13 +20,16 @@ use Nowo\CrmKitBundle\Domain\Model\Pipeline\Deal;
 use Nowo\CrmKitBundle\Domain\Model\Pipeline\Funnel;
 use Nowo\CrmKitBundle\Domain\Model\Pipeline\Stage;
 use Nowo\CrmKitBundle\Domain\Model\Pipeline\StageChange;
+use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealListResult;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealPage;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealView;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\NextActionView;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\StageChangeView;
+use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 
+use function array_filter;
 use function array_map;
 use function array_slice;
 use function array_unique;
@@ -105,6 +108,8 @@ final readonly class DealReader
             $this->pipeline->support->access->require($context, CrmPermission::AmountsView);
         }
         $limit = max(1, min(self::MAX_PAGE, $limit));
+        // 0.10.2: "Mine" is the acting person's deals.
+        $query = $query->forActor($context->actor->value);
 
         return $this->pipeline->support->read(function () use ($context, $query, $after, $limit): DealPage { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $owners  = $this->pipeline->support->access->visibleOwners($context);
@@ -144,6 +149,33 @@ final readonly class DealReader
     }
 
     /**
+     * A numbered page of the deals the actor may view (0.10.2, the deals list: page links and "Showing x–y of N"),
+     * in the query's order. A deal a host's per-record deny hides is left out of the page and out of the total as far
+     * as this page shows (like the company and contact lists). Sorting by amount needs `amounts_view`.
+     *
+     * @throws AccessDeniedException|NotAvailableException
+     */
+    public function page(DealQuery $query, int $page = 1, int $perPage = 25): DealListResult
+    {
+        $context = $this->pipeline->support->access->context(CrmPermission::View);
+        if ($query->sort === DealQuery::SORT_AMOUNT) {
+            $this->pipeline->support->access->require($context, CrmPermission::AmountsView);
+        }
+        $perPage = max(1, min(self::MAX_PAGE, $perPage));
+        // Audit ZBF-L1: the page is capped like the record lists, so the offset stays an integer.
+        $offset = (min(ListQuery::MAX_PAGE, max(1, $page)) - 1) * $perPage;
+        $query  = $query->forActor($context->actor->value);
+
+        return $this->pipeline->support->read(function () use ($context, $query, $offset, $perPage): DealListResult { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            [$rows, $total] = $this->pipeline->store->dealsPage($context->tenant, $query, $this->pipeline->support->access->visibleOwners($context), $offset, $perPage, $this->cutoffs($context, $query->funnelId), $context->now);
+            $granted        = $this->pipeline->support->access->viewable($context, array_map(static fn (Deal $d): SubjectRef => SubjectRef::of(SubjectType::Deal, $d->getId(), $d->getOwnerId()), $rows));
+            $visible        = array_values(array_filter($rows, static fn (Deal $d): bool => isset($granted[SubjectType::Deal->value . ':' . $d->getId()])));
+
+            return new DealListResult($this->views($context, $visible), max(0, $total - (count($rows) - count($visible))));
+        });
+    }
+
+    /**
      * The visible open deals of a company or contact (the 360° page), newest change first, at most 50.
      *
      * @throws AccessDeniedException|NotAvailableException
@@ -169,6 +201,7 @@ final readonly class DealReader
         return ['v' => match ($sort) {
             DealQuery::SORT_AMOUNT         => $deal->getAmount()?->amount,
             DealQuery::SORT_EXPECTED_CLOSE => $deal->getExpectedClose()?->value,
+            DealQuery::SORT_TITLE          => $deal->getTitle(),
             default                        => $deal->getUpdatedAt()->format('Y-m-d H:i:s.u'),
         }, 'id' => $deal->getId()];
     }

@@ -23,6 +23,49 @@
 
 ## Unreleased
 
+Planned as **0.10.2**, from 0.10.1: `composer update nowo-tech/crm-kit-bundle` (it brings `nowo-tech/ui-kit-bundle`
+^2.73). No schema change, no BC break in the public PHP API (the `@internal` `PipelineStoreInterface` gains
+`dealsPage()`). The filter bars of every list change look by default (Beacon filter standard); set the new keys to keep parts of the 0.10.1 bar:
+
+```yaml
+nowo_crm_kit:
+    ui:
+        search_width: lg                 # the search two columns wide again (default: one column)
+        filters_more: { companies: [], contacts: [], deals: [] }   # no "More filters" fold
+        per_page_position: pagination    # "N per page" in UiKit's compact pager instead of the filter actions
+```
+
+- **More filters.** By default the rarer filters fold under *More filters* (see CONFIGURATION, "Filter bars"). A
+  host that styles or tests those fields by their place in the bar should look for them in
+  `details.nowo-ui-filters-more`.
+- **Rows per page** is compact (*25 per page*), first in the filter actions, its label visually hidden (*Results per
+  page*). With `per_page_position: pagination` the filter form has no `per_page` field and the select sits in UiKit's
+  compact pager (Deals included: it has numbered pages since 0.10.2).
+- **Contacts:** `primary_contact` is a checkbox; the query value is still `1`.
+- **Deals:** the *Sort* select is gone; the column headers sort (`sort` = `updated` | `expected_close` | `amount` |
+  `title`, `direction` = `asc` | `desc`). Old links keep working. `DealFilterType`'s `sorts` option is ignored
+  (deprecated); new options `owners`, `stages`, `companies`, `contacts`, `per_page`.
+- **New filter values** in the query: `owner=me` / `owner=none`, `created_from`, `created_to`, `updated_from`,
+  `updated_to` (`YYYY-MM-DD`; anything else is ignored), `company` on Contacts, `stage`, `company`, `contact`,
+  `expected_close_from`, `expected_close_to` on Deals. `ListQuery` and `DealQuery` take them as new optional
+  constructor arguments; a host that builds a query with `ownerMe: true` must pass it through a reader (which calls
+  `forActor()`), or it matches nothing.
+- **Deals pages** are numbered (`?page=`, UiKit pager with the total); the `?after=` cursor of the 0.3–0.10.1 *Next
+  page* link is ignored (the first page shows). The template variable `next` of `pipeline/deals.html.twig` is always
+  null. The API's keyset pages are unchanged.
+- **Tags, Custom fields, Funnels:** sortable headers (`sort`, `direction`); Funnels has the filter card (`q`,
+  `per_page`) and the pager. A test that looked for *Nothing matches the search.* on a searched Tags / Custom fields
+  list now reads *Nothing matches these filters.*
+- **Header and empty state.** Import is a secondary button with an icon, right after create. On an empty, unfiltered
+  list the header has no create button: the empty state carries create and Import. The bundle prepends
+  `theme.bundles.NowoCrmKitBundle.partials.empty` (its own partial); a host entry for that key wins.
+- **Funnel statistics:** `at` is a date (`YYYY-MM-DD`, the end of that day in the application's time zone; now for
+  today); an old `at` with a time is ignored like any invalid filter.
+- **UiKit host options** stay the host's: Beacon-like icon-only Filter / Clear filters need
+  `nowo_ui_kit.theme.pages.list.filters.display: icon` and an icon set other than `none`; the phone sheet needs
+  `nowo_ui_kit.theme.pages.list.filters.sheet: true`.
+- **Assets / translations:** no new asset; 30 new translation keys in the 7 locales (clear the cache).
+
 ## To 0.10.1
 
 From **0.10.0**:

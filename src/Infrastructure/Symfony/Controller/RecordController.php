@@ -31,7 +31,6 @@ use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Column;
 use Nowo\UiKitBundle\View\Confirm;
 use Nowo\UiKitBundle\View\EmptyState;
-use Nowo\UiKitBundle\View\FilterField;
 use Nowo\UiKitBundle\View\FormPage;
 use Nowo\UiKitBundle\View\ListPage;
 use Nowo\UiKitBundle\View\PageHeader;
@@ -62,6 +61,9 @@ final readonly class RecordController
     /** Id of the "New company / New contact" remote form dialog (0.8.0, `ui.record_create: dialog`). */
     public const RECORD_DIALOG = 'crm-record-dialog';
 
+    /** Request attribute of the empty state's extra actions (0.10.2; read by the bundle's `empty` partial). */
+    public const EMPTY_ACTIONS = UiSupport::EMPTY_ACTIONS;
+
     /**
      * Wires the collaborators.
      */
@@ -75,6 +77,7 @@ final readonly class RecordController
         private RecordPage $page,
         private ?ImportServiceInterface $imports = null,
         private ?RemoteDialogResponder $dialog = null,
+        private bool $hubspot = false,
     ) {
     }
 
@@ -97,7 +100,8 @@ final readonly class RecordController
             foreach ($this->reader->tags() as $tag) {
                 $tags[$tag->name] = $tag->id;
             }
-            $filters = $this->ui->form(FilterType::class, null, ['tags' => $tags, 'owners' => $this->forms->owners(), 'roles' => $this->forms->roles(), 'purposes' => $subject === SubjectType::Contact ? $this->forms->affiliationPurposes() : [], 'per_page' => $this->ui->options->listPerPage], '');
+            // 0.10.2: owner "Mine" / "No owner", the company of a contact, created / changed day ranges.
+            $filters = $this->ui->form(FilterType::class, null, ['tags' => $tags, 'owners' => $this->ui->ownerChoices($this->forms->owners()), 'roles' => $this->forms->roles(), 'purposes' => $subject === SubjectType::Contact ? $this->forms->affiliationPurposes() : [], 'companies' => $subject === SubjectType::Contact ? $this->forms->records(SubjectType::Company) : null, 'per_page' => $this->ui->filterPerPage()], '');
             $filters->handleRequest($request);
             $query  = $this->query($request, $subject, $tags);
             $result = $this->reader->list($query);
@@ -115,24 +119,31 @@ final readonly class RecordController
             $canDelete = $this->ui->can(CrmPermission::Delete);
             $actions   = [];
             $canCreate = $this->ui->can(CrmPermission::Create);
-            if ($canCreate) {
+            $filtered  = ListFilters::any($request->query->all());
+            // 0.10.2 (Beacon UI-PATTERNS §3 / §11): one create button — the header's while there are rows (or a filter
+            // hides them), the empty state's on an empty list.
+            $emptyList = $rows === [] && !$filtered && $query->page === 1;
+            if ($canCreate && !$emptyList) {
                 $actions[] = $this->createAction($subject, 'crm-record-new');
+            }
+            // 0.4.0: "Import" opens the import modal (js/nowo-crm-import.js); its href, the import page, is the no-JS
+            // fallback. Only for someone who may import, like the page itself. 0.10.2: the secondary header action,
+            // right after the primary one, and next to create in the empty state.
+            $importDialog = null;
+            $import       = null;
+            if ($this->ui->can(CrmPermission::Import)) {
+                $importDialog = ['url' => $this->ui->url('nowo_crm_kit_import', ['subject' => $subject->value])];
+                $import       = new Action('import', UiSupport::label('list.import'), $importDialog['url'], icon: 'import', variant: 'secondary', attributes: ['data-crm-import-open' => true, 'aria-haspopup' => 'dialog', 'data-testid' => 'crm-import-open']);
+                $actions[]    = $import;
+                // Audit XU-M1: the person's unfinished imports stay reachable once the modal is closed.
+                $importDialog['unfinished'] = $this->imports?->unfinished() ?? ['total' => 0, 'imports' => []];
             }
             if ($this->ui->can(CrmPermission::Export)) {
                 $actions[] = new Action('export', UiSupport::label('list.export'), $this->ui->url('nowo_crm_kit_export', ['type' => $type] + $request->query->all()), icon: 'download');
             }
-            // 0.4.0: "Import" opens the import modal (js/nowo-crm-import.js); its href, the import page, is the no-JS
-            // fallback. Only for someone who may import, like the page itself.
-            $importDialog = null;
-            if ($this->ui->can(CrmPermission::Import)) {
-                $importDialog = ['url' => $this->ui->url('nowo_crm_kit_import', ['subject' => $subject->value])];
-                $actions[]    = new Action('import', UiSupport::label('list.import'), $importDialog['url'], attributes: ['data-crm-import-open' => true, 'aria-haspopup' => 'dialog', 'data-testid' => 'crm-import-open']);
-                // Audit XU-M1: the person's unfinished imports stay reachable once the modal is closed.
-                $importDialog['unfinished'] = $this->imports?->unfinished() ?? ['total' => 0, 'imports' => []];
-            }
             $columns = $subject === SubjectType::Company
-                ? [new Column('label', UiSupport::label('field.name'), true, required: true, sortKey: 'name'), new Column('city', UiSupport::label('field.city'), priority: 2), new Column('email', UiSupport::label('field.email'), priority: 3), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('roles', UiSupport::label('field.roles'), priority: 2), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')]
-                : [new Column('label', UiSupport::label('field.contact_name'), true, required: true, sortKey: 'name'), new Column('email', UiSupport::label('field.email')), new Column('phone', UiSupport::label('field.phone'), priority: 2), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('roles', UiSupport::label('field.roles'), priority: 2), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')];
+                ? [new Column('label', UiSupport::label('field.name'), true, required: true, sortKey: 'name'), new Column('city', UiSupport::label('field.city'), priority: 2), new Column('email', UiSupport::label('field.email'), priority: 3), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('roles', UiSupport::label('field.roles'), priority: 2), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('created', UiSupport::label('list.col.created'), true, priority: 3, sortKey: 'created'), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')]
+                : [new Column('label', UiSupport::label('field.contact_name'), true, required: true, sortKey: 'name'), new Column('email', UiSupport::label('field.email')), new Column('phone', UiSupport::label('field.phone'), priority: 2), new Column('owner', UiSupport::label('field.owner'), priority: 3), new Column('roles', UiSupport::label('field.roles'), priority: 2), new Column('tags', UiSupport::label('field.tags'), priority: 2), new Column('created', UiSupport::label('list.col.created'), true, priority: 3, sortKey: 'created'), new Column('updated', UiSupport::label('list.col.updated'), true, priority: 3, sortKey: 'updated')];
 
             return $this->ui->render('@NowoCrmKit/record/list.html.twig', [
                 'page' => new ListPage(
@@ -159,14 +170,14 @@ final readonly class RecordController
                         return $actions;
                     },
                     $this->ui->pagination($result->total, $query->page, $query->perPage, 'nowo_crm_kit_list', $request),
-                    new EmptyState(UiSupport::label('list.empty.' . $subject->value), UiSupport::label('list.empty_hint'), $canCreate ? $this->createAction($subject, 'crm-record-new-empty') : null),
+                    $this->emptyState($request, $subject, $filtered, $canCreate),
                     $this->ui->url('nowo_crm_kit_list', ['type' => $type]),
                     $query->sort === 'name' ? 'label' : $query->sort,
                     $query->direction,
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-list-' . $subject->value],
-                    filterFields: [new FilterField('q', UiSupport::label('list.filter.q_placeholder'), 'lg', attributes: ['aria-label' => $this->ui->trans('list.filter.q')]), ...$this->ui->perPageField()],
+                    filterFields: $this->ui->filterFields($subject === SubjectType::Company ? 'companies' : 'contacts', UiSupport::label('list.filter.q_placeholder'), ['aria-label' => $this->ui->trans('list.filter.q')]),
                     responsive: 'cards',
                     filtersFold: $this->ui->options->filtersFold ? true : null,
                 ),
@@ -513,6 +524,18 @@ final readonly class RecordController
     }
 
     /**
+     * The empty state of a list (0.10.2, Beacon UI-PATTERNS §11): with a filter set, "nothing matches" and Clear
+     * filters; on the list's defaults, why it is empty (import from a file, or HubSpot with `import.hubspot.enabled`)
+     * with create, and Import next to it (the `empty` partial of the bundle prints the request's extra actions).
+     */
+    private function emptyState(Request $request, SubjectType $subject, bool $filtered, bool $canCreate): EmptyState
+    {
+        $extra = $this->ui->can(CrmPermission::Import) ? [new Action('import', UiSupport::label('list.import'), $this->ui->url('nowo_crm_kit_import', ['subject' => $subject->value]), icon: 'import', variant: 'secondary', attributes: ['data-crm-import-open' => true, 'aria-haspopup' => 'dialog', 'data-testid' => 'crm-import-open-empty'])] : [];
+
+        return $this->ui->emptyState($request, $filtered, $this->ui->url('nowo_crm_kit_list', ['type' => $subject->segment()]), UiSupport::label('list.empty.' . $subject->value), UiSupport::label($this->hubspot ? 'list.empty_hint_hubspot' : 'list.empty_hint'), $canCreate ? $this->createAction($subject, 'crm-record-new-empty') : null, $extra);
+    }
+
+    /**
      * The fragment of the "New company / contact" dialog (0.8.0): the form, its errors and the Save / Cancel row,
      * `Vary: X-Nowo-Dialog` (the URL serves the page too).
      *
@@ -570,7 +593,7 @@ final readonly class RecordController
         $q      = $request->query->all();
         $text   = is_string($q['q'] ?? null) ? $q['q'] : null;
         $tag    = is_string($q['tag'] ?? null) && RecordId::isValid($q['tag']) && ($tags === null || in_array($q['tag'], $tags, true)) ? $q['tag'] : null;
-        $owner  = is_string($q['owner'] ?? null) && $q['owner'] !== '' && ExactId::isValid($q['owner']) ? $q['owner'] : null;
+        $owner  = is_string($q['owner'] ?? null) && $q['owner'] !== '' && ExactId::isValid($q['owner']) && !in_array($q['owner'], [ListFilters::OWNER_ME, ListFilters::OWNER_NONE], true) ? $q['owner'] : null;
         $status = ($q['status'] ?? null) === 'trashed' ? RecordStatus::Trashed : RecordStatus::Active;
         $sort   = is_string($q['sort'] ?? null) ? ($q['sort'] === 'label' ? 'name' : $q['sort']) : 'name';
         // Only configured keys filter (byte for byte); anything else is ignored like an unknown tag.
@@ -587,9 +610,16 @@ final readonly class RecordController
             is_string($q['direction'] ?? null) ? $q['direction'] : 'asc',
             $page ?? (is_numeric($q['page'] ?? null) ? (int) $q['page'] : 1),
             $perPage ?? $this->ui->options->perPage($q['per_page'] ?? null, $this->ui->pageSize),
+            companyId: $type === SubjectType::Contact && is_string($q['company'] ?? null) && RecordId::isValid($q['company']) ? $q['company'] : null,
             role: $role,
             purpose: $purpose,
             primaryContactOnly: $type === SubjectType::Contact && ($q['primary_contact'] ?? null) === '1',
+            ownerMe: ($q['owner'] ?? null) === ListFilters::OWNER_ME,
+            ownerNone: ($q['owner'] ?? null) === ListFilters::OWNER_NONE,
+            createdFrom: ListFilters::day($q['created_from'] ?? null),
+            createdTo: ListFilters::day($q['created_to'] ?? null),
+            updatedFrom: ListFilters::day($q['updated_from'] ?? null),
+            updatedTo: ListFilters::day($q['updated_to'] ?? null),
         );
     }
 
@@ -610,6 +640,7 @@ final readonly class RecordController
             'owner'   => $view->ownerName ?? $view->ownerId,
             'roles'   => implode(', ', array_map(fn (string $r): string => $this->ui->trans('role.' . $r), $view->roles)),
             'tags'    => implode(', ', array_map(static fn (TagView $t): string => $t->name, $view->tags)),
+            'created' => $view->createdAt->format('Y-m-d'),
             'updated' => $view->updatedAt->format('Y-m-d'),
         ];
     }

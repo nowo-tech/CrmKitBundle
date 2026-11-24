@@ -27,6 +27,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as 0.10.2: every list of the kit (Companies, Contacts, Deals, Tags, Custom fields, Funnels) follows Beacon's
+filter standard (Beacon request 2026-11-24, UI-PATTERNS §3, §4, §7, §8 and §11). No BC break in the public PHP API; the new `ui` keys are optional, and
+UPGRADING lists the visible changes of the filter bars.
+
+### Added
+
+- `ui.filters_more` (`companies`, `contacts`, `deals`): the filter fields folded under UiKit's **More filters**
+  disclosure after Filter / Clear filters. It shows how many of them are set and stays open while one is. Defaults:
+  Companies role and dates; Contacts role, purpose, primary contact, company and dates; Deals stage, company,
+  contact, stale and expected close. `[]` for a list = no fold.
+- `ui.per_page_position` (`filters` | `pagination`), `ui.per_page_row_class` and `ui.search_width`: where the compact
+  *N per page* select sits (first in the filter actions, or in UiKit's compact pager), a host class for its row
+  (e.g. `issue-filters__pager`), and the search width (default one grid column).
+- Filters: owner **Mine** (the acting person, through the actor resolver) and **No owner** on Companies, Contacts and
+  Deals; created and changed day ranges on Companies and Contacts (native date fields, `ListQuery::$createdFrom` …
+  `$updatedTo`, whole UTC days); company on Contacts; stage, owner, company, contact and an expected close range on
+  Deals (`DealQuery::$ownerMe`, `$ownerNone`, `$expectedCloseFrom`, `$expectedCloseTo`). `ListQuery::forActor()` and
+  `DealQuery::forActor()` resolve *Mine*; an unresolved *Mine* matches nothing.
+- Sortable column headers: *Created* on Companies and Contacts; *Title*, *Amount*, *Expected close* and *Updated* on
+  Deals, both directions (`DealQuery::SORT_TITLE`, `DealQuery::SORTS`, `DealQuery::$direction`; rows without an
+  amount or a close date stay last). Deals get the *N per page* select too and numbered pages (below).
+- Empty states (§11): on the list defaults the message says why the list is empty and offers create with **Import**
+  next to it; with `import.hubspot.enabled` the hint mentions HubSpot. With a filter set: *Nothing matches these
+  filters* and **Clear filters**. The bundle prepends its own UiKit `empty` partial for the NowoCrmKitBundle domain
+  (`@NowoCrmKit/partials/_empty.html.twig`; a host entry wins).
+- Deals: numbered pages with the total (*Showing 1–25 of N*, UiKit pager) instead of the keyset *Next page* link
+  (`DealReader::page()`, `DealListResult`); a page past the end shows the last page. The keyset reader stays for
+  the API.
+- Tags, Custom fields and Funnels: every column sorts (in memory, both directions); Funnels gets the filter card
+  (name search, *N per page*) and the pager like Tags and Custom fields.
+- Empty states of every list: one sentence saying why it is empty, and the create action(s) (Custom fields: both;
+  Deals without a deal funnel: *Open the funnels*), or *Nothing matches these filters* with **Clear filters** when
+  the search or a filter is set. `UiSupport::emptyState()` / `UiSupport::sortRows()` share it.
+- 30 translation keys in the 7 locales (`list.filter.*`, `deal.filter.*`, `list.empty_hint_hubspot`,
+  `list.no_match_filters`, `list.col.created`, `error.owner_filter`, `tags.empty_hint`, `fields.empty_hint`,
+  `funnels.empty_hint`, `deals.empty_hint`, `deals.empty_no_funnel`, `deals.open_funnels`).
+
+### Changed
+
+- Dependencies: `nowo-tech/ui-kit-bundle` ^2.73 (the 2.72 filter standard: no duplicate select classes, icon-only
+  Filter / Clear filters at field height, the compact pager field, More filters, the phone sheet).
+- The search field is one grid column wide (was two); `ui.search_width: lg` restores it.
+- *Rows per page* is compact (*25 per page*), first in the filter actions, named *Results per page* for assistive tech
+  (visually hidden label); it no longer takes a whole grid track.
+- Contacts: *Primary contacts only* is a checkbox (same `primary_contact=1` query) instead of a select whose
+  placeholder was cut.
+- Deals: the search has a placeholder and an `aria-label`; the funnel placeholder reads *Any funnel*; the *Sort*
+  select is gone (sortable headers instead; `?sort=` still works and `direction` joins it). The `sorts` option of
+  `DealFilterType` is deprecated and ignored.
+- List header (§3): one primary create, then **Import** (secondary, with an icon) and *Export CSV*. While a list is
+  empty and unfiltered, the create button is the empty state's, not the header's (one create button), on every
+  list. A search on Tags / Custom fields now reads *Nothing matches these filters* (was *Nothing matches the
+  search*).
+- Funnel statistics: the filters use the standard bar (icon-only Filter / Clear filters); `at` is a native date and
+  the snapshot is taken at the end of that day in the application's time zone (now, for today).
+- Demo (Symfony 8): UiKit's built-in SVG icons, icon-only filter buttons and the phone filter sheet, as Beacon draws
+  them; screenshots `docs/images/demo/crm-filters-after-*.webp`.
+
 ## [0.10.1] - 2026-11-24
 
 Planned as 0.10.1 (patch): the follow-ups of audit ZAM and its delta. No BC break in the public PHP API or config;

@@ -9,7 +9,6 @@ use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
-use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -32,7 +31,9 @@ final class StatsFilterType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $this->withBuilder($builder, function () use ($options): void {
-            $this->addTypedField('at', DateTimeType::class, ['label' => 'stats.filter.at', 'required' => false, 'widget' => 'single_text', 'input' => 'datetime_immutable', 'model_timezone' => 'UTC']);
+            // 0.10.2 (Beacon filter standard): a native date field; the controller takes the snapshot at the end of that
+            // day in the application's time zone (now, for today).
+            $this->addTypedField('at', DateType::class, ['label' => 'stats.filter.at', 'required' => false, 'widget' => 'single_text', 'input' => 'datetime_immutable', 'model_timezone' => 'UTC', 'view_timezone' => 'UTC']);
             $this->addTypedField('owner', ChoiceType::class, ['label' => 'list.filter.owner', 'choices' => $options['owners'], 'required' => false, 'placeholder' => 'list.filter.any_owner', 'choice_translation_domain' => false]);
             if ($options['roles'] !== []) {
                 $this->addTypedField('role', ChoiceType::class, ['label' => 'list.filter.role', 'choices' => $options['roles'], 'required' => false, 'placeholder' => 'list.filter.any_role']);

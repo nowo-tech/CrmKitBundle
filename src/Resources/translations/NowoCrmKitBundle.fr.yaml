@@ -22,6 +22,7 @@ form:
     save: Enregistrer
     cancel: Annuler
 list:
+    empty_hint_hubspot: 'Créez-en un ou importez depuis un fichier ou HubSpot.'
     next: 'Page suivante'
     title:
         company: Sociétés
@@ -31,11 +32,25 @@ list:
         contact: Aucun contact pour le moment.
     empty_hint: Créez-en un ou importez un fichier CSV ou vCard.
     no_match: 'Aucun résultat pour cette recherche.'
+    no_match_filters: 'Aucun résultat pour ces filtres.'
     export: Exporter en CSV
     import: 'Importer'
     col:
+        created: 'Créé'
         updated: Mis à jour
     filter:
+        owner_me: 'Les miens'
+        owner_none: 'Sans responsable'
+        primary_contacts_only: 'Contacts principaux uniquement'
+        company: 'Entreprise'
+        any_company: 'Toutes les entreprises'
+        created_from: 'Créé depuis le'
+        created_to: 'Créé jusqu''au'
+        updated_from: 'Modifié depuis le'
+        updated_to: 'Modifié jusqu''au'
+        results_per_page: 'Résultats par page'
+        per_page_option: '%count% par page'
+        clear: 'Effacer les filtres'
         apply: 'Appliquer'
         role: 'Rôle'
         purpose: 'Contact pour'
@@ -120,6 +135,7 @@ fields:
     title: Champs personnalisés
     intro: Champs propres aux sociétés et aux contacts. Les champs archivés conservent leurs valeurs.
     empty: Aucun champ personnalisé pour le moment.
+    empty_hint: 'Aucun champ personnalisé pour l''instant : ils ajoutent vos propres données aux entreprises et contacts.'
     define_for: 'Définir un champ pour :'
     col:
         subject: Pour
@@ -211,6 +227,7 @@ tags:
     title_record: Étiquettes
     intro: Les étiquettes regroupent les sociétés et les contacts ; les listes peuvent être filtrées par étiquette.
     empty: Aucune étiquette pour le moment.
+    empty_hint: 'Aucune étiquette pour l''instant : elles regroupent entreprises et contacts.'
     save: Enregistrer les étiquettes
     saved: Les étiquettes ont été enregistrées.
     form:
@@ -483,6 +500,7 @@ flash:
         crm_settings_stale: Quelqu'un a modifié les paramètres au même moment. Vérifiez-les et enregistrez à nouveau.
         crm_write_conflict: 'Une autre modification des mêmes données est arrivée au même moment. Réessayez.'
 error:
+    owner_filter: 'Choisissez Les miens ou Sans responsable, pas les deux.'
     hubspot_needs_person: 'Une personne doit poursuivre cet import : il a atteint des fiches d’autres personnes.'
     hubspot_token_invalid: 'HubSpot a refusé cette clé de service (ou ce jeton d’app privée), ou elle appartient à un autre compte. Collez-en une valide.'
     hubspot_scope_missing: 'Il manque à la clé une autorisation de lecture nécessaire à l’import. Ajoutez les autorisations documentées et réessayez.'
@@ -554,7 +572,18 @@ purpose:
 deals:
     title: 'Affaires'
     empty: 'Aucune affaire pour l’instant.'
+    empty_hint: 'Aucune affaire pour l''instant : créez-en une pour la suivre dans son entonnoir.'
+    empty_no_funnel: 'Aucune affaire pour l''instant : elles avancent dans un entonnoir d''affaires, créez-en donc un d''abord.'
+    open_funnels: 'Ouvrir les entonnoirs'
 deal:
+    filter:
+        any_funnel: 'Tous les entonnoirs'
+        any_stage: 'Toutes les étapes'
+        any_contact: 'Tous les contacts'
+        expected_close_from: 'Clôture prévue depuis le'
+        expected_close_to: 'Clôture prévue jusqu''au'
+        q_placeholder: 'Rechercher des affaires par titre'
+        q_aria: 'Rechercher des affaires'
     new: 'Nouvelle affaire'
     edit: 'Modifier'
     edit_title: 'Modifier %name%'
@@ -648,6 +677,7 @@ funnels:
     title: 'Entonnoirs'
     intro: 'Entonnoirs d’affaires et de cycle de vie des entreprises et des contacts.'
     empty: 'Aucun entonnoir pour l’instant.'
+    empty_hint: 'Aucun entonnoir pour l''instant : un entonnoir regroupe les étapes d''une affaire ou d''un client.'
 funnel:
     add: 'Nouvel entonnoir'
     save: 'Créer'

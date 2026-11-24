@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Domain\Service;
 
+use DateTimeImmutable;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
@@ -42,6 +43,13 @@ final readonly class ListQuery
      *                             `affiliations.purposes`)
      * @param bool $primaryContactOnly contacts only: only contacts that are the primary contact of a company (of
      *                                 `$companyId` when set)
+     * @param bool $ownerMe 0.10.2: only the acting person's records (resolved with {@see self::forActor()} by the
+     *                      reader before the store sees the query; `$ownerId` is ignored)
+     * @param bool $ownerNone 0.10.2: only records without an owner (`$ownerId` is ignored)
+     * @param DateTimeImmutable|null $createdFrom 0.10.2: created on or after this day (UTC, whole days)
+     * @param DateTimeImmutable|null $createdTo 0.10.2: created on or before this day
+     * @param DateTimeImmutable|null $updatedFrom 0.10.2: last changed on or after this day
+     * @param DateTimeImmutable|null $updatedTo 0.10.2: last changed on or before this day
      */
     public function __construct(
         public SubjectType $type,
@@ -57,7 +65,16 @@ final readonly class ListQuery
         public ?string $role = null,
         public ?string $purpose = null,
         public bool $primaryContactOnly = false,
+        public bool $ownerMe = false,
+        public bool $ownerNone = false,
+        public ?DateTimeImmutable $createdFrom = null,
+        public ?DateTimeImmutable $createdTo = null,
+        public ?DateTimeImmutable $updatedFrom = null,
+        public ?DateTimeImmutable $updatedTo = null,
     ) {
+        if ($ownerMe && $ownerNone) {
+            throw InvalidInputException::field('owner', 'error.owner_filter');
+        }
         if ($role !== null && !RoleKey::isValid($role)) {
             throw InvalidInputException::field('role', 'error.role_unknown');
         }
@@ -68,5 +85,17 @@ final readonly class ListQuery
         $this->direction = $direction === 'desc' ? 'desc' : 'asc';
         $this->page      = min(self::MAX_PAGE, max(1, $page));
         $this->perPage   = min(100, max(1, $perPage));
+    }
+
+    /**
+     * The query for one actor (0.10.2): `ownerMe` becomes that actor's owner id; any other query is returned as is.
+     */
+    public function forActor(string $actorId): self
+    {
+        if (!$this->ownerMe) {
+            return $this;
+        }
+
+        return new self($this->type, $this->text, $this->tagId, $actorId, $this->status, $this->sort, $this->direction, $this->page, $this->perPage, $this->companyId, $this->role, $this->purpose, $this->primaryContactOnly, false, false, $this->createdFrom, $this->createdTo, $this->updatedFrom, $this->updatedTo);
     }
 }

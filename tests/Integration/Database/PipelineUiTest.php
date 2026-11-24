@@ -205,10 +205,10 @@ final class PipelineUiTest extends CrmTestCase
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
         self::assertCount(3, $stats->filter('[data-testid="crm-stats-row"]'));
         self::assertStringContainsString('100 EUR', $stats->filter('[data-testid="crm-stats-table"]')->text());
-        $this->client->request('GET', '/crm/funnels/' . $funnel . '/stats?at=2026-11-18T09:00&owner=leo&from=2026-11-01&to=2026-11-30');
+        $this->client->request('GET', '/crm/funnels/' . $funnel . '/stats?at=2026-11-18&owner=leo&from=2026-11-01&to=2026-11-30');
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
-        $this->client->request('GET', '/crm/funnels/' . $funnel . '/stats?at=2030-01-01T00:00');
-        self::assertSame(200, $this->client->getResponse()->getStatusCode(), 'a future instant is a form error');
+        $this->client->request('GET', '/crm/funnels/' . $funnel . '/stats?at=2030-01-01');
+        self::assertSame(200, $this->client->getResponse()->getStatusCode(), 'a future day is a form error');
         $this->client->request('GET', '/crm/funnels/' . $funnel . '/stats.csv');
         self::assertSame('text/csv; charset=UTF-8', $this->client->getResponse()->headers->get('Content-Type'));
         self::assertStringContainsString('"Open","open","1","0","EUR","100","10"', (string) $this->client->getResponse()->getContent());

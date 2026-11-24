@@ -1,6 +1,13 @@
 # The CRM's lists open their row actions on right-click / long press, and its pages offer the focus mode.
+# 0.10.2 (Beacon filter standard): the filter bars as a host like Beacon draws them — icon-only Filter / Clear filters
+# at field height and, below 48rem, the filters in UiKit's phone sheet behind one "Filters (n)" button.
 nowo_ui_kit:
     theme:
         context_menus: true
         focus_mode:
             enabled: true
+        pages:
+            list:
+                filters:
+                    display: icon
+                    sheet: true

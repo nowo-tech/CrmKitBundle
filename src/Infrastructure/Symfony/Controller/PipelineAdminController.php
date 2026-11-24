@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
 use DateInterval;
 use DateTimeImmutable;
+use DateTimeZone;
 use Nowo\CrmKitBundle\Application\CrmAccess;
 use Nowo\CrmKitBundle\Application\Pipeline\FunnelReader;
 use Nowo\CrmKitBundle\Application\Pipeline\FunnelService;
@@ -22,13 +23,13 @@ use Nowo\CrmKitBundle\Domain\Read\Pipeline\FunnelView;
 use Nowo\CrmKitBundle\Domain\Read\Pipeline\StageView;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ActionType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\AdminFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FunnelType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\StageType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\StatsFilterType;
 use Nowo\TransactionDoctrine\WriteUnit\AsWriteUnit;
 use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\Column;
-use Nowo\UiKitBundle\View\EmptyState;
 use Nowo\UiKitBundle\View\FormPage;
 use Nowo\UiKitBundle\View\ListPage;
 use Nowo\UiKitBundle\View\PageHeader;
@@ -38,12 +39,19 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
+use function array_filter;
 use function array_map;
+use function array_slice;
+use function array_values;
 use function count;
+use function date_default_timezone_get;
 use function is_array;
 use function is_numeric;
 use function is_string;
 use function max;
+use function mb_stripos;
+use function mb_substr;
+use function trim;
 
 /**
  * Funnel administration (0.3.0, `manage`: funnels, stages, their order) and the statistics page of a deal funnel
@@ -95,18 +103,39 @@ final readonly class PipelineAdminController
             // 0.9.0: with the dialogs "New funnel" is a header action that loads its page on demand (no form here).
             $actions = $dialogs instanceof PipelineDialogs ? [$dialogs->opener('create', 'funnel.add', 'nowo_crm_kit_funnel_new', [], 'crm-funnel-new', 'primary')] : [];
             $rows    = array_map(fn (FunnelView $f): array => ['id' => $f->id, 'name' => $f->name, 'kind' => $this->ui->trans('funnel.kind.' . ($f->kind === FunnelKind::Deal ? 'deal' : 'party_' . $f->subjectType?->value)), 'stages' => (string) count($f->stages), 'archived' => $f->archived ? $this->ui->trans('value.yes') : ''], $this->reader->funnels(null, true));
+            // 0.10.2 (Beacon filter standard): the name search, rows per page, sortable columns, the pager and the
+            // standard empty state, like the other lists.
+            $filters = $this->ui->form(AdminFilterType::class, null, ['per_page' => $this->ui->filterPerPage()], '');
+            $filters->handleRequest($request);
+            $q    = $request->query->all();
+            $text = is_string($q['q'] ?? null) ? trim(mb_substr($q['q'], 0, 100)) : '';
+            if ($text !== '') {
+                $rows = array_values(array_filter($rows, static fn (array $row): bool => mb_stripos((string) $row['name'], $text) !== false));
+            }
+            [$rows, $sort, $direction] = $this->ui->sortRows($rows, $request, ['name', 'kind', 'stages', 'archived'], 'name');
+            $pager                     = $this->ui->pagination(count($rows), is_numeric($q['page'] ?? null) ? (int) $q['page'] : 1, $this->ui->options->perPage($q['per_page'] ?? null, $this->ui->pageSize), 'nowo_crm_kit_funnels', $request);
+            $rows                      = array_slice($rows, $pager->offset(), $pager->limit());
+            $create                    = $rows === [] && $text === '' && $actions !== [] ? $actions[0] : null;
+            $actions                   = $create instanceof Action ? [] : $actions;
 
             return $this->ui->render('@NowoCrmKit/pipeline/funnels.html.twig', [
                 'page' => new ListPage(
                     new PageHeader(UiSupport::label('funnels.title'), UiSupport::label('funnels.intro'), $actions, tabs: $this->ui->tabs('funnels')),
-                    [new Column('name', UiSupport::label('funnel.form.name'), required: true), new Column('kind', UiSupport::label('funnel.form.kind')), new Column('stages', UiSupport::label('funnel.stages'), priority: 2), new Column('archived', UiSupport::label('funnel.form.archived'), priority: 3)],
+                    [new Column('name', UiSupport::label('funnel.form.name'), true, required: true), new Column('kind', UiSupport::label('funnel.form.kind'), true), new Column('stages', UiSupport::label('funnel.stages'), true, align: 'end', priority: 2), new Column('archived', UiSupport::label('funnel.form.archived'), true, priority: 3)],
                     $rows,
-                    rowActions: fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_funnel_edit', ['id' => $row['id']]), UiSupport::label('funnel.edit'))] : [],
-                    empty: new EmptyState(UiSupport::label('funnels.empty')),
+                    $this->ui->filterView($filters, $pager->perPage),
+                    fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_funnel_edit', ['id' => $row['id']]), UiSupport::label('funnel.edit'))] : [],
+                    $pager,
+                    $this->ui->emptyState($request, $text !== '', $this->ui->url('nowo_crm_kit_funnels'), null, UiSupport::label('funnels.empty_hint'), $create),
+                    $this->ui->url('nowo_crm_kit_funnels'),
+                    $sort,
+                    $direction,
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-funnels'],
+                    filterFields: $this->ui->filterFields(null, UiSupport::label('list.filter.name_placeholder')),
                     responsive: 'cards',
+                    filtersFold: $this->ui->options->filtersFold ? true : null,
                 ),
                 'form'       => $form?->createView(),
                 'crm_dialog' => $dialogs?->shell('funnel.add'),
@@ -279,6 +308,20 @@ final readonly class PipelineAdminController
     }
 
     /**
+     * The snapshot instant of a statistics day (0.10.2, `at` is a date): the end of that day in the application's time
+     * zone (the one the page prints dates in), or now for today (the end of today is still in the future); a later
+     * day stays in the future and is refused as before.
+     */
+    private function endOfDay(DateTimeImmutable $day): DateTimeImmutable
+    {
+        $zone = new DateTimeZone(date_default_timezone_get());
+        $end  = new DateTimeImmutable($day->format('Y-m-d') . ' 23:59:59', $zone);
+        $now  = $this->access->context(CrmPermission::View)->now->setTimezone($zone); // @igor-ignore - an immutable date of this request, never a shared service
+
+        return $end > $now && $day->format('Y-m-d') === $now->format('Y-m-d') ? $now : $end;
+    }
+
+    /**
      * The funnel, its statistics and the filter form of a request.
      *
      * @return array{FunnelView, FunnelStats, FormInterface<mixed>}
@@ -299,7 +342,7 @@ final readonly class PipelineAdminController
         try {
             $stats = $this->statistics->stats(
                 $id,
-                $at instanceof DateTimeImmutable ? $at : null,
+                $at instanceof DateTimeImmutable ? $this->endOfDay($at) : null,
                 $valid && $this->text($filters, 'owner') !== '' ? $this->text($filters, 'owner') : null,
                 $role === '' ? null : $role,
                 $valid && $this->text($filters, 'tag') !== '' ? $this->text($filters, 'tag') : null,

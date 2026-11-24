@@ -22,6 +22,7 @@ form:
     save: Guardar
     cancel: Cancelar
 list:
+    empty_hint_hubspot: 'Crea una o importa desde un archivo o HubSpot.'
     next: 'Página siguiente'
     title:
         company: Empresas
@@ -31,11 +32,25 @@ list:
         contact: Aún no hay contactos.
     empty_hint: Crea una o importa un archivo CSV o vCard.
     no_match: 'Nada coincide con la búsqueda.'
+    no_match_filters: 'Nada coincide con estos filtros.'
     export: Exportar CSV
     import: 'Importar'
     col:
+        created: 'Creado'
         updated: Actualizado
     filter:
+        owner_me: 'Míos'
+        owner_none: 'Sin responsable'
+        primary_contacts_only: 'Solo contactos principales'
+        company: 'Empresa'
+        any_company: 'Cualquier empresa'
+        created_from: 'Creado desde'
+        created_to: 'Creado hasta'
+        updated_from: 'Modificado desde'
+        updated_to: 'Modificado hasta'
+        results_per_page: 'Resultados por página'
+        per_page_option: '%count% por página'
+        clear: 'Limpiar filtros'
         apply: 'Aplicar'
         role: 'Rol'
         purpose: 'Contacto para'
@@ -120,6 +135,7 @@ fields:
     title: Campos personalizados
     intro: Campos propios para empresas y contactos. Los campos archivados conservan sus valores.
     empty: Aún no hay campos personalizados.
+    empty_hint: 'Todavía no hay campos personalizados: añaden tus propios datos a empresas y contactos.'
     define_for: 'Definir un campo para:'
     col:
         subject: Para
@@ -211,6 +227,7 @@ tags:
     title_record: Etiquetas
     intro: Las etiquetas agrupan empresas y contactos; los listados se pueden filtrar por ellas.
     empty: Aún no hay etiquetas.
+    empty_hint: 'Todavía no hay etiquetas: agrupan empresas y contactos.'
     save: Guardar etiquetas
     saved: Se han guardado las etiquetas.
     form:
@@ -483,6 +500,7 @@ flash:
         crm_settings_stale: Alguien ha modificado los ajustes al mismo tiempo. Revísalos y vuelve a guardar.
         crm_write_conflict: 'Otro cambio de los mismos datos llegó al mismo tiempo. Inténtalo de nuevo.'
 error:
+    owner_filter: 'Elige Míos o Sin responsable, no ambos.'
     hubspot_needs_person: 'Una persona debe continuar esta importación: llegó a registros de otra persona.'
     hubspot_token_invalid: 'HubSpot rechazó esta clave de servicio (o token de app privada), o es de otra cuenta. Pega una válida.'
     hubspot_scope_missing: 'A la clave le falta un permiso de lectura que la importación necesita. Añade los permisos de la documentación y vuelve a intentarlo.'
@@ -554,7 +572,18 @@ purpose:
 deals:
     title: 'Oportunidades'
     empty: 'Todavía no hay oportunidades.'
+    empty_hint: 'Todavía no hay oportunidades: crea una para seguirla por su embudo.'
+    empty_no_funnel: 'Todavía no hay oportunidades: avanzan por un embudo de oportunidades, así que crea uno primero.'
+    open_funnels: 'Abrir los embudos'
 deal:
+    filter:
+        any_funnel: 'Cualquier embudo'
+        any_stage: 'Cualquier etapa'
+        any_contact: 'Cualquier contacto'
+        expected_close_from: 'Cierre previsto desde'
+        expected_close_to: 'Cierre previsto hasta'
+        q_placeholder: 'Buscar oportunidades por título'
+        q_aria: 'Buscar oportunidades'
     new: 'Nueva oportunidad'
     edit: 'Editar'
     edit_title: 'Editar %name%'
@@ -648,6 +677,7 @@ funnels:
     title: 'Embudos'
     intro: 'Embudos de oportunidades y de ciclo de vida de empresas y contactos.'
     empty: 'Todavía no hay embudos.'
+    empty_hint: 'Todavía no hay embudos: un embudo reúne las etapas por las que pasa una oportunidad o un cliente.'
 funnel:
     add: 'Nuevo embudo'
     save: 'Crear'

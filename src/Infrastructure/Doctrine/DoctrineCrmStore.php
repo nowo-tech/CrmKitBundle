@@ -241,7 +241,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             ->setFirstResult(($query->page - 1) * $query->perPage)->setMaxResults($query->perPage)
             ->getQuery()->getResult();
 
-        return [$this->visible($this->exact($rows, $this->class($query->type), $tenant, $query->ownerId), $visibleOwners), $total];
+        return [$this->visible($this->exact($rows, $this->class($query->type), $tenant, $query->ownerNone || $query->ownerMe ? null : $query->ownerId), $visibleOwners), $total];
     }
 
     /**
@@ -254,7 +254,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             $qb->andWhere('r.id > :after')->setParameter('after', $afterId); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
 
-        return $this->visible($this->exact($qb->getQuery()->getResult(), $this->class($query->type), $tenant, $query->ownerId), $visibleOwners);
+        return $this->visible($this->exact($qb->getQuery()->getResult(), $this->class($query->type), $tenant, $query->ownerNone || $query->ownerMe ? null : $query->ownerId), $visibleOwners);
     }
 
     /**
@@ -277,7 +277,7 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
                 ->setParameter('psType', $query->type)->setParameter('psFunnel', $stage['funnel'])->setParameter('psStage', $stage['stage']);
         }
 
-        return $this->visible($this->exact($qb->getQuery()->getResult(), $this->class($query->type), $tenant, $query->ownerId), $visibleOwners);
+        return $this->visible($this->exact($qb->getQuery()->getResult(), $this->class($query->type), $tenant, $query->ownerNone || $query->ownerMe ? null : $query->ownerId), $visibleOwners);
     }
 
     /**
@@ -1109,8 +1109,22 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
             $qb->andWhere('EXISTS (SELECT 1 FROM ' . Tagging::class . ' tg WHERE tg.subjectId = r.id AND tg.subjectType = :tagType AND tg.tagId = :tag AND tg.tenantId = :tenant)')
                 ->setParameter('tagType', $query->type)->setParameter('tag', $query->tagId);
         }
-        if ($query->ownerId !== null) {
+        if ($query->ownerNone) {
+            $qb->andWhere('r.ownerId IS NULL');
+        } elseif ($query->ownerId !== null && !$query->ownerMe) {
             $qb->andWhere('r.ownerId = :owner')->setParameter('owner', $query->ownerId);
+        } elseif ($query->ownerMe) {
+            // An unresolved "Mine" (ListQuery::forActor() not called) matches nothing rather than everything.
+            $qb->andWhere('1 = 0');
+        }
+        // 0.10.2: created / last-changed day ranges (whole UTC days, both ends included).
+        foreach ([['createdAt', UtcDateTimeImmutableType::NAME, $query->createdFrom, $query->createdTo], ['updatedAt', UtcMicroDateTimeImmutableType::NAME, $query->updatedFrom, $query->updatedTo]] as [$column, $type, $from, $to]) {
+            if ($from instanceof DateTimeImmutable) {
+                $qb->andWhere('r.' . $column . ' >= :' . $column . 'From')->setParameter($column . 'From', $this->dayStart($from), $type);
+            }
+            if ($to instanceof DateTimeImmutable) {
+                $qb->andWhere('r.' . $column . ' < :' . $column . 'To')->setParameter($column . 'To', $this->dayStart($to)->modify('+1 day'), $type);
+            }
         }
         $this->restrict($qb, $visibleOwners);
         if ($query->role !== null) {
@@ -1136,6 +1150,14 @@ final readonly class DoctrineCrmStore implements CrmStoreInterface
         }
 
         return $qb;
+    }
+
+    /**
+     * The start (00:00 UTC) of a filter day (0.10.2): the date the person picked, whatever the time zone it came in.
+     */
+    private function dayStart(DateTimeImmutable $day): DateTimeImmutable
+    {
+        return new DateTimeImmutable($day->format('Y-m-d') . ' 00:00:00', new DateTimeZone('UTC'));
     }
 
     /**

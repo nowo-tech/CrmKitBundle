@@ -127,6 +127,33 @@ final readonly class DoctrinePipelineStore implements PipelineStoreInterface
      */
     public function deals(TenantRef $tenant, DealQuery $query, ?array $visibleOwners, ?array $after, int $limit, array $staleCutoffs, DateTimeImmutable $now): array
     {
+        $qb = $this->dealsQuery($tenant, $query, $visibleOwners, $staleCutoffs, $now);
+        $this->keyset($qb, $query->sort, $after, $query->direction);
+
+        return $this->keptDeals($tenant, $qb->setMaxResults($limit + 1)->getQuery()->getResult(), $visibleOwners);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function dealsPage(TenantRef $tenant, DealQuery $query, ?array $visibleOwners, int $offset, int $limit, array $staleCutoffs, DateTimeImmutable $now): array
+    {
+        $count = $this->dealsQuery($tenant, $query, $visibleOwners, $staleCutoffs, $now);
+        $total = (int) $count->select('COUNT(d.id)')->getQuery()->getSingleScalarResult();
+        $qb    = $this->dealsQuery($tenant, $query, $visibleOwners, $staleCutoffs, $now);
+        $this->keyset($qb, $query->sort, null, $query->direction);
+
+        return [$this->keptDeals($tenant, $qb->setFirstResult(max(0, $offset))->setMaxResults($limit)->getQuery()->getResult(), $visibleOwners), $total];
+    }
+
+    /**
+     * The filters of a deal list (0.10.2: shared by the keyset and the numbered pages), without an order.
+     *
+     * @param list<string>|null $visibleOwners
+     * @param array<string, DateTimeImmutable> $staleCutoffs
+     */
+    private function dealsQuery(TenantRef $tenant, DealQuery $query, ?array $visibleOwners, array $staleCutoffs, DateTimeImmutable $now): QueryBuilder
+    {
         $qb = $this->em()->createQueryBuilder()->select('d')->from(Deal::class, 'd')
             ->where('d.tenantId = :tenant')->setParameter('tenant', $tenant->value);
         if ($query->status instanceof DealStatus) {
@@ -134,7 +161,20 @@ final readonly class DoctrinePipelineStore implements PipelineStoreInterface
         } else {
             $qb->andWhere('d.status <> :trashed')->setParameter('trashed', DealStatus::Trashed); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
-        foreach (['funnelId' => $query->funnelId, 'ownerId' => $query->ownerId, 'companyId' => $query->companyId, 'contactId' => $query->contactId] as $field => $value) {
+        if ($query->ownerNone) {
+            $qb->andWhere('d.ownerId IS NULL');
+        } elseif ($query->ownerMe) {
+            // An unresolved "Mine" (DealQuery::forActor() not called) matches nothing rather than everything.
+            $qb->andWhere('1 = 0');
+        }
+        // 0.10.2: expected close day range (both ends included).
+        if ($query->expectedCloseFrom instanceof DateTimeImmutable) {
+            $qb->andWhere('d.expectedClose >= :closeFrom')->setParameter('closeFrom', new DateTimeImmutable($query->expectedCloseFrom->format('Y-m-d')), 'date_immutable'); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        }
+        if ($query->expectedCloseTo instanceof DateTimeImmutable) {
+            $qb->andWhere('d.expectedClose <= :closeTo')->setParameter('closeTo', new DateTimeImmutable($query->expectedCloseTo->format('Y-m-d')), 'date_immutable'); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        }
+        foreach (['funnelId' => $query->funnelId, 'ownerId' => $query->ownerNone || $query->ownerMe ? null : $query->ownerId, 'companyId' => $query->companyId, 'contactId' => $query->contactId] as $field => $value) {
             if ($value !== null) {
                 $qb->andWhere('d.' . $field . ' = :' . $field)->setParameter($field, $value); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             }
@@ -150,9 +190,20 @@ final readonly class DoctrinePipelineStore implements PipelineStoreInterface
             $qb->andWhere('d.status = :open')->andWhere($this->staleDql($qb, $staleCutoffs, $now))->setParameter('open', DealStatus::Open); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
         $this->restrict($qb, 'd.ownerId', $visibleOwners);
-        $this->keyset($qb, $query->sort, $after);
 
-        $rows = $qb->setMaxResults($limit + 1)->getQuery()->getResult();
+        return $qb;
+    }
+
+    /**
+     * The rows of the tenant the visible owners may see (re-checked in PHP, REQ-SEC-006 rule 2).
+     *
+     * @param mixed $rows the query's result
+     * @param list<string>|null $visibleOwners
+     *
+     * @return list<Deal>
+     */
+    private function keptDeals(TenantRef $tenant, mixed $rows, ?array $visibleOwners): array
+    {
         $kept = [];
         foreach ($this->exact($rows, Deal::class, $tenant) as $deal) {
             if ($visibleOwners === null || $deal->getOwnerId() === null || in_array($deal->getOwnerId(), $visibleOwners, true)) {
@@ -510,25 +561,33 @@ final readonly class DoctrinePipelineStore implements PipelineStoreInterface
     }
 
     /**
-     * The order and the keyset condition of a deal list.
+     * The order and the keyset condition of a deal list. 0.10.2: every order in both directions (`title` too); rows
+     * without an expected close or an amount stay last, in id order, whatever the direction.
      *
      * @param array{v: string|null, id: string}|null $after
      */
-    private function keyset(QueryBuilder $qb, string $sort, ?array $after): void
+    private function keyset(QueryBuilder $qb, string $sort, ?array $after, string $direction = 'desc'): void
     {
-        if ($sort === DealQuery::SORT_UPDATED) {
-            $qb->orderBy('d.updatedAt', 'DESC')->addOrderBy('d.id', 'DESC'); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        $dir = $direction === 'asc' ? 'ASC' : 'DESC';
+        $op  = $dir === 'ASC' ? '>' : '<';
+        if ($sort === DealQuery::SORT_UPDATED || $sort === DealQuery::SORT_TITLE) {
+            $field = $sort === DealQuery::SORT_TITLE ? 'd.title' : 'd.updatedAt';
+            $qb->orderBy($field, $dir)->addOrderBy('d.id', $dir); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             if ($after !== null && $after['v'] !== null) {
-                $qb->andWhere('d.updatedAt < :kv OR (d.updatedAt = :kv AND d.id < :kid)') // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
-                    ->setParameter('kv', new DateTimeImmutable($after['v'], new DateTimeZone('UTC')), UtcMicroDateTimeImmutableType::NAME)->setParameter('kid', $after['id']);
+                $qb->andWhere($field . ' ' . $op . ' :kv OR (' . $field . ' = :kv AND d.id ' . $op . ' :kid)')->setParameter('kid', $after['id']); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                if ($sort === DealQuery::SORT_TITLE) {
+                    $qb->setParameter('kv', $after['v']); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                } else {
+                    $qb->setParameter('kv', new DateTimeImmutable($after['v'], new DateTimeZone('UTC')), UtcMicroDateTimeImmutableType::NAME); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                }
             }
 
             return;
         }
-        // Ascending expected close, or descending amount: rows without a value come last, in id order.
-        [$field, $direction, $operator] = $sort === DealQuery::SORT_AMOUNT ? ['d.amount', 'DESC', '<'] : ['d.expectedClose', 'ASC', '>'];
+        // Expected close or amount: rows without a value come last, in id order.
+        $field = $sort === DealQuery::SORT_AMOUNT ? 'd.amount' : 'd.expectedClose';
         $qb->addSelect('CASE WHEN ' . $field . ' IS NULL THEN 1 ELSE 0 END AS HIDDEN nullsLast') // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
-            ->orderBy('nullsLast')->addOrderBy($field, $direction)->addOrderBy('d.id', 'ASC');
+            ->orderBy('nullsLast')->addOrderBy($field, $dir)->addOrderBy('d.id', 'ASC');
         if ($after === null) {
             return;
         }
@@ -537,7 +596,7 @@ final readonly class DoctrinePipelineStore implements PipelineStoreInterface
 
             return;
         }
-        $qb->andWhere($field . ' ' . $operator . ' :kv OR (' . $field . ' = :kv AND d.id > :kid) OR ' . $field . ' IS NULL') // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        $qb->andWhere($field . ' ' . $op . ' :kv OR (' . $field . ' = :kv AND d.id > :kid) OR ' . $field . ' IS NULL') // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             ->setParameter('kid', $after['id']);
         if ($sort === DealQuery::SORT_AMOUNT) {
             $qb->setParameter('kv', $after['v']); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service

@@ -27,8 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Planned as 0.10.2: the Companies, Contacts and Deals lists follow Beacon's filter standard (Beacon request
-2026-11-24, UI-PATTERNS §3, §7, §8 and §11). No BC break in the public PHP API; the new `ui` keys are optional, and
+Planned as 0.10.2: every list of the kit (Companies, Contacts, Deals, Tags, Custom fields, Funnels) follows Beacon's
+filter standard (Beacon request 2026-11-24, UI-PATTERNS §3, §4, §7, §8 and §11). No BC break in the public PHP API; the new `ui` keys are optional, and
 UPGRADING lists the visible changes of the filter bars.
 
 ### Added
@@ -53,8 +53,17 @@ UPGRADING lists the visible changes of the filter bars.
   next to it; with `import.hubspot.enabled` the hint mentions HubSpot. With a filter set: *Nothing matches these
   filters* and **Clear filters**. The bundle prepends its own UiKit `empty` partial for the NowoCrmKitBundle domain
   (`@NowoCrmKit/partials/_empty.html.twig`; a host entry wins).
-- 24 translation keys in the 7 locales (`list.filter.*`, `deal.filter.*`, `list.empty_hint_hubspot`,
-  `list.no_match_filters`, `list.col.created`, `error.owner_filter`).
+- Deals: numbered pages with the total (*Showing 1–25 of N*, UiKit pager) instead of the keyset *Next page* link
+  (`DealReader::page()`, `DealListResult`); a page past the end shows the last page. The keyset reader stays for
+  the API.
+- Tags, Custom fields and Funnels: every column sorts (in memory, both directions); Funnels gets the filter card
+  (name search, *N per page*) and the pager like Tags and Custom fields.
+- Empty states of every list: one sentence saying why it is empty, and the create action(s) (Custom fields: both;
+  Deals without a deal funnel: *Open the funnels*), or *Nothing matches these filters* with **Clear filters** when
+  the search or a filter is set. `UiSupport::emptyState()` / `UiSupport::sortRows()` share it.
+- 30 translation keys in the 7 locales (`list.filter.*`, `deal.filter.*`, `list.empty_hint_hubspot`,
+  `list.no_match_filters`, `list.col.created`, `error.owner_filter`, `tags.empty_hint`, `fields.empty_hint`,
+  `funnels.empty_hint`, `deals.empty_hint`, `deals.empty_no_funnel`, `deals.open_funnels`).
 
 ### Changed
 
@@ -69,7 +78,9 @@ UPGRADING lists the visible changes of the filter bars.
   select is gone (sortable headers instead; `?sort=` still works and `direction` joins it). The `sorts` option of
   `DealFilterType` is deprecated and ignored.
 - List header (§3): one primary create, then **Import** (secondary, with an icon) and *Export CSV*. While a list is
-  empty and unfiltered, the create button is the empty state's, not the header's (one create button).
+  empty and unfiltered, the create button is the empty state's, not the header's (one create button), on every
+  list. A search on Tags / Custom fields now reads *Nothing matches these filters* (was *Nothing matches the
+  search*).
 - Funnel statistics: the filters use the standard bar (icon-only Filter / Clear filters); `at` is a native date and
   the snapshot is taken at the end of that day (UTC).
 - Demo (Symfony 8): UiKit's built-in SVG icons, icon-only filter buttons and the phone filter sheet, as Beacon draws

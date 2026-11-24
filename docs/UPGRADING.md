@@ -24,8 +24,8 @@
 ## Unreleased
 
 Planned as **0.10.2**, from 0.10.1: `composer update nowo-tech/crm-kit-bundle` (it brings `nowo-tech/ui-kit-bundle`
-^2.73). No schema change, no BC break in the public PHP API. The filter bars of Companies, Contacts and Deals change
-look by default (Beacon filter standard); set the new keys to keep parts of the 0.10.1 bar:
+^2.73). No schema change, no BC break in the public PHP API (the `@internal` `PipelineStoreInterface` gains
+`dealsPage()`). The filter bars of every list change look by default (Beacon filter standard); set the new keys to keep parts of the 0.10.1 bar:
 
 ```yaml
 nowo_crm_kit:
@@ -50,6 +50,12 @@ nowo_crm_kit:
   `expected_close_from`, `expected_close_to` on Deals. `ListQuery` and `DealQuery` take them as new optional
   constructor arguments; a host that builds a query with `ownerMe: true` must pass it through a reader (which calls
   `forActor()`), or it matches nothing.
+- **Deals pages** are numbered (`?page=`, UiKit pager with the total); the `?after=` cursor of the 0.3–0.10.1 *Next
+  page* link is ignored (the first page shows). The template variable `next` of `pipeline/deals.html.twig` is always
+  null. The API's keyset pages are unchanged.
+- **Tags, Custom fields, Funnels:** sortable headers (`sort`, `direction`); Funnels has the filter card (`q`,
+  `per_page`) and the pager. A test that looked for *Nothing matches the search.* on a searched Tags / Custom fields
+  list now reads *Nothing matches these filters.*
 - **Header and empty state.** Import is a secondary button with an icon, right after create. On an empty, unfiltered
   list the header has no create button: the empty state carries create and Import. The bundle prepends
   `theme.bundles.NowoCrmKitBundle.partials.empty` (its own partial); a host entry for that key wins.
@@ -58,7 +64,7 @@ nowo_crm_kit:
 - **UiKit host options** stay the host's: Beacon-like icon-only Filter / Clear filters need
   `nowo_ui_kit.theme.pages.list.filters.display: icon` and an icon set other than `none`; the phone sheet needs
   `nowo_ui_kit.theme.pages.list.filters.sheet: true`.
-- **Assets / translations:** no new asset; 24 new translation keys in the 7 locales (clear the cache).
+- **Assets / translations:** no new asset; 30 new translation keys in the 7 locales (clear the cache).
 
 ## To 0.10.1
 

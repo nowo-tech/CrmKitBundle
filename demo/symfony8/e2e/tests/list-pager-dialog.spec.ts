@@ -82,7 +82,7 @@ test.describe('CRM Kit 0.8.0 lists and create dialog', () => {
     await expect(page.getByTestId('crm-tags').locator('[data-nowo-ui-region="pagination"]')).toContainText('1');
 
     await page.goto('/crm/admin/fields?q=zzz-nothing');
-    await expect(page.getByTestId('crm-fields')).toContainText('Nothing matches the search.');
+    await expect(page.getByTestId('crm-fields')).toContainText('Nothing matches these filters.');
     await logout(page);
   });
 });

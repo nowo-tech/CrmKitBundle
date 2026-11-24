@@ -461,7 +461,9 @@ consent — are not covered yet, so a general `ui.forms` would promise more than
 
 ### Filter bars (0.10.2)
 
-The Companies, Contacts and Deals lists follow Beacon's filter standard (UI-PATTERNS §8) through UiKit 2.72+: the
+Every list (Companies, Contacts, Deals, Tags, Custom fields, Funnels) follows Beacon's filter standard (UI-PATTERNS
+§7, §8, §11) through UiKit 2.72+: sortable headers, the pager with *Showing x–y of N*, the filter card. On Companies,
+Contacts and Deals: the
 search one grid column wide with a placeholder and an `aria-label`, the main filters in the bar, the rarer ones
 folded under **More filters** (a `<details>` after the actions that shows how many of them are set and stays open
 while one is), and with `list_per_page` a compact *N per page* select first in the actions, then Filter / Clear
@@ -483,7 +485,7 @@ nowo_crm_kit:
 The fields a list can fold: Companies `tag, role, owner, status, created_from, created_to, updated_from,
 updated_to`; Contacts the same plus `purpose, primary_contact, company`; Deals `funnel, status, owner, stage,
 company, contact, stale, expected_close_from, expected_close_to`. A name a list does not have, or a name twice, fails
-the container build. Deals always keeps its select in the filters (it pages by cursor, without a numbered pager).
+the container build.
 
 Filters: the owner select starts with **Mine** (`owner=me`, the person the actor resolver returns) and **No owner**
 (`owner=none`); dates are native date fields (`YYYY-MM-DD`, whole UTC days, both ends included). Column headers sort

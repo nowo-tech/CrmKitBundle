@@ -62,6 +62,17 @@ interface PipelineStoreInterface
     public function deals(TenantRef $tenant, DealQuery $query, ?array $visibleOwners, ?array $after, int $limit, array $staleCutoffs, DateTimeImmutable $now): array;
 
     /**
+     * A numbered page of deals (0.10.2, the deals list of the UI): the rows at `$offset` in the query's order and the
+     * number of rows the query matches (SQL count, before any per-record deny).
+     *
+     * @param list<string>|null $visibleOwners null: every deal; else only ownerless deals and these owners'
+     * @param array<string, DateTimeImmutable> $staleCutoffs stage id ⇒ entered before this instant is stale
+     *
+     * @return array{0: list<Deal>, 1: int}
+     */
+    public function dealsPage(TenantRef $tenant, DealQuery $query, ?array $visibleOwners, int $offset, int $limit, array $staleCutoffs, DateTimeImmutable $now): array;
+
+    /**
      * Deals of a company or contact (any status), in id order.
      *
      * @return list<Deal>

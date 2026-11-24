@@ -127,6 +127,33 @@ final readonly class DoctrinePipelineStore implements PipelineStoreInterface
      */
     public function deals(TenantRef $tenant, DealQuery $query, ?array $visibleOwners, ?array $after, int $limit, array $staleCutoffs, DateTimeImmutable $now): array
     {
+        $qb = $this->dealsQuery($tenant, $query, $visibleOwners, $staleCutoffs, $now);
+        $this->keyset($qb, $query->sort, $after, $query->direction);
+
+        return $this->keptDeals($tenant, $qb->setMaxResults($limit + 1)->getQuery()->getResult(), $visibleOwners);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function dealsPage(TenantRef $tenant, DealQuery $query, ?array $visibleOwners, int $offset, int $limit, array $staleCutoffs, DateTimeImmutable $now): array
+    {
+        $count = $this->dealsQuery($tenant, $query, $visibleOwners, $staleCutoffs, $now);
+        $total = (int) $count->select('COUNT(d.id)')->getQuery()->getSingleScalarResult();
+        $qb    = $this->dealsQuery($tenant, $query, $visibleOwners, $staleCutoffs, $now);
+        $this->keyset($qb, $query->sort, null, $query->direction);
+
+        return [$this->keptDeals($tenant, $qb->setFirstResult(max(0, $offset))->setMaxResults($limit)->getQuery()->getResult(), $visibleOwners), $total];
+    }
+
+    /**
+     * The filters of a deal list (0.10.2: shared by the keyset and the numbered pages), without an order.
+     *
+     * @param list<string>|null $visibleOwners
+     * @param array<string, DateTimeImmutable> $staleCutoffs
+     */
+    private function dealsQuery(TenantRef $tenant, DealQuery $query, ?array $visibleOwners, array $staleCutoffs, DateTimeImmutable $now): QueryBuilder
+    {
         $qb = $this->em()->createQueryBuilder()->select('d')->from(Deal::class, 'd')
             ->where('d.tenantId = :tenant')->setParameter('tenant', $tenant->value);
         if ($query->status instanceof DealStatus) {
@@ -163,9 +190,20 @@ final readonly class DoctrinePipelineStore implements PipelineStoreInterface
             $qb->andWhere('d.status = :open')->andWhere($this->staleDql($qb, $staleCutoffs, $now))->setParameter('open', DealStatus::Open); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
         $this->restrict($qb, 'd.ownerId', $visibleOwners);
-        $this->keyset($qb, $query->sort, $after, $query->direction);
 
-        $rows = $qb->setMaxResults($limit + 1)->getQuery()->getResult();
+        return $qb;
+    }
+
+    /**
+     * The rows of the tenant the visible owners may see (re-checked in PHP, REQ-SEC-006 rule 2).
+     *
+     * @param mixed $rows the query's result
+     * @param list<string>|null $visibleOwners
+     *
+     * @return list<Deal>
+     */
+    private function keptDeals(TenantRef $tenant, mixed $rows, ?array $visibleOwners): array
+    {
         $kept = [];
         foreach ($this->exact($rows, Deal::class, $tenant) as $deal) {
             if ($visibleOwners === null || $deal->getOwnerId() === null || in_array($deal->getOwnerId(), $visibleOwners, true)) {

@@ -135,6 +135,7 @@ fields:
     title: Campos personalizados
     intro: Campos propios para empresas y contactos. Los campos archivados conservan sus valores.
     empty: Aún no hay campos personalizados.
+    empty_hint: 'Todavía no hay campos personalizados: añaden tus propios datos a empresas y contactos.'
     define_for: 'Definir un campo para:'
     col:
         subject: Para
@@ -226,6 +227,7 @@ tags:
     title_record: Etiquetas
     intro: Las etiquetas agrupan empresas y contactos; los listados se pueden filtrar por ellas.
     empty: Aún no hay etiquetas.
+    empty_hint: 'Todavía no hay etiquetas: agrupan empresas y contactos.'
     save: Guardar etiquetas
     saved: Se han guardado las etiquetas.
     form:
@@ -570,6 +572,9 @@ purpose:
 deals:
     title: 'Oportunidades'
     empty: 'Todavía no hay oportunidades.'
+    empty_hint: 'Todavía no hay oportunidades: crea una para seguirla por su embudo.'
+    empty_no_funnel: 'Todavía no hay oportunidades: avanzan por un embudo de oportunidades, así que crea uno primero.'
+    open_funnels: 'Abrir los embudos'
 deal:
     filter:
         any_funnel: 'Cualquier embudo'
@@ -672,6 +677,7 @@ funnels:
     title: 'Embudos'
     intro: 'Embudos de oportunidades y de ciclo de vida de empresas y contactos.'
     empty: 'Todavía no hay embudos.'
+    empty_hint: 'Todavía no hay embudos: un embudo reúne las etapas por las que pasa una oportunidad o un cliente.'
 funnel:
     add: 'Nuevo embudo'
     save: 'Crear'

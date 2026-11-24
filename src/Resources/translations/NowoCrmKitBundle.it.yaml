@@ -135,6 +135,7 @@ fields:
     title: Campi personalizzati
     intro: Campi propri per aziende e contatti. I campi archiviati conservano i loro valori.
     empty: Nessun campo personalizzato per ora.
+    empty_hint: 'Ancora nessun campo personalizzato: aggiungono i tuoi dati ad aziende e contatti.'
     define_for: 'Definisci un campo per:'
     col:
         subject: Per
@@ -226,6 +227,7 @@ tags:
     title_record: Tag
     intro: I tag raggruppano aziende e contatti; gli elenchi possono essere filtrati per tag.
     empty: Nessun tag per ora.
+    empty_hint: 'Ancora nessuna etichetta: raggruppano aziende e contatti.'
     save: Salva tag
     saved: I tag sono stati salvati.
     form:
@@ -570,6 +572,9 @@ purpose:
 deals:
     title: 'Trattative'
     empty: 'Ancora nessuna trattativa.'
+    empty_hint: 'Ancora nessuna opportunità: creane una per seguirla nel suo funnel.'
+    empty_no_funnel: 'Ancora nessuna opportunità: avanzano in un funnel di opportunità, quindi creane prima uno.'
+    open_funnels: 'Apri i funnel'
 deal:
     filter:
         any_funnel: 'Qualsiasi funnel'
@@ -672,6 +677,7 @@ funnels:
     title: 'Imbuti'
     intro: 'Imbuti di trattative e del ciclo di vita di aziende e contatti.'
     empty: 'Ancora nessun imbuto.'
+    empty_hint: 'Ancora nessun funnel: un funnel contiene le fasi che attraversa un''opportunità o un cliente.'
 funnel:
     add: 'Nuovo imbuto'
     save: 'Crea'

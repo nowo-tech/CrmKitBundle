@@ -691,10 +691,11 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Domain/Value/HostTypeLabel.php` | FR-LINK-001 |
 | `src/Resources/views/record/_link_form.html.twig` | FR-LINK-001, FR-UI-001 |
 
-### 0.7.0-0.10.x: UI shell, dialogs and shared constants (12)
+### 0.7.0-0.10.x: UI shell, dialogs and shared constants (13)
 
 | Source file | Requirement IDs |
 | --- | --- |
+| `src/Domain/Read/Pipeline/DealListResult.php` | FR-UI-003 |
 | `src/Domain/TranslationDomain.php` | FR-I18N-001, FR-ARCH-001 |
 | `src/Infrastructure/Symfony/Controller/ListFilters.php` | FR-UI-001, FR-UI-003 |
 | `src/Infrastructure/Symfony/Controller/PipelineDialogs.php` | FR-UI-003 |
@@ -708,5 +709,5 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/views/pipeline/_dialog.html.twig` | FR-UI-003 |
 | `src/Resources/views/pipeline/form.html.twig` | FR-UI-003 |
 
-**Total production sources**: 508 (every file under `src/`; the `0.7.0-0.10.x` sections were added by the 2026-11-24
-refresh, 85 files; 0.10.2 added `ListFilters.php` and `partials/_empty.html.twig`)
+**Total production sources**: 509 (every file under `src/`; the `0.7.0-0.10.x` sections were added by the 2026-11-24
+refresh, 85 files; 0.10.2 added `ListFilters.php`, `DealListResult.php` and `partials/_empty.html.twig`)

@@ -135,6 +135,7 @@ fields:
     title: Aangepaste velden
     intro: Eigen velden voor bedrijven en contacten. Gearchiveerde velden behouden hun waarden.
     empty: Nog geen aangepaste velden.
+    empty_hint: 'Nog geen eigen velden: ze voegen je eigen gegevens toe aan bedrijven en contacten.'
     define_for: 'Een veld definiëren voor:'
     col:
         subject: Voor
@@ -226,6 +227,7 @@ tags:
     title_record: Tags
     intro: Tags groeperen bedrijven en contacten; lijsten kunnen erop worden gefilterd.
     empty: Nog geen tags.
+    empty_hint: 'Nog geen tags: ze groeperen bedrijven en contacten.'
     save: Tags opslaan
     saved: De tags zijn opgeslagen.
     form:
@@ -570,6 +572,9 @@ purpose:
 deals:
     title: 'Deals'
     empty: 'Nog geen deals.'
+    empty_hint: 'Nog geen deals: maak er een aan om hem door zijn trechter te volgen.'
+    empty_no_funnel: 'Nog geen deals: deals doorlopen een dealtrechter, dus maak er eerst een aan.'
+    open_funnels: 'Trechters openen'
 deal:
     filter:
         any_funnel: 'Elke trechter'
@@ -672,6 +677,7 @@ funnels:
     title: 'Trechters'
     intro: 'Dealtrechters en levenscyclustrechters van bedrijven en contacten.'
     empty: 'Nog geen trechters.'
+    empty_hint: 'Nog geen trechters: een trechter bevat de fasen die een deal of klant doorloopt.'
 funnel:
     add: 'Nieuwe trechter'
     save: 'Aanmaken'

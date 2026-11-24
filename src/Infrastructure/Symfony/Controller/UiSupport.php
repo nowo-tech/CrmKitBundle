@@ -15,8 +15,10 @@ use Nowo\CrmKitBundle\Domain\TranslationDomain;
 use Nowo\CrmKitBundle\Domain\Value\HostTypeLabel;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\CrmKitGuard;
+use Nowo\UiKitBundle\View\Action;
 use Nowo\UiKitBundle\View\AreaNav;
 use Nowo\UiKitBundle\View\AreaNavItem;
+use Nowo\UiKitBundle\View\EmptyState;
 use Nowo\UiKitBundle\View\FilterField;
 use Nowo\UiKitBundle\View\Label;
 use Nowo\UiKitBundle\View\Pagination;
@@ -36,10 +38,15 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Twig\Environment;
 
+use function array_key_exists;
+use function in_array;
+use function is_scalar;
 use function is_string;
 use function str_starts_with;
 use function strlen;
+use function strnatcasecmp;
 use function substr;
+use function usort;
 
 /**
  * What every CRM page shares (contract section 11): rendering, the area navigation, flashes, the 404 / 403 mapping
@@ -51,6 +58,9 @@ final readonly class UiSupport
 {
     /** Translation domain. */
     public const DOMAIN = TranslationDomain::NAME;
+
+    /** Request attribute of the empty state's extra actions (0.10.2; read by the bundle's `empty` partial). */
+    public const EMPTY_ACTIONS = '_nowo_crm_kit_empty_actions';
 
     /**
      * Wires the collaborators.
@@ -293,19 +303,65 @@ final readonly class UiSupport
      *
      * @param string|null $list `companies` | `contacts` | `deals` (null: no fold, e.g. the admin lists)
      * @param array<string, bool|float|int|string|null> $searchAttributes widget attributes of the search (aria-label…)
-     * @param bool $keyset a keyset list (Deals: no numbered pager), whose "Rows per page" stays in the filters whatever
-     *                     `ui.per_page_position` says
      *
      * @return list<FilterField>
      */
-    public function filterFields(?string $list, Label|string|null $searchPlaceholder, array $searchAttributes = [], string $search = 'q', bool $keyset = false): array
+    public function filterFields(?string $list, Label|string|null $searchPlaceholder, array $searchAttributes = [], string $search = 'q'): array
     {
         $fields = [new FilterField($search, $searchPlaceholder, $this->options->searchWidth, attributes: $searchAttributes)];
         foreach ($list === null ? [] : $this->options->filtersMoreOf($list) as $name) {
             $fields[] = new FilterField($name, more: true);
         }
 
-        return [...$fields, ...$this->perPageField($keyset)];
+        return [...$fields, ...$this->perPageField()];
+    }
+
+    /**
+     * Rows of an in-memory list (Tags, Custom fields, Funnels) in the order of the request (0.10.2, UI-PATTERNS §7:
+     * every column that can be ordered sorts): `sort` one of `$keys` (else `$default`), `direction` asc | desc;
+     * natural, case-insensitive order, the row id breaking ties.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @param list<string> $keys
+     *
+     * @return array{list<array<string, mixed>>, string, string}
+     */
+    public function sortRows(array $rows, Request $request, array $keys, string $default): array
+    {
+        $q         = $request->query->all();
+        $sort      = is_string($q['sort'] ?? null) && in_array($q['sort'], $keys, true) ? $q['sort'] : $default;
+        $direction = ($q['direction'] ?? null) === 'desc' ? 'desc' : 'asc';
+        usort($rows, static function (array $a, array $b) use ($sort, $direction): int {
+            $va  = array_key_exists($sort, $a) && is_scalar($a[$sort]) ? (string) $a[$sort] : '';
+            $vb  = array_key_exists($sort, $b) && is_scalar($b[$sort]) ? (string) $b[$sort] : '';
+            $cmp = strnatcasecmp($va, $vb);
+            if ($cmp === 0) {
+                $cmp = strnatcasecmp(is_scalar($a['id'] ?? null) ? (string) $a['id'] : '', is_scalar($b['id'] ?? null) ? (string) $b['id'] : '');
+            }
+
+            return $direction === 'desc' ? -$cmp : $cmp;
+        });
+
+        return [$rows, $sort, $direction];
+    }
+
+    /**
+     * The empty state of a list (0.10.2, UI-PATTERNS §11). With a filter set: "Nothing matches these filters" and
+     * Clear filters. On the list's defaults: why it is empty (`$title`, `$hint`) with the create action, and the
+     * `$extra` actions next to it (the bundle's `empty` partial prints them from the request).
+     *
+     * @param list<Action> $extra
+     */
+    public function emptyState(Request $request, bool $filtered, string $clearUrl, Label|string|null $title, Label|string|null $hint, ?Action $create, array $extra = []): EmptyState
+    {
+        if ($filtered) {
+            return new EmptyState(null, self::label('list.no_match_filters'), new Action('custom', self::label('list.filter.clear'), $clearUrl, icon: 'filter_off', variant: 'secondary', attributes: ['data-testid' => 'crm-list-clear-filters']));
+        }
+        if ($extra !== []) {
+            $request->attributes->set(self::EMPTY_ACTIONS, $extra);
+        }
+
+        return new EmptyState($title, $hint, $create);
     }
 
     /**
@@ -341,14 +397,12 @@ final readonly class UiSupport
      * The UiKit options of the "Rows per page" filter (0.8.0): none without `ui.list_per_page` or with
      * `ui.per_page_position: pagination`; 0.10.2: compact, right before Filter / Clear.
      *
-     * @param bool $keyset a keyset list (Deals), whose select stays in the filters with `per_page_position: pagination`
-     *
      * @return list<FilterField>
      */
-    public function perPageField(bool $keyset = false): array
+    public function perPageField(): array
     {
         // 0.10.2: compact, the first item of the filter actions (UiKit FilterField pager), with the host's row class.
-        return ($keyset ? $this->options->perPageSelect() : $this->options->perPageInFilters()) ? [new FilterField('per_page', rowClass: $this->options->perPageRowClass, rowAttributes: ['data-testid' => 'crm-per-page'], pager: true)] : [];
+        return $this->options->perPageInFilters() ? [new FilterField('per_page', rowClass: $this->options->perPageRowClass, rowAttributes: ['data-testid' => 'crm-per-page'], pager: true)] : [];
     }
 
     /**

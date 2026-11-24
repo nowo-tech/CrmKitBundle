@@ -135,6 +135,7 @@ fields:
     title: Benutzerdefinierte Felder
     intro: Eigene Felder für Unternehmen und Kontakte. Archivierte Felder behalten ihre Werte.
     empty: Noch keine benutzerdefinierten Felder.
+    empty_hint: 'Noch keine benutzerdefinierten Felder: Sie ergänzen Firmen und Kontakte um eigene Daten.'
     define_for: 'Feld definieren für:'
     col:
         subject: Für
@@ -226,6 +227,7 @@ tags:
     title_record: Tags
     intro: Tags gruppieren Unternehmen und Kontakte; Listen lassen sich danach filtern.
     empty: Noch keine Tags.
+    empty_hint: 'Noch keine Tags: Sie gruppieren Firmen und Kontakte.'
     save: Tags speichern
     saved: Die Tags wurden gespeichert.
     form:
@@ -570,6 +572,9 @@ purpose:
 deals:
     title: 'Deals'
     empty: 'Noch keine Deals.'
+    empty_hint: 'Noch keine Deals: Legen Sie einen an, um ihn durch seinen Trichter zu verfolgen.'
+    empty_no_funnel: 'Noch keine Deals: Deals durchlaufen einen Deal-Trichter, legen Sie also zuerst einen an.'
+    open_funnels: 'Trichter öffnen'
 deal:
     filter:
         any_funnel: 'Alle Trichter'
@@ -672,6 +677,7 @@ funnels:
     title: 'Trichter'
     intro: 'Deal-Trichter und Lebenszyklus-Trichter von Firmen und Kontakten.'
     empty: 'Noch keine Trichter.'
+    empty_hint: 'Noch keine Trichter: Ein Trichter enthält die Phasen, die ein Deal oder ein Kunde durchläuft.'
 funnel:
     add: 'Neuer Trichter'
     save: 'Anlegen'

@@ -8,21 +8,26 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Nowo\CrmKitBundle\Application\Pipeline\DealInput;
 use Nowo\CrmKitBundle\Application\Pipeline\DealQuery;
+use Nowo\CrmKitBundle\Application\Pipeline\DealReader;
 use Nowo\CrmKitBundle\Application\Pipeline\DealService;
 use Nowo\CrmKitBundle\Application\Pipeline\FunnelService;
 use Nowo\CrmKitBundle\Application\Pipeline\Port\PipelineStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Domain\Enum\FunnelKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealView;
 use Nowo\CrmKitBundle\Domain\Service\ListQuery;
 use Nowo\CrmKitBundle\Domain\Service\RecordInput;
+use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Value\DateImmutable;
 use Nowo\CrmKitBundle\Domain\Value\Money;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Symfony\Component\DomCrawler\Crawler;
 
+use function array_map;
 use function array_replace_recursive;
 use function array_slice;
+use function date_default_timezone_get;
 use function sprintf;
 use function str_repeat;
 use function trim;
@@ -211,7 +216,7 @@ final class FiltersStandardTest extends CrmTestCase
         self::assertSame('10', $first->filter('#per_page option[selected]')->attr('value'));
     }
 
-    public function testDealsKeysetPagesFollowTheDirection(): void
+    public function testDealsPagesFollowTheDirection(): void
     {
         $this->boot(['ui' => ['list_per_page' => [10, 25], 'page_size' => 10]]);
         $this->admin();
@@ -225,8 +230,92 @@ final class FiltersStandardTest extends CrmTestCase
         $rows = $page->filter('[data-testid="crm-deals"] tbody tr td:first-child')->each(static fn (Crawler $c): string => trim($c->text()));
         self::assertSame('Deal 12', $rows[0]);
         self::assertCount(10, $rows);
-        $next = $this->client->request('GET', (string) $page->filter('[data-testid="crm-deals-next"]')->attr('href'));
+        // 0.10.2: numbered pages with the total, like the company and contact lists
+        $pagination = $page->filter('[data-testid="crm-deals"] [data-nowo-ui-region="pagination"]');
+        self::assertStringContainsString('12', $pagination->text());
+        $next = $this->client->request('GET', '/crm/deals?sort=title&direction=desc&page=2');
         self::assertSame(['Deal 02', 'Deal 01'], $next->filter('[data-testid="crm-deals"] tbody tr td:first-child')->each(static fn (Crawler $c): string => trim($c->text())));
+        $past = $this->client->request('GET', '/crm/deals?sort=title&direction=desc&page=9');
+        self::assertSame(['Deal 02', 'Deal 01'], $past->filter('[data-testid="crm-deals"] tbody tr td:first-child')->each(static fn (Crawler $c): string => trim($c->text())), 'a page past the end shows the last page');
+        // the keyset reader (API) follows the direction too
+        $reader = $this->service(DealReader::class);
+        $first  = $reader->deals(new DealQuery(sort: DealQuery::SORT_TITLE, direction: 'desc'), null, 10);
+        self::assertSame('Deal 12', $first->deals[0]->title);
+        self::assertNotNull($first->next);
+        self::assertSame(['Deal 02', 'Deal 01'], array_map(static fn (DealView $d): string => $d->title, $reader->deals(new DealQuery(sort: DealQuery::SORT_TITLE, direction: 'desc'), $first->next, 10)->deals));
+    }
+
+    public function testDealsEmptyStatesAndADeniedDealLeavesTheTotal(): void
+    {
+        $this->boot();
+        $this->admin();
+        // no deal funnel: why, and a way to the funnels
+        $none = $this->client->request('GET', '/crm/deals');
+        self::assertStringContainsString('No deals yet: deals move through a deal funnel, so create one first.', $none->filter('[data-nowo-ui-region="empty"]')->text());
+        self::assertCount(1, $none->filter('[data-testid="crm-deals-empty-funnels"]'));
+        $acme   = $this->company('Acme');
+        $funnel = $this->service(FunnelService::class)->create(FunnelKind::Deal, null, 'Sales');
+        // a funnel, no deal: create in the empty state, none in the header (one create button)
+        $empty = $this->client->request('GET', '/crm/deals');
+        self::assertStringContainsString('No deals yet: create one to follow it through its funnel.', $empty->filter('[data-nowo-ui-region="empty"]')->text());
+        self::assertCount(1, $empty->filter('[data-nowo-ui-region="empty"] a[href$="/crm/deals/new"]'));
+        self::assertCount(0, $empty->filter('.nowo-ui-page-header a[href$="/crm/deals/new"], [data-nowo-ui-region="page-header"] a[href$="/crm/deals/new"]'));
+        $deals = $this->service(DealService::class);
+        $kept  = $deals->create(new DealInput('Kept', $funnel, companyId: $acme));
+        $gone  = $deals->create(new DealInput('Gone', $funnel, companyId: $acme));
+        // a per-record deny hides the deal from the page and from the total
+        $this->ctx()->denied = ['view:' . $gone];
+        $page                = $this->service(DealReader::class)->page(new DealQuery(), 1, 10);
+        self::assertSame([$kept], array_map(static fn (DealView $d): string => $d->id, $page->deals));
+        self::assertSame(1, $page->total);
+        $this->ctx()->denied = [];
+        $this->ctx()->grant('acme', 'ana', 'amounts_view');
+        self::assertSame(2, $this->service(DealReader::class)->page(new DealQuery(sort: DealQuery::SORT_AMOUNT), 1, 10)->total);
+    }
+
+    public function testAdminListsAndFunnelsFollowTheStandard(): void
+    {
+        $this->boot(['ui' => ['admin_create' => 'dialog', 'pipeline_forms' => 'dialog']]);
+        $this->admin();
+        // empty Tags: create in the empty state with its hint, none in the header
+        $tags = $this->client->request('GET', '/crm/admin/tags');
+        self::assertStringContainsString('No tags yet: they group companies and contacts.', $tags->filter('[data-nowo-ui-region="empty"]')->text());
+        self::assertCount(1, $tags->filter('[data-testid="crm-tag-new"]'));
+        self::assertCount(1, $tags->filter('[data-nowo-ui-region="empty"] [data-testid="crm-tag-new"]'));
+        // empty Custom fields: both creates in the empty state (the second one through the bundle's empty partial)
+        $fields = $this->client->request('GET', '/crm/admin/fields');
+        self::assertCount(1, $fields->filter('[data-nowo-ui-region="empty"] [data-testid="crm-field-new-company"]'));
+        self::assertCount(1, $fields->filter('[data-nowo-ui-region="empty"] [data-testid="crm-field-new-contact"]'));
+        foreach (['Beta', 'alpha', 'Gamma'] as $name) {
+            $this->service(TagServiceInterface::class)->create($name, 'blue');
+        }
+        $names = fn (string $query): array => $this->client->request('GET', '/crm/admin/tags' . $query)->filter('[data-testid="crm-tags"] tbody tr td:first-child')->each(static fn (Crawler $c): string => trim($c->text()));
+        self::assertSame(['alpha', 'Beta', 'Gamma'], $names(''));
+        self::assertSame(['Gamma', 'Beta', 'alpha'], $names('?sort=name&direction=desc'));
+        self::assertSame(['alpha', 'Beta', 'Gamma'], $names('?sort=nope'), 'an unknown key keeps the default order');
+        $list = $this->client->request('GET', '/crm/admin/tags');
+        self::assertCount(1, $list->filter('th a[href*="sort=name"]'));
+        self::assertCount(1, $list->filter('[data-testid="crm-tag-new"]'));
+        self::assertCount(0, $list->filter('[data-nowo-ui-region="empty"] [data-testid="crm-tag-new"]'), 'with rows the header carries create');
+
+        // Funnels: search, sortable headers, pager, empty state
+        $funnels = $this->client->request('GET', '/crm/admin/funnels');
+        self::assertStringContainsString('No funnels yet: a funnel holds the stages a deal or a customer goes through.', $funnels->filter('[data-nowo-ui-region="empty"]')->text());
+        self::assertCount(1, $funnels->filter('[data-nowo-ui-region="empty"] [data-testid="crm-funnel-new"]'));
+        foreach (['Sales', 'Accounts'] as $name) {
+            $this->service(FunnelService::class)->create(FunnelKind::Deal, null, $name);
+        }
+        $rows = fn (string $query): array => $this->client->request('GET', '/crm/admin/funnels' . $query)->filter('[data-testid="crm-funnels"] tbody tr td:first-child')->each(static fn (Crawler $c): string => trim($c->text()));
+        self::assertSame(['Accounts', 'Sales'], $rows(''));
+        self::assertSame(['Sales', 'Accounts'], $rows('?sort=name&direction=desc'));
+        self::assertSame(['Sales'], $rows('?q=sal'));
+        $none = $this->client->request('GET', '/crm/admin/funnels?q=zzz');
+        self::assertSame('Nothing matches these filters.', trim($none->filter('[data-nowo-ui-region="empty"] .nowo-ui-empty__message')->text()));
+        self::assertCount(1, $none->filter('[data-testid="crm-list-clear-filters"]'));
+        $page = $this->client->request('GET', '/crm/admin/funnels');
+        self::assertCount(1, $page->filter('form[data-nowo-ui-filters] #q'));
+        self::assertCount(1, $page->filter('[data-testid="crm-funnels"] [data-nowo-ui-region="pagination"]'));
+        self::assertCount(1, $page->filter('th a[href*="sort=stages"]'));
     }
 
     public function testFunnelStatsUseTheStandardBar(): void
@@ -244,7 +333,7 @@ final class FiltersStandardTest extends CrmTestCase
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
         self::assertStringContainsString('2026-01-31 23:59', (string) $this->client->getResponse()->getContent());
         // today: the snapshot is now (the end of today is still ahead), not a "future" error; a later day is refused
-        $today = $this->clock()->now()->setTimezone(new DateTimeZone('UTC'));
+        $today = $this->clock()->now()->setTimezone(new DateTimeZone(date_default_timezone_get()));
         $this->client->request('GET', '/crm/funnels/' . $funnel . '/stats?at=' . $today->format('Y-m-d'));
         self::assertStringContainsString($today->format('Y-m-d H:i'), (string) $this->client->getResponse()->getContent());
         self::assertStringNotContainsString('This value is not valid.', (string) $this->client->getResponse()->getContent());

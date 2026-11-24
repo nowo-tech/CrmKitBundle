@@ -135,6 +135,7 @@ fields:
     title: Campos personalizados
     intro: Campos próprios para empresas e contactos. Os campos arquivados mantêm os seus valores.
     empty: Ainda não há campos personalizados.
+    empty_hint: 'Ainda não há campos personalizados: acrescentam os seus próprios dados a empresas e contactos.'
     define_for: 'Definir um campo para:'
     col:
         subject: Para
@@ -226,6 +227,7 @@ tags:
     title_record: Etiquetas
     intro: As etiquetas agrupam empresas e contactos; as listas podem ser filtradas por elas.
     empty: Ainda não há etiquetas.
+    empty_hint: 'Ainda não há etiquetas: agrupam empresas e contactos.'
     save: Guardar etiquetas
     saved: As etiquetas foram guardadas.
     form:
@@ -570,6 +572,9 @@ purpose:
 deals:
     title: 'Negócios'
     empty: 'Ainda não há negócios.'
+    empty_hint: 'Ainda não há negócios: crie um para o seguir pelo seu funil.'
+    empty_no_funnel: 'Ainda não há negócios: avançam num funil de negócios, por isso crie um primeiro.'
+    open_funnels: 'Abrir os funis'
 deal:
     filter:
         any_funnel: 'Qualquer funil'
@@ -672,6 +677,7 @@ funnels:
     title: 'Funis'
     intro: 'Funis de negócios e de ciclo de vida de empresas e contactos.'
     empty: 'Ainda não há funis.'
+    empty_hint: 'Ainda não há funis: um funil reúne as etapas por que passa um negócio ou um cliente.'
 funnel:
     add: 'Novo funil'
     save: 'Criar'

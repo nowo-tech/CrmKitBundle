@@ -135,6 +135,7 @@ fields:
     title: Custom fields
     intro: Fields of your own for companies and contacts. Archived fields keep their values.
     empty: No custom fields yet.
+    empty_hint: 'No custom fields yet: they add your own data to companies and contacts.'
     define_for: 'Define a field for:'
     col:
         subject: For
@@ -226,6 +227,7 @@ tags:
     title_record: Tags
     intro: Tags group companies and contacts; lists filter by them.
     empty: No tags yet.
+    empty_hint: 'No tags yet: they group companies and contacts.'
     save: Save tags
     saved: The tags were saved.
     form:
@@ -570,6 +572,9 @@ purpose:
 deals:
     title: 'Deals'
     empty: 'No deals yet.'
+    empty_hint: 'No deals yet: create one to follow it through its funnel.'
+    empty_no_funnel: 'No deals yet: deals move through a deal funnel, so create one first.'
+    open_funnels: 'Open the funnels'
 deal:
     filter:
         any_funnel: 'Any funnel'
@@ -672,6 +677,7 @@ funnels:
     title: 'Funnels'
     intro: 'Deal funnels and lifecycle funnels of companies and contacts.'
     empty: 'No funnels yet.'
+    empty_hint: 'No funnels yet: a funnel holds the stages a deal or a customer goes through.'
 funnel:
     add: 'New funnel'
     save: 'Create'

@@ -194,13 +194,13 @@ final class UiPresentationTest extends CrmTestCase
         $tags  = $this->client->request('GET', '/crm/admin/tags');
         $empty = $tags->filter('[data-testid="crm-tags"] [data-nowo-ui-region="empty"]');
         self::assertCount(1, $empty);
-        self::assertSame('No tags yet.', trim($empty->text()));
+        self::assertSame('No tags yet: they group companies and contacts.', trim($empty->text()));
         self::assertCount(0, $tags->filter('[data-testid="crm-tags"] [data-testid="crm-tag-form"]'), 'the form is after the list section');
         self::assertCount(1, $tags->filter('[data-testid="crm-tag-form"] form'), 'inline by default');
         self::assertCount(0, $tags->filter('dialog'));
 
         $fields = $this->client->request('GET', '/crm/admin/fields?for=contact');
-        self::assertSame('No custom fields yet.', trim($fields->filter('[data-testid="crm-fields"] [data-nowo-ui-region="empty"]')->text()));
+        self::assertSame('No custom fields yet: they add your own data to companies and contacts.', trim($fields->filter('[data-testid="crm-fields"] [data-nowo-ui-region="empty"]')->text()));
         $switch = $fields->filter('[data-testid="crm-field-form"] nav[data-testid="crm-fields-for"]');
         self::assertCount(1, $switch, 'the subject switch sits inside the form card');
         self::assertCount(2, $switch->filter('a'));

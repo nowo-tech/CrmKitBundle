@@ -110,13 +110,15 @@ final readonly class AdminController
             if ($remote instanceof RemoteDialogResponder && $remote->isDialog($request)) {
                 return $this->dialogForm($remote, $form, $this->ui->url('nowo_crm_kit_tags'), self::TAG_DIALOG, 'crm-tag-form', 'tag.save', $status);
             }
-            $filters        = $this->filters($request);
-            $text           = $this->search($request);
-            $rows           = array_map(static fn (TagView $t): array => ['id' => $t->id, 'name' => $t->name, 'colour' => $t->colour], array_values(array_filter($this->reader->tags(), static fn (TagView $t): bool => self::matches($text, $t->name))));
-            [$rows, $pager] = $this->page($rows, 'nowo_crm_kit_tags', $request);
-            $create         = null;
-            $remoteShell    = null;
-            $actions        = [];
+            $filters = $this->filters($request);
+            $text    = $this->search($request);
+            $rows    = array_map(static fn (TagView $t): array => ['id' => $t->id, 'name' => $t->name, 'colour' => $t->colour], array_values(array_filter($this->reader->tags(), static fn (TagView $t): bool => self::matches($text, $t->name))));
+            // 0.10.2 (UI-PATTERNS §7): the columns sort, in memory like the search.
+            [$rows, $sort, $direction] = $this->ui->sortRows($rows, $request, ['name', 'colour'], 'name');
+            [$rows, $pager]            = $this->page($rows, 'nowo_crm_kit_tags', $request);
+            $create                    = null;
+            $remoteShell               = null;
+            $actions                   = [];
             if ($remote instanceof RemoteDialogResponder) {
                 // 0.8.0: "New tag" links to ?new=1 (the form card, the no-JS fallback) and loads the form on demand.
                 $actions[]   = $this->remoteAction('tag.add', $this->ui->url('nowo_crm_kit_tags', ['new' => 1]), self::TAG_DIALOG, 'crm-tag-new', 'primary');
@@ -127,17 +129,21 @@ final readonly class AdminController
                 $actions[] = $this->createAction('tag.add', $this->ui->url('nowo_crm_kit_tags', ['new' => 1]), self::TAG_DIALOG, 'crm-tag-new', 'primary');
             }
 
+            [$actions, $empty] = $this->emptyFirst($request, $actions, $rows === [] && $text === null, $text !== null, 'nowo_crm_kit_tags', 'tags.empty_hint');
+
             return $this->vary($remote, $this->ui->render('@NowoCrmKit/admin/tags.html.twig', [
                 'page' => new ListPage(
                     new PageHeader(UiSupport::label('tags.title'), UiSupport::label('tags.intro'), $actions, tabs: $this->ui->tabs('tags')),
-                    [new Column('name', UiSupport::label('tag.form.name'), required: true), new Column('colour', UiSupport::label('tag.form.colour'))],
+                    [new Column('name', UiSupport::label('tag.form.name'), true, required: true), new Column('colour', UiSupport::label('tag.form.colour'), true)],
                     $rows,
                     $this->ui->filterView($filters, $pager->perPage),
                     fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_tag_edit', ['id' => $row['id']]), UiSupport::label('tag.edit'))] : [],
                     $pager,
-                    // 0.6.1 (UX-005): one sentence, the UiKit `empty` message (no title, so no second "No items found.").
-                    new EmptyState(null, UiSupport::label($text === null ? 'tags.empty' : 'list.no_match')),
+                    // 0.10.2 (UI-PATTERNS §11): why it is empty and the create action, or no match and Clear filters.
+                    $empty,
                     $this->ui->url('nowo_crm_kit_tags'),
+                    $sort,
+                    $direction,
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-tags'],
@@ -238,7 +244,9 @@ final readonly class AdminController
                 $matching = array_filter($this->reader->fields($type, true), static fn (FieldView $f): bool => self::matches($text, $f->label) || self::matches($text, $f->key));
                 $rows     = array_merge($rows, array_map(fn (FieldView $f): array => ['id' => $f->id, 'subject' => $this->ui->trans('type.' . $f->subjectType->value), 'key' => $f->key, 'label' => $f->label, 'type' => $this->ui->trans('field_type.' . $f->type->value), 'state' => $this->ui->trans($f->archived ? 'field.archived' : 'field.active')], array_values($matching)));
             }
-            [$rows, $pager] = $this->page($rows, 'nowo_crm_kit_fields', $request);
+            // 0.10.2 (UI-PATTERNS §7): the columns sort, in memory like the search.
+            [$rows, $sort, $direction] = $this->ui->sortRows($rows, $request, ['subject', 'label', 'key', 'type', 'state'], 'subject');
+            [$rows, $pager]            = $this->page($rows, 'nowo_crm_kit_fields', $request);
 
             $create      = null;
             $actions     = [];
@@ -247,7 +255,7 @@ final readonly class AdminController
             if ($remote instanceof RemoteDialogResponder) {
                 // 0.8.0: one opener per subject (?for=<subject>&new=1, the form card without JavaScript), one shell.
                 foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
-                    $actions[] = $this->remoteAction('field.add.' . $type->value, $this->ui->url('nowo_crm_kit_fields', ['for' => $type->value, 'new' => 1]), self::FIELD_DIALOG, 'crm-field-new-' . $type->value, $type === SubjectType::Company ? 'primary' : null);
+                    $actions[] = $this->remoteAction('field.add.' . $type->value, $this->ui->url('nowo_crm_kit_fields', ['for' => $type->value, 'new' => 1]), self::FIELD_DIALOG, 'crm-field-new-' . $type->value, $type === SubjectType::Company ? 'primary' : 'secondary');
                 }
                 $remoteShell = $this->remoteShell($request, $status, self::FIELD_DIALOG, 'field.add.' . $subject->value, ['form' => $form, 'title' => 'field.add.' . $subject->value, 'submit' => 'field.save', 'action' => $this->ui->url('nowo_crm_kit_fields', ['for' => $subject->value]), 'testid' => 'crm-field-form']);
             } elseif ($this->ui->options->createDialog()) {
@@ -256,23 +264,27 @@ final readonly class AdminController
                 foreach ([SubjectType::Company, SubjectType::Contact] as $type) {
                     $id        = 'crm-field-dialog-' . $type->value;
                     $dialogs[] = ['form' => $type === $subject ? $form : $this->fieldForm(), 'id' => $id, 'title' => 'field.add.' . $type->value, 'submit' => 'field.save', 'action' => $this->ui->url('nowo_crm_kit_fields', ['for' => $type->value]), 'testid' => 'crm-field-form-' . $type->value, 'open' => $type === $subject];
-                    $actions[] = $this->createAction('field.add.' . $type->value, $this->ui->url('nowo_crm_kit_fields', ['for' => $type->value, 'new' => 1]), $id, 'crm-field-new-' . $type->value, $type === SubjectType::Company ? 'primary' : null);
+                    $actions[] = $this->createAction('field.add.' . $type->value, $this->ui->url('nowo_crm_kit_fields', ['for' => $type->value, 'new' => 1]), $id, 'crm-field-new-' . $type->value, $type === SubjectType::Company ? 'primary' : 'secondary');
                 }
                 $create = $this->create($request, $status, $dialogs);
                 $view   = $create['dialogs'][$subject === SubjectType::Company ? 0 : 1]['form'] ?? null;
             }
 
+            [$actions, $empty] = $this->emptyFirst($request, $actions, $rows === [] && $text === null, $text !== null, 'nowo_crm_kit_fields', 'fields.empty_hint');
+
             return $this->vary($remote, $this->ui->render('@NowoCrmKit/admin/fields.html.twig', [
                 'page' => new ListPage(
                     new PageHeader(UiSupport::label('fields.title'), UiSupport::label('fields.intro'), $actions, tabs: $this->ui->tabs('fields')),
-                    [new Column('subject', UiSupport::label('fields.col.subject')), new Column('label', UiSupport::label('field.form.label'), required: true), new Column('key', UiSupport::label('field.form.key'), priority: 2), new Column('type', UiSupport::label('field.form.type'), priority: 2), new Column('state', UiSupport::label('fields.col.state'), priority: 3)],
+                    [new Column('subject', UiSupport::label('fields.col.subject'), true), new Column('label', UiSupport::label('field.form.label'), true, required: true), new Column('key', UiSupport::label('field.form.key'), true, priority: 2), new Column('type', UiSupport::label('field.form.type'), true, priority: 2), new Column('state', UiSupport::label('fields.col.state'), true, priority: 3)],
                     $rows,
                     $this->ui->filterView($filters, $pager->perPage),
                     fn (mixed $row): array => is_array($row) && is_string($row['id'] ?? null) ? [Action::edit($this->ui->url('nowo_crm_kit_field_edit', ['id' => $row['id']]), UiSupport::label('field.edit'))] : [],
                     $pager,
-                    // 0.6.1 (UX-005): one sentence, the UiKit `empty` message.
-                    new EmptyState(null, UiSupport::label($text === null ? 'fields.empty' : 'list.no_match')),
+                    // 0.10.2 (UI-PATTERNS §11): why it is empty and the create actions, or no match and Clear filters.
+                    $empty,
                     $this->ui->url('nowo_crm_kit_fields'),
+                    $sort,
+                    $direction,
                     bundle: UiSupport::DOMAIN,
                     layout: $this->ui->layout(),
                     attributes: ['data-testid' => 'crm-fields'],
@@ -464,6 +476,22 @@ final readonly class AdminController
     private function createAction(string $label, string $href, string $dialog, string $testid, ?string $variant): Action
     {
         return new Action('create', UiSupport::label($label), $href, variant: $variant, attributes: ['data-nowo-confirm-open' => true, 'data-nowo-confirm-target' => $dialog, 'aria-haspopup' => 'dialog', 'aria-controls' => $dialog, 'data-testid' => $testid]);
+    }
+
+    /**
+     * The header actions and the empty state of an admin list (0.10.2, UI-PATTERNS §11, one create button): on an
+     * empty list without a search the empty state carries the create action(s) and the header none; else the header
+     * keeps them and the empty state says in one sentence why the list is empty, or that nothing matches (with Clear filters).
+     *
+     * @param list<Action> $actions
+     *
+     * @return array{list<Action>, EmptyState}
+     */
+    private function emptyFirst(Request $request, array $actions, bool $emptyList, bool $filtered, string $route, string $hint): array
+    {
+        $create = $emptyList && $actions !== [] ? $actions : [];
+
+        return [$create === [] ? $actions : [], $this->ui->emptyState($request, $filtered, $this->ui->url($route), null, UiSupport::label($hint), $create[0] ?? null, array_slice($create, 1))];
     }
 
     /**

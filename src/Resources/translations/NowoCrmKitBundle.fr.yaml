@@ -135,6 +135,7 @@ fields:
     title: Champs personnalisés
     intro: Champs propres aux sociétés et aux contacts. Les champs archivés conservent leurs valeurs.
     empty: Aucun champ personnalisé pour le moment.
+    empty_hint: 'Aucun champ personnalisé pour l''instant : ils ajoutent vos propres données aux entreprises et contacts.'
     define_for: 'Définir un champ pour :'
     col:
         subject: Pour
@@ -226,6 +227,7 @@ tags:
     title_record: Étiquettes
     intro: Les étiquettes regroupent les sociétés et les contacts ; les listes peuvent être filtrées par étiquette.
     empty: Aucune étiquette pour le moment.
+    empty_hint: 'Aucune étiquette pour l''instant : elles regroupent entreprises et contacts.'
     save: Enregistrer les étiquettes
     saved: Les étiquettes ont été enregistrées.
     form:
@@ -570,6 +572,9 @@ purpose:
 deals:
     title: 'Affaires'
     empty: 'Aucune affaire pour l’instant.'
+    empty_hint: 'Aucune affaire pour l''instant : créez-en une pour la suivre dans son entonnoir.'
+    empty_no_funnel: 'Aucune affaire pour l''instant : elles avancent dans un entonnoir d''affaires, créez-en donc un d''abord.'
+    open_funnels: 'Ouvrir les entonnoirs'
 deal:
     filter:
         any_funnel: 'Tous les entonnoirs'
@@ -672,6 +677,7 @@ funnels:
     title: 'Entonnoirs'
     intro: 'Entonnoirs d’affaires et de cycle de vie des entreprises et des contacts.'
     empty: 'Aucun entonnoir pour l’instant.'
+    empty_hint: 'Aucun entonnoir pour l''instant : un entonnoir regroupe les étapes d''une affaire ou d''un client.'
 funnel:
     add: 'Nouvel entonnoir'
     save: 'Créer'

@@ -62,7 +62,7 @@ final readonly class RecordController
     public const RECORD_DIALOG = 'crm-record-dialog';
 
     /** Request attribute of the empty state's extra actions (0.10.2; read by the bundle's `empty` partial). */
-    public const EMPTY_ACTIONS = '_nowo_crm_kit_empty_actions';
+    public const EMPTY_ACTIONS = UiSupport::EMPTY_ACTIONS;
 
     /**
      * Wires the collaborators.
@@ -530,14 +530,9 @@ final readonly class RecordController
      */
     private function emptyState(Request $request, SubjectType $subject, bool $filtered, bool $canCreate): EmptyState
     {
-        if ($filtered) {
-            return new EmptyState(null, UiSupport::label('list.no_match_filters'), new Action('custom', UiSupport::label('list.filter.clear'), $this->ui->url('nowo_crm_kit_list', ['type' => $subject->segment()]), icon: 'filter_off', variant: 'secondary', attributes: ['data-testid' => 'crm-list-clear-filters']));
-        }
-        if ($this->ui->can(CrmPermission::Import)) {
-            $request->attributes->set(self::EMPTY_ACTIONS, [new Action('import', UiSupport::label('list.import'), $this->ui->url('nowo_crm_kit_import', ['subject' => $subject->value]), icon: 'import', variant: 'secondary', attributes: ['data-crm-import-open' => true, 'aria-haspopup' => 'dialog', 'data-testid' => 'crm-import-open-empty'])]);
-        }
+        $extra = $this->ui->can(CrmPermission::Import) ? [new Action('import', UiSupport::label('list.import'), $this->ui->url('nowo_crm_kit_import', ['subject' => $subject->value]), icon: 'import', variant: 'secondary', attributes: ['data-crm-import-open' => true, 'aria-haspopup' => 'dialog', 'data-testid' => 'crm-import-open-empty'])] : [];
 
-        return new EmptyState(UiSupport::label('list.empty.' . $subject->value), UiSupport::label($this->hubspot ? 'list.empty_hint_hubspot' : 'list.empty_hint'), $canCreate ? $this->createAction($subject, 'crm-record-new-empty') : null);
+        return $this->ui->emptyState($request, $filtered, $this->ui->url('nowo_crm_kit_list', ['type' => $subject->segment()]), UiSupport::label('list.empty.' . $subject->value), UiSupport::label($this->hubspot ? 'list.empty_hint_hubspot' : 'list.empty_hint'), $canCreate ? $this->createAction($subject, 'crm-record-new-empty') : null, $extra);
     }
 
     /**

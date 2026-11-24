@@ -246,7 +246,7 @@ final class ListPagerDialogTest extends CrmTestCase
         self::assertSame(1, $this->rows($page, 'crm-tags'), 'case-insensitive name search');
         self::assertSame('KEY', $page->filter('input[name="q"]')->attr('value'));
         $none = $this->client->request('GET', '/crm/admin/tags?q=nothing');
-        self::assertStringContainsString('Nothing matches the search.', $none->filter('[data-testid="crm-tags"]')->text());
+        self::assertStringContainsString('Nothing matches these filters.', $none->filter('[data-testid="crm-tags"]')->text());
         $this->client->request('GET', '/crm/admin/tags?q[]=x');
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
     }
@@ -267,7 +267,7 @@ final class ListPagerDialogTest extends CrmTestCase
         self::assertSame(1, $this->rows($this->client->request('GET', '/crm/admin/fields?q=vip'), 'crm-fields'), 'the key matches');
         self::assertSame(1, $this->rows($this->client->request('GET', '/crm/admin/fields?q=shoe+SIZE'), 'crm-fields'), 'the label matches');
         self::assertSame(3, $this->rows($this->client->request('GET', '/crm/admin/fields?q=+'), 'crm-fields'), 'a blank search is no search');
-        self::assertStringContainsString('Nothing matches the search.', $this->client->request('GET', '/crm/admin/fields?q=zzz')->text());
+        self::assertStringContainsString('Nothing matches these filters.', $this->client->request('GET', '/crm/admin/fields?q=zzz')->text());
 
         $this->actAs('zoe', 'view', 'edit');
         self::assertSame(403, $this->httpStatus('GET', '/crm/admin/fields?q=vip'), 'the filters keep the gate');

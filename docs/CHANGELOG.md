@@ -56,10 +56,13 @@ the new keys have defaults that keep 0.10.0's behaviour.
 
 ### Fixed
 
+- ZAWD-L1: the "script loaded" once-guard of `nowo-crm-import.js` is UiKit 2.71+'s: a clobbered, read-only or
+  cross-origin `window.__nowoScriptBanners` (DOM named access) falls back to a module set and can no longer throw
+  before the import modal starts.
 - ZAM-D2: the DoctrineEncrypt box can now be rotated without losing tokens. Add a DoctrineEncrypt profile with the new
   key, seal with it under a new `key_id`, and list the old key id and profile under `previous`. The old tokens keep
   working, and `nowo:crm-kit:secrets:rotate` re-seals them.
-- ZAW-L1: the DoctrineEncrypt box loads the key in its own step before it decrypts (it encrypts a constant,
+- ZAW-L1: when a decryption fails, the DoctrineEncrypt box loads the key in its own step (it encrypts a constant,
   non-secret probe value). A key that is missing, unreadable, malformed or of the wrong length (Halite `InvalidKey`,
   `CannotPerformOperation`, a bad Defuse key) is now "key not available": the connection stays active. Only the
   value failures (Halite `InvalidMessage` / `InvalidSignature` / `InvalidDigestLength` / `InvalidType`, Defuse
@@ -107,7 +110,10 @@ the new keys have defaults that keep 0.10.0's behaviour.
 ### Internal
 
 - REQ-GH-002 / REQ-GH-003: Dependabot watches the npm toolchain in two groups, and `dependabot-assets.yml` rebuilds the
-  committed import script and `build-info.json` on those PRs.
+  committed import script and `build-info.json` on those PRs. Hardened before release (audit ZAWD-M1): the build job
+  is read-only (no persisted credentials, `pnpm install --ignore-scripts`) and the commit job, the only one with write
+  access, never installs or builds. The commit job then dispatches `ci.yml` (now `workflow_dispatch`-able) so the
+  required checks run on the rebuilt head (ZAWD-L2).
 - REQ-CS-009: PHP-CS-Fixer uses `@PER-CS` and `@PER-CS:risky` instead of `@PSR12`.
 - REQ-SPECKIT-001 / 003: the code inventory lists every file under `src/` (506 at 0.10.1).
 

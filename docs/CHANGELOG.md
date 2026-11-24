@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.10.2] - 2026-11-24](#0102---2026-11-24)
 - [[0.10.1] - 2026-11-24](#0101---2026-11-24)
 - [[0.10.0] - 2026-11-23](#0100---2026-11-23)
 - [[0.9.0] - 2026-11-23](#090---2026-11-23)
@@ -26,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - [[0.1.0] - 2026-11-19](#010---2026-11-19)
 
 ## [Unreleased]
+
+## [0.10.2] - 2026-11-24
 
 Planned as 0.10.2: every list of the kit (Companies, Contacts, Deals, Tags, Custom fields, Funnels) follows Beacon's
 filter standard (Beacon request 2026-11-24, UI-PATTERNS §3, §4, §7, §8 and §11). No BC break in the public PHP API; the new `ui` keys are optional, and

@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.10.2](#to-0102)
 - [To 0.10.1](#to-0101)
 - [To 0.10.0](#to-0100)
 - [To 0.9.0](#to-090)
@@ -22,6 +23,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.10.2
+
+From **0.10.1**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 Planned as **0.10.2**, from 0.10.1: `composer update nowo-tech/crm-kit-bundle` (it brings `nowo-tech/ui-kit-bundle`
 ^2.73). No schema change, no BC break in the public PHP API (the `@internal` `PipelineStoreInterface` gains

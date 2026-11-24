@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.10.1](#to-0101)
 - [To 0.10.0](#to-0100)
 - [To 0.9.0](#to-090)
 - [To 0.8.1](#to-081)
@@ -21,6 +22,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.10.1
+
+From **0.10.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 Planned as **0.10.1**, from 0.10.0: `composer update nowo-tech/crm-kit-bundle`. No BC break in the public PHP API or
 config; the new keys default to 0.10.0's behaviour. No new schema change; the only schema step is the correction of

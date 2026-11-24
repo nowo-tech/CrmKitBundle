@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.10.1] - 2026-11-24](#0101---2026-11-24)
 - [[0.10.0] - 2026-11-23](#0100---2026-11-23)
 - [[0.9.0] - 2026-11-23](#090---2026-11-23)
 - [[0.8.1] - 2026-11-23](#081---2026-11-23)
@@ -25,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - [[0.1.0] - 2026-11-19](#010---2026-11-19)
 
 ## [Unreleased]
+
+## [0.10.1] - 2026-11-24
 
 Planned as 0.10.1 (patch): the follow-ups of audit ZAM and its delta. No BC break in the public PHP API or config;
 the new keys have defaults that keep 0.10.0's behaviour.

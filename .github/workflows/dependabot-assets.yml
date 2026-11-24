@@ -1,6 +1,11 @@
 # REQ-GH-003: when Dependabot bumps the npm toolchain (vite, vitest, eslint, typescript), rebuild the committed import
 # script (src/Resources/public/js) and build-info.json on the Dependabot branch, so ci.yml's dist-freshness check
-# ("Check the committed assets match the build") keeps passing. The commit is marked [dependabot-skip].
+# ("Check the committed assets match the build") keeps passing.
+#
+# Supply chain (audit ZAWD-M1): the bumped packages are untrusted code. They run only in `build`, which has a
+# read-only token, no persisted credentials and no install scripts (`--ignore-scripts`, so neither the root
+# `preinstall` nor any dependency hook runs). `commit` has write access but never installs, builds or runs a repository
+# script: it checks out the branch, copies the two artifact paths in and pushes them.
 name: Dependabot rebuild assets
 
 on: pull_request
@@ -9,18 +14,19 @@ permissions:
   contents: read
 
 jobs:
-  rebuild:
-    name: Rebuild the import script
+  build:
+    name: Build the import script (read-only)
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     if: github.event.pull_request.user.login == 'dependabot[bot]' && contains(github.event.pull_request.head.ref, 'npm_and_yarn')
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -29,17 +35,65 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '22'
-          cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install dependencies (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build the import script
         run: pnpm run build
 
-      - name: Commit the rebuilt script
-        uses: stefanzweifel/git-auto-commit-action@v7
+      - name: Upload the rebuilt files
+        uses: actions/upload-artifact@v7
         with:
-          commit_message: "[dependabot-skip] Rebuild the import script"
-          branch: ${{ github.head_ref }}
-          file_pattern: 'src/Resources/public/js/*.js build-info.json'
+          name: rebuilt-assets
+          path: |
+            src/Resources/public/js/*.js
+            build-info.json
+          if-no-files-found: error
+          retention-days: 1
+
+  commit:
+    name: Commit the rebuilt script
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && contains(github.event.pull_request.head.ref, 'npm_and_yarn')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Download the rebuilt files
+        uses: actions/download-artifact@v8
+        with:
+          name: rebuilt-assets
+          path: ${{ runner.temp }}/rebuilt
+
+      - name: Copy only the two expected paths
+        env:
+          SRC: ${{ runner.temp }}/rebuilt
+        run: |
+          set -eu
+          cp "$SRC/build-info.json" build-info.json
+          for f in "$SRC"/src/Resources/public/js/*.js; do
+            cp "$f" "src/Resources/public/js/$(basename "$f")"
+          done
+
+      - name: Commit and push
+        id: push
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -eu
+          git add -- build-info.json 'src/Resources/public/js/*.js'
+          if git diff --cached --quiet; then
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "[dependabot-skip] Rebuild the import script"
+          git push origin "HEAD:$BRANCH"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"

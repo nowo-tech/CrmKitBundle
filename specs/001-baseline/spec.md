@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-baseline` (phase A on `feat/phase-a-companies-contacts`)
 **Created**: 2026-11-18
-**Status**: Baseline (phase A, 0.1.0, not tagged)
+**Status**: Baseline (phase A, 0.1.0), extended through 0.10.1 (inventory refreshed 2026-11-24)
 **Input**: Contract v0.1 for symfony-beacon spec 245 ([`docs/CONTRACT.md`](../../docs/CONTRACT.md), adjusted to the
 phase A code), owner decision D-20261118-05, every Q-O and Q-B question as recommended until answered.
 
@@ -95,6 +95,15 @@ tables on a private entity manager and never flushes the host's work.
 - **Given** one kept-alive kernel serving two tenants and two actors, **then** no data crosses, no managed entity
   survives a request and memory stays flat.
 
+### US-08 - HubSpot import (0.10.0)
+
+- **Given** a CRM manager pastes a HubSpot credential with read scopes only, **then** it is checked, sealed and shown
+  as its last four characters; a credential with a write scope is refused.
+- **Given** a person with `import` + `edit` picks objects and lists, maps the properties and confirms, **then** the run
+  imports companies, contacts, owners and lists page by page, and a re-run updates instead of duplicating.
+- **Given** an operator rotates the secret key, **then** every token keeps opening and `secrets:rotate` re-seals them
+  without losing any; a key that is not configured pauses the import and keeps the token.
+
 ## Requirements
 
 - **FR-CONFIG-001**: strict configuration tree (contract section 10 as built), parameters `nowo_crm_kit.<path>`, the
@@ -156,6 +165,17 @@ tables on a private entity manager and never flushes the host's work.
 - **FR-UI-003** (0.5.0): pipeline pages, forms, row actions, stylesheet `nowo-crm-kit.css`.
 - **FR-SEARCH-002** (0.6.0): SearchKit providers for deals and note hits (bridge).
 - **FR-I18N-001**: translations in en, es, it, fr, pt, de, nl (REQ-I18N-002).
+- **FR-HUB-001** (0.10.0): one HubSpot credential per tenant (service key or private app token), checked against
+  HubSpot (account, read-only scopes) before it is sealed; connect / replace / disconnect need `import` + `manage`,
+  rate-limited per tenant (`connect_rate_limit`); only the last four characters are shown.
+- **FR-HUB-002** (0.10.0): HubSpot import of companies, contacts, associations, owners and lists on the import queue:
+  start, mapping, confirm, one page per write unit, references (`crm_external_ref`), unattended runs only for the
+  confirmer's own or ownerless records; the start and mapping pages and the confirm are rate-limited per tenant
+  (`browse_rate_limit`, 0.10.1).
+- **FR-SECRET-001** (0.10.0): the secret box port (`CrmSecretBoxInterface`): sodium default, DoctrineEncrypt bridge with
+  key ids and previous profiles (0.10.1); a bad value marks the connection invalid, an unavailable key keeps it;
+  `secrets:rotate` never loses a token.
+- **FR-MSG-001** (0.10.0): background import runs with Symfony Messenger (`import.messenger`).
 
 ## Success criteria
 

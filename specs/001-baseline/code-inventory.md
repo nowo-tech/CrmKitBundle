@@ -2,11 +2,11 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/crm-kit-bundle`  
-**Last audited**: 2026-11-22 (0.6.0 tagged; API, pipeline, access and bridge files mapped)
+**Last audited**: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped)
 
-Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **418** (355 PHP files, 24 Doctrine XML
-mappings, 26 Twig views, 7 translation files, assets and CSS). Sections headed `0.3.0-0.6.0` were added by the
-2026-11-22 refresh (194 files).
+Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **503** (428 PHP files, 26 Doctrine XML
+mappings, 36 Twig views, 7 translation files, assets and CSS). Sections headed `0.3.0-0.6.0` were added by the
+2026-11-22 refresh, sections headed `0.7.0-0.10.x` by the 2026-11-24 refresh.
 
 Requirement ids are those of [`spec.md`](spec.md#requirements).
 
@@ -192,7 +192,7 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Application/Taggings.php` | FR-TAG-001 |
 | `src/Application/WriteSupport.php` | FR-GATE-001, FR-CONC-001, FR-EVT-001, FR-TL-001 |
 
-### Application: persistence port and shared units (6)
+### Application: persistence port and shared units (5)
 
 | Source file | Requirement IDs |
 | --- | --- |
@@ -201,7 +201,6 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Application/Shared/Effects.php` | FR-EVT-001, FR-WORKER-001 |
 | `src/Application/Shared/StaleRowException.php` | FR-CONC-001 |
 | `src/Application/Shared/TransactionRunnerInterface.php` | FR-CONC-001 |
-| `src/Application/Shared/WriteConflictException.php` | FR-CONC-001 |
 
 ### Infrastructure: Doctrine (5)
 
@@ -223,19 +222,18 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Infrastructure/Symfony/DependencyInjection/ParameterFlattener.php` | FR-CONFIG-001 |
 | `src/Infrastructure/Symfony/DependencyInjection/ServiceDefinitions.php` | FR-CONFIG-001 |
 
-### Infrastructure: port defaults (7)
+### Infrastructure: port defaults (6)
 
 | Source file | Requirement IDs |
 | --- | --- |
 | `src/Infrastructure/Symfony/Port/ConfiguredFeatureGate.php` | FR-PORT-001 |
 | `src/Infrastructure/Symfony/Port/ConfiguredPlanLimits.php` | FR-PORT-001 |
 | `src/Infrastructure/Symfony/Port/PsrLogAuditSink.php` | FR-PORT-001 |
-| `src/Infrastructure/Symfony/Port/RoleMapAccessChecker.php` | FR-PORT-001 |
 | `src/Infrastructure/Symfony/Port/SecurityActorDirectory.php` | FR-PORT-001 |
 | `src/Infrastructure/Symfony/Port/SingleTenantResolver.php` | FR-PORT-001 |
 | `src/Infrastructure/Symfony/Port/SymfonyUuidGenerator.php` | FR-PORT-001 |
 
-### Infrastructure: HTTP listeners (4)
+### Infrastructure: HTTP listeners (5)
 
 | Source file | Requirement IDs |
 | --- | --- |
@@ -281,12 +279,6 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Infrastructure/Symfony/Form/TagsAssignType.php` | FR-UI-001 |
 | `src/Infrastructure/Symfony/Routing/UiRouteLoader.php` | FR-UI-001 |
 
-### Bridge: SearchKit (1)
-
-| Source file | Requirement IDs |
-| --- | --- |
-| `src/Bridge/SearchKit/CrmSearchProvider.php` | FR-SEARCH-001 |
-
 ### Resources: Doctrine XML mapping (16)
 
 | Source file | Requirement IDs |
@@ -308,7 +300,7 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/config/doctrine/Tag.orm.xml` | FR-EM-001, FR-SEC-006 |
 | `src/Resources/config/doctrine/Tagging.orm.xml` | FR-EM-001, FR-SEC-006 |
 
-### Resources: Twig views (13)
+### Resources: Twig views (22)
 
 | Source file | Requirement IDs |
 | --- | --- |
@@ -601,4 +593,115 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/views/pipeline/funnels.html.twig` | FR-UI-003 |
 | `src/Resources/views/pipeline/stats.html.twig` | FR-UI-003 |
 
-**Total production sources**: 418 (224 from the phase-A sections, 194 from the `0.3.0-0.6.0` sections)
+### 0.7.0-0.10.x: HubSpot connection and secret box (22)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/HubSpot/HubSpotConnectionService.php` | FR-HUB-001 |
+| `src/Application/HubSpot/HubSpotTokenOpener.php` | FR-HUB-001, FR-SECRET-001 |
+| `src/Bridge/DoctrineEncrypt/DoctrineEncryptCrmSecretBox.php` | FR-SECRET-001 |
+| `src/Bridge/OutboundUrlGuard/GuardedHubSpotRequestOptions.php` | FR-HUB-001, FR-HUB-002 |
+| `src/Domain/Enum/HubSpotConnectionStatus.php` | FR-HUB-001 |
+| `src/Domain/Event/HubSpotConnected.php` | FR-HUB-001, FR-EVT-001 |
+| `src/Domain/Event/HubSpotDisconnected.php` | FR-HUB-001, FR-EVT-001 |
+| `src/Domain/Exception/SecretKeyUnavailableException.php` | FR-SECRET-001 |
+| `src/Domain/Exception/SecretUnsealException.php` | FR-SECRET-001 |
+| `src/Domain/Model/HubSpot/HubSpotConnection.php` | FR-HUB-001 |
+| `src/Domain/Port/CrmSecretBoxInterface.php` | FR-SECRET-001, FR-PORT-001 |
+| `src/Domain/Read/HubSpot/HubSpotConnectionView.php` | FR-HUB-001 |
+| `src/Domain/Read/HubSpot/HubSpotTokenInfo.php` | FR-HUB-001 |
+| `src/Domain/Service/HubSpotConnectionServiceInterface.php` | FR-HUB-001 |
+| `src/Domain/Value/HubSpotAccountId.php` | FR-HUB-001, FR-SEC-006 |
+| `src/Domain/Value/HubSpotToken.php` | FR-HUB-001 |
+| `src/Domain/Value/SealedSecret.php` | FR-SECRET-001 |
+| `src/Domain/Value/SecretContext.php` | FR-SECRET-001 |
+| `src/Infrastructure/Crypto/SodiumCrmSecretBox.php` | FR-SECRET-001 |
+| `src/Infrastructure/Symfony/Command/SecretsRotateCommand.php` | FR-SECRET-001 |
+| `src/Infrastructure/Symfony/Form/HubSpotConnectType.php` | FR-HUB-001, FR-UI-001 |
+| `src/Resources/config/doctrine-hubspot/HubSpotConnection.orm.xml` | FR-HUB-001, FR-SEC-006 |
+
+### 0.7.0-0.10.x: HubSpot import run (43)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/HubSpot/HubSpotErrors.php` | FR-HUB-002 |
+| `src/Application/HubSpot/HubSpotException.php` | FR-HUB-002 |
+| `src/Application/HubSpot/HubSpotImportService.php` | FR-HUB-002, FR-IMP-001 |
+| `src/Application/HubSpot/HubSpotMapper.php` | FR-HUB-002 |
+| `src/Application/HubSpot/HubSpotRecordWriter.php` | FR-HUB-002, FR-GATE-001 |
+| `src/Application/HubSpot/HubSpotRunState.php` | FR-HUB-002 |
+| `src/Application/HubSpot/HubSpotRunner.php` | FR-HUB-002, FR-CONC-001 |
+| `src/Application/HubSpot/NeedsPersonException.php` | FR-HUB-002, FR-GATE-001 |
+| `src/Application/HubSpot/Port/HubSpotReaderInterface.php` | FR-HUB-002 |
+| `src/Application/HubSpot/Port/HubSpotStoreInterface.php` | FR-HUB-001, FR-HUB-002 |
+| `src/Application/Port/ExternalRefHooksInterface.php` | FR-HUB-002, FR-GDPR-002, FR-MERGE-001 |
+| `src/Domain/Enum/HubSpotObject.php` | FR-HUB-002 |
+| `src/Domain/Model/HubSpot/ExternalRef.php` | FR-HUB-002 |
+| `src/Domain/Port/CrmActorEmailLookupInterface.php` | FR-HUB-002, FR-PORT-001 |
+| `src/Domain/Read/HubSpot/HubSpotAssociation.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotIdPage.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotList.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotOwner.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotOwnerPage.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotPage.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotProperty.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotPropertyView.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotRecord.php` | FR-HUB-002 |
+| `src/Domain/Read/HubSpot/HubSpotSchemaView.php` | FR-HUB-002 |
+| `src/Domain/Service/HubSpotImportServiceInterface.php` | FR-HUB-002 |
+| `src/Domain/Value/HubSpotCursor.php` | FR-HUB-002, FR-SEC-006 |
+| `src/Domain/Value/HubSpotImportScope.php` | FR-HUB-002 |
+| `src/Domain/Value/HubSpotKey.php` | FR-HUB-002, FR-SEC-006 |
+| `src/Domain/Value/HubSpotMapping.php` | FR-HUB-002 |
+| `src/Domain/Value/HubSpotNumericIdTrait.php` | FR-HUB-002, FR-SEC-006 |
+| `src/Domain/Value/HubSpotObjectId.php` | FR-HUB-002, FR-SEC-006 |
+| `src/Infrastructure/Doctrine/DoctrineHubSpotStore.php` | FR-HUB-001, FR-HUB-002, FR-CONC-001 |
+| `src/Infrastructure/HubSpot/HttpHubSpotReader.php` | FR-HUB-002 |
+| `src/Infrastructure/HubSpot/HubSpotHttpClientFactory.php` | FR-HUB-002 |
+| `src/Infrastructure/HubSpot/HubSpotRequestOptionsInterface.php` | FR-HUB-002 |
+| `src/Infrastructure/Symfony/Controller/HubSpotImportController.php` | FR-HUB-001, FR-HUB-002, FR-UI-002 |
+| `src/Infrastructure/Symfony/Form/HubSpotMappingType.php` | FR-HUB-002, FR-UI-002 |
+| `src/Infrastructure/Symfony/Form/HubSpotStartType.php` | FR-HUB-002, FR-UI-002 |
+| `src/Resources/config/doctrine-hubspot/ExternalRef.orm.xml` | FR-HUB-002, FR-SEC-006 |
+| `src/Resources/views/import/_hubspot_state.html.twig` | FR-HUB-002, FR-UI-002 |
+| `src/Resources/views/import/hubspot/_body.html.twig` | FR-HUB-001, FR-HUB-002, FR-UI-002 |
+| `src/Resources/views/import/hubspot/dialog.html.twig` | FR-HUB-001, FR-HUB-002, FR-UI-002 |
+| `src/Resources/views/import/hubspot/page.html.twig` | FR-HUB-001, FR-HUB-002, FR-UI-002 |
+
+### 0.7.0-0.10.x: background import runs (Messenger) (4)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/Port/ImportRunDispatcherInterface.php` | FR-MSG-001 |
+| `src/Infrastructure/Symfony/Messenger/MessengerImportRunDispatcher.php` | FR-MSG-001 |
+| `src/Infrastructure/Symfony/Messenger/RunCrmImport.php` | FR-MSG-001 |
+| `src/Infrastructure/Symfony/Messenger/RunCrmImportHandler.php` | FR-MSG-001, FR-WORKER-001 |
+
+### 0.7.0-0.10.x: host object picker (6)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Domain/Port/CrmHostObjectSearchInterface.php` | FR-LINK-001, FR-PORT-001 |
+| `src/Domain/Port/CrmHostObjectTypeLabelInterface.php` | FR-LINK-001, FR-PORT-001 |
+| `src/Domain/Service/HostObjectPickerInterface.php` | FR-LINK-001 |
+| `src/Domain/Value/HostObjectMatch.php` | FR-LINK-001 |
+| `src/Domain/Value/HostTypeLabel.php` | FR-LINK-001 |
+| `src/Resources/views/record/_link_form.html.twig` | FR-LINK-001, FR-UI-001 |
+
+### 0.7.0-0.10.x: UI shell, dialogs and shared constants (10)
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Domain/TranslationDomain.php` | FR-I18N-001, FR-ARCH-001 |
+| `src/Infrastructure/Symfony/Controller/PipelineDialogs.php` | FR-UI-003 |
+| `src/Infrastructure/Symfony/Controller/UiIcons.php` | FR-UI-001 |
+| `src/Infrastructure/Symfony/Form/AdminFilterType.php` | FR-UI-001 |
+| `src/Infrastructure/Symfony/Form/FormProfile.php` | FR-UI-001, FR-ARCH-001 |
+| `src/Resources/views/_dialog_form.html.twig` | FR-UI-001 |
+| `src/Resources/views/admin/_create.html.twig` | FR-UI-001 |
+| `src/Resources/views/admin/_create_remote.html.twig` | FR-UI-001 |
+| `src/Resources/views/pipeline/_dialog.html.twig` | FR-UI-003 |
+| `src/Resources/views/pipeline/form.html.twig` | FR-UI-003 |
+
+**Total production sources**: 503 (every file under `src/`; the `0.7.0-0.10.x` sections were added by the 2026-11-24
+refresh, 85 files)

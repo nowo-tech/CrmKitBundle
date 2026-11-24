@@ -28,6 +28,39 @@ updates:
     commit-message:
       prefix: "chore(deps):"
 
+  # REQ-GH-002: the import modal's TypeScript toolchain. A bump changes the build, so the companion workflow
+  # (dependabot-assets.yml, REQ-GH-003) rebuilds src/Resources/public/js and build-info.json on the PR, and the
+  # dist-freshness check of ci.yml keeps passing.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "HecFranco"
+    labels:
+      - "dependencies"
+      - "javascript"
+    groups:
+      build:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "@vitest/*"
+          - "jsdom"
+      lint:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "typescript"
+          - "typescript-eslint"
+          - "@types/*"
+    commit-message:
+      prefix: "chore(deps):"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

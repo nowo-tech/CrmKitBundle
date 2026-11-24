@@ -1,0 +1,45 @@
+# REQ-GH-003: when Dependabot bumps the npm toolchain (vite, vitest, eslint, typescript), rebuild the committed import
+# script (src/Resources/public/js) and build-info.json on the Dependabot branch, so ci.yml's dist-freshness check
+# ("Check the committed assets match the build") keeps passing. The commit is marked [dependabot-skip].
+name: Dependabot rebuild assets
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    name: Rebuild the import script
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && contains(github.event.pull_request.head.ref, 'npm_and_yarn')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the import script
+        run: pnpm run build
+
+      - name: Commit the rebuilt script
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "[dependabot-skip] Rebuild the import script"
+          branch: ${{ github.head_ref }}
+          file_pattern: 'src/Resources/public/js/*.js build-info.json'

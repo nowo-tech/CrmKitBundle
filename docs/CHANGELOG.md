@@ -36,6 +36,23 @@ the new keys have defaults that keep 0.10.0's behaviour.
 - `secrets.doctrine_encrypt` (`profile`, `key_id`, `previous`): the DoctrineEncrypt box's profiles, so its key can be
   rotated (ZAM-D2). `DoctrineEncryptCrmSecretBox` takes two optional constructor arguments, `$keyId` and `$previous`.
 - `SecretKeyUnavailableException`: the key a sealed value names is not configured or cannot be used.
+- REQ-ASSETS-005: `nowo-crm-import.js` logs one `📦 [crm-kit/import] script loaded, build: …` line per page (once-guard,
+  build time from the committed `build-info.json`). Silence it with `<html data-nowo-console="quiet">` or
+  `globalThis.NOWO_CONSOLE = 'quiet'` (USAGE, "Browser console").
+- REQ-MSG-001: `RunCrmImportHandler` is declared with `#[AsMessageHandler]` and takes an optional PSR logger. It logs
+  the message type, the import id and the outcome, and a warning when it drops a message whose tenant id is not valid.
+
+### Changed
+
+- Dependencies: `nowo-tech/form-kit-bundle` ^2.25.1, `nowo-tech/transaction-contract` ^1.1,
+  `nowo-tech/transaction-doctrine` ^1.10.1, `nowo-tech/ui-kit-bundle` ^2.71 (twig 3.31 in the locks; the demo's lock
+  follows).
+- `NextActionService::set()` names transaction-contract's `ConcurrencyConflict`. transaction-doctrine 1.10 aliases
+  its old class name to it, so callers catch the same class. Deptrac's last `skip_violations` entry is gone.
+- REQ-RUNTIME-002: with `import.messenger.enabled`, the entity-manager hygiene listener also runs on Messenger's
+  `WorkerMessageHandledEvent` / `WorkerMessageFailedEvent`, so every message in a worker starts with an empty manager.
+- The DoctrineEncrypt box probes its key only after a decryption failed (audit ZAWF-I2: Defuse no longer derives its
+  key twice per successful unseal); the classification is unchanged.
 
 ### Fixed
 
@@ -54,6 +71,11 @@ the new keys have defaults that keep 0.10.0's behaviour.
 - UPGRADING (docs, ZAW-I1, ZAW-I3): the rotation steps now say to restart every worker, consumer and cron host, and
   to rotate once more before removing the old key. The consent normalisation only rewrites values that become valid,
   says what to do with the rest, and warns that the ALTERs rebuild the tables.
+- Docs: CONFIGURATION "Timeouts" (REQ-RUNTIME-001: HubSpot calls per request, the hierarchy up to PHP, the proxy write
+  timeout and FrankenPHP `max_wait_time`), DEMO-FRANKENPHP "Timeouts", SECURITY "Content-Security-Policy"
+  (REQ-UX-001), an up-to-date FRANKENPHP-WORKER-AUDIT (0.10.1), PER-CS in PSR.md and the agent rules, the README
+  status and TS coverage, the SPEC-DRIVEN-DEVELOPMENT scope through 0.10.1, and the binary comparison in the UPGRADING
+  consent normalisation (ZAWF-I1).
 - UPGRADING (docs): the 0.10.0 schema notes missed `nowo_crm_consent.source`. That column became a binary exact key on
   MySQL / MariaDB when `source` joined `CrmMetadataListener::EXACT_COLUMNS`. The notes also gave `utf8mb4_bin`
   instead of `utf8mb4_0900_bin` for the new MySQL 8.4 columns. UPGRADING "Unreleased" now has the check query and the
@@ -83,6 +105,11 @@ the new keys have defaults that keep 0.10.0's behaviour.
   (audit ZAW-L2), after its local checks: a stale version or an invalid mapping is refused before any HubSpot call.
 
 ### Internal
+
+- REQ-GH-002 / REQ-GH-003: Dependabot watches the npm toolchain in two groups, and `dependabot-assets.yml` rebuilds the
+  committed import script and `build-info.json` on those PRs.
+- REQ-CS-009: PHP-CS-Fixer uses `@PER-CS` and `@PER-CS:risky` instead of `@PSR12`.
+- REQ-SPECKIT-001 / 003: the code inventory lists every file under `src/` (506 at 0.10.1).
 
 - **Deptrac layer check** (REQ-ARCH-002): `deptrac.yaml` with a strict ruleset (Domain / Application framework-free,
   uncovered dependencies and unassigned classes fail), `composer deptrac`, `make deptrac`, part of

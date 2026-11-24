@@ -23,6 +23,7 @@ Canonical per-repo doc for **REQ-GIT-001** (no Cursor co-author trailers). Copy 
   - [Classification](#classification)
   - [What still runs in light mode](#what-still-runs-in-light-mode)
   - [Concurrency](#concurrency)
+- [Dependabot npm updates and the asset rebuild](#dependabot-npm-updates-and-the-asset-rebuild)
 - [Acceptance criteria](#acceptance-criteria)
 - [References](#references)
 
@@ -279,6 +280,25 @@ A new push to a PR cancels its superseded run. Push runs use their own `run_id` 
 `tag_when_green.sh` would then find no green run for that release commit.
 
 ---
+
+## Dependabot npm updates and the asset rebuild
+
+REQ-GH-002 / REQ-GH-003. Dependabot bumps the import modal's TypeScript toolchain (`.github/dependabot.yml`, groups
+`build` and `lint`). A bump changes the built script, so `ci.yml`'s step "Check the committed assets match the build"
+fails until `src/Resources/public/js/*.js` and `build-info.json` are rebuilt. `.github/workflows/dependabot-assets.yml`
+does that on Dependabot's npm branches only (author `dependabot[bot]`, branch `dependabot/npm_and_yarn/…`), in two jobs
+(audit ZAWD-M1):
+
+- **build** (`contents: read`): checks out without persisted credentials, runs `pnpm install --frozen-lockfile
+  --ignore-scripts` (no lifecycle script of the bumped, untrusted packages, and not the root `preinstall`), builds and
+  uploads only the built JS and `build-info.json` as an artifact (kept one day).
+- **commit** (`contents: write`, `actions: write`): never installs, builds or runs a repository script. It checks
+  out the branch, copies the two artifact paths in, commits `[dependabot-skip] Rebuild the import script` and pushes.
+
+A push made with `GITHUB_TOKEN` starts no workflow (audit ZAWD-L2), so the commit job then runs `gh workflow run
+ci.yml --ref <branch>`. `ci.yml` accepts `workflow_dispatch` (always the full mode), and its check runs land on the
+rebuilt head, which is what the PR's required checks look at. If that dispatch ever fails, re-run CI on the PR by
+hand (close and reopen it, or push an empty commit as a person) before merging.
 
 ## Acceptance criteria
 

@@ -9,7 +9,7 @@
         "doctrine/orm": "^3.7",
         "nowo-tech/form-kit-bundle": "^2.25.1",
         "nowo-tech/transaction-doctrine": "^1.10.1",
-        "nowo-tech/ui-kit-bundle": "^2.73",
+        "nowo-tech/ui-kit-bundle": "^2.74",
         "nowo-tech/crm-kit-bundle": "@dev",
         "php": ">=8.2,<8.6",
         "symfony/asset": "7.4.*",

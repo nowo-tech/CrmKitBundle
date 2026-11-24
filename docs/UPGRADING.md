@@ -24,6 +24,26 @@
 
 ## Unreleased
 
+Planned as **0.10.3**, from 0.10.2: `composer update nowo-tech/crm-kit-bundle` (it brings `nowo-tech/ui-kit-bundle`
+^2.74), then `assets:install` (the import modal script changed). No schema change, no BC break.
+
+- **Direct GET of the import steps** is opt-in:
+
+  ```yaml
+  nowo_crm_kit:
+      import:
+          dialog:
+              direct_get: redirect   # default off
+  ```
+
+  The bundle marks its routes in `nowo_ui_kit.remote_dialog.direct_get.routes`. A host that imports the kit's routes a
+  second time under another name (a prefixed twin) adds those names itself, with the same `page`, `dialog` and
+  `page_defaults` / `page_resolver` (see CONFIGURATION). Mark only safe GETs: the kit's step GETs change nothing.
+- **Import modal layout:** the step's primary moved to the footer (*Start an import* / *Connect HubSpot* on the
+  HubSpot source step); the test ids are unchanged. A host that styled the HubSpot card's `<dl>` or the mapping's
+  stacked selects should look at UiKit's detail list and the mapping tables (`[data-testid^="crm-hubspot-mapping-"]`).
+- **Translations:** 7 new keys in the 7 locales (clear the cache).
+
 ## To 0.10.2
 
 From **0.10.1**:

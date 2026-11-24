@@ -362,7 +362,14 @@ import:
             owner: 'Eigenaar (via e-mail)'
             domain: 'Website uit het domein'
             custom: 'Eigen veld %key%'
+        mapping:
+            property: 'HubSpot-eigenschap'
+            target: 'CRM-veld'
+            list: 'HubSpot-lijst'
+            lists: 'Lijsten'
+            options: 'Opties'
         card:
+            title: 'HubSpot-koppeling'
             write_unverified: 'schrijfrechten niet gecontroleerd'
             label: 'Naam'
             account: 'HubSpot-account'

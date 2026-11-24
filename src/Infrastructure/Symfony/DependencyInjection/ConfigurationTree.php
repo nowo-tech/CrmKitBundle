@@ -95,6 +95,9 @@ final class ConfigurationTree
         $import->integerNode('sync_rows')->defaultValue(500)->min(10)->max(50000)->end();
         $import->integerNode('chunk_rows')->defaultValue(100)->min(10)->max(1000)->end();
         $import->integerNode('stale_claim_seconds')->defaultValue(600)->min(60)->max(86400)->end();
+        $import->arrayNode('dialog')->addDefaultsIfNotSet()->info('0.10.3: the import modal of the lists.')->children()
+            ->enumNode('direct_get')->values(['off', 'redirect'])->defaultValue('off')->info('0.10.3 (UiKit 2.74 remote_dialog.direct_get, Beacon D-20261124-05): what a step URL of the import modal (CSV / vCard file, mapping, preview and result; with import.hubspot.enabled the HubSpot source, connect, start and mapping) does when it is opened directly (address bar, bookmark, a link from another site). off (default) = its page, as before; redirect = after the same access checks (a denied person keeps the 404) a 302 to the companies or contacts list with the modal reopened on that step. Links followed inside the app keep the page (the no-JS fallback); dialog fetches and POSTs are unchanged. Needs ui.enabled.')->end()
+        ->end()->end();
         self::hubspot($children, $import);
         $import->end()->end();
         $children->arrayNode('gdpr')->addDefaultsIfNotSet()->children()

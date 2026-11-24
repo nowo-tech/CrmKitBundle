@@ -362,7 +362,14 @@ import:
             owner: 'Responsable (par e-mail)'
             domain: 'Site web depuis le domaine'
             custom: 'Champ personnalisé %key%'
+        mapping:
+            property: 'Propriété HubSpot'
+            target: 'Champ du CRM'
+            list: 'Liste HubSpot'
+            lists: 'Listes'
+            options: 'Réglages'
         card:
+            title: 'Connexion HubSpot'
             write_unverified: 'autorisations d’écriture non vérifiées'
             label: 'Nom'
             account: 'Compte HubSpot'

@@ -15,6 +15,7 @@
 - [UI](#ui)
   - [Rows per page and the create dialog (0.8.0)](#rows-per-page-and-the-create-dialog-080)
   - [Filter bars (0.10.2)](#filter-bars-0102)
+  - [Import steps opened directly (0.10.3)](#import-steps-opened-directly-0103)
   - [Area tab icons](#area-tab-icons)
 - [Later phases](#later-phases)
 - [Per-tenant settings](#per-tenant-settings)
@@ -63,6 +64,8 @@ nowo_crm_kit:
         sync_rows: 500             # 10..50000 rows run in the confirm request (then "Continue")
         chunk_rows: 100            # 10..1000 rows per transaction
         stale_claim_seconds: 600   # 60..86400: a running import without progress for this long may be taken over
+        dialog:
+            direct_get: off        # 0.10.3: off | redirect (a step URL opened directly lands on its list, modal open)
         hubspot:                   # 0.10.0
             enabled: false         # needs a secret box (secrets.*) and symfony/http-client
             page_size: 100         # 10..100 objects per HubSpot page
@@ -499,6 +502,48 @@ the list is empty and unfiltered the header shows no create button (one create b
 The look of the buttons is UiKit's host configuration: icon-only Filter / Clear filters with
 `nowo_ui_kit.theme.pages.list.filters.display: icon` (an icon set other than `none`), and the phone bottom sheet with
 `nowo_ui_kit.theme.pages.list.filters.sheet: true`.
+
+### Import steps opened directly (0.10.3)
+
+The import modal of the lists loads its steps from the import routes. Opened from the address bar, a bookmark or a
+link of another site, such a URL showed a bare page. With `import.dialog.direct_get: redirect` (and `ui.enabled`) it
+lands on its list with the modal open on that step (UiKit 2.74 `remote_dialog.direct_get`, Beacon D-20261124-05):
+
+```yaml
+nowo_crm_kit:
+    import:
+        dialog:
+            direct_get: redirect
+```
+
+The bundle prepends these UiKit entries (page `nowo_crm_kit_list`, dialog `crm-import-dialog`):
+
+| Route | Step | Lands on |
+| --- | --- | --- |
+| `nowo_crm_kit_import` | file (CSV / vCard) | the list of `?subject=` (contacts for `contact`, else companies) |
+| `nowo_crm_kit_import_show` | columns, preview, result | the list of the import's subject (`ImportDialogPageResolver`) |
+| `nowo_crm_kit_hubspot`, `_hubspot_connect`, `_hubspot_new`, `_hubspot_mapping` | HubSpot source, connect, start, mapping (with `import.hubspot.enabled`) | the companies list |
+
+- The controller's access check runs first: a person who may not import (or not manage HubSpot, for connect) keeps
+  the 403 / 404; an import of another person or tenant, or an unknown id, makes no redirect.
+- Only top-level navigations from outside the app are redirected (UiKit reads the fetch metadata); a link of the app
+  followed without JavaScript keeps the page, the modal's own fetches and every POST are unchanged.
+- On the list, the modal reopens only for a route of its safe list that equals the route the server resolved, at the
+  URL the router generated again (never a URL from the query), and the reopen query leaves the address.
+- A host entry for one of these routes replaces the kit's whole; `nowo_ui_kit.remote_dialog.direct_get.routes.<route>:
+  false` unmarks it. A host that imports the kit's routes again under other names adds those names with the same
+  values, for example:
+
+```yaml
+nowo_ui_kit:
+    remote_dialog:
+        direct_get:
+            routes:
+                customers_ws.nowo_crm_kit_import_show:
+                    page: customers_ws.nowo_crm_kit_list
+                    dialog: crm-import-dialog
+                    page_defaults: { type: companies }
+```
 
 ### Area tab icons
 

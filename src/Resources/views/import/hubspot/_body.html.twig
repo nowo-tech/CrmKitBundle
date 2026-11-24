@@ -3,8 +3,15 @@
   import flow carry data-crm-import-link (the modal loads them in place; without JavaScript they are plain links).
   Variables: step (source | connect | start | mapping), connection (HubSpotConnectionView|null), form (FormView|null),
   action (FormView|null, the disconnect CSRF form), alert (string|null), manage (bool), importId (string|null),
-  form_id (the id the footer's submit button points at), bundle.
+  form_id (the id the footer's submit button points at), bundle; 0.10.3: in_dialog (bool, default false) — in the modal
+  the step's one primary action (Start an import / Connect HubSpot) is the footer's (UI-PATTERNS §16: no primary in the
+  body), so the body leaves it out.
+
+  0.10.3 layout (UI-PATTERNS §16): sections without cards, each with a small heading and the dialog's divider between
+  them (UiKit `nowo-ui-section`); the connection as UiKit's detail list (term | value); the section's own actions secondary; the mapping as a table per object (HubSpot property | CRM field, UiKit
+  `table` in its scroll wrapper, readable at phone width) and the lists and options in their own sections.
 #}
+{%- set in_dialog = in_dialog|default(false) -%}
 {%- set _d = 'NowoCrmKitBundle' -%}
 {%- set _b = bundle -%}
 {% if alert %}
@@ -13,43 +20,77 @@
 {% if step == 'source' %}
     <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-hubspot-source">
         {% if connection %}
-            <dl data-testid="crm-hubspot-connection" data-status="{{ connection.status.value }}">
-                <dt>{{ 'import.hubspot.card.label'|trans({}, _d) }}</dt><dd>{{ connection.label }}</dd>
-                <dt>{{ 'import.hubspot.card.account'|trans({}, _d) }}</dt><dd>{{ connection.accountId }}</dd>
-                <dt>{{ 'import.hubspot.card.credential'|trans({}, _d) }}</dt><dd data-testid="crm-hubspot-last4">••••{{ connection.tokenLast4 }}</dd>
-                <dt>{{ 'import.hubspot.card.status'|trans({}, _d) }}</dt><dd>{{ ('import.hubspot.status.' ~ connection.status.value)|trans({}, _d) }}</dd>
-                <dt>{{ 'import.hubspot.card.scopes'|trans({}, _d) }}</dt><dd>{{ connection.scopes|join(', ') }}{% if not connection.scopesVerified %} <span data-testid="crm-hubspot-unverified">({{ 'import.hubspot.card.write_unverified'|trans({}, _d) }})</span>{% endif %}</dd>
-                <dt>{{ 'import.hubspot.card.validated'|trans({}, _d) }}</dt><dd>{{ connection.validatedAt|date('Y-m-d H:i') }} UTC</dd>
+            <h3>{{ 'import.hubspot.card.title'|trans({}, _d) }}</h3>
+            <dl class="{{ nowo_ui_class('detail_list', _b) }}" data-testid="crm-hubspot-connection" data-status="{{ connection.status.value }}">
+                <div class="{{ nowo_ui_class('detail_item', _b) }}"><dt class="{{ nowo_ui_class('detail_term', _b) }}">{{ 'import.hubspot.card.label'|trans({}, _d) }}</dt><dd class="{{ nowo_ui_class('detail_value', _b) }}">{{ connection.label }}</dd></div>
+                <div class="{{ nowo_ui_class('detail_item', _b) }}"><dt class="{{ nowo_ui_class('detail_term', _b) }}">{{ 'import.hubspot.card.account'|trans({}, _d) }}</dt><dd class="{{ nowo_ui_class('detail_value', _b) }}">{{ connection.accountId }}</dd></div>
+                <div class="{{ nowo_ui_class('detail_item', _b) }}"><dt class="{{ nowo_ui_class('detail_term', _b) }}">{{ 'import.hubspot.card.credential'|trans({}, _d) }}</dt><dd class="{{ nowo_ui_class('detail_value', _b) }}" data-testid="crm-hubspot-last4">••••{{ connection.tokenLast4 }}</dd></div>
+                <div class="{{ nowo_ui_class('detail_item', _b) }}"><dt class="{{ nowo_ui_class('detail_term', _b) }}">{{ 'import.hubspot.card.status'|trans({}, _d) }}</dt><dd class="{{ nowo_ui_class('detail_value', _b) }}">{{ ('import.hubspot.status.' ~ connection.status.value)|trans({}, _d) }}</dd></div>
+                <div class="{{ nowo_ui_class('detail_item', _b) }}"><dt class="{{ nowo_ui_class('detail_term', _b) }}">{{ 'import.hubspot.card.scopes'|trans({}, _d) }}</dt><dd class="{{ nowo_ui_class('detail_value', _b) }}">{{ connection.scopes|join(', ') }}{% if not connection.scopesVerified %} <span data-testid="crm-hubspot-unverified">({{ 'import.hubspot.card.write_unverified'|trans({}, _d) }})</span>{% endif %}</dd></div>
+                <div class="{{ nowo_ui_class('detail_item', _b) }}"><dt class="{{ nowo_ui_class('detail_term', _b) }}">{{ 'import.hubspot.card.validated'|trans({}, _d) }}</dt><dd class="{{ nowo_ui_class('detail_value', _b) }}">{{ connection.validatedAt|date('Y-m-d H:i') }} UTC</dd></div>
             </dl>
-            <p>
-                {% if connection.status.value == 'active' %}
-                    <a href="{{ path('nowo_crm_kit_hubspot_new') }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-crm-import-link data-testid="crm-hubspot-start">{{ 'import.hubspot.start'|trans({}, _d) }}</a>
-                {% endif %}
-                {% if manage %}
-                    <a href="{{ path('nowo_crm_kit_hubspot_connect') }}" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-link data-testid="crm-hubspot-replace">{{ 'import.hubspot.replace'|trans({}, _d) }}</a>
-                {% endif %}
-            </p>
-            {% if manage and action %}
-                {{ form_start(action, {action: path('nowo_crm_kit_hubspot_disconnect'), attr: {class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
-                {{ form_widget(action) }}
-                <button type="submit" class="{{ nowo_ui_class('btn_danger', _b) }}" data-testid="crm-hubspot-disconnect">{{ 'import.hubspot.disconnect'|trans({}, _d) }}</button>
-                {{ form_end(action) }}
+            {% if not in_dialog and connection.status.value == 'active' %}
+                <p><a href="{{ path('nowo_crm_kit_hubspot_new') }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-crm-import-link data-testid="crm-hubspot-start">{{ 'import.hubspot.start'|trans({}, _d) }}</a></p>
             {% endif %}
         {% else %}
+            <h3>{{ 'import.hubspot.card.title'|trans({}, _d) }}</h3>
             <p class="{{ nowo_ui_class('muted', _b) }}">{{ 'import.hubspot.not_connected'|trans({}, _d) }}</p>
-            {% if manage %}
-                <p><a href="{{ path('nowo_crm_kit_hubspot_connect') }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-crm-import-link data-testid="crm-hubspot-connect">{{ 'import.hubspot.connect'|trans({}, _d) }}</a></p>
-            {% else %}
+            {% if not manage %}
                 <p data-testid="crm-hubspot-ask-manager">{{ 'import.hubspot.ask_manager'|trans({}, _d) }}</p>
+            {% elseif not in_dialog %}
+                <p><a href="{{ path('nowo_crm_kit_hubspot_connect') }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-crm-import-link data-testid="crm-hubspot-connect">{{ 'import.hubspot.connect'|trans({}, _d) }}</a></p>
             {% endif %}
         {% endif %}
     </div>
+    {% if connection and manage %}
+        {#- the key's own actions: secondary, in a section of their own (never next to the primary) -#}
+        <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-hubspot-key">
+            <h3>{{ 'import.hubspot.card.credential'|trans({}, _d) }}</h3>
+            {%- set _replace -%}<a href="{{ path('nowo_crm_kit_hubspot_connect') }}" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-link data-testid="crm-hubspot-replace">{{ 'import.hubspot.replace'|trans({}, _d) }}</a>{%- endset -%}
+            {% if action %}
+                {#- one row: the disconnect form is the toolbar, Replace the key first -#}
+                {{ form_start(action, {action: path('nowo_crm_kit_hubspot_disconnect'), attr: {class: nowo_ui_class('toolbar', _b), 'data-crm-import-form': true}}) }}
+                {{ _replace }}
+                {%- for _hidden in action %}{{ form_widget(_hidden) }}{% endfor -%}
+                <button type="submit" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-testid="crm-hubspot-disconnect">{{ 'import.hubspot.disconnect'|trans({}, _d) }}</button>
+                {{ form_end(action) }}
+            {% else %}
+                <div class="{{ nowo_ui_class('toolbar', _b) }}">{{ _replace }}</div>
+            {% endif %}
+        </div>
+    {% endif %}
 {% elseif form %}
+    {% set _action = step == 'connect' ? path('nowo_crm_kit_hubspot_connect') : (step == 'start' ? path('nowo_crm_kit_hubspot_new') : path('nowo_crm_kit_hubspot_mapping', {id: importId})) %}
     <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-hubspot-{{ step }}">
         <p class="{{ nowo_ui_class('muted', _b) }}">{{ ('import.hubspot.intro.' ~ step)|trans({}, _d) }}</p>
-        {% set _action = step == 'connect' ? path('nowo_crm_kit_hubspot_connect') : (step == 'start' ? path('nowo_crm_kit_hubspot_new') : path('nowo_crm_kit_hubspot_mapping', {id: importId})) %}
-        {{ form_start(form, {action: _action, attr: {id: form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
-        {{ include('@NowoCrmKit/import/_dialog_fields.html.twig', {form: form}, false) }}
-        {{ form_end(form) }}
+        {% if step == 'mapping' %}
+            {{ form_start(form, {action: _action, attr: {id: form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
+            {#- 0.10.3: one table per object (HubSpot property | CRM field), then the lists, then the options -#}
+            {% for _object in ['companies', 'contacts'] %}
+                {%- set _rows = [] -%}
+                {%- for _child in form -%}{%- if _child.vars.name starts with ('p_' ~ _object ~ '_') -%}{%- set _rows = _rows|merge([_child]) -%}{%- endif -%}{%- endfor -%}
+                {% if _rows is not empty %}
+                    <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-hubspot-mapping-{{ _object }}">
+                        {{ include('@NowoCrmKit/import/hubspot/_mapping_table.html.twig', {rows: _rows, caption: ('import.hubspot.object.' ~ _object)|trans({}, _d), head: 'import.hubspot.mapping.property'|trans({}, _d), bundle: _b}, false) }}
+                    </div>
+                {% endif %}
+            {% endfor %}
+            {%- set _lists = [] -%}
+            {%- for _child in form -%}{%- if _child.vars.name starts with 'l_' -%}{%- set _lists = _lists|merge([_child]) -%}{%- endif -%}{%- endfor -%}
+            {% if _lists is not empty %}
+                <div class="{{ nowo_ui_class('section', _b) }}" data-testid="crm-hubspot-mapping-lists">
+                    {{ include('@NowoCrmKit/import/hubspot/_mapping_table.html.twig', {rows: _lists, caption: 'import.hubspot.mapping.lists'|trans({}, _d), head: 'import.hubspot.mapping.list'|trans({}, _d), bundle: _b}, false) }}
+                </div>
+            {% endif %}
+            <div class="{{ nowo_ui_class('section', _b) }}">
+                <h3>{{ 'import.hubspot.mapping.options'|trans({}, _d) }}</h3>
+                {{ include('@NowoCrmKit/import/_dialog_fields.html.twig', {form: form}, false) }}
+            </div>
+            {{ form_end(form) }}
+        {% else %}
+            {{ form_start(form, {action: _action, attr: {id: form_id, class: nowo_ui_class('form', _b), 'data-crm-import-form': true}}) }}
+            {{ include('@NowoCrmKit/import/_dialog_fields.html.twig', {form: form}, false) }}
+            {{ form_end(form) }}
+        {% endif %}
     </div>
 {% endif %}

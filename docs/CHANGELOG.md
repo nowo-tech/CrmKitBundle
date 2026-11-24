@@ -28,6 +28,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as 0.10.3: the steps of the import modal opened directly land on their list with the modal open on that step
+(Beacon D-20261124-05, UiKit 2.74 `remote_dialog.direct_get`), and every step of the modal is laid out to Beacon's
+dialog standard (UI-PATTERNS §16). No BC break; the new option is off by default.
+
+### Added
+
+- `import.dialog.direct_get` (`off` | `redirect`, default `off`). With `redirect` (and `ui.enabled`), a step URL of the
+  import modal opened from the address bar, a bookmark or another site — the CSV / vCard file step (`/import`), the
+  steps of an import (`/import/{id}`: columns, preview, result) and, with `import.hubspot.enabled`, the HubSpot source,
+  connect, start and mapping steps — answers a `302` to the companies or contacts list with the modal reopened on that
+  step. The bundle prepends the UiKit `remote_dialog.direct_get.routes` (dialog `crm-import-dialog`); a host entry
+  replaces one whole and `<route>: false` unmarks it. The controller's access check runs first: a denied person keeps
+  the 403 / 404, never the redirect. Links followed inside the app keep the page (the no-JS fallback); the modal's own
+  fetches and every POST (422 re-renders included) are unchanged.
+- `ImportDialogPageResolver` (UiKit `page_resolver`, internal): the file step goes to the list of its `?subject=`, the
+  steps of an import to the list of the import's subject (read with the person's access checked again; refused,
+  unknown or another tenant's import = no redirect, no oracle); the HubSpot steps go to the companies list.
+- The import modal script reads UiKit's reopen contract on the list (`data-nowo-ui-remote-form-reopen-*`): it opens the
+  modal on the step the server named, only for a route of the safe list that equals the server's and a same-origin
+  path, then removes the reopen query from the address (`history.replaceState`).
+- Demo (Symfony 8): a fake in-memory HubSpot account (`App\Crm\DemoHubSpot`, credential `demo-hubspot-key`), the
+  direct-GET redirect on, and before / after screenshots of every step at desktop and 390 px
+  (`docs/images/demo/crm-import-{before,after}-*.webp`).
+- 7 translation keys in the 7 locales (`import.hubspot.card.title`, `import.hubspot.mapping.*`).
+
+### Changed
+
+- Dependencies: `nowo-tech/ui-kit-bundle` ^2.74 (direct-GET page parameters and resolvers).
+- Import modal layout (UI-PATTERNS §16): one primary per step, on the right of the footer with an icon and its label
+  (*Next*, *Preview*, *Import*, *Continue*, *Check and save*, *Start an import*, *Connect HubSpot*); no primary in the
+  body. The HubSpot connection is UiKit's detail list under a heading; *Replace the key* and *Disconnect* are secondary
+  actions in a section of their own. The HubSpot mapping is a table per object (*HubSpot property* | *CRM field*),
+  then the lists and the options, each a section with a heading and the dialog's divider; it stays readable at phone
+  width without sideways scrolling. A mapping select is labelled by the property alone (the table caption names the
+  object). The no-JS pages keep their layout.
+
 ## [0.10.2] - 2026-11-24
 
 Planned as 0.10.2: every list of the kit (Companies, Contacts, Deals, Tags, Custom fields, Funnels) follows Beacon's

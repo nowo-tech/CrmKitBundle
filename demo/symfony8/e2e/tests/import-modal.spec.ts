@@ -43,6 +43,7 @@ async function shot(page: Page, name: string): Promise<void> {
     return;
   }
   mkdirSync(shotsDir, { recursive: true });
+  await page.locator('.sf-toolbar').evaluateAll((elements) => elements.forEach((element) => element.remove()));
   await settled(page);
   await page.screenshot({ path: resolve(shotsDir, `${name}.png`) });
 }

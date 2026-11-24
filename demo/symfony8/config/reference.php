@@ -471,7 +471,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     disallow_search_engine_index?: bool|Param, // Enabled by default when debug is enabled. // Default: true
  *     http_client?: bool|array{ // HTTP Client configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         max_host_connections?: int|Param, // The maximum number of connections to a single host.
  *         default_options?: array{
  *             headers?: array<string, mixed>,
@@ -1441,6 +1441,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *                 page?: scalar|Param|null, // Default: null
  *                 dialog?: scalar|Param|null, // Default: null
  *                 page_parameters?: list<scalar|Param|null>,
+ *                 page_defaults?: array<string, scalar|Param|null>,
+ *                 page_resolver?: scalar|Param|null, // 2.74: id of a Nowo\UiKitBundle\Dialog\RemoteDialogPageResolverInterface service for page parameters that come from the record (it runs after the controller's access check; null or an exception = no redirect). // Default: null
  *                 redirect_same_origin?: bool|Param, // Also redirect a navigation started from a page of this origin (Sec-Fetch-Site: same-origin: a link followed without JavaScript or opened in a new tab). Default false: those keep the route's own page (the no-JS fallback). // Default: false
  *             }>,
  *         },
@@ -1866,6 +1868,9 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         sync_rows?: int|Param, // Default: 500
  *         chunk_rows?: int|Param, // Default: 100
  *         stale_claim_seconds?: int|Param, // Default: 600
+ *         dialog?: array{ // 0.10.3: the import modal of the lists.
+ *             direct_get?: "off"|"redirect"|Param, // 0.10.3 (UiKit 2.74 remote_dialog.direct_get, Beacon D-20261124-05): what a step URL of the import modal (CSV / vCard file, mapping, preview and result; with import.hubspot.enabled the HubSpot source, connect, start and mapping) does when it is opened directly (address bar, bookmark, a link from another site). off (default) = its page, as before; redirect = after the same access checks (a denied person keeps the 404) a 302 to the companies or contacts list with the modal reopened on that step. Links followed inside the app keep the page (the no-JS fallback); dialog fetches and POSTs are unchanged. Needs ui.enabled. // Default: "off"
+ *         },
  *         hubspot?: array{ // 0.10.0: import companies, contacts, owners and lists from HubSpot (a private app token per tenant, read-only scopes).
  *             enabled?: bool|Param, // Needs a secret box (secrets.box, or secrets.keys + current_key) and symfony/http-client; maps the HubSpot tables and routes. // Default: false
  *             page_size?: int|Param, // Objects per HubSpot page (HubSpot's maximum is 100). // Default: 100

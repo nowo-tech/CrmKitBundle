@@ -362,7 +362,14 @@ import:
             owner: 'Responsável (por e-mail)'
             domain: 'Site a partir do domínio'
             custom: 'Campo personalizado %key%'
+        mapping:
+            property: 'Propriedade do HubSpot'
+            target: 'Campo do CRM'
+            list: 'Lista do HubSpot'
+            lists: 'Listas'
+            options: 'Opções'
         card:
+            title: 'Ligação ao HubSpot'
             write_unverified: 'permissões de escrita não verificadas'
             label: 'Nome'
             account: 'Conta HubSpot'

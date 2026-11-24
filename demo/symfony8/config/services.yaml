@@ -7,3 +7,10 @@ services:
     resource: '../src/'
     exclude:
       - '../src/Kernel.php'
+
+  # 0.10.3, demo only: the kit's HubSpot client answers from an in-memory fake account (nothing leaves the demo).
+  App\Crm\DemoHubSpot: ~
+  app.demo_hubspot_client:
+    class: Symfony\Component\HttpClient\MockHttpClient
+    decorates: nowo_crm_kit.hubspot.http_client
+    arguments: ['@App\Crm\DemoHubSpot', 'https://api.hubapi.com']

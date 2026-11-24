@@ -428,9 +428,94 @@ export function openImportDialog(options: ImportDialogOptions): ImportDialog {
   return { dialog, load, submit, close };
 }
 
+/** 0.10.3: the reopen contract UiKit 2.73+ prints on the dialog of the owning page (`remote_dialog.direct_get`). */
+export const REOPEN_PARAM_ATTR = 'data-nowo-ui-remote-form-reopen-param';
+export const REOPEN_ROUTES_ATTR = 'data-nowo-ui-remote-form-reopen-routes';
+export const REOPEN_ROUTE_ATTR = 'data-nowo-ui-remote-form-reopen-route';
+export const REOPEN_URL_ATTR = 'data-nowo-ui-remote-form-reopen-url';
+
+const REOPEN_PARAMETER = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+
+/**
+ * The import step to reopen from the page address (0.10.3, `import.dialog.direct_get: redirect`): a step URL opened
+ * directly was sent to its list with `?_dialog[route]=…&_dialog[params][…]=…`, and the server printed on the dialog
+ * its safe list of step routes and, for a listed route, the URL the router generated again. The query only names a
+ * route: it must be in the safe list and equal the server's route, and the server's URL must be a same-origin path
+ * (no `//`, no backslash, no other origin). The URL opened is never read from the query.
+ *
+ * @param dialog The import dialog.
+ * @param search The page query (`location.search`).
+ * @returns The step URL, or null.
+ */
+export function reopenTarget(dialog: Element, search: string): string | null {
+  const param = dialog.getAttribute(REOPEN_PARAM_ATTR);
+  if (param === null || !REOPEN_PARAMETER.test(param)) {
+    return null;
+  }
+  const route = new URLSearchParams(search).get(`${param}[route]`);
+  const allowed = (dialog.getAttribute(REOPEN_ROUTES_ATTR) ?? '').split(/\s+/).filter((name) => name !== '');
+  if (route === null || route === '' || !allowed.includes(route) || dialog.getAttribute(REOPEN_ROUTE_ATTR) !== route) {
+    return null;
+  }
+  const url = dialog.getAttribute(REOPEN_URL_ATTR) ?? '';
+  if (!url.startsWith('/') || url.startsWith('//') || url.includes('\\') || !sameOriginUrl(url)) {
+    return null;
+  }
+
+  return url;
+}
+
+/**
+ * `href` without the reopen parameter (`<param>` and every `<param>[…]` key), as path + query + hash.
+ *
+ * @param href The page address.
+ * @param param The reopen parameter name.
+ * @returns The cleaned address.
+ */
+export function withoutReopen(href: string, param: string): string {
+  const url = new URL(href, window.location.href);
+  for (const key of [...new Set(url.searchParams.keys())]) {
+    if (key === param || key.startsWith(`${param}[`)) {
+      url.searchParams.delete(key);
+    }
+  }
+
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/**
+ * Opens the import modal on the step the page address asks for (0.10.3), once; the reopen parameter then leaves the
+ * history entry, so a reload does not reopen it.
+ *
+ * @param root The document.
+ * @param options Test seams.
+ * @returns The opened modal, or null.
+ */
+export function reopenFromLocation(root: Document = document, options: Pick<ImportDialogOptions, 'fetcher' | 'reload'> = {}): ImportDialog | null {
+  const dialog = root.querySelector<HTMLDialogElement>('dialog[data-crm-import-dialog]');
+  if (dialog === null || dialog.open || dialog.hasAttribute('data-crm-import-reopened')) {
+    return null;
+  }
+  const url = reopenTarget(dialog, window.location.search);
+  if (url === null) {
+    return null;
+  }
+  dialog.setAttribute('data-crm-import-reopened', '');
+  const opener = root.querySelector<HTMLElement>('[data-crm-import-open]');
+  const modal = openImportDialog({ dialog, returnTo: opener, ...options });
+  void modal.load(url);
+  try {
+    window.history.replaceState(window.history.state, '', withoutReopen(window.location.href, dialog.getAttribute(REOPEN_PARAM_ATTR) ?? ''));
+  } catch {
+    // A sandboxed document may refuse history changes: the modal is open anyway.
+  }
+
+  return modal;
+}
+
 /**
  * Starts the modal on a page: a click on a `[data-crm-import-open]` link opens the page's import dialog and loads the
- * link's address (the import page answers the first step to the modal). A click with a modifier key, or a page without
+ * link's address (the import page answers the first step to the modal); 0.10.3: a reopen query opens it on its step. A click with a modifier key, or a page without
  * the dialog, follows the link (the import page).
  *
  * @param root The document.
@@ -454,5 +539,7 @@ export function start(root: Document = document, options: Pick<ImportDialogOptio
     void modal.load(url);
   };
   root.addEventListener('click', onClick);
+  // 0.10.3: a step opened directly lands here with the reopen query.
+  reopenFromLocation(root, options);
   return () => root.removeEventListener('click', onClick);
 }

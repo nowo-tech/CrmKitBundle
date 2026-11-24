@@ -4,7 +4,7 @@ Package: `nowo-tech/crm-kit-bundle` (`symfony-bundle`)
 
 | PSR | Status | Notes |
 | --- | --- | --- |
-| PSR-1 / PSR-12 Coding style | **Adopted** | PHP-CS-Fixer (`@PSR12` + `@Symfony`), `make cs-check` in CI |
+| PSR-1 / PSR-12 Coding style | **Adopted** (PSR-12 superseded by PER-CS) | PHP-CS-Fixer `@PER-CS` + `@PER-CS:risky` + `@Symfony` (REQ-CS-009), `make cs-check` in CI |
 | PSR-4 Autoloading | **Adopted** | `Nowo\CrmKitBundle\` maps to `src/` |
 | PSR-3 Logger | **Adopted** | The default audit sink and the panel reader take an optional `Psr\Log\LoggerInterface`; ids, counts and class names only, no personal data in the log context |
 | PSR-6 Cache | **N/A** | Phase A has no cache |

@@ -257,7 +257,8 @@ final readonly class HubSpotImportController
                 foreach ($property->targets as $target) {
                     $choices[$this->targetLabel($target)] = $target;
                 }
-                $rows[]       = ['name' => $name, 'label' => $this->ui->trans('import.hubspot.object.' . $object) . ' · ' . $property->label . ' (' . $property->name . ')', 'choices' => $choices];
+                // 0.10.3: the mapping step shows a table per object (its caption names the object).
+                $rows[]       = ['name' => $name, 'label' => $property->label . ' (' . $property->name . ')', 'choices' => $choices];
                 $names[$name] = [(string) $object, $property->name];
                 $data[$name]  = $property->target;
             }

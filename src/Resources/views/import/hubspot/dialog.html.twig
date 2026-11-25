@@ -14,12 +14,18 @@
 <div data-crm-import-step="hubspot-{{ step }}" data-testid="crm-import-step" data-step="hubspot-{{ step }}">
     <div data-part="steps">{{ include(nowo_ui_partial('steps', _b), {items: _steps, label: 'import.steps'|trans({}, _d), attr: {class: 'nowo-ui-steps--compact'}}, false) }}</div>
     <div data-part="body">
-        {{ include('@NowoCrmKit/import/hubspot/_body.html.twig', {step: step, connection: connection, form: form, action: action, alert: alert, manage: manage, importId: importId, form_id: _form_id, bundle: _b}, false) }}
+        {{ include('@NowoCrmKit/import/hubspot/_body.html.twig', {step: step, connection: connection, form: form, action: action, alert: alert, manage: manage, importId: importId, form_id: _form_id, bundle: _b, in_dialog: true}, false) }}
     </div>
     <div data-part="footer">
         <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-close data-testid="crm-import-dialog-cancel">{{ 'import.dialog.cancel'|trans({}, _d) }}</button>
+        {#- 0.10.3 (UI-PATTERNS §16): the step's one primary, with its icon, on the right; on the source step it is the
+            link to the next step (Start an import, or Connect HubSpot for a manager), never a primary in the body -#}
         {% if form %}
-            <button type="submit" form="{{ _form_id }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ ('import.hubspot.submit.' ~ step)|trans({}, _d) }}</button>
+            {{ include('@NowoCrmKit/import/_primary.html.twig', {label: ('import.hubspot.submit.' ~ step)|trans({}, _d), icon: step == 'mapping' ? 'import' : (step == 'connect' ? 'save' : 'next'), form: _form_id, testid: 'crm-import-dialog-submit', bundle: _b}, false) }}
+        {% elseif step == 'source' and connection and connection.status.value == 'active' %}
+            {{ include('@NowoCrmKit/import/_primary.html.twig', {label: 'import.hubspot.start'|trans({}, _d), icon: 'next', href: path('nowo_crm_kit_hubspot_new'), testid: 'crm-hubspot-start', bundle: _b}, false) }}
+        {% elseif step == 'source' and not connection and manage %}
+            {{ include('@NowoCrmKit/import/_primary.html.twig', {label: 'import.hubspot.connect'|trans({}, _d), icon: 'next', href: path('nowo_crm_kit_hubspot_connect'), testid: 'crm-hubspot-connect', bundle: _b}, false) }}
         {% endif %}
     </div>
 </div>

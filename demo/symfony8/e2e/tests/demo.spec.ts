@@ -63,7 +63,11 @@ test.describe('CRM Kit demo', () => {
 
   test('mia imports contacts from a CSV file', async ({ page }) => {
     await login(page, 'mia');
-    await page.goto('/crm/import');
+    // 0.10.3: the import page opened from the address bar lands on the list with the modal (import.dialog.direct_get);
+    // a link of the app keeps the page, the no-JS fallback.
+    await page.goto('/crm/companies');
+    await page.locator('a[href="/crm/import"]:not([data-crm-import-open])').first().click();
+    await expect(page).toHaveURL(/\/crm\/import$/);
     await page.locator('input[type="file"]').setInputFiles({
       name: 'people.csv',
       mimeType: 'text/csv',

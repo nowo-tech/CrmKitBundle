@@ -16,6 +16,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ConfigurationTr
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ParameterFlattener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FormProfile;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ImportDialogPageResolver;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -38,6 +39,9 @@ final class NowoCrmKitBundle extends AbstractBundle
 {
     /** Configuration root and container parameter prefix. */
     public const ALIAS = 'nowo_crm_kit';
+
+    /** 0.10.3: the id of the import modal for UiKit's remote dialog reopen contract (`remote_dialog.direct_get`). */
+    public const IMPORT_DIALOG = 'crm-import-dialog';
 
     /** Translation domain (REQ-I18N-003) and Twig namespace (REQ-TWIG-002). */
     public const TRANSLATION_DOMAIN = TranslationDomain::NAME;
@@ -116,6 +120,7 @@ final class NowoCrmKitBundle extends AbstractBundle
             }
         }
         $this->prependRowActions($builder);
+        $this->prependImportDirectGet($builder);
         if (!$builder->hasExtension('doctrine')) {
             return;
         }
@@ -183,6 +188,47 @@ final class NowoCrmKitBundle extends AbstractBundle
             $partials['row_actions'] = '@NowoCrmKit/partials/_row_actions.html.twig';
         }
         $builder->prependExtensionConfig('nowo_ui_kit', ['theme' => ['bundles' => [self::TRANSLATION_DOMAIN => ['partials' => $partials]]]]);
+    }
+
+    /**
+     * 0.10.3 (Beacon D-20261124-05, UiKit 2.74 `remote_dialog.direct_get`): with `ui.enabled` and
+     * `import.dialog.direct_get: redirect`, the steps of the import modal are marked as remote dialog content of the
+     * companies / contacts list (dialog `crm-import-dialog`): opened directly, a step answers a 302 to its list with
+     * the modal reopened on it. The file step and the steps of an import go to the list of their subject
+     * ({@see ImportDialogPageResolver}); the HubSpot steps (with `import.hubspot.enabled`) to the companies list. A host
+     * entry for one of these routes replaces the kit's whole (UiKit), and `<route>: false` unmarks it.
+     */
+    private function prependImportDirectGet(ContainerBuilder $builder): void
+    {
+        if (!$builder->hasExtension('nowo_ui_kit')) {
+            return;
+        }
+        $ui       = false;
+        $redirect = false;
+        $hubspot  = false;
+        foreach ($builder->getExtensionConfig(self::ALIAS) as $config) {
+            $config = is_array($config) ? $config : [];
+            $ui     = is_array($config['ui'] ?? null) && array_key_exists('enabled', $config['ui']) ? $config['ui']['enabled'] === true : $ui;
+            $import = is_array($config['import'] ?? null) ? $config['import'] : [];
+            if (is_array($import['dialog'] ?? null) && array_key_exists('direct_get', $import['dialog'])) {
+                $redirect = $import['dialog']['direct_get'] === 'redirect';
+            }
+            $hubspot = is_array($import['hubspot'] ?? null) && array_key_exists('enabled', $import['hubspot']) ? $import['hubspot']['enabled'] === true : $hubspot;
+        }
+        if (!$ui || !$redirect) {
+            return;
+        }
+        $entry  = ['page' => ImportDialogPageResolver::PAGE, 'dialog' => self::IMPORT_DIALOG, 'page_defaults' => ['type' => 'companies']];
+        $routes = [
+            ImportDialogPageResolver::FILE_ROUTE   => $entry + ['page_resolver' => ImportDialogPageResolver::class],
+            ImportDialogPageResolver::IMPORT_ROUTE => $entry + ['page_resolver' => ImportDialogPageResolver::class],
+        ];
+        if ($hubspot) {
+            foreach (['nowo_crm_kit_hubspot', 'nowo_crm_kit_hubspot_connect', 'nowo_crm_kit_hubspot_new', 'nowo_crm_kit_hubspot_mapping'] as $route) {
+                $routes[$route] = $entry;
+            }
+        }
+        $builder->prependExtensionConfig('nowo_ui_kit', ['remote_dialog' => ['direct_get' => ['routes' => $routes]]]);
     }
 
     /**

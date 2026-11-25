@@ -6,6 +6,10 @@
   the import page: the no-JS fallback) and loads the steps from the import routes (import/dialog.html.twig); the texts
   of the notices it builds itself are data attributes of the dialog. Rendered only for someone who may import.
 
+  0.10.3 (`import.dialog.direct_get: redirect`, UiKit 2.74): the dialog carries UiKit's reopen contract for the id
+  `crm-import-dialog` (nowo_ui_remote_dialog_reopen_attrs: the safe list of step routes and, for a reopen query, the
+  step URL the router generated again); the script opens the modal on that step once the page loads.
+
   Variables: dialog ({url: the import page of this list}).
 #}
 {%- set _d = 'NowoCrmKitBundle' -%}
@@ -33,7 +37,7 @@
         'data-open-page': 'import.dialog.open_page'|trans({}, 'NowoCrmKitBundle'),
         'data-notice-class': nowo_ui_class('flash_error', 'NowoCrmKitBundle'),
         'data-reload-class': nowo_ui_class('btn_secondary', 'NowoCrmKitBundle'),
-    },
+    }|merge(nowo_ui_remote_dialog_reopen_attrs('crm-import-dialog')),
     bundle: 'NowoCrmKitBundle',
 } only %}
     {% block body %}

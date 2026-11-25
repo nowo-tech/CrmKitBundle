@@ -6,8 +6,11 @@ import {
   notice,
   openImportDialog,
   parseStep,
+  reopenFromLocation,
+  reopenTarget,
   sameOriginUrl,
   start,
+  withoutReopen,
 } from '../src/import-dialog';
 
 /** The shell the list renders (import/_dialog_shell.html.twig, UiKit confirm_dialog anatomy). */
@@ -529,5 +532,85 @@ describe('start and the steps', () => {
     expect(again.defaultPrevented).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(2);
     stop();
+  });
+});
+
+describe('reopen from the page address (0.10.3, import.dialog.direct_get)', () => {
+  const contract = (route: string | null, url: string | null, routes = 'nowo_crm_kit_import nowo_crm_kit_import_show'): void => {
+    const dialog = dialogElement();
+    dialog.setAttribute('data-nowo-ui-remote-form-reopen-param', '_dialog');
+    dialog.setAttribute('data-nowo-ui-remote-form-reopen-routes', routes);
+    if (route !== null) {
+      dialog.setAttribute('data-nowo-ui-remote-form-reopen-route', route);
+    }
+    if (url !== null) {
+      dialog.setAttribute('data-nowo-ui-remote-form-reopen-url', url);
+    }
+  };
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('opens the modal on the step the server named, then drops the reopen query', async () => {
+    contract('nowo_crm_kit_import_show', '/crm/import/abc');
+    window.history.replaceState({ keep: 1 }, '', '/crm/contacts?q=x&_dialog%5Broute%5D=nowo_crm_kit_import_show&_dialog%5Bparams%5D%5Bid%5D=abc#top');
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(fragment(step('mapping')));
+    const stop = start(document, { fetcher });
+    await flush();
+    expect(dialogElement().open).toBe(true);
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/crm/import/abc');
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe('/crm/contacts?q=x#top');
+    expect(window.history.state).toEqual({ keep: 1 });
+    expect(reopenFromLocation(document, { fetcher })).toBeNull();
+    stop();
+  });
+
+  it('opens nothing for a route outside the safe list, another route than the server one or a foreign URL', () => {
+    const search = '?_dialog%5Broute%5D=nowo_crm_kit_import';
+    contract('nowo_crm_kit_import', '/crm/import', 'nowo_crm_kit_import_show');
+    expect(reopenTarget(dialogElement(), search)).toBeNull();
+    contract('nowo_crm_kit_import_show', '/crm/import');
+    expect(reopenTarget(dialogElement(), search)).toBeNull();
+    for (const url of ['//evil.test/x', 'https://evil.test/x', '/crm\\x', 'javascript:alert(1)', 'crm/import']) {
+      contract('nowo_crm_kit_import', url);
+      expect(reopenTarget(dialogElement(), search)).toBeNull();
+    }
+    contract('nowo_crm_kit_import', '/crm/import?subject=contact');
+    expect(reopenTarget(dialogElement(), search)).toBe('/crm/import?subject=contact');
+    expect(reopenTarget(dialogElement(), '?other=1')).toBeNull();
+    dialogElement().setAttribute('data-nowo-ui-remote-form-reopen-param', 'bad param');
+    expect(reopenTarget(dialogElement(), search)).toBeNull();
+    dialogElement().removeAttribute('data-nowo-ui-remote-form-reopen-param');
+    expect(reopenTarget(dialogElement(), search)).toBeNull();
+  });
+
+  it('does nothing without the dialog, on an open dialog or without a target', () => {
+    const fetcher = vi.fn<typeof fetch>();
+    expect(reopenFromLocation(document, { fetcher })).toBeNull();
+    dialogElement().setAttribute('open', '');
+    contract('nowo_crm_kit_import', '/crm/import');
+    window.history.replaceState(null, '', '/crm/companies?_dialog%5Broute%5D=nowo_crm_kit_import');
+    expect(reopenFromLocation(document, { fetcher })).toBeNull();
+    dialogElement().remove();
+    expect(reopenFromLocation(document, { fetcher })).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('keeps the modal open when the history refuses the change', async () => {
+    contract('nowo_crm_kit_import', '/crm/import');
+    window.history.replaceState(null, '', '/crm/companies?_dialog%5Broute%5D=nowo_crm_kit_import');
+    const replace = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {
+      throw new Error('sandboxed');
+    });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(fragment(step('file')));
+    expect(reopenFromLocation(document, { fetcher })).not.toBeNull();
+    await flush();
+    expect(dialogElement().open).toBe(true);
+    replace.mockRestore();
+  });
+
+  it('removes only the reopen parameter', () => {
+    expect(withoutReopen('/crm/companies?_dialog=1&_dialog%5Broute%5D=a&_dialogx=2&page=3', '_dialog')).toBe('/crm/companies?_dialogx=2&page=3');
   });
 });

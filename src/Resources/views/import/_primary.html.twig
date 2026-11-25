@@ -1,0 +1,18 @@
+{#
+  0.10.3 (UI-PATTERNS §16 / §4): the one primary action of an import modal step, on the right of the footer, with an
+  icon and its label (the icon is left out with `icon_set: none`, which would print its name as text). A submit button
+  bound to the step's form (`form`, `name` / `value` optional) or, with `href`, a link that loads in the modal
+  (`data-crm-import-link`; the page without JavaScript).
+  Variables: label (translated), icon (UiKit icon kind), testid, and form / name / value, or href; bundle.
+#}
+{%- set _b = bundle -%}
+{%- set _icon = icon|default(null) and nowo_ui_kit_icon_set|default('bootstrap-icons') != 'none' -%}
+{%- set _inner -%}
+    {%- if _icon -%}<span aria-hidden="true">{{ include('@NowoUiKitBundle/components/_icon.html.twig', {name: icon, label: ''}, false)|trim|raw }}</span> {% endif -%}
+    <span>{{ label }}</span>
+{%- endset -%}
+{%- if href|default(null) -%}
+    <a href="{{ href }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-crm-import-link data-testid="{{ testid }}">{{ _inner }}</a>
+{%- else -%}
+    <button type="submit" form="{{ form }}"{% if name|default(null) %} name="{{ name }}" value="{{ value }}"{% endif %} class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="{{ testid }}">{{ _inner }}</button>
+{%- endif -%}

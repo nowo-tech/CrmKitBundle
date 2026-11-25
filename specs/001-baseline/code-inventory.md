@@ -242,6 +242,7 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Infrastructure/Symfony/Http/DomainExceptionListener.php` | FR-GATE-001, FR-CONC-001 |
 | `src/Infrastructure/Symfony/Http/EntityManagerHygieneListener.php` | FR-WORKER-001 |
 | `src/Infrastructure/Symfony/Http/ImportDialog.php` (0.4.0) | FR-UI-002 |
+| `src/Infrastructure/Symfony/Http/ImportDialogPageResolver.php` (0.10.3) | FR-UI-002 |
 
 ### Infrastructure: console (3)
 
@@ -668,6 +669,8 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/config/doctrine-hubspot/ExternalRef.orm.xml` | FR-HUB-002, FR-SEC-006 |
 | `src/Resources/views/import/_hubspot_state.html.twig` | FR-HUB-002, FR-UI-002 |
 | `src/Resources/views/import/hubspot/_body.html.twig` | FR-HUB-001, FR-HUB-002, FR-UI-002 |
+| `src/Resources/views/import/hubspot/_mapping_table.html.twig` (0.10.3) | FR-HUB-002, FR-UI-002 |
+| `src/Resources/views/import/_primary.html.twig` (0.10.3) | FR-UI-002 |
 | `src/Resources/views/import/hubspot/dialog.html.twig` | FR-HUB-001, FR-HUB-002, FR-UI-002 |
 | `src/Resources/views/import/hubspot/page.html.twig` | FR-HUB-001, FR-HUB-002, FR-UI-002 |
 
@@ -709,5 +712,6 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/views/pipeline/_dialog.html.twig` | FR-UI-003 |
 | `src/Resources/views/pipeline/form.html.twig` | FR-UI-003 |
 
-**Total production sources**: 509 (every file under `src/`; the `0.7.0-0.10.x` sections were added by the 2026-11-24
-refresh, 85 files; 0.10.2 added `ListFilters.php`, `DealListResult.php` and `partials/_empty.html.twig`)
+**Total production sources**: 512 (every file under `src/`; the `0.7.0-0.10.x` sections were added by the 2026-11-24
+refresh, 85 files; 0.10.2 added `ListFilters.php`, `DealListResult.php` and `partials/_empty.html.twig`; 0.10.3 added
+`ImportDialogPageResolver.php`, `import/_primary.html.twig` and `import/hubspot/_mapping_table.html.twig`)

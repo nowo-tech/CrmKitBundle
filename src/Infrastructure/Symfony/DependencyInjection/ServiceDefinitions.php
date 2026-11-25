@@ -168,6 +168,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\TagType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\CrmConflictFormatter;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\DomainExceptionListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\EntityManagerHygieneListener;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ImportDialogPageResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\MessengerImportRunDispatcher;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImport;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImportHandler;
@@ -608,6 +609,9 @@ final class ServiceDefinitions
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid()]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class), service(ImportServiceInterface::class), service(RemoteDialogResponder::class)->nullOnInvalid(), param($p . 'import.hubspot.enabled')])->public()->tag('controller.service_arguments');
         $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class), service(HostObjectPickerInterface::class)])->public()->tag('controller.service_arguments');
+        // 0.10.3: the owning list of an import step opened directly (import.dialog.direct_get: redirect; the bundle
+        // prepends the UiKit routes that name it; private, removed when unused).
+        $s->set(ImportDialogPageResolver::class)->args([service('request_stack'), service(ImportServiceInterface::class)]);
         $s->set(ImportController::class)->args([service(UiSupport::class), service(ImportServiceInterface::class), service(RecordForms::class), param($p . 'import.sync_chunks'), param($p . 'import.max_bytes'), param($p . 'import.hubspot.enabled')])->public()->tag('controller.service_arguments');
         foreach ([ActionType::class, AdminFilterType::class, AffiliationType::class, ConsentType::class, FieldDefinitionType::class, FilterType::class, HostLinkType::class, ImportConfirmType::class, ImportUploadType::class, MergePickType::class, MergeType::class, NoteType::class, RecordType::class, SettingsType::class, TagType::class, TagsAssignType::class] as $type) {
             $s->set($type)->tag('form.type');

@@ -97,16 +97,16 @@
         {% if step == 'result' %}
             <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-close data-testid="crm-import-dialog-close">{{ 'import.dialog.close'|trans({}, _d) }}</button>
             {% if import.status.value == 'running' and action is not null %}
-                <button type="submit" form="{{ _form_id }}" name="do" value="run" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ 'import.continue'|trans({}, _d) }}</button>
+                {{ include('@NowoCrmKit/import/_primary.html.twig', {label: 'import.continue'|trans({}, _d), icon: 'run', form: _form_id, name: 'do', value: 'run', testid: 'crm-import-dialog-submit', bundle: _b}, false) }}
             {% endif %}
         {% else %}
             <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-crm-import-close data-testid="crm-import-dialog-cancel">{{ 'import.dialog.cancel'|trans({}, _d) }}</button>
             {% if step == 'file' %}
-                <button type="submit" form="{{ _form_id }}" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ 'import.dialog.next'|trans({}, _d) }}</button>
+                {{ include('@NowoCrmKit/import/_primary.html.twig', {label: 'import.dialog.next'|trans({}, _d), icon: 'next', form: _form_id, testid: 'crm-import-dialog-submit', bundle: _b}, false) }}
             {% elseif step == 'mapping' %}
-                <button type="submit" form="{{ _form_id }}" name="do" value="preview" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ 'import.dialog.preview'|trans({}, _d) }}</button>
+                {{ include('@NowoCrmKit/import/_primary.html.twig', {label: 'import.dialog.preview'|trans({}, _d), icon: 'view', form: _form_id, name: 'do', value: 'preview', testid: 'crm-import-dialog-submit', bundle: _b}, false) }}
             {% else %}
-                <button type="submit" form="{{ _form_id }}" name="do" value="confirm" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="crm-import-dialog-submit">{{ 'import.confirm'|trans({}, _d) }}</button>
+                {{ include('@NowoCrmKit/import/_primary.html.twig', {label: 'import.confirm'|trans({}, _d), icon: 'import', form: _form_id, name: 'do', value: 'confirm', testid: 'crm-import-dialog-submit', bundle: _b}, false) }}
             {% endif %}
         {% endif %}
     </div>

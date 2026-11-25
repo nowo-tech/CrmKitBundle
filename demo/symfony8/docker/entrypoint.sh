@@ -34,6 +34,15 @@ if ! grep -q '^APP_SECRET=..*' /app/.env; then
 		echo "APP_SECRET=${GENERATED}" >> /app/.env
 	fi
 fi
+# 0.10.3: a random key for the CRM kit's secret box (the demo HubSpot connection), per checkout: nothing committed.
+if ! grep -q '^CRM_KIT_DEMO_SECRET_KEY=..*' /app/.env; then
+	GENERATED="$(php -r 'echo base64_encode(random_bytes(32));')"
+	if grep -q '^CRM_KIT_DEMO_SECRET_KEY=' /app/.env; then
+		sed -i "s|^CRM_KIT_DEMO_SECRET_KEY=.*|CRM_KIT_DEMO_SECRET_KEY=${GENERATED}|" /app/.env
+	else
+		echo "CRM_KIT_DEMO_SECRET_KEY=${GENERATED}" >> /app/.env
+	fi
+fi
 
 if [ ! -f /app/vendor/autoload_runtime.php ]; then
 	echo "vendor not found, running composer install..."

@@ -9,5 +9,12 @@ under `/crm` (companies, contacts, import, tags, custom fields, settings). The d
 to by id (`P-1`, `P-2`, `P-3`) and a panel listing the projects linked to a company. `src/Crm/DemoActors.php` is the
 actor directory (record owners). The entrypoint creates the tables with `doctrine:schema:update --em=nowo_crm_kit`.
 
+0.10.3: **Import → Import from HubSpot instead** runs against a fake, in-memory HubSpot account
+(`src/Crm/DemoHubSpot.php`, a copy of the kit's test fixture; nothing leaves the demo). Connect it as `admin` with the
+fake credential `demo-hubspot-key`; the token is sealed with a random key the entrypoint writes to `.env`
+(`CRM_KIT_DEMO_SECRET_KEY`). `import.dialog.direct_get: redirect` is on: open a step URL such as
+http://localhost:8262/crm/import/hubspot/connect from the address bar and it lands on the companies list with the
+import modal open on that step.
+
 `make test-e2e` runs the Playwright suite against the running demo; `make demo-screenshots` refreshes the README
 screenshots.

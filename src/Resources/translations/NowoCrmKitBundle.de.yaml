@@ -362,7 +362,14 @@ import:
             owner: 'Verantwortlich (per E-Mail)'
             domain: 'Website aus der Domain'
             custom: 'Eigenes Feld %key%'
+        mapping:
+            property: 'HubSpot-Eigenschaft'
+            target: 'CRM-Feld'
+            list: 'HubSpot-Liste'
+            lists: 'Listen'
+            options: 'Optionen'
         card:
+            title: 'HubSpot-Verbindung'
             write_unverified: 'Schreib-Scopes nicht geprüft'
             label: 'Name'
             account: 'HubSpot-Konto'

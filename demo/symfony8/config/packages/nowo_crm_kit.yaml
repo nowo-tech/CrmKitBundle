@@ -25,6 +25,18 @@ nowo_crm_kit:
         record_create: dialog
         # 0.9.0: the funnel pages render no form they have not opened; each form loads on demand into one dialog.
         pipeline_forms: dialog
+    # 0.10.3: the HubSpot import against the demo's fake HubSpot account (App\Crm\DemoHubSpot; credential
+    # "demo-hubspot-key"), its token sealed with a random per-checkout key; a step URL of the import modal opened
+    # directly lands on its list with the modal reopened on that step (UiKit remote_dialog.direct_get).
+    import:
+        hubspot:
+            enabled: true
+        dialog:
+            direct_get: redirect
+    secrets:
+        keys:
+            demo: '%env(base64:CRM_KIT_DEMO_SECRET_KEY)%'
+        current_key: demo
     # 0.3.0: deal funnels, lifecycle funnels, next actions (the built-in task list).
     pipeline:
         enabled: true

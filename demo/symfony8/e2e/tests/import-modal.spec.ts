@@ -25,9 +25,14 @@ function dialog(page: Page): Locator {
 }
 
 async function settled(page: Page): Promise<void> {
-  // No hover state and the dialog's entrance transition finished (axe reads colours mid-fade otherwise).
+  // No hover state and the dialog's entrance transition finished (axe reads colours mid-fade otherwise). Audit ZBJ-I1:
+  // wait two frames (a transition starts on the frame after the dialog opens), then until no finite animation of the
+  // page (the dialog, its ::backdrop) is still running; endless ones (a spinner) never settle and are left out.
   await page.mouse.move(1, 1);
-  await dialog(page).evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)));
+  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity).length), { timeout: 5_000 })
+    .toBe(0);
 }
 
 async function axe(page: Page): Promise<void> {
@@ -43,6 +48,7 @@ async function shot(page: Page, name: string): Promise<void> {
     return;
   }
   mkdirSync(shotsDir, { recursive: true });
+  await page.locator('.sf-toolbar').evaluateAll((elements) => elements.forEach((element) => element.remove()));
   await settled(page);
   await page.screenshot({ path: resolve(shotsDir, `${name}.png`) });
 }

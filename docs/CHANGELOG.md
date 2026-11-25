@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.10.3] - 2026-11-25](#0103---2026-11-25)
 - [[0.10.2] - 2026-11-24](#0102---2026-11-24)
 - [[0.10.1] - 2026-11-24](#0101---2026-11-24)
 - [[0.10.0] - 2026-11-23](#0100---2026-11-23)
@@ -27,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - [[0.1.0] - 2026-11-19](#010---2026-11-19)
 
 ## [Unreleased]
+
+## [0.10.3] - 2026-11-25
 
 Planned as 0.10.3: the steps of the import modal opened directly land on their list with the modal open on that step
 (Beacon D-20261124-05, UiKit 2.74 `remote_dialog.direct_get`), and every step of the modal is laid out to Beacon's

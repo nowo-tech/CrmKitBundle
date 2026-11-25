@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.10.3](#to-0103)
 - [To 0.10.2](#to-0102)
 - [To 0.10.1](#to-0101)
 - [To 0.10.0](#to-0100)
@@ -23,6 +24,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.10.3
+
+From **0.10.2**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 Planned as **0.10.3**, from 0.10.2: `composer update nowo-tech/crm-kit-bundle` (it brings `nowo-tech/ui-kit-bundle`
 ^2.74), then `assets:install` (the import modal script changed). No schema change, no BC break.

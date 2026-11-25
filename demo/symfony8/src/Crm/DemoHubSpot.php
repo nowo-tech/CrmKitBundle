@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Crm;
 
-use Closure;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
 use function array_key_exists;
 use function array_slice;
-use function array_values;
 use function count;
 use function explode;
 use function in_array;
@@ -21,7 +19,6 @@ use function json_encode;
 use function parse_str;
 use function parse_url;
 use function preg_match;
-use function str_starts_with;
 use function strtolower;
 use function strtr;
 
@@ -34,7 +31,9 @@ use const PHP_URL_QUERY;
  * decorates the kit's HubSpot client), so the HubSpot steps of the import modal can be tried and screenshotted without
  * a HubSpot account. A copy of the kit's test fixture (tests/Fixtures/HubSpot/FakeHubSpot.php) with a fixed, obviously
  * fake demo credential (`demo-hubspot-key`, never shaped like HubSpot's `pat-(na|eu)N-`) and a few sample records. Fake
- * data only; nothing leaves the demo.
+ * data only; nothing leaves the demo. Worker mode (a shared service kept alive between requests, audit ZBJ-L1): it
+ * records nothing per request — no request log, no Authorization header kept, no forced failures (those test hooks stay
+ * in the kit's test double); only the fixed sample account lives in its properties.
  */
 final class DemoHubSpot
 {
@@ -90,22 +89,6 @@ final class DemoHubSpot
         ],
     ];
 
-    /**
-     * Forced answers, first match wins and is consumed: [path prefix, status, headers, body].
-     *
-     * @var array<int, array{string, int, array<string, string>, string}>
-     */
-    public array $failures = [];
-
-    /** @var (Closure(string): void)|null called with the path of every request (a test acting meanwhile) */
-    public ?Closure $onRequest = null;
-
-    /** @var list<array{string, string}> method, URL of every request */
-    public array $requests = [];
-
-    /** @var list<string> every Authorization header seen */
-    public array $authorizations = [];
-
     public function __construct()
     {
         // The demo's fake credential (type it in "Connect HubSpot"): never a real one.
@@ -121,36 +104,6 @@ final class DemoHubSpot
     }
 
     /**
-     * Adds companies `1..n` (ids from `$from`).
-     */
-    public function seedCompanies(int $count, int $from = 1001): void
-    {
-        for ($i = 0; $i < $count; ++$i) {
-            $this->companies[(string) ($from + $i)] = ['name' => 'Company ' . ($from + $i), 'domain' => 'c' . ($from + $i) . '.example', 'city' => 'City', 'country' => 'es'];
-        }
-    }
-
-    /**
-     * Adds contacts `1..n` (ids from `$from`).
-     */
-    public function seedContacts(int $count, int $from = 2001): void
-    {
-        for ($i = 0; $i < $count; ++$i) {
-            $this->contacts[(string) ($from + $i)] = ['firstname' => 'Person', 'lastname' => 'No' . ($from + $i), 'email' => 'p' . ($from + $i) . '@people.example'];
-        }
-    }
-
-    /**
-     * Fails the next request to the path.
-     *
-     * @param array<string, string> $headers
-     */
-    public function failNext(string $prefix, int $status, array $headers = [], string $body = '{}'): void
-    {
-        $this->failures[] = [$prefix, $status, $headers, $body];
-    }
-
-    /**
      * The MockHttpClient callback.
      *
      * @param array<string, mixed> $options
@@ -163,18 +116,7 @@ final class DemoHubSpot
         if (is_string($line)) {
             $auth = $line;
         }
-        $path                   = (string) parse_url($url, PHP_URL_PATH);
-        if ($this->onRequest instanceof Closure) {
-            ($this->onRequest)($path);
-        }
-        foreach ($this->failures as $i => [$prefix, $status, $extra, $body]) {
-            if ($path === $prefix || str_starts_with($path, $prefix . '?')) {
-                unset($this->failures[$i]);
-                $this->failures = array_values($this->failures);
-
-                return new MockResponse($body, ['http_code' => $status, 'response_headers' => $extra]);
-            }
-        }
+        $path = (string) parse_url($url, PHP_URL_PATH);
         if ($auth !== 'Authorization: Bearer ' . $this->token) {
             return $this->json(['status' => 'error', 'message' => 'Authentication credentials not found'], 401);
         }

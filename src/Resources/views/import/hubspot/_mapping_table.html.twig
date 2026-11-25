@@ -1,8 +1,9 @@
 {#
   0.10.3 (UI-PATTERNS §16, Beacon D-20261105-54): a part of the HubSpot mapping step as a table — the HubSpot
   property (or list) in the row header, its CRM field (or tag) select in the cell; UiKit `table` in its scroll wrapper,
-  two columns that stay readable at phone width (the label wraps, the select takes the rest). Each select keeps its
-  own label for assistive tech (visually hidden: the row header shows the same text).
+  two columns that stay readable at phone width (the label wraps, the select takes the rest). The row header is the
+  select's own <label> (form_label, `for` = the select), so the select is named by the property; the table caption
+  names the object.
   Variables: rows (list of FormView, the selects), caption (the table caption), head (header of the first column),
   bundle.
 #}

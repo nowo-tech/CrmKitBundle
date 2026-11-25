@@ -96,9 +96,19 @@ final class ImportDirectGetTest extends CrmTestCase
             self::assertContains($this->client->getResponse()->getStatusCode(), [403, 404], $path);
             self::assertNull($this->client->getResponse()->headers->get('Location'), $path);
         }
-        // an import of another person or an unknown id: no redirect either
+        // an unknown id: the same 404, no redirect
+        $this->admin();
         $this->client->request('GET', '/crm/import/00000000-0000-7000-8000-000000000000', [], [], self::NAVIGATE);
+        $unknown = $this->client->getResponse()->getStatusCode();
+        self::assertSame(404, $unknown);
         self::assertNull($this->client->getResponse()->headers->get('Location'));
+        // audit ZBJ-I6: an import of another tenant answers exactly like an unknown id (no oracle, no redirect)
+        $this->ctx()->tenant = 'globex';
+        $this->actAs('ana', 'view', 'edit', 'manage');
+        $this->client->request('GET', '/crm/import/' . $id, [], [], self::NAVIGATE);
+        self::assertSame($unknown, $this->client->getResponse()->getStatusCode());
+        self::assertNull($this->client->getResponse()->headers->get('Location'));
+        self::assertNull($this->service(ImportDialogPageResolver::class)->resolve(ImportDialogPageResolver::IMPORT_ROUTE, ['id' => $id]), 'the resolver refuses it too');
     }
 
     public function testTheListReopensOnlyTheKitsOwnStepRoutes(): void

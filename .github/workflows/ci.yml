@@ -358,6 +358,9 @@ jobs:
   deps-floor:
     name: Dependency floor (nowo-tech/transaction-* lowest, demo lock)
     runs-on: ubuntu-latest
+    # Light mode: skipped (a skipped non-matrix job reports its own name as skipped, accepted by branch protection).
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.mode != 'light' }}
 
     services:
       mysql:

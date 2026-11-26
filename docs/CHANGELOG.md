@@ -29,6 +29,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Documentation
+
+- `docs/images/demo/` keeps only the two README screenshots (REQ-DEMO-013: 1-3 images, no gallery). The 68 before /
+  after review captures of 0.10.0 and 0.10.2 (`crm-import-{before,after}-*`, `crm-filters-after-*`) are removed from
+  the tree (they stay in the git history); the filter review spec now writes to the git-ignored
+  `demo/symfony8/e2e/test-results/review-shots/` under its own Playwright project `review-shots`, and `make
+  demo-screenshots` runs only `screenshots.spec.ts`.
+- Tables of contents: `docs/ROADMAP.md` gets one, `docs/CONFIGURATION.md` lists `Key rotation` (REQ-DOCS-005).
+
 ## [0.10.3] - 2026-11-25
 
 Planned as 0.10.3: the steps of the import modal opened directly land on their list with the modal open on that step

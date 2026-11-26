@@ -6,6 +6,30 @@ renders nothing. Each phase is one pull request with tests, docs and a green CI,
 audit; **1.0.0** follows phase G, `bundle-req-audit` at 100 % and the REQ-SEC-004 audits. Every phase gets its own
 contract revision (tables, services, concurrency) before it is built.
 
+## Table of contents
+
+- [Phases](#phases)
+- [HubSpot parity (Beacon spec 254)](#hubspot-parity-beacon-spec-254)
+  - [Fixed points](#fixed-points)
+  - [Release plan](#release-plan)
+  - [Reuse matrix](#reuse-matrix)
+  - [Old phases and spec 254](#old-phases-and-spec-254)
+  - [Block A — activities and templates (A-1 0.13.0, A-2 0.14.0)](#block-a--activities-and-templates-a-1-0130-a-2-0140)
+  - [Block B — mailbox sync and tracking (CrmKit 0.15.0)](#block-b--mailbox-sync-and-tracking-crmkit-0150)
+  - [Block C — products, line items and quotes (C-1 0.16.0, C-2 0.17.0)](#block-c--products-line-items-and-quotes-c-1-0160-c-2-0170)
+  - [Block D — tickets, SLA and support inbox (D-1 0.18.0, D-2 0.19.0, D-3 later)](#block-d--tickets-sla-and-support-inbox-d-1-0180-d-2-0190-d-3-later)
+  - [Block E — segments and forms (E-1 0.20.0, E-2 0.21.0)](#block-e--segments-and-forms-e-1-0200-e-2-0210)
+  - [Block F — automation, sequences and lead scoring (F-1 0.22.0, F-2 0.23.0, F-3 0.24.0)](#block-f--automation-sequences-and-lead-scoring-f-1-0220-f-2-0230-f-3-0240)
+  - [Block G — forecast, goals and teams (CrmKit 0.25.0)](#block-g--forecast-goals-and-teams-crmkit-0250)
+  - [Block H — knowledge base (WikiBundle `published_spaces`; CrmKit bridge in 0.19.0)](#block-h--knowledge-base-wikibundle-published_spaces-crmkit-bridge-in-0190)
+  - [Block I — meeting scheduling links (CrmKit 0.26.0)](#block-i--meeting-scheduling-links-crmkit-0260)
+  - [HubSpot scopes (verification)](#hubspot-scopes-verification)
+  - [Owner questions (Q-254)](#owner-questions-q-254)
+  - [Sequencing](#sequencing)
+- [Not planned](#not-planned)
+- [Phase A follow-ups](#phase-a-follow-ups)
+- [Road to 1.0.0](#road-to-100)
+
 ## Phases
 
 The order below is the owner's phase plan of 2026-11-19 ([CONTRACT.md](CONTRACT.md) section 25); it replaces the

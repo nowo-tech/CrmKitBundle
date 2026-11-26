@@ -7,10 +7,12 @@ import { login } from './helpers';
  * 0.10.2 filter standard screenshots (Beacon request 2026-11-24): every list (Companies, Contacts, Deals, Tags, Custom
  * fields, Funnels) at desktop (1280 px) and phone (390 px) width, the phone filter sheet open, "More filters" open
  * with a folded filter set, and a filter that matches nothing.
- * SHOT_PREFIX names the set (`before` on 0.10.1, `after` on 0.10.2); PNG, converted to WebP by scripts/to-webp.mjs
- * (REQ-DEMO-013).
+ * SHOT_PREFIX names the set (`before` / `after`). These are review captures for UI pull requests, not the README
+ * gallery: they go to REVIEW_SHOTS_DIR (default `test-results/review-shots`, git-ignored) and never to
+ * `docs/images/demo/`, which keeps only the 1-3 marketing screenshots of screenshots.spec.ts (REQ-DEMO-013). Run with
+ * `npx playwright test --project=review-shots`.
  */
-const outDir = process.env.SCREENSHOT_DIR ? resolve(process.env.SCREENSHOT_DIR) : resolve(__dirname, '../../../../docs/images/demo');
+const outDir = process.env.REVIEW_SHOTS_DIR ? resolve(process.env.REVIEW_SHOTS_DIR) : resolve(__dirname, '../test-results/review-shots');
 const prefix = process.env.SHOT_PREFIX ?? 'after';
 
 async function shot(page: Page, name: string): Promise<void> {

@@ -7,18 +7,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    # Light mode (docs/GITHUB_CI.md#light-mode-for-deps-and-docs-only-prs): skipped when the PR only touches these.
-    # Only allowed because this workflow holds no required check (a path-filtered workflow leaves required checks pending).
-    paths-ignore:
-      - 'composer.json'
-      - 'composer.lock'
-      - 'demo/*/composer.json'
-      - 'demo/*/composer.lock'
-      - 'docs/**'
-      - '**.md'
-      - '.github/ISSUE_TEMPLATE/**'
-      - 'specs/**'
-      - '.cursor/**'
   workflow_dispatch:
 
 permissions:
@@ -29,10 +17,24 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Light mode (docs/GITHUB_CI.md#light-mode-for-deps-and-docs-only-prs): no workflow-level paths-ignore (it would leave
+  # the required check pending forever); the job below is skipped instead, and a skipped job reports as passed.
+  changes:
+    name: Change scope (e2e)
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+    steps:
+      - name: Classify the change
+        id: classify
+        uses: nowo-tech/ci-actions/changes@v1
+        with:
+          mode-variable: ${{ vars.NOWO_CI_PR_MODE }}
+
   e2e:
     name: Demo symfony8 Playwright e2e
-    # NOWO_CI_PR_MODE=light skips the e2e on every PR (push and manual runs are never skipped).
-    if: ${{ github.event_name != 'pull_request' || vars.NOWO_CI_PR_MODE != 'light' }}
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.mode != 'light' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

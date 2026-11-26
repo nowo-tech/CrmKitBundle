@@ -50,6 +50,10 @@ make test-e2e           # Playwright suite (demo/symfony8/e2e)
 make demo-screenshots   # on a fresh stack: refresh docs/images/demo/*.webp (PNG captured, converted to WebP, PNG removed)
 ```
 
+`docs/images/demo/` holds only the two README screenshots. Before / after captures for a UI pull request go to the
+git-ignored `demo/symfony8/e2e/test-results/review-shots/` (`npx playwright test --project=review-shots`, or a spec's
+`IMPORT_SHOTS_DIR`) and are attached to the pull request, not committed.
+
 See [DEMO-FRANKENPHP.md](DEMO-FRANKENPHP.md).
 
 ## Cursor Agent

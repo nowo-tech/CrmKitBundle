@@ -40,9 +40,16 @@ export default defineConfig({
       testIgnore: /screenshots\.spec\.ts/,
     },
     {
+      // README gallery only (REQ-DEMO-013: 1-3 WebP under docs/images/demo/).
       name: 'screenshots',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: /screenshots\.spec\.ts/,
+      testMatch: /(^|[\\/])screenshots\.spec\.ts$/,
+    },
+    {
+      // Review captures for UI pull requests (git-ignored test-results/review-shots), never committed.
+      name: 'review-shots',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /filters-standard-screenshots\.spec\.ts$/,
     },
   ],
 });

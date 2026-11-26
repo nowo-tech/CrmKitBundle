@@ -9,6 +9,7 @@
 - [Doctrine](#doctrine)
 - [Fields, import and GDPR](#fields-import-and-gdpr)
 - [HubSpot import (0.10.0)](#hubspot-import-0100)
+  - [Key rotation](#key-rotation)
   - [Timeouts](#timeouts)
 - [Roles and affiliation purposes](#roles-and-affiliation-purposes)
 - [Search](#search)

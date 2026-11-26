@@ -11,6 +11,7 @@ use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Service\EngagementInput;
 use Nowo\CrmKitBundle\Domain\Service\EngagementServiceInterface;
+use Nowo\SearchKitBundle\Model\SearchQuery;
 use Nowo\SearchKitBundle\Model\SearchReference;
 
 use function array_replace_recursive;
@@ -30,6 +31,16 @@ final class ActivitySearchContractTest extends CrmSearchKitTestCase
         /** @var array<string, mixed> $merged */
         $merged = array_replace_recursive(['activities' => ['enabled' => true]], $config);
         parent::bootCrm($merged);
+    }
+
+    public function testNoRecentsNoSeeAllAndASensitiveGroup(): void
+    {
+        $definition = $this->definition();
+        self::assertNull($definition->referenceId($this->referenceTo('nowo_crm_kit_show', ['type' => 'contacts', 'id' => '0190a000-0000-7000-8000-000000000001'])));
+        self::assertNull($definition->idField());
+        self::assertNull($definition->seeAllUrl(new SearchQuery('call', null, 5, null, false, 'ana')));
+        self::assertTrue($definition->sensitive());
+        self::assertSame(['crm_activities', 'activity', 'tabler:activity', ['r.title']], [$definition->group(), $definition->subjectType(), $definition->icon(), $definition->searchableFields()]);
     }
 
     protected function definitionId(): string

@@ -52,6 +52,10 @@ Phase A (0.1.0), always on when the bundle is enabled:
   technical, general; configurable).
 - **Notes and timeline**: plain-text notes (pinned first) and an append-only activity timeline per record; a company's
   timeline includes its contacts' entries; your application adds its own entries.
+- **Activities** (unreleased, 0.11.0, opt-in `activities.enabled`): log calls, meetings and e-mails on companies and
+  contacts (shown on their companies and open deals too), an activity feed filtered by kind and person, pinned notes,
+  @mentions with MilkdownEditor and NotifyKit, your own items on the feed (host activity source), meetings on
+  TaskBoard's calendar and as `.ics`.
 - **360° page**: details, contacts / companies, host links (your projects, tickets and so on, referenced by id and
   resolved by your code on every view), host panels (your read models), notes, timeline, possible duplicates, consents.
 - **Import and export**: CSV (`,` or `;`) and vCard 3.0 / 4.0 import in a modal from the lists (0.4.0; the import page

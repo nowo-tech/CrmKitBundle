@@ -117,6 +117,7 @@ Read for this contract (2026-11-18):
   - [25.7 0.9.0: lists and segments](#257-090-lists-and-segments)
   - [25.8 0.10.0: lean informative circulars](#258-0100-lean-informative-circulars)
 - [26. Addendum: HubSpot import source (design, 2026-11-23)](#26-addendum-hubspot-import-source-design-2026-11-23)
+- [27. Addendum: activities (A-1, 0.11.0)](#27-addendum-activities-a-1-0110)
 
 ## 0. Findings that shaped the contract
 
@@ -1249,3 +1250,28 @@ up by one (H1 0.10.0, H2 0.11.0, H3 0.12.0). Changes against the design, from th
 - Not in H1: the account-details call for currency (H2), per-input association paging (a contact's first page of
   companies is read), English country names (only ISO alpha-2 codes are mapped), the 80-requests-per-10-seconds
   token bucket (bursts are handled by the 429 backoff).
+
+## 27. Addendum: activities (A-1, 0.11.0)
+
+Contract revision of Beacon spec 254 block A-1 (tasks T001 and T002), built as 0.11.0 (Beacon priority, 2026-11-26).
+Full requirements: [`specs/002-activities/spec.md`](../specs/002-activities/spec.md); configuration:
+[CONFIGURATION.md](CONFIGURATION.md#activities-0110); usage: [USAGE.md](USAGE.md#activities-0110).
+
+- **Switch.** `activities.enabled` (default false): three tables (`crm_engagement`, `crm_engagement_subject`,
+  `crm_engagement_attendee`), services and routes only while on.
+- **Services.** `EngagementServiceInterface` (`log`, `edit`, `delete`), `ActivityFeedInterface` (`feed`,
+  `engagement`), `PinnedNotesInterface` (`pin`), `MentionDirectoryInterface` (`candidates`, `names`).
+- **Ports (host, safe defaults).** `CrmHostActivitySourceInterface` (none), `CrmNotifierInterface` (NotifyKit bridge,
+  else none), `CrmRecordAudienceInterface` (the `resource_scoping` rule). Bundle-owned VOs only (REQ-ARCH-001 rule 3).
+- **Access.** `view` reads (feed, `.ics`), `edit` writes on the record (log, pin, notes), `manage` for someone else's
+  activity; an activity is shown only while its primary record is viewable; mention candidates and recipients are
+  members of the same tenant the audience lets view the record.
+- **Concurrency (REQ-RUNTIME-003).** Each write locks the primary record `FOR UPDATE` in a transaction-doctrine write
+  unit; `Engagement` and `Note` are versioned (409); the pin limit is enforced under the record lock; events and
+  notifications after the commit; the runner's lost-savepoint pattern. Two-connection race tests: pins, edits of one
+  activity, logging against an erasure.
+- **GDPR (§16).** Export (`activities`, `meetings_attended`), erasure, purge, retention (`timeline_years`), merges
+  and actor anonymisation (`engagement.author`, `engagement_attendee.actor`) cover the activities.
+- **Deviations from the roadmap's plan.** No MailKit invite part yet (an authorised `.ics` download instead;
+  `CrmMailSenderInterface` with MailKit 2.3); no NotifyKit reminders (Q-254-2, later slice); `ActivityDirection`
+  instead of `CallDirection`; HubSpot engagements in HubSpot part 4.

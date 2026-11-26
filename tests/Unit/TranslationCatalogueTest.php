@@ -38,6 +38,10 @@ final class TranslationCatalogueTest extends TestCase
      */
     private const ALLOWED_IDENTICAL = [
         'de' => [
+            'activity_log.kind.meeting',
+            'activity_log.filter.person',
+            'activity_log.filter.kind_meeting',
+            'notify.category.crm',
             'import.hubspot.form.label',
             'import.hubspot.card.label',
             'import.hubspot.card.status',
@@ -84,6 +88,8 @@ final class TranslationCatalogueTest extends TestCase
             'type.deal',
         ],
         'es' => [
+            'activity_log.minutes',
+            'notify.category.crm',
             'consent.source.api',
             'field.roles',
             'import.format.csv',
@@ -94,6 +100,15 @@ final class TranslationCatalogueTest extends TestCase
             'value.no',
         ],
         'fr' => [
+            'activity_log.minutes',
+            'activity_log.kind.note',
+            'activity_log.kind.email',
+            'activity_log.filter.kind',
+            'activity_log.filter.kind_note',
+            'activity_log.filter.kind_email',
+            'activity_log.form.contacts',
+            'activity_log.form.notes',
+            'notify.category.crm',
             'import.hubspot.object.contacts',
             'import.hubspot.status.active',
             'colour.orange',
@@ -124,6 +139,9 @@ final class TranslationCatalogueTest extends TestCase
             'type.contact',
         ],
         'it' => [
+            'activity_log.minutes',
+            'activity_log.kind.email',
+            'notify.category.crm',
             'consent.purpose.newsletter',
             'consent.source.api',
             'field.email',
@@ -141,6 +159,12 @@ final class TranslationCatalogueTest extends TestCase
             'value.no',
         ],
         'nl' => [
+            'activity_log.minutes',
+            'activity_log.kind.email',
+            'activity_log.kind.host',
+            'activity_log.filter.kind_email',
+            'activity_log.filter.kind_host',
+            'notify.category.crm',
             'import.hubspot.card.status',
             'import.hubspot.card.scopes',
             'import.hubspot.col.object',
@@ -187,6 +211,10 @@ final class TranslationCatalogueTest extends TestCase
             'type.deal',
         ],
         'pt' => [
+            'activity_log.minutes',
+            'activity_log.kind.email',
+            'activity_log.filter.kind_email',
+            'notify.category.crm',
             'consent.source.api',
             'deal.history.via',
             'field.email',

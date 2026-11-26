@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Doctrine;
 
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
@@ -29,6 +30,8 @@ use function str_starts_with;
  * - Both forget the bundle's entities when the unit ends. On the private entity manager a refused unit closes it
  *   (Doctrine's `wrapInTransaction`) and it is reset through the registry before the next unit (worker mode: no
  *   managed entity and no broken manager survive a call).
+ *
+ * **(0.11.0)** Both managers share one transaction path with the lost-savepoint pattern ({@see self::rollBackTo()}).
  *
  * Never flushes the host's entity manager (rule 6): with `entity_manager: null` it is the default one, and the
  * runner opens, flushes and commits its transaction itself; on a failure it rolls back and forgets only the
@@ -72,12 +75,7 @@ final readonly class DoctrineTransactionRunner implements TransactionRunnerInter
             $shared  = $this->shared($manager);
             $this->release($manager);
             try {
-                return $shared ? $this->sharedTransaction($manager, $work) : $manager->wrapInTransaction(static function (EntityManagerInterface $manager) use ($work): mixed { // @igor-ignore - the runner calls this closure at once and keeps nothing
-                    $result = $work();
-                    $manager->flush();
-
-                    return $result;
-                });
+                return $this->transaction($manager, $work, $shared);
             } catch (UniqueConstraintViolationException $e) {
                 throw new DuplicateRowException($e);
             } catch (OptimisticLockException $e) {
@@ -91,14 +89,19 @@ final readonly class DoctrineTransactionRunner implements TransactionRunnerInter
     }
 
     /**
-     * One transaction on the host's shared entity manager without closing it on a failure: begin, work, flush,
-     * commit; any failure rolls back (the bundle's entities are forgotten by the caller).
+     * One transaction of the unit: begin, work, flush, commit. Any failure rolls back to the nesting level the unit
+     * started at (REQ-RUNTIME-003, the lost-savepoint pattern): a rollback that fails itself (a MySQL / MariaDB deadlock
+     * inside a nested flush drops the savepoints, so `ROLLBACK TO SAVEPOINT` fails with 1305; a broken link) closes the
+     * connection, so the worker's next unit never inherits a half-open transaction, and the original failure is
+     * rethrown (never the rollback's). The private entity manager is closed on a failure (Doctrine's
+     * `wrapInTransaction` did the same; it is reset before the next unit); the host's shared one stays open.
      *
      * @param callable(): mixed $work
      */
-    private function sharedTransaction(EntityManagerInterface $manager, callable $work): mixed
+    private function transaction(EntityManagerInterface $manager, callable $work, bool $shared): mixed
     {
         $connection = $manager->getConnection();
+        $level      = $connection->getTransactionNestingLevel();
         $connection->beginTransaction();
         try {
             $result = $work();
@@ -107,11 +110,27 @@ final readonly class DoctrineTransactionRunner implements TransactionRunnerInter
 
             return $result;
         } catch (Throwable $e) {
-            if ($connection->isTransactionActive()) {
-                $connection->rollBack();
+            if (!$shared) {
+                $manager->close();
             }
+            self::rollBackTo($connection, $level);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Rolls back to `$level`; when a rollback fails, closes the connection (its failure is dropped: the caller rethrows
+     * the original one).
+     */
+    public static function rollBackTo(Connection $connection, int $level): void
+    {
+        try {
+            while ($connection->isTransactionActive() && $connection->getTransactionNestingLevel() > $level) {
+                $connection->rollBack();
+            }
+        } catch (Throwable) {
+            $connection->close();
         }
     }
 

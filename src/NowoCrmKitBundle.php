@@ -58,6 +58,9 @@ final class NowoCrmKitBundle extends AbstractBundle
     /** Doctrine mapping name of the funnels (0.3.0; only with `pipeline.enabled`). */
     public const PIPELINE_MAPPING_NAME = 'NowoCrmKitBundlePipeline';
 
+    /** Doctrine mapping name of the logged activities (0.11.0; only with `activities.enabled`). */
+    public const ACTIVITIES_MAPPING_NAME = 'NowoCrmKitBundleActivities';
+
     /** Doctrine mapping name of the HubSpot import (0.10.0; only with `import.hubspot.enabled`). */
     public const HUBSPOT_MAPPING_NAME = 'NowoCrmKitBundleHubSpot';
 
@@ -128,7 +131,11 @@ final class NowoCrmKitBundle extends AbstractBundle
         $pipeline = false;
         $api      = false;
         $hubspot  = false;
+        $active   = false;
         foreach ($builder->getExtensionConfig(self::ALIAS) as $config) {
+            if (is_array($config) && is_array($config['activities'] ?? null) && array_key_exists('enabled', $config['activities'])) {
+                $active = $config['activities']['enabled'] === true;
+            }
             $doctrine = is_array($config) && is_array($config['doctrine'] ?? null) ? $config['doctrine'] : [];
             if (array_key_exists('entity_manager', $doctrine)) {
                 $manager = is_string($doctrine['entity_manager']) && $doctrine['entity_manager'] !== '' ? $doctrine['entity_manager'] : 'default';
@@ -158,6 +165,10 @@ final class NowoCrmKitBundle extends AbstractBundle
         if ($api) {
             // 0.3.0: the idempotency table is mapped only while `api.enabled`.
             $mappings[self::API_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-api', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Api', 'is_bundle' => false];
+        }
+        if ($active) {
+            // 0.11.0: the logged activities, their records and their meeting attendees only while `activities.enabled`.
+            $mappings[self::ACTIVITIES_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-activities', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Engagement', 'is_bundle' => false];
         }
         if ($hubspot) {
             // 0.10.0: the HubSpot connection and external reference tables only while `import.hubspot.enabled`.

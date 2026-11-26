@@ -46,7 +46,7 @@ final readonly class RecordPage
     /**
      * Wires the collaborators.
      */
-    public function __construct(private UiSupport $ui, private CrmReaderInterface $reader, private CrmAccess $access, private RecordForms $forms, private ?PipelineRecordBlock $pipeline = null)
+    public function __construct(private UiSupport $ui, private CrmReaderInterface $reader, private CrmAccess $access, private RecordForms $forms, private ?PipelineRecordBlock $pipeline = null, private ?ActivityRecordBlock $activities = null)
     {
     }
 
@@ -121,8 +121,11 @@ final readonly class RecordPage
             default               => null,
         };
         $forms = [];
+        // 0.11.0: with @mentions, MilkdownEditor's note field with the record's mention candidates.
+        $editor = $edit ? $this->activities?->noteEditor($view) : null;
+        $body   = $editor === null ? [] : ['body_type' => $editor[0], 'body_options' => $editor[1]];
         if ($edit) {
-            $forms['note']  = $this->ui->form(NoteType::class, null, [], 'crm_note')->createView();
+            $forms['note']  = $this->ui->form(NoteType::class, null, $body, 'crm_note')->createView();
             $forms['notes'] = [];
             $tags           = [];
             foreach ($this->reader->tags() as $tag) {
@@ -163,7 +166,7 @@ final readonly class RecordPage
         $buttons = ['notes' => [], 'links' => [], 'affiliations' => [], 'primary_contact' => []];
         if ($edit) {
             foreach ($notes as $note) {
-                $forms['notes'][$note->id]   = $this->ui->form(NoteType::class, ['body' => $note->body, 'pinned' => $note->pinned, 'version' => (string) $note->version], ['versioned' => true], 'crm_note')->createView();
+                $forms['notes'][$note->id]   = $this->ui->form(NoteType::class, ['body' => $note->body, 'pinned' => $note->pinned, 'version' => (string) $note->version], ['versioned' => true] + $body, 'crm_note')->createView();
                 $buttons['notes'][$note->id] = $this->post($token, 'delete', 'note.delete', 'nowo_crm_kit_note_delete', ['id' => $note->id] + $back, 'note.delete_confirm', 'danger');
             }
             foreach ($links as $link) {
@@ -203,6 +206,8 @@ final readonly class RecordPage
             'consents'   => $type === SubjectType::Contact ? $this->reader->consents($view->id) : [],
             // 0.3.0: deals, lifecycle stages and next actions (only while the funnels are on).
             'pipeline' => $this->pipeline instanceof PipelineRecordBlock && $view->status !== RecordStatus::Erased ? $this->pipeline->variables($view, $edit) : null,
+            // 0.11.0: the activity feed, the pin buttons and the notes' text with mentions (only while activities are on).
+            'activities' => $this->activities instanceof ActivityRecordBlock && $view->status !== RecordStatus::Erased ? $this->activities->variables($view, $edit, $notes) : null,
         ]);
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Application;
 
+use Nowo\CrmKitBundle\Application\Engagement\EngagementHousekeeping;
 use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
 use Nowo\CrmKitBundle\Application\Port\ExternalRefHooksInterface;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
@@ -32,7 +33,7 @@ use const DATE_ATOM;
 
 /**
  * GDPR export and erasure of a contact (contract section 16). Erasure blanks the personal columns, deletes notes,
- * taggings, links, affiliations, timeline entries and merge traces of the contact, keeps consent rows without their
+ * taggings, links, affiliations, timeline entries, logged activities (0.11.0) and merge traces of the contact, keeps consent rows without their
  * evidence, blanks the merge tombstones that point at it (recursively, under lock) with their merge traces, and is
  * idempotent. Stateless.
  */
@@ -44,7 +45,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
     /**
      * Wires the collaborators.
      */
-    public function __construct(private WriteSupport $support, private PlanCounter $counter, private ?PipelineHousekeeping $pipeline = null, private ?ExternalRefHooksInterface $refs = null)
+    public function __construct(private WriteSupport $support, private PlanCounter $counter, private ?PipelineHousekeeping $pipeline = null, private ?ExternalRefHooksInterface $refs = null, private ?EngagementHousekeeping $engagements = null)
     {
     }
 
@@ -75,6 +76,10 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
             if ($this->pipeline instanceof PipelineHousekeeping) {
                 // 0.3.0: its deals, lifecycle stages, stage history and next actions.
                 $data += $this->pipeline->exportContact($context->tenant, $contactId);
+            }
+            if ($this->engagements instanceof EngagementHousekeeping) {
+                // 0.11.0: the activities logged on it and the meetings it attends.
+                $data += $this->engagements->exportContact($context->tenant, $contactId);
             }
             $this->support->activity($context, SubjectType::Contact, $contactId, ActivityKind::Exported);
             $this->support->audit($effects, $context, 'crm.contact.exported', SubjectType::Contact, $contactId);
@@ -138,6 +143,8 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
             }
             // 0.3.0: its deals are unlinked; its stage history, lifecycle stages and next actions are deleted.
             $this->pipeline?->forgetRecord($context->tenant, SubjectType::Contact, $contactId);
+            // 0.11.0: its logged activities are deleted; it leaves the activities and meetings of other records.
+            $this->engagements?->forgetRecord($context->tenant, SubjectType::Contact, $contactId);
             // 0.10.0 (Q-H6): its HubSpot references become tombstones, so a re-run never brings the person back.
             $this->refs?->tombstone($context->tenant, $contactId);
             // The merge tombstones of this contact, and theirs in turn: locked, blanked, their merge traces deleted.

@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Domain\Enum;
 
+use function in_array;
+
 /**
- * Kinds of timeline entries (contract section 6.6).
+ * Kinds of timeline entries (contract section 6.6). **(0.11.0, `activities.enabled`)** `Call`, `Meeting` and `Email` are
+ * the logged activities (an entry on the record they were logged on, pointing at the activity by id) and
+ * `ActivityEdited` / `ActivityDeleted` their changes; `FormSubmitted` and `Sms` are reserved for later blocks (never
+ * written by this release).
  */
 enum ActivityKind: string
 {
@@ -35,4 +40,22 @@ enum ActivityKind: string
     case NextActionAdded  = 'next_action_added';
     case NextActionClosed = 'next_action_closed';
     case LifecycleStage   = 'lifecycle_stage';
+    case Call             = 'call';
+    case Meeting          = 'meeting';
+    case Email            = 'email';
+    case ActivityEdited   = 'activity_edited';
+    case ActivityDeleted  = 'activity_deleted';
+    case FormSubmitted    = 'form_submitted';
+    case Sms              = 'sms';
+
+    /** The kinds a person logs as an activity (0.11.0). */
+    public const LOGGABLE = [self::Call, self::Meeting, self::Email];
+
+    /**
+     * Whether the kind is a logged activity (`call`, `meeting`, `email`).
+     */
+    public function isLoggable(): bool
+    {
+        return in_array($this, [self::Call, self::Meeting, self::Email], true);
+    }
 }

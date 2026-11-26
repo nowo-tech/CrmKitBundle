@@ -281,6 +281,13 @@ timeline:
     empty: Noch ist nichts passiert.
     open: Öffnen
 activity:
+    call: "Anruf erfasst von %actor%"
+    meeting: "Meeting erfasst von %actor%"
+    email: "E-Mail erfasst von %actor%"
+    activity_edited: "Aktivität bearbeitet von %actor%"
+    activity_deleted: "Aktivität gelöscht von %actor%"
+    form_submitted: "Formular gesendet"
+    sms: "SMS erfasst von %actor%"
     via_token: "über Agent ‹%token%›"
     lifecycle_stage: 'Lebenszyklusphase geändert von %actor%'
     next_action_closed: 'Nächste Aktion abgeschlossen von %actor%'
@@ -490,6 +497,7 @@ settings:
         merge_keep_days: Tage, die eine Zusammenführung die Werte des zusammengeführten Datensatzes behält (1-365)
 search:
     group:
+        activities: "Aktivitäten"
         companies: Unternehmen
         contacts: Kontakte
         deals: 'Deals'
@@ -751,3 +759,95 @@ lost_reason:
     competitor: 'Wettbewerber'
     no_decision: 'Keine Entscheidung'
     other: 'Sonstiges'
+activity_log:
+    title: "Aktivitäten"
+    log_call: "Anruf erfassen"
+    log_meeting: "Meeting erfassen"
+    log_email: "E-Mail erfassen"
+    edit_call: "Anruf bearbeiten"
+    edit_meeting: "Meeting bearbeiten"
+    edit_email: "E-Mail bearbeiten"
+    save: "Speichern"
+    logged_call: "Anruf erfasst."
+    logged_meeting: "Meeting erfasst."
+    logged_email: "E-Mail erfasst."
+    saved: "Aktivität gespeichert."
+    deleted: "Aktivität gelöscht."
+    edit: "Bearbeiten"
+    delete: "Löschen"
+    delete_confirm: "Diese Aktivität löschen? Das kann nicht rückgängig gemacht werden."
+    ics: "Zum Kalender hinzufügen (.ics)"
+    pin: "Anheften"
+    unpin: "Lösen"
+    pinned: "Notiz angeheftet."
+    unpinned: "Notiz gelöst."
+    empty: "Noch keine Aktivitäten."
+    empty_filtered: "Keine Aktivität passt zum Filter."
+    older: "Ältere Aktivitäten anzeigen"
+    until: "bis %time%"
+    minutes: "%count% Min."
+    cancelled: "Abgesagt"
+    attendees: "Teilnehmende"
+    logged_on: "Erfasst bei"
+    kind:
+        note: "Notiz"
+        call: "Anruf"
+        meeting: "Meeting"
+        email: "E-Mail"
+        host: "Aktualisierung"
+    direction:
+        in: "Eingehend"
+        out: "Ausgehend"
+    filter:
+        kind: "Art"
+        person: "Person"
+        any_kind: "Alle Arten"
+        anybody: "Alle Personen"
+        apply: "Filtern"
+        clear: "Zurücksetzen"
+        kind_note: "Notizen"
+        kind_call: "Anrufe"
+        kind_meeting: "Meetings"
+        kind_email: "E-Mails"
+        kind_host: "Aktualisierungen"
+    form:
+        meeting_title: "Titel"
+        starts_at: "Beginn"
+        ends_at: "Ende"
+        timezone: "Zeitzone"
+        place: "Ort oder Videolink"
+        members: "Teammitglieder"
+        contacts: "Kontakte"
+        notes: "Notizen"
+        cancelled: "Abgesagt"
+        occurred_at: "Wann"
+        direction: "Richtung"
+        outcome: "Ergebnis"
+        no_outcome: "Kein Ergebnis"
+        duration: "Dauer (Minuten)"
+        call_title: "Zusammenfassung"
+        subject: "Betreff"
+        excerpt: "Auszug (bis zu 500 Zeichen)"
+activity_error:
+    kind: "Die Art einer Aktivität kann nicht geändert werden."
+    attendees_limit: "Ein Meeting hat höchstens %max% Teilnehmende."
+    attendee_unknown: "Wählen Sie Teammitglieder und Kontakte, die Sie sehen können."
+    time: "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein."
+    title: "Ein Titel hat bis zu 200 Zeichen Text."
+    excerpt: "Ein Auszug hat bis zu 500 Zeichen reinen Text."
+    outcome: "Unbekanntes Ergebnis."
+    duration: "Eine Dauer liegt zwischen 0 und 1440 Minuten."
+    timezone: "Wählen Sie eine Zeitzone."
+    slot: "Ein Meeting endet nach seinem Beginn, höchstens 7 Tage später."
+    place: "Ein Ort hat bis zu 200 Zeichen oder ist ein https-Link."
+call_outcome:
+    connected: "Erreicht"
+    left_voicemail: "Auf Mailbox gesprochen"
+    no_answer: "Keine Antwort"
+    busy: "Besetzt"
+    wrong_number: "Falsche Nummer"
+notify:
+    mention:
+        title: "%actor% hat Sie in einer CRM-Notiz erwähnt"
+    category:
+        crm: "CRM"

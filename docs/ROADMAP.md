@@ -14,15 +14,15 @@ contract revision (tables, services, concurrency) before it is built.
   - [Release plan](#release-plan)
   - [Reuse matrix](#reuse-matrix)
   - [Old phases and spec 254](#old-phases-and-spec-254)
-  - [Block A — activities and templates (A-1 0.13.0, A-2 0.14.0)](#block-a--activities-and-templates-a-1-0130-a-2-0140)
-  - [Block B — mailbox sync and tracking (CrmKit 0.15.0)](#block-b--mailbox-sync-and-tracking-crmkit-0150)
-  - [Block C — products, line items and quotes (C-1 0.16.0, C-2 0.17.0)](#block-c--products-line-items-and-quotes-c-1-0160-c-2-0170)
-  - [Block D — tickets, SLA and support inbox (D-1 0.18.0, D-2 0.19.0, D-3 later)](#block-d--tickets-sla-and-support-inbox-d-1-0180-d-2-0190-d-3-later)
-  - [Block E — segments and forms (E-1 0.20.0, E-2 0.21.0)](#block-e--segments-and-forms-e-1-0200-e-2-0210)
-  - [Block F — automation, sequences and lead scoring (F-1 0.22.0, F-2 0.23.0, F-3 0.24.0)](#block-f--automation-sequences-and-lead-scoring-f-1-0220-f-2-0230-f-3-0240)
-  - [Block G — forecast, goals and teams (CrmKit 0.25.0)](#block-g--forecast-goals-and-teams-crmkit-0250)
-  - [Block H — knowledge base (WikiBundle `published_spaces`; CrmKit bridge in 0.19.0)](#block-h--knowledge-base-wikibundle-published_spaces-crmkit-bridge-in-0190)
-  - [Block I — meeting scheduling links (CrmKit 0.26.0)](#block-i--meeting-scheduling-links-crmkit-0260)
+  - [Block A — activities and templates (A-1 0.11.0, A-2 0.15.0)](#block-a--activities-and-templates-a-1-0110-a-2-0150)
+  - [Block B — mailbox sync and tracking (CrmKit 0.16.0)](#block-b--mailbox-sync-and-tracking-crmkit-0160)
+  - [Block C — products, line items and quotes (C-1 0.17.0, C-2 0.18.0)](#block-c--products-line-items-and-quotes-c-1-0170-c-2-0180)
+  - [Block D — tickets, SLA and support inbox (D-1 0.19.0, D-2 0.20.0, D-3 later)](#block-d--tickets-sla-and-support-inbox-d-1-0190-d-2-0200-d-3-later)
+  - [Block E — segments and forms (E-1 0.21.0, E-2 0.22.0)](#block-e--segments-and-forms-e-1-0210-e-2-0220)
+  - [Block F — automation, sequences and lead scoring (F-1 0.23.0, F-2 0.24.0, F-3 0.25.0)](#block-f--automation-sequences-and-lead-scoring-f-1-0230-f-2-0240-f-3-0250)
+  - [Block G — forecast, goals and teams (CrmKit 0.26.0)](#block-g--forecast-goals-and-teams-crmkit-0260)
+  - [Block H — knowledge base (WikiBundle `published_spaces`; CrmKit bridge in 0.20.0)](#block-h--knowledge-base-wikibundle-published_spaces-crmkit-bridge-in-0200)
+  - [Block I — meeting scheduling links (CrmKit 0.27.0)](#block-i--meeting-scheduling-links-crmkit-0270)
   - [HubSpot scopes (verification)](#hubspot-scopes-verification)
   - [Owner questions (Q-254)](#owner-questions-q-254)
   - [Sequencing](#sequencing)
@@ -49,8 +49,13 @@ earlier order B → C → D → E → F → G.
 | **E2** informative circulars | 0.10.0 | One e-mail per recipient through MailKit's queue with a rate limit; per-purpose unsubscribe; `service_notice` purpose; commercial circulars need marketing consent; bounces mark the address; send log; open signal to scoring; payment reminders through this channel | `campaigns.enabled` | Not started |
 | **G** reports | later → 1.0.0 | Deal scoring, deeper forecasts, velocity and cohorts, open / click tracking, two-way sync with external calendars, inactive-contact review | `reports.enabled` | Not started |
 | **H1** HubSpot import: connection, companies, contacts | 0.10.0 | HubSpot as a third import source next to CSV and vCard (same `crm_import` queue, mapping, duplicate policy, limits, progress): a per-tenant service key (or legacy private app token), validated (account id, read scopes; write scopes refused where HubSpot lists them) and sealed; companies, contacts, contact ↔ company associations, owners → members by e-mail, lists → tags; HubSpot ids kept as external refs so a re-run updates; paging, 429 backoff, resume; optional Messenger run. Design: [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md) (Beacon spec 253, D-20261123-04) | `import.hubspot.enabled` | Built (PR #23), unreleased |
-| **H2** HubSpot import: deals | 0.11.0 | Pipelines → deal funnels, stages → stages (created on confirmation), deals with amount, currency, close date and open / won / lost; deal ↔ company / contact | `import.hubspot.deals` (needs `pipeline.enabled`, phase B released in 0.3.0) | Designed, not started |
-| **H3** HubSpot import: OAuth | 0.12.0 | "Connect to HubSpot" with state + PKCE, sealed refresh token, revoke on disconnect; the token path keeps working | `import.hubspot.oauth.enabled` | Designed, not started |
+| **H2** HubSpot import: deals | 0.12.0 | Pipelines → deal funnels, stages → stages (created on confirmation), deals with amount, currency, close date and open / won / lost; deal ↔ company / contact | `import.hubspot.deals` (needs `pipeline.enabled`, phase B released in 0.3.0) | Designed, not started |
+| **H3** HubSpot import: OAuth | 0.14.0 | "Connect to HubSpot" with state + PKCE, sealed refresh token, revoke on disconnect; the token path keeps working | `import.hubspot.oauth.enabled` | Designed, not started |
+
+**2026-11-26 (Beacon priority):** A-1 activities (Beacon spec 254) moves first and is built as **0.11.0**; H2 follows
+as 0.12.0, the Zoho import Z1 (Beacon spec 253 block Z, owner decisions Q-Z1..18 of 2026-11-24, design in the Zoho
+design note) as 0.13.0 and H3 as 0.14.0. Z2 / Z3 and the later spec 254 slices take their numbers when they are
+scheduled, in the order below.
 
 Status as of 2026-11-23 (latest tag v0.8.0; 0.8.1 is being released; 0.9.0, the pipeline dialogs, is PR #22; H1 is
 built as 0.10.0 in draft PR #23). Tags v0.4.0 to v0.8.1 were not the phases of the plan: they are UI and
@@ -98,29 +103,30 @@ Q-O questions) in [CONTRACT.md](CONTRACT.md) before it is built.
 
 ### Release plan
 
-Version numbers continue after H3 (0.12.0) and move up by one if another release lands first; the order does not
-change. "Kit option" is the configuration switch; off means no tables mapped, no routes, no services, no menu entries.
+Version numbers as of 2026-11-26: A-1 moved first (Beacon priority) and is **0.11.0**; then H2 0.12.0, Z1 (Zoho
+companies and contacts) 0.13.0, H3 0.14.0; the slices after them take the next free minor in the order of this table
+when they are scheduled (numbers move up when another release lands first; the order does not change). "Kit option" is the configuration switch; off means no tables mapped, no routes, no services, no menu entries.
 
 | Slice | CrmKit | Content | Kit option | Other bundles (new work in **bold**) | Beacon release (target) |
 | --- | --- | --- | --- | --- | --- |
-| H1 / H2 / H3 | 0.10.0 / 0.11.0 / 0.12.0 | HubSpot import (spec 253) | `import.hubspot.*` | — | v1.174 (H1) |
-| **A-1** activities | 0.13.0 | Kinds `call`, `meeting`, `email`; log dialogs; timeline filter by kind and person; fan-out contact → companies / deals; pinned notes; @mentions; host activity source; meetings on TaskBoard's calendar + ICS; HubSpot notes / calls / meetings / tasks | `activities.enabled` | TaskBoard (event source, as is), NotifyKit 0.3 (as is), MilkdownEditor mentions (as is), **MailKit: ICS invites**, SearchKit | v1.176 |
-| **A-2** templates | 0.14.0 | Personal and shared e-mail templates, snippets, closed merge-field resolver, consent purpose per template; *Write e-mail* insert; sent mail logged as `email` | `templates.enabled` | **MailKit: stored templates + placeholder registry** (CrmKit adds the CRM placeholders) | v1.176 or v1.177 |
-| **B** mailbox sync + tracking | 0.15.0 | Auto-link by exact contact e-mail, `email` activities from linked messages, open / click signal, reply detection; HubSpot e-mails (metadata; bodies on opt-in) | `mail_link.enabled` | **MailKit B1: Graph delegated personal mailboxes** (spec 236 kit side); **MailKit B2: Gmail provider** (off until Google's review); **TimeTrack: OAuth helpers with extra scopes** (Q-254-15); MailKit tracking + ShortLink clicks (as is) | v1.177 (Outlook); Gmail by configuration later |
-| **C-1** catalogue + line items | 0.16.0 | Product catalogue, line items on deals, deal amount from items (per funnel), MRR / ARR; HubSpot products and line items | `catalog.enabled` | — (new in CrmKit; CurrencyKit only for an optional reference display) | v1.178 |
-| **C-2** quotes | 0.17.0 | Quotes with series numbering, versions, branded PDF, signed accept / reject link, immutable acceptance, won / lost on answer; HubSpot quotes | `quotes.enabled` | ReportKit PDF runner + brand-contracts (as is); PdfSignable later as a provider (as is) | v1.178 or v1.179 |
-| **D-1** tickets + SLA | 0.18.0 | `FunnelKind::Ticket`, priority, owner, team, links, board and list, SLA policies on business hours, pause, breach events; teams port; HubSpot tickets and ticket pipelines | `tickets.enabled` | **WorkingTime: business-time calculator**; TaskBoard teams (as is); NotifyKit (as is) | v1.179 |
-| **D-2** e-mail channel + articles | 0.19.0 | Ticket address per organisation, e-mail → ticket, reply threading by token, unknown sender without contact; article suggester port and Wiki bridge | `tickets.inbound.enabled` | MailKit Graph inbound + plus addresses (as is); Wiki (block H) | v1.180 |
+| **A-1** activities | 0.11.0 | Kinds `call`, `meeting`, `email`; log dialogs; timeline filter by kind and person; fan-out contact → companies / deals; pinned notes; @mentions; host activity source; meetings on TaskBoard's calendar + ICS download (MailKit invite part a follow-up); HubSpot notes / calls / meetings / tasks in a later slice (HubSpot part 4) | `activities.enabled` | TaskBoard (event source, as is), NotifyKit 0.3 (as is), MilkdownEditor mentions (as is), **MailKit: ICS invites** (follow-up), SearchKit | v1.176 |
+| H1 / H2 / Z1 / H3 | 0.10.0 / 0.12.0 / 0.13.0 / 0.14.0 | HubSpot import (spec 253), Zoho import Z1 (spec 253 block Z) | `import.hubspot.*`, `import.zoho.*` | — | v1.174 (H1) |
+| **A-2** templates | 0.15.0 | Personal and shared e-mail templates, snippets, closed merge-field resolver, consent purpose per template; *Write e-mail* insert; sent mail logged as `email` | `templates.enabled` | **MailKit: stored templates + placeholder registry** (CrmKit adds the CRM placeholders) | v1.176 or v1.177 |
+| **B** mailbox sync + tracking | 0.16.0 | Auto-link by exact contact e-mail, `email` activities from linked messages, open / click signal, reply detection; HubSpot e-mails (metadata; bodies on opt-in) | `mail_link.enabled` | **MailKit B1: Graph delegated personal mailboxes** (spec 236 kit side); **MailKit B2: Gmail provider** (off until Google's review); **TimeTrack: OAuth helpers with extra scopes** (Q-254-15); MailKit tracking + ShortLink clicks (as is) | v1.177 (Outlook); Gmail by configuration later |
+| **C-1** catalogue + line items | 0.17.0 | Product catalogue, line items on deals, deal amount from items (per funnel), MRR / ARR; HubSpot products and line items | `catalog.enabled` | — (new in CrmKit; CurrencyKit only for an optional reference display) | v1.178 |
+| **C-2** quotes | 0.18.0 | Quotes with series numbering, versions, branded PDF, signed accept / reject link, immutable acceptance, won / lost on answer; HubSpot quotes | `quotes.enabled` | ReportKit PDF runner + brand-contracts (as is); PdfSignable later as a provider (as is) | v1.178 or v1.179 |
+| **D-1** tickets + SLA | 0.19.0 | `FunnelKind::Ticket`, priority, owner, team, links, board and list, SLA policies on business hours, pause, breach events; teams port; HubSpot tickets and ticket pipelines | `tickets.enabled` | **WorkingTime: business-time calculator**; TaskBoard teams (as is); NotifyKit (as is) | v1.179 |
+| **D-2** e-mail channel + articles | 0.20.0 | Ticket address per organisation, e-mail → ticket, reply threading by token, unknown sender without contact; article suggester port and Wiki bridge | `tickets.inbound.enabled` | MailKit Graph inbound + plus addresses (as is); Wiki (block H) | v1.180 |
 | **D-3** chat channel | later | Signed-in customers' chat opens or continues a ticket | `tickets.chat.enabled` | **ChatKit customer-channel option**; needs phase F (portal) | after phase F (Q-254-8) |
-| **E-1** segments (phase E1) | 0.20.0 | Static lists and dynamic segments with live counts, bulk actions; HubSpot lists → lists / segments | `segments.enabled` | CrmKit tags as static lists (Q-254-16); **UiKit: rule-builder component** | v1.181 |
-| **E-2** web forms | 0.21.0 | Form builder, field mapping, UTM fields, consent per purpose, embed by script / iframe, allowed origins, signed token, honeypot + Altcha, rate limits, double opt-in; no HubSpot form definitions in v1 (Q-254-3) | `forms.enabled` | **FormKit: honeypot + embed mode**; AltchaType, LegalKit, MailKit (as is) | v1.181 or v1.182 |
+| **E-1** segments (phase E1) | 0.21.0 | Static lists and dynamic segments with live counts, bulk actions; HubSpot lists → lists / segments | `segments.enabled` | CrmKit tags as static lists (Q-254-16); **UiKit: rule-builder component** | v1.181 |
+| **E-2** web forms | 0.22.0 | Form builder, field mapping, UTM fields, consent per purpose, embed by script / iframe, allowed origins, signed token, honeypot + Altcha, rate limits, double opt-in; no HubSpot form definitions in v1 (Q-254-3) | `forms.enabled` | **FormKit: honeypot + embed mode**; AltchaType, LegalKit, MailKit (as is) | v1.181 or v1.182 |
 | **F-0** sending domains | — | Per-organisation sending domain, SPF / DKIM / DMARC verification before campaigns and daily for sequences | — | **MailKit `sending_domains`** (Q-254-6) | with F-2 |
-| **F-1** scoring (phase S) | 0.22.0 | Explainable rule scoring, hot / warm / cold bands, breakdown, worker-safe recompute | `scoring.enabled` | — | v1.182 |
-| **F-2** circulars (phase E2) | 0.23.0 | Informative and marketing circulars through MailKit's queue, only from a verified domain | `campaigns.enabled` | MailKit (`sending_domains`, tracking) | v1.183 |
-| **F-3** automation + sequences | 0.24.0 | CRM triggers and actions for AutomationKit, the mailbox e-mail action and the sequence stop signals (reply, booking, unsubscribe); the sequences engine itself is AutomationKit's (Q-AK-1) | `automation.enabled` | **new `nowo-tech/automation-kit-bundle`** 0.1.0 (Q-254-7: repo created, contract first; Workflow evaluated first); WorkflowBundle through an AutomationKit action (as is); UiKit rule builder; OutboundUrlGuard (as is) | v1.184 |
-| **G** forecast, goals, teams | 0.25.0 | Forecast categories with override history, goals per rep / team and period; HubSpot goals and owners' teams | `forecast.enabled` | ReportKit (as is; CrmKit ships the report types in `Bridge/ReportKit`); TaskBoard teams (as is) | v1.185 (may swap with C or E) |
-| **H** knowledge base | — (bridge in 0.19.0) | Published spaces; suggestions in ticket replies | — | **WikiBundle `published_spaces`** (next Wiki minor) | with D-2 or alone |
-| **I** booking links | 0.26.0 | Booking pages, availability (free / busy only), signed cancel / reschedule, meeting + ICS, sequence stop | `booking.enabled` | TaskBoard (event source, as is); **TimeTrack: busy-window reader** (Google / Microsoft) | v1.186 |
+| **F-1** scoring (phase S) | 0.23.0 | Explainable rule scoring, hot / warm / cold bands, breakdown, worker-safe recompute | `scoring.enabled` | — | v1.182 |
+| **F-2** circulars (phase E2) | 0.24.0 | Informative and marketing circulars through MailKit's queue, only from a verified domain | `campaigns.enabled` | MailKit (`sending_domains`, tracking) | v1.183 |
+| **F-3** automation + sequences | 0.25.0 | CRM triggers and actions for AutomationKit, the mailbox e-mail action and the sequence stop signals (reply, booking, unsubscribe); the sequences engine itself is AutomationKit's (Q-AK-1) | `automation.enabled` | **new `nowo-tech/automation-kit-bundle`** 0.1.0 (Q-254-7: repo created, contract first; Workflow evaluated first); WorkflowBundle through an AutomationKit action (as is); UiKit rule builder; OutboundUrlGuard (as is) | v1.184 |
+| **G** forecast, goals, teams | 0.26.0 | Forecast categories with override history, goals per rep / team and period; HubSpot goals and owners' teams | `forecast.enabled` | ReportKit (as is; CrmKit ships the report types in `Bridge/ReportKit`); TaskBoard teams (as is) | v1.185 (may swap with C or E) |
+| **H** knowledge base | — (bridge in 0.20.0) | Published spaces; suggestions in ticket replies | — | **WikiBundle `published_spaces`** (next Wiki minor) | with D-2 or alone |
+| **I** booking links | 0.27.0 | Booking pages, availability (free / busy only), signed cancel / reschedule, meeting + ICS, sequence stop | `booking.enabled` | TaskBoard (event source, as is); **TimeTrack: busy-window reader** (Google / Microsoft) | v1.186 |
 
 Spec 254 allows C, E and G to swap with a neighbour when a customer asks. The Beacon release column is a target that
 assumes one kit minor per Beacon release from v1.176; it is not a commitment.
@@ -193,7 +199,23 @@ created, README only).
 | E2 circulars | **F-2** (needs the verified domain of FR-064) |
 | G reports | Forecast and goals become **G**; velocity, cohorts and deal scoring stay in phase G "reports" later |
 
-### Block A — activities and templates (A-1 0.13.0, A-2 0.14.0)
+### Block A — activities and templates (A-1 0.11.0, A-2 0.15.0)
+
+- **A-1 as built (0.11.0, Beacon tasks T001 and T002; spec in `specs/002-activities/`).** `activities.enabled` (off by
+  default); calls, meetings and e-mails (`Engagement`, its records and attendees, three tables) with log / edit dialogs
+  loaded on demand; the activity feed of a company, contact or deal (notes, activities, host items) filtered by kind and
+  person, keyset pages; fan-out of a contact's activity to its companies and open deals (a company's to its open deals);
+  pinned notes (`activities.max_pinned`, default 1); @mentions with MilkdownEditor as is (candidates: same tenant, may
+  view the record) and NotifyKit 0.3 as is (`CrmNotifierInterface`, NotifyKit bridge); GDPR export / erasure /
+  retention (`timeline_years`) and actor anonymisation; audit entries and after-commit events; the SearchKit group
+  `crm_activities`; the host activity source (`CrmHostActivitySourceInterface`, T002); meetings on TaskBoard's calendar
+  (`Bridge/TaskBoard`, TaskBoard >= 2.24); an authorised `.ics` download of a meeting. Deviations from the plan below:
+  - MailKit has no ICS invite part yet (2.2.2): A-1 ships the download, not invites. The MailKit extension stays the
+    follow-up of the reuse matrix (`text/calendar`, `METHOD:REQUEST` / `CANCEL`, UID, SEQUENCE; MailKit 2.3.0), with
+    `CrmMailSenderInterface` / `CrmOutgoingMail` / `CrmSentMailRef`; `IcsInvite` already carries UID and SEQUENCE.
+  - The HubSpot engagements import (notes, calls, meetings, tasks) is the next slice (HubSpot part 4, after H2).
+  - NotifyKit reminders (Q-254-2) are not part of 0.11.0; they reuse `CrmNotifierInterface` in a later slice.
+  - `ActivityDirection` (in / out) serves calls and e-mails instead of a `CallDirection` of calls only.
 
 - **Reuse (owner rule).**
   - Meetings on a calendar: **reuse TaskBoard as is** (`CalendarEventSourceInterface`, timed events since 2.24;
@@ -240,7 +262,7 @@ created, README only).
 - **HubSpot import (A-1).** Notes, calls, meetings, tasks (→ next actions) with their associations to companies,
   contacts and deals; owners → actors as in H1. Scopes: see [HubSpot scopes](#hubspot-scopes-verification).
 
-### Block B — mailbox sync and tracking (CrmKit 0.15.0)
+### Block B — mailbox sync and tracking (CrmKit 0.16.0)
 
 - **Reuse (owner rule).**
   - Personal Outlook mailboxes: **extend MailKit** with Graph delegated mode (MailKit 1.8 / 1.9 is app-only on shared
@@ -282,7 +304,7 @@ created, README only).
   machine opens apart); no body stored for unlinked mail; a private message stays neutral for other viewers.
 - **HubSpot import.** E-mail engagements: metadata always, bodies only on the organisation's opt-in (FR-101).
 
-### Block C — products, line items and quotes (C-1 0.16.0, C-2 0.17.0)
+### Block C — products, line items and quotes (C-1 0.17.0, C-2 0.18.0)
 
 - **Reuse (owner rule).**
   - Catalogue, line items, MRR / ARR: **new in CrmKit**, because no bundle models products or prices.
@@ -319,7 +341,7 @@ created, README only).
 - **HubSpot import.** C-1 products and line items (deal ↔ line item associations; amount kept as imported); C-2 quotes
   (status mapped; no acceptance record is invented for an imported accepted quote).
 
-### Block D — tickets, SLA and support inbox (D-1 0.18.0, D-2 0.19.0, D-3 later)
+### Block D — tickets, SLA and support inbox (D-1 0.19.0, D-2 0.20.0, D-3 later)
 
 - **Reuse (owner rule).**
   - Ticket record and pipeline: **reuse CrmKit's own funnel engine** (`FunnelKind::Ticket`). ChatKit's support
@@ -360,7 +382,7 @@ created, README only).
 - **HubSpot import (D-1).** Tickets and ticket pipelines (→ ticket funnels and stages, created on confirmation as in
   H2), ticket ↔ company / contact / deal associations.
 
-### Block E — segments and forms (E-1 0.20.0, E-2 0.21.0)
+### Block E — segments and forms (E-1 0.21.0, E-2 0.22.0)
 
 - **Reuse (owner rule).**
   - Static lists: **reuse CrmKit tags** (Q-254-16, Decision 2026-11-23: tags with a `list` flag). A static list is a tag (H1 already maps HubSpot lists to tags);
@@ -397,7 +419,7 @@ created, README only).
 - **HubSpot import.** E-1 lists (static → lists; active → segments where every filter maps to a `SegmentRule`, else a
   static snapshot with a note); form definitions are not imported in v1 (Q-254-3, decided 2026-11-23: `forms` is not a read-only scope).
 
-### Block F — automation, sequences and lead scoring (F-1 0.22.0, F-2 0.23.0, F-3 0.24.0)
+### Block F — automation, sequences and lead scoring (F-1 0.23.0, F-2 0.24.0, F-3 0.25.0)
 
 - **Reuse (owner rule).**
   - Rules engine: **WorkflowBundle was evaluated first.** It persists Symfony Workflow state machines bound to a
@@ -436,7 +458,7 @@ created, README only).
   beyond ids.
 - **HubSpot import.** None (FR-101: workflows, sequences and scores are rebuilt, not imported).
 
-### Block G — forecast, goals and teams (CrmKit 0.25.0)
+### Block G — forecast, goals and teams (CrmKit 0.26.0)
 
 - **Reuse (owner rule).**
   - Forecast categories, overrides and goals: **new in CrmKit**, because no bundle models them.
@@ -452,7 +474,7 @@ created, README only).
 - **Audit before tag (normal).** A rep sees only their own figures without `forecast_view`; amounts by permission.
 - **HubSpot import.** Goals and owners' teams.
 
-### Block H — knowledge base (WikiBundle `published_spaces`; CrmKit bridge in 0.19.0)
+### Block H — knowledge base (WikiBundle `published_spaces`; CrmKit bridge in 0.20.0)
 
 - **Reuse (owner rule).** Knowledge base: **extend WikiBundle** with `published_spaces`, built on the
   "Public links" design Wiki's roadmap already has (off until an admin enables it per space, D-W23; no-index;
@@ -465,7 +487,7 @@ created, README only).
   no-index option. Published articles are not imported from HubSpot (`cms.knowledge_base.articles.read` exists but
   spec 254 does not ask for it).
 
-### Block I — meeting scheduling links (CrmKit 0.26.0)
+### Block I — meeting scheduling links (CrmKit 0.27.0)
 
 - **Reuse (owner rule).**
   - Booking pages: **new in CrmKit**, because no bundle has public booking.
@@ -551,7 +573,7 @@ sequences engine in AutomationKit.
   commit of each block's PR and is built only after H2 (and H3 if open) is merged.
 - **Block A can start** its code (A-1 builder) as soon as **H1 (PR #23) is merged and 0.10.0 is tagged**, i.e. while
   Beacon works on v1.175 (architecture debt); it runs in parallel with H2 / H3 except its HubSpot engagements commit,
-  which waits for H2's merge. Target: A-1 0.13.0 audited and tagged in time for **Beacon v1.176**; A-2 follows in
+  which waits for H2's merge. Target: A-1 (0.11.0 since 2026-11-26) audited and tagged in time for **Beacon v1.176**; A-2 follows in
   v1.176 or v1.177.
 - **Block B** CrmKit side starts after A-1 is merged; MailKit B1 can be built in parallel with A (another repository).
   Gmail (MailKit B2) is built behind its switch and enabled when Google approves.
@@ -584,7 +606,7 @@ processing, native apps.
 with spec 254, 1.0.0 comes once blocks A–D are released and audited, later blocks as additive 1.x minors (Q-254-14, decided 2026-11-23). Status as of 2026-11-23, latest tag v0.8.0.
 
 - **HubSpot import (H1–H3)** is designed in [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md): H1 0.10.0 (PR #23),
-  H2 0.11.0, H3 0.12.0; numbers move up if another release lands first. Owner questions Q-H1..Q-H13 are listed there.
+  H2 0.12.0, H3 0.14.0 (since 2026-11-26: A-1 is 0.11.0 and Z1 0.13.0); numbers move up if another release lands first. Owner questions Q-H1..Q-H13 are listed there.
 - **HubSpot parity (Beacon spec 254)** adds nine blocks A–I after H3 (section below); its owner questions
   Q-254-1..Q-254-14 were decided on 2026-11-23 (all recommendations accepted). Q-254-15 (mailbox OAuth through TimeTrack) and Q-254-16
   (static lists as tags) were decided the same day, as were AutomationKit's Q-AK-1..17.

@@ -2,9 +2,9 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/crm-kit-bundle`  
-**Last audited**: 2026-11-27 (512/512 re-verified; earlier: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped))
+**Last audited**: 2026-11-26 (0.11.0: 570 files, the 58 activity files mapped; earlier 2026-11-27: 512/512 re-verified; earlier: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped))
 
-Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **512** (2026-11-27, 0.10.3; 506 before the 0.10.2-0.10.3 files) (428 PHP files, 26 Doctrine XML
+Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **570** (0.11.0, 58 new activity files; **512** on 2026-11-27, 0.10.3; 506 before the 0.10.2-0.10.3 files) (428 PHP files, 26 Doctrine XML
 mappings, 36 Twig views, 7 translation files, assets and CSS). Sections headed `0.3.0-0.6.0` were added by the
 2026-11-22 refresh, sections headed `0.7.0-0.10.x` by the 2026-11-24 refresh.
 
@@ -712,6 +712,73 @@ Requirement ids are those of [`spec.md`](spec.md#requirements).
 | `src/Resources/views/pipeline/_dialog.html.twig` | FR-UI-003 |
 | `src/Resources/views/pipeline/form.html.twig` | FR-UI-003 |
 
-**Total production sources**: 512 (every file under `src/`; the `0.7.0-0.10.x` sections were added by the 2026-11-24
+### 0.11.0: activities (A-1, [spec 002](../002-activities/spec.md)) (58)
+
+Requirement ids `FR-ACT-*` are those of [`../002-activities/spec.md`](../002-activities/spec.md#requirements). Files
+changed by 0.11.0 keep their rows above (pins and mentions in `NoteService`, housekeeping hooks, the runner's
+lost-savepoint pattern, the configuration tree, routes and service definitions also map to FR-ACT-001 … FR-ACT-014).
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/Engagement/ActivityFeed.php` | FR-ACT-004, FR-ACT-008 |
+| `src/Application/Engagement/EngagementHousekeeping.php` | FR-ACT-011 |
+| `src/Application/Engagement/EngagementService.php` | FR-ACT-002, FR-ACT-003, FR-ACT-012 |
+| `src/Application/Engagement/IcsWriter.php` | FR-ACT-009 |
+| `src/Application/Engagement/MentionNotifier.php` | FR-ACT-006 |
+| `src/Application/Engagement/Mentions.php` | FR-ACT-006 |
+| `src/Application/Engagement/Port/EngagementStoreInterface.php` | FR-ACT-001, FR-ACT-004 |
+| `src/Bridge/NotifyKit/CrmNotifyKitTypes.php` | FR-ACT-006 |
+| `src/Bridge/NotifyKit/NotifyKitCrmNotifier.php` | FR-ACT-006 |
+| `src/Bridge/SearchKit/CrmEngagementSearchDefinition.php` | FR-ACT-010 |
+| `src/Bridge/TaskBoard/CrmMeetingCalendarSource.php` | FR-ACT-008 |
+| `src/Domain/Enum/ActivityDirection.php` | FR-ACT-002 |
+| `src/Domain/Enum/FeedKind.php` | FR-ACT-004 |
+| `src/Domain/Event/EngagementChanged.php` | FR-ACT-012 |
+| `src/Domain/Event/EngagementDeleted.php` | FR-ACT-012 |
+| `src/Domain/Event/EngagementLogged.php` | FR-ACT-012 |
+| `src/Domain/Event/NoteMentioned.php` | FR-ACT-006, FR-ACT-012 |
+| `src/Domain/Event/NotePinned.php` | FR-ACT-005, FR-ACT-012 |
+| `src/Domain/Model/Engagement/Engagement.php` | FR-ACT-001, FR-ACT-002 |
+| `src/Domain/Model/Engagement/EngagementAttendee.php` | FR-ACT-001, FR-ACT-002 |
+| `src/Domain/Model/Engagement/EngagementSubject.php` | FR-ACT-001, FR-ACT-003 |
+| `src/Domain/Port/CrmHostActivitySourceInterface.php` | FR-ACT-007 |
+| `src/Domain/Port/CrmNotifierInterface.php` | FR-ACT-006 |
+| `src/Domain/Port/CrmRecordAudienceInterface.php` | FR-ACT-006 |
+| `src/Domain/Read/AttendeeView.php` | FR-ACT-004 |
+| `src/Domain/Read/EngagementView.php` | FR-ACT-004 |
+| `src/Domain/Read/Feed.php` | FR-ACT-004 |
+| `src/Domain/Read/FeedItem.php` | FR-ACT-004 |
+| `src/Domain/Read/MentionCandidate.php` | FR-ACT-006 |
+| `src/Domain/Service/ActivityFeedInterface.php` | FR-ACT-004 |
+| `src/Domain/Service/EngagementInput.php` | FR-ACT-002 |
+| `src/Domain/Service/EngagementServiceInterface.php` | FR-ACT-002 |
+| `src/Domain/Service/MentionDirectoryInterface.php` | FR-ACT-006 |
+| `src/Domain/Service/PinnedNotesInterface.php` | FR-ACT-005 |
+| `src/Domain/Value/ActivityDuration.php` | FR-ACT-002 |
+| `src/Domain/Value/CallOutcomeKey.php` | FR-ACT-002 |
+| `src/Domain/Value/CrmNotification.php` | FR-ACT-006 |
+| `src/Domain/Value/EmailExcerpt.php` | FR-ACT-002 |
+| `src/Domain/Value/HostActivityItem.php` | FR-ACT-007 |
+| `src/Domain/Value/IcsInvite.php` | FR-ACT-009 |
+| `src/Domain/Value/MeetingAttendee.php` | FR-ACT-002 |
+| `src/Domain/Value/MeetingPlace.php` | FR-ACT-002 |
+| `src/Domain/Value/MeetingSlot.php` | FR-ACT-002 |
+| `src/Domain/Value/MentionRef.php` | FR-ACT-006 |
+| `src/Domain/Value/TimelineFilter.php` | FR-ACT-004 |
+| `src/Domain/Value/TimelineWindow.php` | FR-ACT-004 |
+| `src/Infrastructure/Doctrine/DoctrineEngagementStore.php` | FR-ACT-001, FR-ACT-004, FR-ACT-014 |
+| `src/Infrastructure/Symfony/Controller/ActivityController.php` | FR-ACT-013, FR-ACT-009, FR-ACT-005 |
+| `src/Infrastructure/Symfony/Controller/ActivityRecordBlock.php` | FR-ACT-013, FR-ACT-004 |
+| `src/Infrastructure/Symfony/Form/EngagementType.php` | FR-ACT-013 |
+| `src/Infrastructure/Symfony/Form/FeedFilterType.php` | FR-ACT-013, FR-ACT-004 |
+| `src/Infrastructure/Symfony/Port/NoHostActivitySource.php` | FR-ACT-007, FR-PORT-001 |
+| `src/Infrastructure/Symfony/Port/NullCrmNotifier.php` | FR-ACT-006, FR-PORT-001 |
+| `src/Infrastructure/Symfony/Port/ScopedRecordAudience.php` | FR-ACT-006, FR-PORT-001 |
+| `src/Resources/config/doctrine-activities/Engagement.orm.xml` | FR-ACT-001, FR-ACT-002 |
+| `src/Resources/config/doctrine-activities/EngagementAttendee.orm.xml` | FR-ACT-001, FR-ACT-002 |
+| `src/Resources/config/doctrine-activities/EngagementSubject.orm.xml` | FR-ACT-001, FR-ACT-003 |
+| `src/Resources/views/record/_activities.html.twig` | FR-ACT-013 |
+
+**Total production sources**: 570 (every file under `src/`; 0.11.0 added the 58 activity files; the `0.7.0-0.10.x` sections were added by the 2026-11-24
 refresh, 85 files; 0.10.2 added `ListFilters.php`, `DealListResult.php` and `partials/_empty.html.twig`; 0.10.3 added
 `ImportDialogPageResolver.php`, `import/_primary.html.twig` and `import/hubspot/_mapping_table.html.twig`)

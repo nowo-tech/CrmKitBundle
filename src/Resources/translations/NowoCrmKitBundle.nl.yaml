@@ -281,6 +281,13 @@ timeline:
     empty: Er is nog niets gebeurd.
     open: Openen
 activity:
+    call: "Gesprek vastgelegd door %actor%"
+    meeting: "Afspraak vastgelegd door %actor%"
+    email: "E-mail vastgelegd door %actor%"
+    activity_edited: "Activiteit bewerkt door %actor%"
+    activity_deleted: "Activiteit verwijderd door %actor%"
+    form_submitted: "Formulier verzonden"
+    sms: "Sms vastgelegd door %actor%"
     via_token: "via agent ‹%token%›"
     lifecycle_stage: 'Levenscyclusfase gewijzigd door %actor%'
     next_action_closed: 'Volgende actie afgesloten door %actor%'
@@ -490,6 +497,7 @@ settings:
         merge_keep_days: Dagen dat een samenvoeging de waarden van het samengevoegde record bewaart (1-365)
 search:
     group:
+        activities: "Activiteiten"
         companies: Bedrijven
         contacts: Contacten
         deals: 'Deals'
@@ -751,3 +759,95 @@ lost_reason:
     competitor: 'Concurrent'
     no_decision: 'Geen beslissing'
     other: 'Overig'
+activity_log:
+    title: "Activiteiten"
+    log_call: "Gesprek vastleggen"
+    log_meeting: "Afspraak vastleggen"
+    log_email: "E-mail vastleggen"
+    edit_call: "Gesprek bewerken"
+    edit_meeting: "Afspraak bewerken"
+    edit_email: "E-mail bewerken"
+    save: "Opslaan"
+    logged_call: "Gesprek vastgelegd."
+    logged_meeting: "Afspraak vastgelegd."
+    logged_email: "E-mail vastgelegd."
+    saved: "Activiteit opgeslagen."
+    deleted: "Activiteit verwijderd."
+    edit: "Bewerken"
+    delete: "Verwijderen"
+    delete_confirm: "Deze activiteit verwijderen? Dit kan niet ongedaan worden gemaakt."
+    ics: "Toevoegen aan agenda (.ics)"
+    pin: "Vastpinnen"
+    unpin: "Losmaken"
+    pinned: "Notitie vastgepind."
+    unpinned: "Notitie losgemaakt."
+    empty: "Nog geen activiteiten."
+    empty_filtered: "Geen activiteiten passen bij het filter."
+    older: "Oudere activiteiten tonen"
+    until: "tot %time%"
+    minutes: "%count% min"
+    cancelled: "Geannuleerd"
+    attendees: "Deelnemers"
+    logged_on: "Vastgelegd bij"
+    kind:
+        note: "Notitie"
+        call: "Gesprek"
+        meeting: "Afspraak"
+        email: "E-mail"
+        host: "Update"
+    direction:
+        in: "Inkomend"
+        out: "Uitgaand"
+    filter:
+        kind: "Soort"
+        person: "Persoon"
+        any_kind: "Alle soorten"
+        anybody: "Iedereen"
+        apply: "Filteren"
+        clear: "Wissen"
+        kind_note: "Notities"
+        kind_call: "Gesprekken"
+        kind_meeting: "Afspraken"
+        kind_email: "E-mails"
+        kind_host: "Updates"
+    form:
+        meeting_title: "Titel"
+        starts_at: "Begint"
+        ends_at: "Eindigt"
+        timezone: "Tijdzone"
+        place: "Plaats of videolink"
+        members: "Teamleden"
+        contacts: "Contactpersonen"
+        notes: "Notities"
+        cancelled: "Geannuleerd"
+        occurred_at: "Wanneer"
+        direction: "Richting"
+        outcome: "Resultaat"
+        no_outcome: "Geen resultaat"
+        duration: "Duur (minuten)"
+        call_title: "Samenvatting"
+        subject: "Onderwerp"
+        excerpt: "Fragment (tot 500 tekens)"
+activity_error:
+    kind: "Het soort van een activiteit kan niet veranderen."
+    attendees_limit: "Een afspraak heeft hoogstens %max% deelnemers."
+    attendee_unknown: "Kies teamleden en contactpersonen die u kunt zien."
+    time: "Voer een geldige datum en tijd in."
+    title: "Een titel heeft tot 200 tekens tekst."
+    excerpt: "Een fragment heeft tot 500 tekens platte tekst."
+    outcome: "Onbekend resultaat."
+    duration: "Een duur ligt tussen 0 en 1440 minuten."
+    timezone: "Kies een tijdzone."
+    slot: "Een afspraak eindigt na het begin, hoogstens 7 dagen later."
+    place: "Een plaats heeft tot 200 tekens, of is een https-link."
+call_outcome:
+    connected: "Bereikt"
+    left_voicemail: "Voicemail ingesproken"
+    no_answer: "Geen antwoord"
+    busy: "In gesprek"
+    wrong_number: "Verkeerd nummer"
+notify:
+    mention:
+        title: "%actor% heeft u genoemd in een CRM-notitie"
+    category:
+        crm: "CRM"

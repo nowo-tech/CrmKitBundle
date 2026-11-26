@@ -34,6 +34,11 @@
   - [Steps and rules](#steps-and-rules)
   - [Background runs (Messenger)](#background-runs-messenger)
 - [The API (0.3.0)](#the-api-030)
+- [Activities (0.11.0)](#activities-0110)
+  - [Logging and the feed](#logging-and-the-feed)
+  - [Pinned notes and @mentions](#pinned-notes-and-mentions)
+  - [Host activity source](#host-activity-source)
+  - [Meetings: TaskBoard's calendar and .ics](#meetings-taskboards-calendar-and-ics)
 - [SearchKit](#searchkit)
 - [UiKit context menus and focus mode](#uikit-context-menus-and-focus-mode)
 
@@ -1068,12 +1073,109 @@ The `Api\Operation` services and the `/crm/v1` JSON API are off by default. [API
   that every list, search, label and timeline hides records a `nowo_crm_kit.record_access_check` listener denies;
 - the setup for a plain Symfony host and for an MCP host.
 
+## Activities (0.11.0)
+
+Opt in with `activities.enabled: true` ([CONFIGURATION.md](CONFIGURATION.md#activities-0110)) and create the three
+tables (UPGRADING "To 0.11.0"). Everything below follows the CRM's gate: tenant, feature gate, actor, the permission on
+the record (404 / 403), deny by default; every service is stateless (worker mode).
+
+### Logging and the feed
+
+```php
+use Nowo\CrmKitBundle\Domain\Enum\ActivityDirection;
+use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
+use Nowo\CrmKitBundle\Domain\Enum\FeedKind;
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Service\ActivityFeedInterface;
+use Nowo\CrmKitBundle\Domain\Service\EngagementInput;
+use Nowo\CrmKitBundle\Domain\Service\EngagementServiceInterface;
+use Nowo\CrmKitBundle\Domain\Value\ActorRef;
+use Nowo\CrmKitBundle\Domain\Value\MeetingAttendee;
+use Nowo\CrmKitBundle\Domain\Value\RecordId;
+use Nowo\CrmKitBundle\Domain\Value\TimelineFilter;
+use Nowo\CrmKitBundle\Domain\Value\TimelineWindow;
+
+$id = $engagements->log(SubjectType::Contact, $contactId, new EngagementInput(
+    ActivityKind::Call, new DateTimeImmutable('now'), 'Follow-up', 'Wants a demo', ActivityDirection::Out, 'connected', 12,
+));
+$engagements->log(SubjectType::Company, $companyId, new EngagementInput(
+    ActivityKind::Meeting, $start, 'Quarterly review', endsAt: $end, timezone: 'Europe/Madrid',
+    place: 'https://meet.example.test/q', attendees: [MeetingAttendee::member(new ActorRef('ana')), MeetingAttendee::contact(new RecordId($contactId))],
+));
+$engagements->edit($id, $input, $version);   // 409 crm_record_stale on an old version
+$engagements->delete($id);
+
+$page = $feed->feed(SubjectType::Company, $companyId, new TimelineFilter([FeedKind::Call, FeedKind::Meeting], new ActorRef('ana')), TimelineWindow::after($cursor, 30));
+foreach ($page->items as $item) { /* $item->note, $item->engagement or $item->host */ }
+$next = $page->next;   // the cursor of the next page, or null
+```
+
+- `edit` on the record to log; `manage` too to change or delete someone else's activity. Input errors come back per
+  field (`InvalidInputException::$errors`: `occurred_at`, `ends_at`, `timezone`, `title`, `body`, `direction`,
+  `outcome`, `duration`, `place`, `attendees`, `kind`).
+- A contact's activity is associated, when it is logged, with the contact's companies and open deals (a company's with
+  its open deals); it shows on their feeds too, but only to viewers who may view the contact (the primary record).
+- Timeline entries `call`, `meeting`, `email`, `activity_edited`, `activity_deleted`; audit `crm.activity.logged`,
+  `crm.activity.edited`, `crm.activity.deleted`; events `EngagementLogged`, `EngagementChanged`, `EngagementDeleted`
+  (after the commit; `CrmKitEvents::ENGAGEMENT_*`).
+
+### Pinned notes and @mentions
+
+`PinnedNotesInterface::pin($noteId, true, $version)` pins a note (`edit` on the record); with `activities.max_pinned`
+(default 1) the oldest pinned notes beyond the limit are unpinned in the same write (`NotePinned`).
+
+With MilkdownEditor (>= 1.19) installed, the note field of the 360° page is MilkdownEditor's, with
+`suggestions['@']` = `GET <crm>/{companies|contacts}/{id}/mentions?q=` (`[{id: <handle>, label: <name>}]`, at most 10)
+and `user_title_url` = `.../mentions/names?handles=a,b` (`mention_display: name`). Candidates are the tenant's members
+(`CrmActorDirectoryInterface::owners()`) whose name or e-mail contains the query and who may view the record
+(`CrmRecordAudienceInterface`, see CONFIGURATION). A handle is `u` + 24 hexadecimal characters of an HMAC (kernel
+secret, tenant, actor): the note's text never holds an id or an address, and the page shows `@Name`.
+
+When a note is saved, the members newly mentioned in it (not the author, at most `mentions.max_per_note`, re-checked
+inside the write) are announced after the commit (`NoteMentioned`) and handed to `CrmNotifierInterface`. With
+NotifyKit (>= 0.3) installed the bridge sends a personal notification of type `crm.mention` (category `crm`, title
+`notify.mention.title` of the `NowoCrmKitBundle` domain: "‹actor› mentioned you in a CRM note") with the record page
+as its URL, no params and the mentioned people as `involved`. It never carries the record's name or the note's text;
+opening it runs the page's own access check.
+
+### Host activity source
+
+```php
+use Nowo\CrmKitBundle\Domain\Port\CrmHostActivitySourceInterface;
+use Nowo\CrmKitBundle\Domain\Value\HostActivityItem;
+
+final class TasksOnTheFeed implements CrmHostActivitySourceInterface
+{
+    public function items(TenantRef $tenant, ActorRef $viewer, SubjectRef $subject, TimelineWindow $window): array
+    {
+        // Only what $viewer may see, of this record, newest first, before $window->before (at most $window->limit).
+        return [new HostActivityItem($subject, 'task-42', 'Send the contract', $doneAt, '/tasks/42', new ActorRef('ana'), 'tabler:checkbox')];
+    }
+}
+```
+
+`activities.host_source: App\Crm\TasksOnTheFeed`. The kit drops any item of another record, outside the page or of
+another person when the feed is filtered; titles are printed escaped, URLs linked only when local or https.
+
+### Meetings: TaskBoard's calendar and .ics
+
+With TaskBoard (>= 2.24) installed and `activities.taskboard_calendar` (default), the source `crm-meetings` puts on
+a board's calendar the meetings the signed-in person logged or attends (not cancelled) on records they may view,
+read-only, linked to the record's feed. It runs the CRM's own gate for the session; a board whose tenant key is not
+the CRM's tenant gets nothing (a board without tenancy gets the CRM tenant's meetings).
+
+Every meeting has "Add to calendar (.ics)": `GET <crm>/activities/{id}/meeting.ics` (`view` on its record),
+`METHOD:PUBLISH`, UID `<id>@<host>`, a SEQUENCE that moves when its time, place, title or cancellation changes,
+`STATUS:CANCELLED` once cancelled, no notes and no addresses. Invites by e-mail (`METHOD:REQUEST` / `CANCEL`) wait for
+MailKit's invite part (MailKit 2.3, follow-up).
+
 ## SearchKit
 
 With `nowo-tech/search-kit-bundle` **^1.9** installed (it needs PHP >= 8.3), `ui.enabled` and `search.enabled`
 (default), the bundle registers three groups on SearchKit's entity provider base (`EntitySearchDefinition`, tag
-`nowo_search_kit.entity_definition`): `crm_companies` (priority 60), `crm_contacts` (59) and, with
-`pipeline.enabled`, `crm_deals` (58). On every search each group:
+`nowo_search_kit.entity_definition`): `crm_companies` (priority 60), `crm_contacts` (59), with
+`pipeline.enabled` `crm_deals` (58) and, with `activities.enabled` (0.11.0), `crm_activities` (57: titles of calls,
+meetings and e-mails whose company or contact is active and visible; sensitive, no recents, opens the record's feed). On every search each group:
 
 - resolves the tenant and the feature gate of the CRM and checks `view` (any refusal: no group, no count, no hint);
 - searches only rows of that tenant, in SQL: active companies (name, legal name, tax id key, website domain, e-mail),

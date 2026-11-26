@@ -12,6 +12,7 @@ use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormTypeInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
@@ -32,7 +33,12 @@ final class NoteType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $this->withBuilder($builder, function () use ($options): void {
-            $this->addTypedField('body', TextareaType::class, ['label' => 'note.form.body', 'attr' => ['maxlength' => 10000, 'rows' => 4]]);
+            // 0.11.0: with @mentions, MilkdownEditor's field (`body_type`) with the CRM's candidate URLs (`body_options`).
+            /** @var class-string<FormTypeInterface<mixed>> $type */
+            $type = $options['body_type'];
+            /** @var array<string, mixed> $extra */
+            $extra = $options['body_options'];
+            $this->addTypedField('body', $type, ['label' => 'note.form.body', 'attr' => ['maxlength' => 10000, 'rows' => 4]] + $extra);
             $this->addTypedField('pinned', CheckboxType::class, ['attr' => ['class' => ''], 'label' => 'note.form.pinned', 'required' => false]);
             if ($options['versioned'] === true) {
                 $this->addTypedField('version', HiddenType::class, []);
@@ -52,7 +58,11 @@ final class NoteType extends AbstractType
             'allow_extra_fields' => false,
             'translation_domain' => TranslationDomain::NAME,
             'versioned'          => false,
+            'body_type'          => TextareaType::class,
+            'body_options'       => [],
         ]);
+        $resolver->setAllowedTypes('body_type', 'string');
+        $resolver->setAllowedTypes('body_options', 'array');
     }
 
     /**

@@ -2,7 +2,8 @@
   The 360° page of a company or contact (contract section 9). Variables: page (ShowPage), record (RecordView),
   segment, can_edit, can_manage, can_merge, forms (note, notes[id], tags, link, affiliation, affiliations[id], consent), buttons (notes, links,
   affiliations, primary_contact: View\Action per affiliation id), back (return params), notes, timeline, links, panels, duplicates, consents,
-  pipeline (0.3.0: deals, lifecycle, next actions; null while the funnels are off).
+  pipeline (0.3.0: deals, lifecycle, next actions; null while the funnels are off), activities (0.11.0: the activity feed,
+  the pin buttons and the notes' text with mentions as names; null while `activities.enabled` is off).
 #}
 {% extends '@NowoUiKit/page/show.html.twig' %}
 
@@ -99,8 +100,9 @@
             {% if notes is empty %}{{ include(nowo_ui_partial('empty', _b), {message: 'note.empty'|trans({}, _d), region: 'empty', bundle: _b}, false) }}{% endif %}
             {% for note in notes %}
                 <article class="crm-kit-note" data-testid="crm-note"{% if note.pinned %} data-pinned="1"{% endif %}>
-                    <p>{{ note.body|nl2br }}</p>
+                    <p>{{ (activities is not null ? activities.texts[note.id] ?? note.body : note.body)|nl2br }}</p>
                     <p><small>{{ note.authorName ?? note.authorId ?? '—' }} · {{ note.createdAt|date('Y-m-d H:i') }}{% if note.pinned %} · {{ 'note.pinned'|trans({}, _d) }}{% endif %}</small></p>
+                    {% if activities is not null and activities.pins[note.id] is defined %}{{ include(nowo_ui_partial('action', _b), {action: activities.pins[note.id], context: 'row', bundle: _b}) }}{% endif %}
                     {% if forms.notes[note.id] is defined %}
                         <details><summary>{{ 'note.edit'|trans({}, _d) }}</summary>
                             {{ include('@NowoCrmKit/_form.html.twig', {form: forms.notes[note.id], title: null, submit: 'note.save', action: path('nowo_crm_kit_note_edit', {id: note.id}|merge(back)), testid: 'crm-note-edit', variant: 'btn_secondary'}) }}
@@ -113,6 +115,10 @@
     </section>
     {% if forms.note is defined %}
         {{ include('@NowoCrmKit/_form.html.twig', {form: forms.note, title: 'note.add', submit: 'note.save', action: path('nowo_crm_kit_note_add', {type: segment, id: record.id}), testid: 'crm-note-form'}) }}
+    {% endif %}
+
+    {% if activities is not null %}
+        {{ include('@NowoCrmKit/record/_activities.html.twig') }}
     {% endif %}
 
     {% if record.type.value == 'contact' %}

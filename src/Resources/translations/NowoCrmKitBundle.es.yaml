@@ -281,6 +281,13 @@ timeline:
     empty: Aún no ha ocurrido nada.
     open: Abrir
 activity:
+    call: "Llamada registrada por %actor%"
+    meeting: "Reunión registrada por %actor%"
+    email: "Correo registrado por %actor%"
+    activity_edited: "Actividad editada por %actor%"
+    activity_deleted: "Actividad eliminada por %actor%"
+    form_submitted: "Formulario enviado"
+    sms: "SMS registrado por %actor%"
     via_token: "vía agente ‹%token%›"
     lifecycle_stage: 'Etapa del ciclo de vida cambiada por %actor%'
     next_action_closed: 'Próxima acción cerrada por %actor%'
@@ -490,6 +497,7 @@ settings:
         merge_keep_days: Días que una fusión conserva los valores del registro fusionado (1-365)
 search:
     group:
+        activities: "Actividades"
         companies: Empresas
         contacts: Contactos
         deals: 'Oportunidades'
@@ -751,3 +759,95 @@ lost_reason:
     competitor: 'Competencia'
     no_decision: 'Sin decisión'
     other: 'Otro'
+activity_log:
+    title: "Actividades"
+    log_call: "Registrar llamada"
+    log_meeting: "Registrar reunión"
+    log_email: "Registrar correo"
+    edit_call: "Editar llamada"
+    edit_meeting: "Editar reunión"
+    edit_email: "Editar correo"
+    save: "Guardar"
+    logged_call: "Llamada registrada."
+    logged_meeting: "Reunión registrada."
+    logged_email: "Correo registrado."
+    saved: "Actividad guardada."
+    deleted: "Actividad eliminada."
+    edit: "Editar"
+    delete: "Eliminar"
+    delete_confirm: "¿Eliminar esta actividad? No se puede deshacer."
+    ics: "Añadir al calendario (.ics)"
+    pin: "Fijar"
+    unpin: "Desfijar"
+    pinned: "Nota fijada."
+    unpinned: "Nota desfijada."
+    empty: "Todavía no hay actividades."
+    empty_filtered: "Ninguna actividad coincide con el filtro."
+    older: "Ver actividades anteriores"
+    until: "hasta %time%"
+    minutes: "%count% min"
+    cancelled: "Cancelada"
+    attendees: "Asistentes"
+    logged_on: "Registrada en"
+    kind:
+        note: "Nota"
+        call: "Llamada"
+        meeting: "Reunión"
+        email: "Correo"
+        host: "Novedad"
+    direction:
+        in: "Entrante"
+        out: "Saliente"
+    filter:
+        kind: "Tipo"
+        person: "Persona"
+        any_kind: "Todos los tipos"
+        anybody: "Cualquiera"
+        apply: "Filtrar"
+        clear: "Limpiar"
+        kind_note: "Notas"
+        kind_call: "Llamadas"
+        kind_meeting: "Reuniones"
+        kind_email: "Correos"
+        kind_host: "Novedades"
+    form:
+        meeting_title: "Título"
+        starts_at: "Empieza"
+        ends_at: "Termina"
+        timezone: "Zona horaria"
+        place: "Lugar o enlace de videollamada"
+        members: "Miembros del equipo"
+        contacts: "Contactos"
+        notes: "Notas"
+        cancelled: "Cancelada"
+        occurred_at: "Cuándo"
+        direction: "Dirección"
+        outcome: "Resultado"
+        no_outcome: "Sin resultado"
+        duration: "Duración (minutos)"
+        call_title: "Resumen"
+        subject: "Asunto"
+        excerpt: "Extracto (hasta 500 caracteres)"
+activity_error:
+    kind: "El tipo de una actividad no se puede cambiar."
+    attendees_limit: "Una reunión tiene como máximo %max% asistentes."
+    attendee_unknown: "Elige miembros del equipo y contactos que puedas ver."
+    time: "Introduce una fecha y hora válidas."
+    title: "Un título tiene hasta 200 caracteres de texto."
+    excerpt: "Un extracto tiene hasta 500 caracteres de texto plano."
+    outcome: "Resultado desconocido."
+    duration: "Una duración va de 0 a 1440 minutos."
+    timezone: "Elige una zona horaria."
+    slot: "Una reunión termina después de empezar, como mucho 7 días más tarde."
+    place: "Un lugar tiene hasta 200 caracteres, o es un enlace https."
+call_outcome:
+    connected: "Contactado"
+    left_voicemail: "Mensaje en el buzón"
+    no_answer: "Sin respuesta"
+    busy: "Ocupado"
+    wrong_number: "Número equivocado"
+notify:
+    mention:
+        title: "%actor% te ha mencionado en una nota del CRM"
+    category:
+        crm: "CRM"

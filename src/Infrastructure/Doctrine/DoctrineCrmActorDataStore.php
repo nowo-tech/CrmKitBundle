@@ -17,6 +17,8 @@ use Nowo\CrmKitBundle\Domain\Model\Company;
 use Nowo\CrmKitBundle\Domain\Model\Consent;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
 use Nowo\CrmKitBundle\Domain\Model\CrmSettings;
+use Nowo\CrmKitBundle\Domain\Model\Engagement\Engagement;
+use Nowo\CrmKitBundle\Domain\Model\Engagement\EngagementAttendee;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
 use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
@@ -73,6 +75,9 @@ final readonly class DoctrineCrmActorDataStore implements CrmActorDataStoreInter
         'merge.actor'          => [MergeRecord::class, 'actor_id', 'id', false, null],
         'merge.owner'          => [MergeRecord::class, 'snapshot', 'id', false, 'owner'],
         'settings.updated_by'  => [CrmSettings::class, 'updated_by_id', 'tenant_id', true, null],
+        // 0.11.0 (activities.enabled): who logged an activity, the members of a meeting.
+        'engagement.author'         => [Engagement::class, 'author_id', 'id', true, null],
+        'engagement_attendee.actor' => [EngagementAttendee::class, 'actor_id', 'id', false, null],
     ];
 
     /**

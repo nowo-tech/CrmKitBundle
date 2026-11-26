@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Application\Pipeline;
 
 use DateTimeImmutable;
+use Nowo\CrmKitBundle\Application\Engagement\EngagementHousekeeping;
 use Nowo\CrmKitBundle\Application\Pipeline\Port\PipelineStoreInterface;
 use Nowo\CrmKitBundle\Application\PlanCounter;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
@@ -36,7 +37,7 @@ final readonly class PipelineHousekeeping
     /**
      * Wires the collaborators.
      */
-    public function __construct(private PipelineStoreInterface $store, private CrmStoreInterface $crm, private PlanCounter $counter)
+    public function __construct(private PipelineStoreInterface $store, private CrmStoreInterface $crm, private PlanCounter $counter, private ?EngagementHousekeeping $engagements = null)
     {
     }
 
@@ -49,6 +50,8 @@ final readonly class PipelineHousekeeping
         foreach ($this->crm->allActivities($tenant, SubjectType::Deal, $deal->getId()) as $row) {
             $this->crm->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
         }
+        // 0.11.0: the activities associated with the deal stop pointing at it.
+        $this->engagements?->forgetRecord($tenant, SubjectType::Deal, $deal->getId());
         $this->crm->remove($deal); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
     }
 

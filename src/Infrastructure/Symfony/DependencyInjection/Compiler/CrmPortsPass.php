@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler;
 
 use LogicException;
 use Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox;
+use Nowo\CrmKitBundle\Bridge\NotifyKit\NotifyKitCrmNotifier;
 use Nowo\CrmKitBundle\Bridge\OutboundUrlGuard\GuardedHubSpotRequestOptions;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\CrmTaskBoardUserResolverInterface;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\TaskBoardCrmTaskPort;
@@ -13,7 +14,10 @@ use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorEmailLookupInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostActivitySourceInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmNotifierInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmRecordAudienceInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
@@ -24,6 +28,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefiniti
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistry;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
+use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiReadOperations;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiTaskOperations;
@@ -100,8 +105,31 @@ final class CrmPortsPass implements CompilerPassInterface
         if ($container->getParameter($p . 'import.hubspot.enabled') === true) {
             $this->hubspot($container);
         }
+        if ($container->hasParameter($p . 'activities.enabled') && $container->getParameter($p . 'activities.enabled') === true) {
+            $this->activities($container);
+        }
         if ($container->getParameter($p . 'import.messenger.enabled') === true && !$container->has('messenger.default_bus')) {
             throw new LogicException('nowo_crm_kit.import.messenger.enabled needs symfony/messenger with a default bus (framework.messenger).');
+        }
+    }
+
+    /**
+     * The logged activities' ports (0.11.0): `activities.host_source`, `activities.audience` and `activities.notifier`
+     * replace the defaults; without a notifier, the NotifyKit bridge when NotifyKit's notifier is defined.
+     */
+    private function activities(ContainerBuilder $container): void
+    {
+        $p = ServiceDefinitions::P;
+        foreach (['host_source' => CrmHostActivitySourceInterface::class, 'audience' => CrmRecordAudienceInterface::class, 'notifier' => CrmNotifierInterface::class] as $key => $interface) {
+            $id = $container->getParameter($p . 'activities.' . $key);
+            if (is_string($id) && $id !== '') {
+                $container->setAlias($interface, $id);
+            }
+        }
+        $notifier = $container->getParameter($p . 'activities.notifier');
+        if ((!is_string($notifier) || $notifier === '') && interface_exists(NotifierInterface::class) && $container->has(NotifierInterface::class)) {
+            $container->setDefinition(NotifyKitCrmNotifier::class, (new Definition(NotifyKitCrmNotifier::class))->setArguments([new Reference(NotifierInterface::class), new Reference('router'), $container->getParameter($p . 'activities.notify_kit.recipient_type')]));
+            $container->setAlias(CrmNotifierInterface::class, NotifyKitCrmNotifier::class);
         }
     }
 

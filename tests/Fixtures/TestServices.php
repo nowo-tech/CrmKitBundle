@@ -7,12 +7,17 @@ namespace Nowo\CrmKitBundle\Tests\Fixtures;
 use Nowo\CrmKitBundle\Domain\Event\ActorAnonymised;
 use Nowo\CrmKitBundle\Domain\Event\ConsentRecorded;
 use Nowo\CrmKitBundle\Domain\Event\ContactErased;
+use Nowo\CrmKitBundle\Domain\Event\EngagementChanged;
+use Nowo\CrmKitBundle\Domain\Event\EngagementDeleted;
+use Nowo\CrmKitBundle\Domain\Event\EngagementLogged;
 use Nowo\CrmKitBundle\Domain\Event\HostLinkAdded;
 use Nowo\CrmKitBundle\Domain\Event\HostLinkRemoved;
 use Nowo\CrmKitBundle\Domain\Event\HubSpotConnected;
 use Nowo\CrmKitBundle\Domain\Event\HubSpotDisconnected;
 use Nowo\CrmKitBundle\Domain\Event\ImportCompleted;
 use Nowo\CrmKitBundle\Domain\Event\NoteAdded;
+use Nowo\CrmKitBundle\Domain\Event\NoteMentioned;
+use Nowo\CrmKitBundle\Domain\Event\NotePinned;
 use Nowo\CrmKitBundle\Domain\Event\RecordCreated;
 use Nowo\CrmKitBundle\Domain\Event\RecordPurged;
 use Nowo\CrmKitBundle\Domain\Event\RecordRestored;
@@ -42,7 +47,7 @@ final class TestServices
 
     public const USERS = ['ana' => ['password' => 'x', 'roles' => ['ROLE_USER']], 'root' => ['password' => 'x', 'roles' => ['ROLE_ADMIN']], 'leo' => ['password' => 'x', 'roles' => ['ROLE_USER']]];
 
-    public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, RecordsPurged::class, ActorAnonymised::class, TagsChanged::class, RolesChanged::class, HostLinkAdded::class, HostLinkRemoved::class, HubSpotConnected::class, HubSpotDisconnected::class];
+    public const EVENTS = [RecordCreated::class, RecordUpdated::class, RecordTrashed::class, RecordRestored::class, RecordPurged::class, RecordsMerged::class, ContactErased::class, NoteAdded::class, ConsentRecorded::class, ImportCompleted::class, RecordsPurged::class, ActorAnonymised::class, TagsChanged::class, RolesChanged::class, HostLinkAdded::class, HostLinkRemoved::class, HubSpotConnected::class, HubSpotDisconnected::class, EngagementLogged::class, EngagementChanged::class, EngagementDeleted::class, NotePinned::class, NoteMentioned::class];
 
     /** The bundle configuration that points every port at the test services. */
     public const PORTS = [
@@ -71,6 +76,7 @@ final class TestServices
             ->tag('kernel.event_listener', ['event' => 'nowo_crm_kit.record_access_check', 'method' => 'onRecord'])
             ->tag('kernel.event_listener', ['event' => 'nowo_crm_kit.record_visibility', 'method' => 'onVisibility']);
         $s->set('test.task_port', TestTaskPort::class)->public();
+        $s->set('test.activities', TestActivitySources::class)->public();
         $s->set('test.queries', QueryLog::class)->public();
         $s->set('test.query_counter', QueryCounter::class)->args([service('test.queries')])->tag('doctrine.middleware');
         $s->set('test.clock', MockClock::class)->args(['2026-11-18 10:00:00', 'UTC'])->public();

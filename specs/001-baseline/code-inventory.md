@@ -2,9 +2,9 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/crm-kit-bundle`  
-**Last audited**: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped)
+**Last audited**: 2026-11-27 (512/512 re-verified; earlier: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped))
 
-Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **506** (428 PHP files, 26 Doctrine XML
+Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **512** (2026-11-27, 0.10.3; 506 before the 0.10.2-0.10.3 files) (428 PHP files, 26 Doctrine XML
 mappings, 36 Twig views, 7 translation files, assets and CSS). Sections headed `0.3.0-0.6.0` were added by the
 2026-11-22 refresh, sections headed `0.7.0-0.10.x` by the 2026-11-24 refresh.
 

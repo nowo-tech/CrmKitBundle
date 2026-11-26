@@ -44,6 +44,10 @@ updates:
     labels:
       - "dependencies"
       - "javascript"
+    ignore:
+      # Wait until typescript-eslint supports TS 7 (it rejects it: "typescript-eslint does not support TS 7.0").
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       build:
         patterns:

@@ -15,8 +15,10 @@ use Symfony\Component\Mime\Email;
 
 /**
  * The default {@see CrmMailSenderInterface} (0.13.0): a plain-text message through Symfony Mailer, which MailKit
- * decorates (From and Reply-To from MailKit's settings when the message has none, the sent-mail log, its tag). The
- * person's own address, when the host shares it, is the Reply-To. Stateless.
+ * decorates (From and Reply-To from MailKit's settings when the message has none, the sent-mail log). The log tag is
+ * the tenant's ({@see CrmMailLogTag}, audit ZDI-M1), so the contact's erasure and export reach only the rows this
+ * tenant's CRM sent; the template key goes to MailKit's tracking policy as the template id. The person's own address,
+ * when the host shares it, is the Reply-To. Stateless.
  */
 final readonly class MailKitCrmMailSender implements CrmMailSenderInterface
 {
@@ -39,8 +41,9 @@ final readonly class MailKitCrmMailSender implements CrmMailSenderInterface
         if ($mail->replyTo instanceof EmailAddress) {
             $email->replyTo(new Address($mail->replyTo->value));
         }
+        MailHeaders::tag($email, CrmMailLogTag::of($mail->tenant));
         if ($mail->tag !== null) {
-            MailHeaders::tag($email, $mail->tag);
+            MailHeaders::template($email, $mail->tag);
         }
         $this->mailer->send($email);
 

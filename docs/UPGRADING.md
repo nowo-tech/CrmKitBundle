@@ -40,10 +40,10 @@ No BC break: everything new is behind `templates.enabled` (default `false`); wit
 
 1. Keep `activities.enabled: true` (a sent e-mail is logged as an `email` activity; without it the configuration is
    refused).
-2. Install MailKit >= 2.7 and turn its stored templates on (its UPGRADING "To 2.7.0": the `mail_kit_template` table):
+2. Install MailKit >= 2.8 and turn its stored templates on (its UPGRADING "To 2.7.0": the `mail_kit_template` table):
 
    ```bash
-   composer require nowo-tech/mail-kit-bundle:^2.7
+   composer require nowo-tech/mail-kit-bundle:^2.8
    ```
 
    ```yaml

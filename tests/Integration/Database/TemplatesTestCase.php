@@ -11,7 +11,8 @@ use Nowo\CrmKitBundle\Domain\Service\MailComposerInterface;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailer;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailTemplates;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestSentMailLog;
-use Nowo\MailKitBundle\Log\SentMailPersonalDataEraserInterface;
+use Nowo\MailKitBundle\Log\SentMailTaggedPersonalDataEraserInterface;
+use Nowo\MailKitBundle\Log\SentMailTaggedPersonalDataExporterInterface;
 use Nowo\MailKitBundle\Template\Service\TemplateLibraryInterface;
 use Nowo\MailKitBundle\Template\Service\TemplateRendererInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
@@ -44,7 +45,8 @@ abstract class TemplatesTestCase extends CrmTestCase
             $s->alias(TemplateLibraryInterface::class, 'test.mail_templates')->public();
             $s->alias(TemplateRendererInterface::class, 'test.mail_templates')->public();
             $s->set('test.sent_mail_log', TestSentMailLog::class)->public();
-            $s->alias(SentMailPersonalDataEraserInterface::class, 'test.sent_mail_log')->public();
+            $s->alias(SentMailTaggedPersonalDataEraserInterface::class, 'test.sent_mail_log')->public();
+            $s->alias(SentMailTaggedPersonalDataExporterInterface::class, 'test.sent_mail_log')->public();
         });
     }
 

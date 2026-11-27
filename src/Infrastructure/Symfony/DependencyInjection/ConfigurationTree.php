@@ -40,6 +40,9 @@ final class ConfigurationTree
     /** MailKit's template library (a literal: MailKit is optional; 0.13.0). */
     public const MAIL_KIT_LIBRARY = 'Nowo\\MailKitBundle\\Template\\Service\\TemplateLibraryInterface';
 
+    /** MailKit 2.8's tag-scoped sent-mail log erasure port (audit ZDI-M1): its presence marks MailKit >= 2.8. */
+    public const MAIL_KIT_TAGGED_ERASER = 'Nowo\\MailKitBundle\\Log\\SentMailTaggedPersonalDataEraserInterface';
+
     /** Built-in party roles (`distributor` is translated too, but opt-in). */
     public const DEFAULT_ROLES = ['customer', 'supplier', 'partner'];
 
@@ -179,7 +182,7 @@ final class ConfigurationTree
         self::templates($children);
         self::api($children);
         $root->validate()->ifTrue(static fn (array $v): bool => self::on($v, 'templates') && !self::on($v, 'activities'))->thenInvalid('nowo_crm_kit.templates.enabled needs activities.enabled: a sent e-mail is logged as an email activity.')->end();
-        $root->validate()->ifTrue(static fn (array $v): bool => self::on($v, 'templates') && !interface_exists(self::MAIL_KIT_LIBRARY))->thenInvalid('nowo_crm_kit.templates.enabled needs nowo-tech/mail-kit-bundle >= 2.7 with nowo_mail_kit.templates.enabled: composer require nowo-tech/mail-kit-bundle.')->end();
+        $root->validate()->ifTrue(static fn (array $v): bool => self::on($v, 'templates') && (!interface_exists(self::MAIL_KIT_LIBRARY) || !interface_exists(self::MAIL_KIT_TAGGED_ERASER)))->thenInvalid('nowo_crm_kit.templates.enabled needs nowo-tech/mail-kit-bundle >= 2.8 with nowo_mail_kit.templates.enabled: composer require nowo-tech/mail-kit-bundle.')->end();
         $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !class_exists(HttpClient::class))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs symfony/http-client: composer require symfony/http-client.')->end();
         $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !self::hasSecretBox($v))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs a secret box: set secrets.box, or secrets.keys with secrets.current_key one of them.')->end();
         foreach (self::LATER_PHASES as $phase => $release) {
@@ -396,12 +399,12 @@ final class ConfigurationTree
     }
 
     /**
-     * The e-mail templates and *Write e-mail* (0.13.0, Beacon spec 254 A-2): stored by MailKit (>= 2.7, optional), the
+     * The e-mail templates and *Write e-mail* (0.13.0, Beacon spec 254 A-2): stored by MailKit (>= 2.8, optional), the
      * CRM's placeholders, consent classification and sending.
      */
     private static function templates(NodeBuilder $children): void
     {
-        $templates = $children->arrayNode('templates')->addDefaultsIfNotSet()->info('0.13.0: personal and shared e-mail templates and snippets stored by MailKit (nowo-tech/mail-kit-bundle >= 2.7 with nowo_mail_kit.templates.enabled), the contact.*, company.*, deal.*, me.* placeholders, a consent purpose per template, and Write e-mail on a contact\'s 360° page (sent mail logged as an email activity). Needs activities.enabled. Table and routes only while enabled.')->children();
+        $templates = $children->arrayNode('templates')->addDefaultsIfNotSet()->info('0.13.0: personal and shared e-mail templates and snippets stored by MailKit (nowo-tech/mail-kit-bundle >= 2.8 with nowo_mail_kit.templates.enabled), the contact.*, company.*, deal.*, me.* placeholders, a consent purpose per template, and Write e-mail on a contact\'s 360° page (sent mail logged as an email activity). Needs activities.enabled. Table and routes only while enabled.')->children();
         $templates->booleanNode('enabled')->defaultFalse()->end();
         $templates->scalarNode('mail_sender')->defaultNull()->info('Service id of a host CrmMailSenderInterface (e.g. a person\'s own mailbox); null = MailKit\'s mailer (Symfony Mailer, plain text, the person\'s e-mail as Reply-To when the actor directory shares it).')->end();
         $templates->arrayNode('send_rate_limit')->addDefaultsIfNotSet()->info('Write e-mail sends per person; beyond it the form shows an error asking to wait (422, no 429 / Retry-After).')->children()

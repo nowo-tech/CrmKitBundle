@@ -4,19 +4,30 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\DBAL\Types\Types;
+use Nowo\CrmKitBundle\Bridge\MailKit\CrmMailLogTag;
 use Nowo\CrmKitBundle\Domain\Enum\EmailTemplateKind;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
+use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\EmailTemplateInput;
 use Nowo\CrmKitBundle\Domain\Service\EmailTemplatesInterface;
 use Nowo\CrmKitBundle\Domain\Service\MailComposerInterface;
 use Nowo\CrmKitBundle\Domain\Service\MailDraft;
+use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailer;
 use Nowo\MailKitBundle\Log\NullSentMailErasure;
-use Nowo\MailKitBundle\Log\SentMailPersonalDataEraserInterface;
+use Nowo\MailKitBundle\Log\NullSentMailPersonalDataExporter;
+use Nowo\MailKitBundle\Log\SentMailPersonalDataSubject;
+use Nowo\MailKitBundle\Log\SentMailRecorder;
+use Nowo\MailKitBundle\Log\SentMailTaggedPersonalDataEraserInterface;
+use Nowo\MailKitBundle\Log\SentMailTaggedPersonalDataExporterInterface;
 use Nowo\MailKitBundle\Mailbox\Html\MailHtmlSanitizer;
 use Nowo\MailKitBundle\Mailbox\Html\RemoteImages;
+use Nowo\MailKitBundle\Mailer\MailHeaders;
 use Nowo\MailKitBundle\Template\Engine\PlaceholderResolver;
 use Nowo\MailKitBundle\Template\Engine\TemplateLibrary;
 use Nowo\MailKitBundle\Template\Engine\TemplateRenderer;
@@ -29,6 +40,7 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Throwable;
 
+use function array_column;
 use function array_map;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
@@ -43,20 +55,7 @@ final class RealMailKitTest extends CrmTestCase
 {
     public function testTheBridgeWorksOnMailKitsOwnTemplateServices(): void
     {
-        $this->bootWithUiKit(['activities' => ['enabled' => true, 'notifier' => 'test.activities'], 'templates' => ['enabled' => true]], [], static function (ServicesConfigurator $s): void {
-            $s->set('test.mailer', TestMailer::class)->public();
-            $s->alias(MailerInterface::class, 'test.mailer')->public();
-            $s->set(TemplateStore::class)->args([service('doctrine')])->public();
-            $s->alias(TemplatePermissionInterface::class, 'nowo_crm_kit.template_permission');
-            $s->set(PlaceholderResolver::class)->args([tagged_locator('nowo_mail_kit.template_placeholder_provider', null, 'placeholderNamespace'), 50, 1_048_576]);
-            $s->set('test.mail_kit_sanitizer', MailHtmlSanitizer::class)->args([RemoteImages::HttpsOnly, 1_048_576]);
-            $s->set(TemplateLibrary::class)->args([service(TemplateStore::class), service(TemplatePermissionInterface::class), service(PlaceholderResolver::class), service('test.mail_kit_sanitizer'), 65_536, 200, service('event_dispatcher'), null]);
-            $s->alias(TemplateLibraryInterface::class, TemplateLibrary::class)->public();
-            $s->set(TemplateRenderer::class)->args([service(TemplateLibrary::class), service(PlaceholderResolver::class), service('test.mail_kit_sanitizer'), 1_048_576]);
-            $s->alias(TemplateRendererInterface::class, TemplateRenderer::class)->public();
-            $s->set(NullSentMailErasure::class);
-            $s->alias(SentMailPersonalDataEraserInterface::class, NullSentMailErasure::class);
-        });
+        $this->bootWithMailKit();
         $store = $this->kernel->getContainer()->get(TemplateStore::class);
         self::assertInstanceOf(TemplateStore::class, $store);
         $store->execute(['DROP TABLE IF EXISTS ' . $store->table()]);
@@ -92,6 +91,106 @@ final class RealMailKitTest extends CrmTestCase
         $templates->delete($id, 2);
         self::assertSame([0, 0], [$this->int('SELECT COUNT(*) FROM nowo_crm_template_purpose WHERE id = ?', [$id]), $this->int('SELECT COUNT(*) FROM ' . $store->table() . ' WHERE id = ?', [$id])]);
         $store->execute(['DROP TABLE ' . $store->table()]);
+    }
+
+    /**
+     * Audit ZDI-M1 on MailKit's own recorder and database: a *Write e-mail* logged as MailKit logs it carries the
+     * tenant's tag; the contact's export lists it and its erasure removes it, while another tenant's row and the host's
+     * untagged row for the same address stay as they were.
+     */
+    public function testTheContactsSentMailLogIsTheTenantsOnlyOnMailKitsRecorder(): void
+    {
+        $this->bootWithMailKit(true);
+        $db = $this->connection();
+        $this->createSentMailLog($db);
+        $recorder = $this->kernel->getContainer()->get(SentMailRecorder::class);
+        self::assertInstanceOf(SentMailRecorder::class, $recorder);
+
+        $this->admin();
+        $ada = $this->contact('Ada', 'Lovelace', 'ada@example.test');
+        $this->service(MailComposerInterface::class)->send(new MailDraft($ada, 'Your quote', 'Text', null, MailDraft::newKey()));
+        $mailer = $this->kernel->getContainer()->get('test.mailer');
+        self::assertInstanceOf(TestMailer::class, $mailer);
+        // What MailKit's mailer decoration does with the message the CRM sent.
+        $recorder->sent(null, $mailer->sent[0], 'smtp', null, null);
+        $globex = (new Email())->from('app@example.test')->to('ada@example.test')->subject('Other tenant')->text('t');
+        MailHeaders::tag($globex, CrmMailLogTag::of(new TenantRef('globex')));
+        $recorder->sent(null, $globex, 'smtp', null, null);
+        $recorder->sent(null, (new Email())->from('app@example.test')->to('ADA@example.test')->subject('Host mail')->text('t'), 'smtp', null, null);
+
+        $personalData = $this->service(CrmPersonalDataInterface::class);
+        $sent         = $personalData->export($ada)['sent_mail'] ?? null;
+        self::assertIsArray($sent);
+        self::assertSame(['Your quote'], array_column($sent, 'subject'));
+
+        $personalData->erase($ada);
+        self::assertSame(['Host mail', 'Other tenant'], $db->fetchFirstColumn('SELECT subject FROM mail_kit_sent_mail ORDER BY subject'));
+        self::assertSame([], $recorder->exportTagged(SentMailPersonalDataSubject::fromEmail('ada@example.test'), CrmMailLogTag::of(new TenantRef('acme'))));
+        $db->executeStatement('DROP TABLE mail_kit_sent_mail_body');
+        $db->executeStatement('DROP TABLE mail_kit_sent_mail');
+    }
+
+    /**
+     * Boots the CRM on MailKit's own template services, with MailKit's sent-mail log recorder or its no-op ports.
+     */
+    private function bootWithMailKit(bool $realLog = false): void
+    {
+        $this->bootWithUiKit(['activities' => ['enabled' => true, 'notifier' => 'test.activities'], 'templates' => ['enabled' => true]], [], static function (ServicesConfigurator $s) use ($realLog): void {
+            $s->set('test.mailer', TestMailer::class)->public();
+            $s->alias(MailerInterface::class, 'test.mailer')->public();
+            $s->set(TemplateStore::class)->args([service('doctrine')])->public();
+            $s->alias(TemplatePermissionInterface::class, 'nowo_crm_kit.template_permission');
+            $s->set(PlaceholderResolver::class)->args([tagged_locator('nowo_mail_kit.template_placeholder_provider', null, 'placeholderNamespace'), 50, 1_048_576]);
+            $s->set('test.mail_kit_sanitizer', MailHtmlSanitizer::class)->args([RemoteImages::HttpsOnly, 1_048_576]);
+            $s->set(TemplateLibrary::class)->args([service(TemplateStore::class), service(TemplatePermissionInterface::class), service(PlaceholderResolver::class), service('test.mail_kit_sanitizer'), 65_536, 200, service('event_dispatcher'), null]);
+            $s->alias(TemplateLibraryInterface::class, TemplateLibrary::class)->public();
+            $s->set(TemplateRenderer::class)->args([service(TemplateLibrary::class), service(PlaceholderResolver::class), service('test.mail_kit_sanitizer'), 1_048_576]);
+            $s->alias(TemplateRendererInterface::class, TemplateRenderer::class)->public();
+            if ($realLog) {
+                // MailKit's own sent-mail log recorder on the test database (audit ZDI-M1).
+                $s->set(SentMailRecorder::class)->args([service('doctrine')])->public();
+                $s->alias(SentMailTaggedPersonalDataEraserInterface::class, SentMailRecorder::class);
+                $s->alias(SentMailTaggedPersonalDataExporterInterface::class, SentMailRecorder::class);
+            } else {
+                $s->set(NullSentMailErasure::class);
+                $s->set(NullSentMailPersonalDataExporter::class);
+                $s->alias(SentMailTaggedPersonalDataEraserInterface::class, NullSentMailErasure::class);
+                $s->alias(SentMailTaggedPersonalDataExporterInterface::class, NullSentMailPersonalDataExporter::class);
+            }
+        });
+    }
+
+    /**
+     * MailKit's two sent-mail log tables (the columns its recorder writes), created with DBAL on any platform.
+     */
+    private function createSentMailLog(Connection $db): void
+    {
+        $db->executeStatement('DROP TABLE IF EXISTS mail_kit_sent_mail_body');
+        $db->executeStatement('DROP TABLE IF EXISTS mail_kit_sent_mail');
+        $schema = new Schema();
+        $main   = $schema->createTable('mail_kit_sent_mail');
+        $main->addColumn('id', Types::STRING, ['length' => 36]);
+        $main->addColumn('status', Types::STRING, ['length' => 16]);
+        $main->addColumn('tag', Types::STRING, ['length' => 64, 'notnull' => false]);
+        $main->addColumn('subject', Types::STRING, ['length' => 255]);
+        $main->addColumn('sender', Types::STRING, ['length' => 255]);
+        $main->addColumn('recipients', Types::TEXT);
+        $main->addColumn('recipient_index', Types::TEXT);
+        $main->addColumn('transport', Types::STRING, ['length' => 32]);
+        $main->addColumn('provider_message_id', Types::STRING, ['length' => 255, 'notnull' => false]);
+        $main->addColumn('size', Types::INTEGER, ['notnull' => false]);
+        $main->addColumn('error', Types::TEXT, ['notnull' => false]);
+        $main->addColumn('attempts', Types::INTEGER, ['default' => 0]);
+        $main->addColumn('queued_at', Types::DATETIME_IMMUTABLE);
+        $main->addColumn('sent_at', Types::DATETIME_IMMUTABLE, ['notnull' => false]);
+        $main->addColumn('failed_at', Types::DATETIME_IMMUTABLE, ['notnull' => false]);
+        $body = $schema->createTable('mail_kit_sent_mail_body');
+        $body->addColumn('id', Types::STRING, ['length' => 36]);
+        $body->addColumn('html_body', Types::TEXT, ['notnull' => false]);
+        $body->addColumn('text_body', Types::TEXT, ['notnull' => false]);
+        foreach ($schema->toSql($db->getDatabasePlatform()) as $sql) {
+            $db->executeStatement($sql);
+        }
     }
 
     /**

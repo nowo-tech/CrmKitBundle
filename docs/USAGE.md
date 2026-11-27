@@ -1239,7 +1239,7 @@ MailKit's invite part (MailKit 2.3, follow-up).
 
 ## E-mail templates and Write e-mail (0.13.0)
 
-Opt in with `templates.enabled: true` next to `activities.enabled: true`, install MailKit **>= 2.7** with its stored
+Opt in with `templates.enabled: true` next to `activities.enabled: true`, install MailKit **>= 2.8** with its stored
 templates on, point MailKit's permission port at the CRM's ([CONFIGURATION.md](CONFIGURATION.md#e-mail-templates-0130))
 and create the table (UPGRADING "To 0.13.0"). The templates and snippets are MailKit's rows; the CRM adds the
 `contact.*`, `company.*`, `deal.*` and `me.*` placeholders, a consent purpose per template and *Write e-mail*.
@@ -1325,7 +1325,8 @@ $outcome->engagementId;   // the email activity, or null when the mail went out 
 - A message without a template is a service message (no consent needed). The template that applies is the one last
   inserted, not the picker's current value.
 - The default sender sends plain text with Symfony Mailer (MailKit decorates it: From and Reply-To from its settings
-  when missing, the sent-mail log with the template key as tag). Reply-To is the person's e-mail when the actor
+  when missing, the sent-mail log with the tenant's tag `CrmMailLogTag::of()`, the template key as the tracking
+  template id). Reply-To is the person's e-mail when the actor
   directory shares it. To send from the person's own mailbox, implement `CrmMailSenderInterface` and set
   `templates.mail_sender`.
 

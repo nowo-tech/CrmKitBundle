@@ -56,7 +56,7 @@ Phase A (0.1.0), always on when the bundle is enabled:
   contacts (shown on their companies and open deals too), an activity feed filtered by kind and person, pinned notes,
   @mentions with MilkdownEditor and NotifyKit, your own items on the feed (host activity source), meetings on
   TaskBoard's calendar and as `.ics`.
-- **E-mail templates** (unreleased, 0.13.0, opt-in `templates.enabled`, with MailKit >= 2.7): personal and shared
+- **E-mail templates** (unreleased, 0.13.0, opt-in `templates.enabled`, with MailKit >= 2.8): personal and shared
   templates and snippets with `contact.*`, `company.*`, `deal.*` and `me.*` placeholders (closed, never evaluated), a
   consent purpose per template, and *Write e-mail* on a contact's page (sent mail logged as an `email` activity).
 - **360° page**: details, contacts / companies, host links (your projects, tickets and so on, referenced by id and

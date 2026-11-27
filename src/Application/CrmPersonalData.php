@@ -39,8 +39,9 @@ use const DATE_ATOM;
  * GDPR export and erasure of a contact (contract section 16). Erasure blanks the personal columns, deletes notes,
  * taggings, links, affiliations, timeline entries, logged activities (0.11.0) and merge traces of the contact, keeps consent rows without their
  * evidence, blanks the merge tombstones that point at it (recursively, under lock) with their merge traces, and is
- * idempotent. 0.13.0 (audit ZDI-M1): with `templates.enabled`, the erasure erases MailKit's sent-mail log rows of the
- * contact's addresses (its own and those its merge traces keep of the contacts merged into it). Stateless.
+ * idempotent. 0.13.0 (audit ZDI-M1): with `templates.enabled`, the export lists and the erasure erases the MailKit
+ * sent-mail log rows this tenant's CRM sent to the contact's addresses (its own and those its merge traces keep of the
+ * contacts merged into it). Stateless.
  */
 final readonly class CrmPersonalData implements CrmPersonalDataInterface
 {
@@ -86,6 +87,10 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
                 // 0.11.0: the activities logged on it and the meetings it attends.
                 $data += $this->engagements->exportContact($context->tenant, $contactId);
             }
+            if ($this->mailLog instanceof ContactMailLogInterface) {
+                // 0.13.0 (audit ZDI-M1): the rows of MailKit's sent-mail log this tenant's CRM sent to its addresses.
+                $data['sent_mail'] = $this->mailLog->export($context->tenant, $this->addresses($context, $record));
+            }
             $this->support->activity($context, SubjectType::Contact, $contactId, ActivityKind::Exported);
             $this->support->audit($effects, $context, 'crm.contact.exported', SubjectType::Contact, $contactId);
 
@@ -124,7 +129,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
             $store = $this->support->store;
             // 0.13.0 (audit ZDI-M1): the sent-mail log rows of its addresses, before the addresses are blanked. MailKit
             // joins this unit when both share the connection; erasing again on a replay is a no-op.
-            $this->mailLog?->erase($this->addresses($context, $record));
+            $this->mailLog?->erase($context->tenant, $this->addresses($context, $record));
             // 0.12.0 (audit ZDE-M2, Q-H6): the HubSpot references of the notes, activities and next actions deleted
             // below become tombstones first, so a re-run never brings what was said about the person back.
             $this->refs?->tombstoneItems($context->tenant, $contactId, $this->engagements instanceof EngagementHousekeeping, $this->pipeline instanceof PipelineHousekeeping);

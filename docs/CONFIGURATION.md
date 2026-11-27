@@ -132,7 +132,7 @@ nowo_crm_kit:
         mentions: { enabled: true, max_per_note: 20, rate_limit: { limit: 60, interval: 60 } }   # @mentions in notes (MilkdownEditor >= 1.19); per-person limit of the mention endpoints
         notify_kit: { recipient_type: user }            # NotifyKit's RecipientRef type of the CRM's actor ids
         taskboard_calendar: true   # meetings on TaskBoard's calendar (TaskBoard >= 2.24 installed)
-    templates:                     # 0.13.0: e-mail templates (MailKit >= 2.7) and Write e-mail (see "E-mail templates")
+    templates:                     # 0.13.0: e-mail templates (MailKit >= 2.8) and Write e-mail (see "E-mail templates")
         enabled: false             # needs activities.enabled and nowo_mail_kit.templates.enabled
         mail_sender: null          # service id of a CrmMailSenderInterface; null = Symfony Mailer (MailKit's)
         send_rate_limit:
@@ -648,13 +648,13 @@ after exporting and dropping the tables (UPGRADING "To 0.11.0").
 It needs:
 
 - `activities.enabled: true` (a sent e-mail is logged as an `email` activity); otherwise the configuration is refused;
-- `nowo-tech/mail-kit-bundle` **>= 2.7** (an optional dependency: `composer require nowo-tech/mail-kit-bundle`) with
+- `nowo-tech/mail-kit-bundle` **>= 2.8** (an optional dependency: `composer require nowo-tech/mail-kit-bundle`) with
   `nowo_mail_kit.templates.enabled: true`; otherwise the container build fails with that fix;
 - a mail sender: Symfony Mailer (`framework.mailer`, which MailKit decorates), or `templates.mail_sender`.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `mail_sender` | `null` | Service id of a host `CrmMailSenderInterface` (for instance the person's own mailbox through MailKit's delegated mailboxes); `null` = `Bridge\MailKit\MailKitCrmMailSender`: a plain-text message through Symfony Mailer, the person's e-mail (from the actor directory) as Reply-To, the template key as MailKit's log tag; From comes from MailKit's settings |
+| `mail_sender` | `null` | Service id of a host `CrmMailSenderInterface` (for instance the person's own mailbox through MailKit's delegated mailboxes); `null` = `Bridge\MailKit\MailKitCrmMailSender`: a plain-text message through Symfony Mailer, the person's e-mail (from the actor directory) as Reply-To, the tenant's tag (`Bridge\MailKit\CrmMailLogTag`) as MailKit's log tag and the template key as its tracking template id; From comes from MailKit's settings |
 | `send_rate_limit.limit` | `30` | *Write e-mail* sends per person and window (1–1000); beyond it the dialog says to wait |
 | `send_rate_limit.interval` | `300` | Window in seconds (60–86 400, rounded up to minutes) |
 

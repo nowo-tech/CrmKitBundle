@@ -13,7 +13,7 @@ use Nowo\CrmKitBundle\Domain\Read\ComposedText;
 use Nowo\CrmKitBundle\Domain\Read\EmailTemplateView;
 
 /**
- * The person's e-mail templates and snippets (0.13.0, `templates.enabled`), stored by MailKit (>= 2.7) for the call's
+ * The person's e-mail templates and snippets (0.13.0, `templates.enabled`), stored by MailKit (>= 2.8) for the call's
  * tenant and person: personal rows (only their owner sees them) and the organisation's shared rows (`manage` to change
  * them), with the CRM's consent purpose per template. Rows the person may not see read as missing (404).
  */

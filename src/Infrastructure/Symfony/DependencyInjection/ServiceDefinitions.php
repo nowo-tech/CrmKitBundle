@@ -290,8 +290,11 @@ final class ServiceDefinitions
     /** MailKit's tag of placeholder providers (0.13.0). */
     public const MAIL_KIT_PLACEHOLDER_TAG = 'nowo_mail_kit.template_placeholder_provider';
 
-    /** MailKit's erasure port of the sent-mail log (audit ZDI-M1). */
-    public const MAIL_KIT_LOG_ERASER = 'Nowo\\MailKitBundle\\Log\\SentMailPersonalDataEraserInterface';
+    /** MailKit's tag-scoped erasure port of the sent-mail log (audit ZDI-M1, MailKit >= 2.8). */
+    public const MAIL_KIT_LOG_ERASER = 'Nowo\\MailKitBundle\\Log\\SentMailTaggedPersonalDataEraserInterface';
+
+    /** MailKit's tag-scoped export port of the sent-mail log (audit ZDI-M1, MailKit >= 2.8). */
+    public const MAIL_KIT_LOG_EXPORTER = 'Nowo\\MailKitBundle\\Log\\SentMailTaggedPersonalDataExporterInterface';
 
     /** MailKit's event after a template was deleted (its class name; 0.13.0). */
     public const MAIL_KIT_TEMPLATE_DELETED = 'Nowo\\MailKitBundle\\Template\\Event\\TemplateDeletedEvent';
@@ -693,7 +696,7 @@ final class ServiceDefinitions
     }
 
     /**
-     * The e-mail templates (0.13.0, `templates.enabled` with `activities.enabled`, MailKit >= 2.7): the CRM's
+     * The e-mail templates (0.13.0, `templates.enabled` with `activities.enabled`, MailKit >= 2.8): the CRM's
      * classification store, the MailKit permission port (`nowo_crm_kit.template_permission`), the `contact`, `company`,
      * `deal` and `me` placeholder providers, the listener of MailKit's deletes, the templates service and *Write e-mail*.
      * {@see Compiler\CrmPortsPass} checks MailKit's services and wires the mail sender.
@@ -711,8 +714,9 @@ final class ServiceDefinitions
         $s->set(CompanyPlaceholders::class)->args([service(CrmTemplateActors::class), service(CrmReaderInterface::class)])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
         $s->set(DealPlaceholders::class)->args([service(CrmTemplateActors::class), $pipeline ? service(DealReader::class) : null])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
         $s->set(MePlaceholders::class)->args([service(CrmTemplateActors::class), service(CrmActorDirectoryInterface::class)])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
-        // Audit ZDI-M1: MailKit's sent-mail log erasure port (always registered by MailKit) for the contact's erasure.
-        $s->set(MailKitContactMailLog::class)->args([service(self::MAIL_KIT_LOG_ERASER)]);
+        // Audit ZDI-M1: MailKit's tag-scoped sent-mail log ports (always registered by MailKit >= 2.8) for the contact's
+        // erasure and export.
+        $s->set(MailKitContactMailLog::class)->args([service(self::MAIL_KIT_LOG_ERASER), service(self::MAIL_KIT_LOG_EXPORTER)]);
         $s->alias(ContactMailLogInterface::class, MailKitContactMailLog::class);
         $s->set(TemplatePurposeCleaner::class)->args([service(TemplateMailStoreInterface::class)])
             ->tag('kernel.event_listener', ['event' => self::MAIL_KIT_TEMPLATE_DELETED, 'method' => '__invoke']);

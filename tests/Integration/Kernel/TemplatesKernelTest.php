@@ -15,7 +15,8 @@ use Nowo\CrmKitBundle\Tests\Fixtures\TestMailer;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailTemplates;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestSentMailLog;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestServices;
-use Nowo\MailKitBundle\Log\SentMailPersonalDataEraserInterface;
+use Nowo\MailKitBundle\Log\SentMailTaggedPersonalDataEraserInterface;
+use Nowo\MailKitBundle\Log\SentMailTaggedPersonalDataExporterInterface;
 use Nowo\MailKitBundle\Template\Service\TemplateLibraryInterface;
 use Nowo\MailKitBundle\Template\Service\TemplateRendererInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -52,7 +53,7 @@ final class TemplatesKernelTest extends KernelTestCase
     {
         // Audit ZDI-M1: the contact's erasure covers MailKit's sent-mail log.
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('needs MailKit\'s sent-mail log erasure port');
+        $this->expectExceptionMessage('needs MailKit\'s tag-scoped sent-mail log ports');
         $this->bootKernel(TestServices::PORTS + self::ON, $this->host(true, false, false));
     }
 
@@ -92,7 +93,8 @@ final class TemplatesKernelTest extends KernelTestCase
             $s->alias(TemplateRendererInterface::class, 'test.mail_templates')->public();
             if ($log) {
                 $s->set('test.sent_mail_log', TestSentMailLog::class)->public();
-                $s->alias(SentMailPersonalDataEraserInterface::class, 'test.sent_mail_log')->public();
+                $s->alias(SentMailTaggedPersonalDataEraserInterface::class, 'test.sent_mail_log')->public();
+                $s->alias(SentMailTaggedPersonalDataExporterInterface::class, 'test.sent_mail_log')->public();
             }
             if ($mailer) {
                 $s->set('test.mailer', TestMailer::class)->public();

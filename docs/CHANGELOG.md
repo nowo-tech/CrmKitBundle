@@ -34,7 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Planned as **0.13.0** (Beacon spec 254, block A-2, task T003, FR-015 / FR-016; owner D-20261127-02). 0.12.0 (the
 HubSpot activity import) and 0.12.1 are released. No BC break: everything new is behind `templates.enabled` (off by
-default; it needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.7); with it off no table is
+default; it needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.8); with it off no table is
 mapped and no route or service is added.
 
 ### Added
@@ -51,11 +51,14 @@ mapped and no route or service is added.
   counts as none, so racing saves or a crash between MailKit's commit and the CRM's never pair a text with another
   text's purpose. The row goes with the template on MailKit's `TemplateDeletedEvent`
   (`Bridge\MailKit\TemplatePurposeCleaner`, inside MailKit's delete transaction on a shared connection).
-- **Contact erasure covers MailKit's sent-mail log** (pre-tag audit ZDI-M1): with `templates.enabled`,
-  `CrmPersonalDataInterface::erase()` erases the log rows (MailKit's `SentMailPersonalDataEraserInterface`) of the
-  contact's address and those its merge traces keep (contacts merged into it), in the erasure's unit (new internal port
-  `Application\Port\ContactMailLogInterface`, `Bridge\MailKit\MailKitContactMailLog`). The export does not list the
-  log, which has no tenant: the host's data-subject export covers it (SECURITY.md).
+- **Contact export and erasure cover the tenant's rows of MailKit's sent-mail log** (pre-tag audit ZDI-M1, MailKit
+  >= 2.8): every *Write e-mail* sent through Symfony Mailer carries the tenant's log tag
+  (`Bridge\MailKit\CrmMailLogTag`, `crm:` + 32 hex characters of a SHA-256 of the tenant; the template key goes to
+  MailKit's tracking policy as the template id). With `templates.enabled`, `CrmPersonalDataInterface::export()` lists
+  (`sent_mail`) and `erase()` erases, in the erasure's unit, the log rows with that tag (MailKit's tag-scoped
+  `SentMailTaggedPersonalDataExporterInterface` / `SentMailTaggedPersonalDataEraserInterface`) of the contact's address
+  and those its merge traces keep (contacts merged into it); rows another tenant or the host sent to the same address
+  stay (new internal port `Application\Port\ContactMailLogInterface`, `Bridge\MailKit\MailKitContactMailLog`).
 - **CRM placeholders** for MailKit's closed registry (tag `nowo_mail_kit.template_placeholder_provider`):
   `contact.*`, `company.*` (the contact's primary company), `deal.*` (`amount` only with `amounts_view`) and `me.*`,
   read through the CRM's readers (tenant, `view`, the host's record checks), only for the exact CRM tenant and person
@@ -73,7 +76,7 @@ mapped and no route or service is added.
 - **Templates page** (`/crm/templates`, area tab "Templates", icon `templates` in `ui.tab_icons`): the person's and
   the organisation's templates and snippets with their consent column, create / edit forms loaded on demand into a
   remote dialog, delete with a confirm.
-- Configuration `templates.*` (CONFIGURATION.md), translations in the seven locales, `nowo-tech/mail-kit-bundle` ^2.7
+- Configuration `templates.*` (CONFIGURATION.md), translations in the seven locales, `nowo-tech/mail-kit-bundle` ^2.8
   in `require-dev` (the tests run on the real MailKit: an in-memory library for most of them and MailKit's own
   library, renderer, store and permission port for the bridge test, audit ZDI-L2), `symfony/mailer` and `symfony/mime`
   for the tests, `nowo-tech/mail-kit-bundle` suggested.

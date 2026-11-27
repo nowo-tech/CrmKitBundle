@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 
+use Nowo\CrmKitBundle\Bridge\MailKit\CrmMailLogTag;
 use Nowo\CrmKitBundle\Domain\Enum\ConsentSource;
 use Nowo\CrmKitBundle\Domain\Enum\EmailTemplateKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
@@ -20,12 +21,14 @@ use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\EmailTemplateInput;
 use Nowo\CrmKitBundle\Domain\Service\MailDraft;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
+use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\CrmKitEvents;
 use Nowo\MailKitBundle\Log\SentMailLogTableMissingException;
 use Nowo\MailKitBundle\Mailer\MailHeaders;
 use Nowo\MailKitBundle\Template\Value\TemplateKind;
 use Symfony\Component\Mime\Address;
 
+use function array_column;
 use function array_filter;
 use function array_keys;
 use function array_map;
@@ -53,7 +56,9 @@ final class MailComposerTest extends TemplatesTestCase
         self::assertSame(['ana@example.test'], array_map(static fn (Address $a): string => $a->getAddress(), $mail->getReplyTo()));
         self::assertSame("Your \u{200D}quote", $mail->getSubject());
         self::assertNull($mail->getHtmlBody(), 'plain text only');
-        self::assertSame('hello', $mail->getHeaders()->get(MailHeaders::TAG)?->getBodyAsString());
+        // Audit ZDI-M1: the log tag is the tenant's; the template key goes to MailKit's tracking policy.
+        self::assertSame(CrmMailLogTag::of(new TenantRef('acme')), $mail->getHeaders()->get(MailHeaders::TAG)?->getBodyAsString());
+        self::assertSame('hello', $mail->getHeaders()->get(MailHeaders::TEMPLATE)?->getBodyAsString());
         self::assertSame(['Your quote', "Dear Ada,\n\nhere it is.", 'out'], [$this->text("SELECT title FROM nowo_crm_engagement WHERE kind = 'email'"), $this->text("SELECT body FROM nowo_crm_engagement WHERE kind = 'email'"), $this->text("SELECT direction FROM nowo_crm_engagement WHERE kind = 'email'")]);
         $events = array_values(array_filter($this->recorder()->events, static fn (CrmEvent $e): bool => $e instanceof CrmMailSent));
         self::assertCount(1, $events);
@@ -76,13 +81,15 @@ final class MailComposerTest extends TemplatesTestCase
         $this->composer()->send(new MailDraft($ada, 'Plain', 'Text', null, MailDraft::newKey()));
         self::assertSame([], $this->lastMail()->getReplyTo());
         $this->actAs('ana');
-        self::assertNull($plain->getHeaders()->get(MailHeaders::TAG));
+        self::assertNull($plain->getHeaders()->get(MailHeaders::TEMPLATE));
+        self::assertSame(CrmMailLogTag::of(new TenantRef('acme')), $plain->getHeaders()->get(MailHeaders::TAG)?->getBodyAsString());
     }
 
     public function testTheContactsErasureCoversMailKitsSentMailLog(): void
     {
-        // Audit ZDI-M1: the rows MailKit's sent-mail log holds for the contact's addresses (its own and those its merge
-        // traces keep of the contacts merged into it) are erased with the contact; other people's rows stay.
+        // Audit ZDI-M1: the rows this tenant's CRM logged in MailKit's sent-mail log for the contact's addresses (its own
+        // and those its merge traces keep of the contacts merged into it) are exported and erased with the contact;
+        // other people's rows, another tenant's and the host's rows for the same addresses stay.
         $this->boot();
         $this->admin();
         $reader = $this->service(CrmReaderInterface::class);
@@ -90,16 +97,28 @@ final class MailComposerTest extends TemplatesTestCase
         $dup    = $this->contact('Ada', 'L.', 'ada.old@example.test');
         $this->service(MergeServiceInterface::class)->merge(SubjectType::Contact, $ada, $dup, [], $reader->record(SubjectType::Contact, $ada)->version, 1);
         $this->composer()->send(new MailDraft($ada, 'Your quote', 'Text', null, MailDraft::newKey()));
-        $log = $this->sentMailLog();
-        $log->log('Ada@Example.test', 'Your quote');
-        $log->log('ada.old@example.test', 'Older');
-        $log->log('bob@example.test', 'Someone else');
+        $log  = $this->sentMailLog();
+        $acme = CrmMailLogTag::of(new TenantRef('acme'));
+        $log->log('Ada@Example.test', 'Your quote', $acme);
+        $log->log('ada.old@example.test', 'Older', $acme);
+        $log->log('bob@example.test', 'Someone else', $acme);
+        // Another tenant's CRM and the host (untagged, or a template tag) wrote to the same address: never touched.
+        $log->log('ada@example.test', 'Other tenant', CrmMailLogTag::of(new TenantRef('globex')));
+        $log->log('ada@example.test', 'Host mail');
+        $log->log('ada.old@example.test', 'Host reset', 'password_reset');
 
-        self::assertArrayNotHasKey('sent_mail', $this->service(CrmPersonalDataInterface::class)->export($ada), 'the log is host-wide: the host exports it');
+        // The export lists the tenant's rows of its addresses only.
+        $sent = $this->service(CrmPersonalDataInterface::class)->export($ada)['sent_mail'] ?? null;
+        self::assertIsArray($sent);
+        self::assertSame(['Your quote', 'Older'], array_column($sent, 'subject'));
+        self::assertIsArray($sent[0]);
+        self::assertSame(['id', 'roles', 'status', 'subject', 'queued_at', 'sent_at', 'failed_at'], array_keys($sent[0]));
 
         $this->service(CrmPersonalDataInterface::class)->erase($ada);
-        self::assertSame(['ada@example.test', 'ada.old@example.test'], $log->erased);
-        self::assertSame(['bob@example.test'], array_keys($log->rows));
+        self::assertSame(['ada@example.test ' . $acme, 'ada.old@example.test ' . $acme], $log->erased);
+        self::assertSame(['Other tenant', 'Host mail'], array_column($log->rows['ada@example.test'], 'subject'));
+        self::assertSame(['Host reset'], array_column($log->rows['ada.old@example.test'], 'subject'));
+        self::assertSame(['Someone else'], array_column($log->rows['bob@example.test'], 'subject'));
         $this->service(CrmPersonalDataInterface::class)->erase($ada);
         self::assertCount(2, $log->erased, 'an erased contact is not erased again');
 
@@ -108,7 +127,7 @@ final class MailComposerTest extends TemplatesTestCase
         $log->missing = true;
         $this->expectThrows(SentMailLogTableMissingException::class, fn () => $this->service(CrmPersonalDataInterface::class)->erase($bob));
         self::assertSame('active', $this->text('SELECT status FROM nowo_crm_contact WHERE id = ?', [$bob]));
-        self::assertSame(['bob@example.test'], array_keys($log->rows));
+        self::assertSame(['Someone else'], array_column($log->rows['bob@example.test'], 'subject'));
     }
 
     public function testConsentAndClassificationDecideWhetherATemplateMaySend(): void

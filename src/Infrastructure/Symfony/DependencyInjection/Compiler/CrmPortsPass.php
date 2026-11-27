@@ -156,18 +156,20 @@ final class CrmPortsPass implements CompilerPassInterface
 
     /**
      * The e-mail templates (0.13.0): MailKit's template services must exist (`nowo_mail_kit.templates.enabled`), and its
-     * sent-mail log erasure port (the contact's erasure), and the mail sender is `templates.mail_sender` or the MailKit bridge on Symfony Mailer.
+     * tag-scoped sent-mail log ports (the contact's erasure and export, MailKit >= 2.8), and the mail sender is `templates.mail_sender` or the MailKit bridge on Symfony Mailer.
      */
     private function templates(ContainerBuilder $container): void
     {
         foreach ([ServiceDefinitions::MAIL_KIT_LIBRARY, ServiceDefinitions::MAIL_KIT_RENDERER] as $service) {
             if (!$container->has($service)) {
-                throw new LogicException('nowo_crm_kit.templates.enabled needs MailKit\'s stored templates: set nowo_mail_kit.templates.enabled: true (nowo-tech/mail-kit-bundle >= 2.7).');
+                throw new LogicException('nowo_crm_kit.templates.enabled needs MailKit\'s stored templates: set nowo_mail_kit.templates.enabled: true (nowo-tech/mail-kit-bundle >= 2.8).');
             }
         }
         // Audit ZDI-M1: the contact's erasure covers MailKit's sent-mail log (MailKit always registers the port).
-        if (!$container->has(ServiceDefinitions::MAIL_KIT_LOG_ERASER)) {
-            throw new LogicException('nowo_crm_kit.templates.enabled needs MailKit\'s sent-mail log erasure port (' . ServiceDefinitions::MAIL_KIT_LOG_ERASER . '): register NowoMailKitBundle (nowo-tech/mail-kit-bundle >= 2.7).');
+        foreach ([ServiceDefinitions::MAIL_KIT_LOG_ERASER, ServiceDefinitions::MAIL_KIT_LOG_EXPORTER] as $service) {
+            if (!$container->has($service)) {
+                throw new LogicException('nowo_crm_kit.templates.enabled needs MailKit\'s tag-scoped sent-mail log ports (' . $service . '): register NowoMailKitBundle (nowo-tech/mail-kit-bundle >= 2.8).');
+            }
         }
         $sender = $container->getParameter(ServiceDefinitions::P . 'templates.mail_sender');
         if (is_string($sender) && $sender !== '') {

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.11.0] - 2026-11-27](#0110---2026-11-27)
 - [[0.10.3] - 2026-11-25](#0103---2026-11-25)
 - [[0.10.2] - 2026-11-24](#0102---2026-11-24)
 - [[0.10.1] - 2026-11-24](#0101---2026-11-24)
@@ -28,6 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - [[0.1.0] - 2026-11-19](#010---2026-11-19)
 
 ## [Unreleased]
+
+## [0.11.0] - 2026-11-27
 
 Planned as **0.11.0** (Beacon spec 254, block A-1, tasks T001 and T002; Beacon priority moves it before H2). No BC
 break: everything new is behind `activities.enabled` (off by default); with it off no table is mapped and no route or

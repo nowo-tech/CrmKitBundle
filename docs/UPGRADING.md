@@ -27,6 +27,9 @@
 
 ## Unreleased
 
+Planned as **0.12.1**: nothing to do. If you ever imported from HubSpot and switched `import.hubspot.enabled` off, read
+SECURITY "GDPR" (tombstones are written only while the import is on).
+
 ## To 0.12.0
 
 From **0.11.0**:

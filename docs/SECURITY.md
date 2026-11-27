@@ -215,7 +215,8 @@ Notes, calls, meetings and tasks (Beacon spec 254 T004; audit ZDE, PASS with fix
   associated record (an activity's subject rows, a meeting's attendees) needs `view` attended and the owner rule
   unattended; any other is left out and counted in `associations_skipped`.
 - **GDPR** (ZDE-M2, Q-H6): an item associated with a contact whose reference is a tombstone is skipped
-  (`error.record_erased`), on every record it was associated with; erasing a contact also turns the references of its
+  (`error.record_erased`), on every record it was associated with (0.12.1, ZDE-v-1: every contact id HubSpot gives
+  inline is checked, not only the 20 used as records; association paging is not followed); erasing a contact also turns the references of its
   deleted notes, activities and next actions into tombstones, so a re-run never recreates them, even when HubSpot no
   longer associates them with the person.
 - **Re-runs** (ZDE-I4): HubSpot wins: a non-empty HubSpot value overwrites a CRM-side edit of an imported note, call,
@@ -237,6 +238,14 @@ The tenant is the controller; the bundle is the tool.
   `erased`; notes, taggings, role assignments, host links, affiliations, timeline entries and merge snapshots of the
   contact are deleted; consent rows are kept **without their evidence** as proof that consent was given or withdrawn; the plan
   counter is released when the contact was active. An erased contact cannot be edited, restored or merged.
+- **HubSpot tombstones need the import switched on** (0.12.1, audit ZDE-v-2). An erasure turns the contact's HubSpot
+  references (and those of its imported notes, activities and next actions) into tombstones only while
+  `import.hubspot.enabled` is on: the reference table is mapped, and its hooks registered, only then, and the kit does
+  not write to a table it has not mapped. A contact erased while the import is off keeps plain references; if the
+  import is switched on again later, a HubSpot re-run of the same account can bring the person and their activities
+  back. Hosts that ever imported from HubSpot keep `import.hubspot.enabled: true` (no import runs unless someone starts
+  one), or erase such a contact again after switching it back on (the erasure is idempotent and tombstones the
+  references then).
 - **Retention** (`nowo:crm-kit:purge`): trashed records after `trash_days` with every child row, timeline entries
   after `timeline_years`, import rows after `import_keep_days`, merge snapshots after `merge_keep_days`; one audit
   entry per tenant with counts only. **(0.2.1)** Every committed batch of deleted records (trashed records and merge

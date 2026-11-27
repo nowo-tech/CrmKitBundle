@@ -10,6 +10,7 @@ use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotActivity;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
+use Nowo\CrmKitBundle\Domain\Enum\RowOutcome;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Read\ImportRowView;
@@ -23,10 +24,12 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 
 use function array_map;
+use function array_slice;
 use function is_array;
 use function is_string;
 use function json_decode;
 use function json_encode;
+use function range;
 use function str_contains;
 
 use const JSON_THROW_ON_ERROR;
@@ -251,6 +254,24 @@ final class HubSpotActivitiesTest extends HubSpotTestCase
         self::assertSame(['created' => 0, 'updated' => 1, 'duplicate' => 4, 'invalid' => 0, 'limit' => 0], $view->counts);
         self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_engagement WHERE title LIKE '%Ada%'"));
         self::assertSame([0, 1, 0], [$this->int('SELECT COUNT(*) FROM nowo_crm_note'), $this->int('SELECT COUNT(*) FROM nowo_crm_engagement'), $this->int('SELECT COUNT(*) FROM nowo_crm_next_action')]);
+    }
+
+    public function testAnErasedContactPastTheTwentiethAssociationStillKeepsTheItemOut(): void
+    {
+        $fake = $this->hubspot(self::ON);
+        $fake->seedCompanies(1);
+        $fake->seedContacts(21);
+        $this->importRecords($fake);
+        $this->service(CrmPersonalDataInterface::class)->erase($this->target('2021'));
+        $contacts                   = array_map(static fn (int $i): string => (string) (2000 + $i), range(1, 21));
+        $fake->engagements['calls'] = ['4001' => ['properties' => ['hs_timestamp' => '2026-01-01T00:00:00Z', 'hs_call_title' => 'With 21 people'], 'contacts' => $contacts, 'companies' => ['1001']]];
+        $view                       = $this->finish($this->activities([HubSpotActivity::Call]));
+        self::assertSame([RowOutcome::Duplicate, 'error.record_erased'], [$view->rows[0]->outcome, $view->rows[0]->message]);
+        self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_engagement'));
+        // Without the erased person, the first 20 contacts and the company become records.
+        $fake->engagements['calls']['4001']['contacts'] = array_slice($contacts, 0, 20);
+        $this->finish($this->activities([HubSpotActivity::Call]));
+        self::assertSame(21, $this->int('SELECT COUNT(*) FROM nowo_crm_engagement_subject'));
     }
 
     public function testUnattendedRunsNeedAPersonForSomeoneElsesRecord(): void

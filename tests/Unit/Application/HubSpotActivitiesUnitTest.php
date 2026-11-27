@@ -23,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 
 use function array_map;
+use function count;
 use function implode;
 use function range;
 use function str_repeat;
@@ -108,7 +109,8 @@ final class HubSpotActivitiesUnitTest extends TestCase
         // At most 100 ids of each kind are kept.
         $many = implode(',', array_map(static fn (int $i): string => '{"id": "' . $i . '", "type": "t"}', range(1, 120)));
         $fake->failNext('/crm/v3/objects/notes', 200, [], '{"results": [{"id": "1", "properties": {}, "associations": {"contacts": {"results": [' . $many . ']}}}]}');
-        self::assertCount(HttpHubSpotReader::MAX_ASSOCIATED, $reader->engagements($token, HubSpotActivity::Note, null, 10)->engagements[0]->contacts);
+        $capped = $reader->engagements($token, HubSpotActivity::Note, null, 10)->engagements[0];
+        self::assertSame([HttpHubSpotReader::MAX_ASSOCIATED, 120], [count($capped->contacts), count($capped->allContacts)], 'every inline contact is kept for the erased check');
         foreach (['{"results": [{"id": "1", "associations": {"contacts": "x"}}]}', '{"results": [{"id": "1", "associations": {"companies": {"results": [{"id": "0"}]}}}]}', '{"results": [{"id": "1", "associations": {"companies": {"results": [5]}}}]}'] as $body) {
             $fake->failNext('/crm/v3/objects/notes', 200, [], $body);
             try {

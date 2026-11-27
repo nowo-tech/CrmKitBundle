@@ -222,7 +222,7 @@ final class HubSpotActivitiesTest extends HubSpotTestCase
         $this->stages($id, ['owners', 'notes', 'tasks']);
         $view = $this->confirmAndFinish($id);
         self::assertSame('import.hubspot.tasks_off', $view->rows[0]->message);
-        self::assertSame(['object' => 'task', 'id' => ''], $view->rows[0]->data);
+        self::assertEquals(['object' => 'task', 'id' => ''], $view->rows[0]->data, 'MySQL reorders JSON keys');
     }
 
     public function testWithoutActivitiesNothingIsOfferedOrRun(): void

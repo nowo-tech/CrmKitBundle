@@ -204,9 +204,11 @@ final class ApiModelTest extends TestCase
     {
         $codec  = new CrmApiCursorCodec('secret');
         $filter = CrmApiCursorCodec::filterHash(['q' => 'x']);
-        $sealed = $codec->seal(CrmApiOperation::Search, $filter, ['v' => 'Ada', 'id' => self::ID]);
-        self::assertStringNotContainsString('Ada', $sealed);
-        self::assertSame(['v' => 'Ada', 'id' => self::ID], $codec->open(new CrmApiCursor($sealed), CrmApiOperation::Search, $filter));
+        // A long unique marker: a short value such as 'Ada' can appear by chance in the random base64 text.
+        $plain  = 'Zq9-plaintext-marker-7Xk';
+        $sealed = $codec->seal(CrmApiOperation::Search, $filter, ['v' => $plain, 'id' => self::ID]);
+        self::assertStringNotContainsString($plain, $sealed);
+        self::assertSame(['v' => $plain, 'id' => self::ID], $codec->open(new CrmApiCursor($sealed), CrmApiOperation::Search, $filter));
         $tampered = substr($sealed, 0, -2) . ($sealed[-2] === 'A' ? 'B' : 'A') . $sealed[-1];
         foreach ([
             static fn (): array => $codec->open(new CrmApiCursor($tampered), CrmApiOperation::Search, $filter),

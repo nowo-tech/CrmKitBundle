@@ -7,7 +7,7 @@ namespace Nowo\CrmKitBundle\Domain\Read\HubSpot;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotObjectId;
 
 /**
- * One HubSpot note, call, meeting or task as read (0.13.0): its id, the requested properties only (null or absent:
+ * One HubSpot note, call, meeting or task as read (0.12.0): its id, the requested properties only (null or absent:
  * HubSpot has no value) and the ids of the contacts and companies it is associated with (at most 100 of each, in
  * HubSpot's order, distinct). Lives for one page; never stored.
  */

@@ -1,4 +1,4 @@
-# Implementation plan: HubSpot activities import (0.13.0)
+# Implementation plan: HubSpot activities import (0.12.0)
 
 **Spec**: [spec.md](spec.md)
 

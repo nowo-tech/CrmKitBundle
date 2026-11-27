@@ -7,7 +7,7 @@ namespace Nowo\CrmKitBundle\Domain\Read\HubSpot;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotCursor;
 
 /**
- * One page of HubSpot engagements of one kind (0.13.0) and the cursor of the next one (null: the last page).
+ * One page of HubSpot engagements of one kind (0.12.0) and the cursor of the next one (null: the last page).
  */
 final readonly class HubSpotEngagementPage
 {

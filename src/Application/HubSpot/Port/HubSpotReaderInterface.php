@@ -56,7 +56,7 @@ interface HubSpotReaderInterface
     public function probe(HubSpotToken $token, string $scope): bool;
 
     /**
-     * How many objects of the kind the account holds (not archived); 0.13.0: engagements of a kind too.
+     * How many objects of the kind the account holds (not archived); 0.12.0: engagements of a kind too.
      *
      * @throws HubSpotException
      */
@@ -81,7 +81,7 @@ interface HubSpotReaderInterface
     public function records(HubSpotToken $token, HubSpotObject $object, array $properties, ?HubSpotCursor $after, int $limit): HubSpotPage;
 
     /**
-     * One page of engagements of a kind (0.13.0) with the kind's fixed properties and their contact and company
+     * One page of engagements of a kind (0.12.0) with the kind's fixed properties and their contact and company
      * associations, in one request.
      *
      * @throws HubSpotException

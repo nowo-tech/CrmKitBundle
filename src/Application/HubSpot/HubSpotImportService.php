@@ -69,7 +69,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
      *                         start and mapping pages per tenant in a window
      * @param int $browseInterval `import.hubspot.browse_rate_limit.interval`: the window in seconds
      * @param LoggerInterface|null $logger where an unavailable secret key is reported (0.10.1, audit ZAW-I2)
-     * @param list<string> $activities 0.13.0: the engagement kinds the configuration imports (`notes`, `calls`,
+     * @param list<string> $activities 0.12.0: the engagement kinds the configuration imports (`notes`, `calls`,
      *                                 `meetings` with `activities.enabled`; `tasks` with `pipeline.enabled` too)
      */
     public function __construct(

@@ -28,7 +28,7 @@ use const JSON_THROW_ON_ERROR;
  * The run cursor of a HubSpot import (0.10.0, `crm_import.run_cursor`): the account, the stage, HubSpot's `after`
  * token and page number, the owner map (HubSpot owner id ⇒ actor id), the lists and their member kinds, the records
  * read per object and the skipped associations. Ids and counts only, never a value from a record. Advanced in the same
- * unit that settles the page, compared before (compare-and-set under the import row's lock). 0.13.0: the engagement
+ * unit that settles the page, compared before (compare-and-set under the import row's lock). 0.12.0: the engagement
  * kinds are stages after the objects.
  *
  * @internal
@@ -80,7 +80,7 @@ final readonly class HubSpotRunState
             $stages[] = $object->value;
         }
         foreach ($scope->activities as $activity) {
-            // 0.13.0: the engagements after the records they attach to.
+            // 0.12.0: the engagements after the records they attach to.
             $stages[] = $activity->value;
         }
         $lists = [];
@@ -185,7 +185,7 @@ final readonly class HubSpotRunState
     }
 
     /**
-     * The stage's engagement kind, or null (0.13.0).
+     * The stage's engagement kind, or null (0.12.0).
      */
     public function activity(): ?HubSpotActivity
     {

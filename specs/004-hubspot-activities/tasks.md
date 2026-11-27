@@ -1,4 +1,4 @@
-# Tasks: HubSpot activities import (0.13.0, Beacon spec 254 T004)
+# Tasks: HubSpot activities import (0.12.0, Beacon spec 254 T004)
 
 - [x] T004.1 Verify HubSpot's engagement endpoints and scopes (legacy v3: `crm.objects.contacts.read`; `2026-09`: any
       CRM read scope incl. granular `crm.objects.{notes,calls,meetings,tasks}.read`) — no new scope

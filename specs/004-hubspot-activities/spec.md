@@ -1,4 +1,4 @@
-# Feature specification: HubSpot activities import (0.13.0)
+# Feature specification: HubSpot activities import (0.12.0)
 
 **Feature branch**: `feat/hubspot-activities`
 **Created**: 2026-11-27

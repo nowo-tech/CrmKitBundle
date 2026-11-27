@@ -84,7 +84,7 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
         'crm.lists.read'             => ['POST', '/crm/v3/lists/search', []],
     ];
 
-    /** Most associated ids of one kind kept per engagement (0.13.0). */
+    /** Most associated ids of one kind kept per engagement (0.12.0). */
     public const MAX_ASSOCIATED = 100;
 
     /** HubSpot's primary company association (contact ⇒ company, HUBSPOT_DEFINED). */

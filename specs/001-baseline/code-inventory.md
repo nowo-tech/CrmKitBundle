@@ -781,7 +781,7 @@ lost-savepoint pattern, the configuration tree, routes and service definitions a
 | `src/Resources/config/doctrine-activities/EngagementSubject.orm.xml` | FR-ACT-001, FR-ACT-003 |
 | `src/Resources/views/record/_activities.html.twig` | FR-ACT-013 |
 
-### 0.13.0: HubSpot activities import (5)
+### 0.12.0: HubSpot activities import (5)
 
 | File | Requirements |
 | --- | --- |
@@ -791,6 +791,6 @@ lost-savepoint pattern, the configuration tree, routes and service definitions a
 | `src/Domain/Read/HubSpot/HubSpotEngagement.php` | FR-HUB-002 (spec 004) |
 | `src/Domain/Read/HubSpot/HubSpotEngagementPage.php` | FR-HUB-002 (spec 004) |
 
-**Total production sources**: 577 (every file under `src/`; 0.13.0 added the 5 HubSpot activities files; 0.11.0 added the 60 activity files; the `0.7.0-0.10.x` sections were added by the 2026-11-24
+**Total production sources**: 577 (every file under `src/`; 0.12.0 added the 5 HubSpot activities files; 0.11.0 added the 60 activity files; the `0.7.0-0.10.x` sections were added by the 2026-11-24
 refresh, 85 files; 0.10.2 added `ListFilters.php`, `DealListResult.php` and `partials/_empty.html.twig`; 0.10.3 added
 `ImportDialogPageResolver.php`, `import/_primary.html.twig` and `import/hubspot/_mapping_table.html.twig`)

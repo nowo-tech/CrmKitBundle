@@ -28,7 +28,7 @@ use function range;
 use function str_repeat;
 
 /**
- * The HubSpot engagements import's pure parts (0.13.0): the text rules (HTML ⇒ plain text, titles, times, minutes),
+ * The HubSpot engagements import's pure parts (0.12.0): the text rules (HTML ⇒ plain text, titles, times, minutes),
  * the kinds, the scope and the run cursor with engagement stages, the reader's engagement pages and the kinds a
  * configuration imports.
  */

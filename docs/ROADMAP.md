@@ -49,13 +49,14 @@ earlier order B → C → D → E → F → G.
 | **E2** informative circulars | 0.10.0 | One e-mail per recipient through MailKit's queue with a rate limit; per-purpose unsubscribe; `service_notice` purpose; commercial circulars need marketing consent; bounces mark the address; send log; open signal to scoring; payment reminders through this channel | `campaigns.enabled` | Not started |
 | **G** reports | later → 1.0.0 | Deal scoring, deeper forecasts, velocity and cohorts, open / click tracking, two-way sync with external calendars, inactive-contact review | `reports.enabled` | Not started |
 | **H1** HubSpot import: connection, companies, contacts | 0.10.0 | HubSpot as a third import source next to CSV and vCard (same `crm_import` queue, mapping, duplicate policy, limits, progress): a per-tenant service key (or legacy private app token), validated (account id, read scopes; write scopes refused where HubSpot lists them) and sealed; companies, contacts, contact ↔ company associations, owners → members by e-mail, lists → tags; HubSpot ids kept as external refs so a re-run updates; paging, 429 backoff, resume; optional Messenger run. Design: [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md) (Beacon spec 253, D-20261123-04) | `import.hubspot.enabled` | Built (PR #23), unreleased |
-| **H2** HubSpot import: deals | 0.12.0 | Pipelines → deal funnels, stages → stages (created on confirmation), deals with amount, currency, close date and open / won / lost; deal ↔ company / contact | `import.hubspot.deals` (needs `pipeline.enabled`, phase B released in 0.3.0) | Designed, not started |
+| **H2** HubSpot import: deals | after 0.13.0 | Pipelines → deal funnels, stages → stages (created on confirmation), deals with amount, currency, close date and open / won / lost; deal ↔ company / contact | `import.hubspot.deals` (needs `pipeline.enabled`, phase B released in 0.3.0) | Designed, not started |
 | **H3** HubSpot import: OAuth | 0.14.0 | "Connect to HubSpot" with state + PKCE, sealed refresh token, revoke on disconnect; the token path keeps working | `import.hubspot.oauth.enabled` | Designed, not started |
 
 **2026-11-26 (Beacon priority):** A-1 activities (Beacon spec 254) moves first and is built as **0.11.0**; H2 follows
 as 0.12.0, the Zoho import Z1 (Beacon spec 253 block Z, owner decisions Q-Z1..18 of 2026-11-24, design in the Zoho
 design note) as 0.13.0 and H3 as 0.14.0. Z2 / Z3 and the later spec 254 slices take their numbers when they are
-scheduled, in the order below.
+scheduled, in the order below. **2026-11-27:** the HubSpot activities import (spec 254 T004) ships as **0.12.0**; A-2
+templates waits for MailKit's stored templates and becomes 0.13.0; H2, Z1 and H3 follow with the next free minors.
 
 Status as of 2026-11-23 (latest tag v0.8.0; 0.8.1 is being released; 0.9.0, the pipeline dialogs, is PR #22; H1 is
 built as 0.10.0 in draft PR #23). Tags v0.4.0 to v0.8.1 were not the phases of the plan: they are UI and
@@ -103,15 +104,15 @@ Q-O questions) in [CONTRACT.md](CONTRACT.md) before it is built.
 
 ### Release plan
 
-Version numbers as of 2026-11-26: A-1 moved first (Beacon priority) and is **0.11.0**; then H2 0.12.0, Z1 (Zoho
-companies and contacts) 0.13.0, H3 0.14.0; the slices after them take the next free minor in the order of this table
+Version numbers as of 2026-11-27: A-1 moved first (Beacon priority) and is **0.11.0**; then the HubSpot activities
+import 0.12.0, A-2 templates 0.13.0, then H2, Z1 (Zoho companies and contacts) and H3; the slices after them take the next free minor in the order of this table
 when they are scheduled (numbers move up when another release lands first; the order does not change). "Kit option" is the configuration switch; off means no tables mapped, no routes, no services, no menu entries.
 
 | Slice | CrmKit | Content | Kit option | Other bundles (new work in **bold**) | Beacon release (target) |
 | --- | --- | --- | --- | --- | --- |
-| **A-1** activities | 0.11.0 | Kinds `call`, `meeting`, `email`; log dialogs; timeline filter by kind and person; fan-out contact → companies / deals; pinned notes; @mentions; host activity source; meetings on TaskBoard's calendar + ICS download (MailKit invite part a follow-up); HubSpot notes / calls / meetings / tasks built as 0.13.0 (T004, `specs/004-hubspot-activities/`) | `activities.enabled` | TaskBoard (event source, as is), NotifyKit 0.3 (as is), MilkdownEditor mentions (as is), **MailKit: ICS invites** (follow-up), SearchKit | v1.176 |
-| H1 / H2 / Z1 / H3 | 0.10.0 / 0.12.0 / 0.13.0 / 0.14.0 | HubSpot import (spec 253), Zoho import Z1 (spec 253 block Z) | `import.hubspot.*`, `import.zoho.*` | — | v1.174 (H1) |
-| **A-2** templates | 0.15.0 | Personal and shared e-mail templates, snippets, closed merge-field resolver, consent purpose per template; *Write e-mail* insert; sent mail logged as `email` | `templates.enabled` | **MailKit: stored templates + placeholder registry** (CrmKit adds the CRM placeholders) | v1.176 or v1.177 |
+| **A-1** activities | 0.11.0 | Kinds `call`, `meeting`, `email`; log dialogs; timeline filter by kind and person; fan-out contact → companies / deals; pinned notes; @mentions; host activity source; meetings on TaskBoard's calendar + ICS download (MailKit invite part a follow-up); HubSpot notes / calls / meetings / tasks built as 0.12.0 (T004, `specs/004-hubspot-activities/`) | `activities.enabled` | TaskBoard (event source, as is), NotifyKit 0.3 (as is), MilkdownEditor mentions (as is), **MailKit: ICS invites** (follow-up), SearchKit | v1.176 |
+| H1 / H2 / Z1 / H3 | 0.10.0 / next free minors after A-2 | HubSpot import (spec 253), Zoho import Z1 (spec 253 block Z) | `import.hubspot.*`, `import.zoho.*` | — | v1.174 (H1) |
+| **A-2** templates | 0.13.0 | Personal and shared e-mail templates, snippets, closed merge-field resolver, consent purpose per template; *Write e-mail* insert; sent mail logged as `email` | `templates.enabled` | **MailKit: stored templates + placeholder registry** (CrmKit adds the CRM placeholders) | v1.176 or v1.177 |
 | **B** mailbox sync + tracking | 0.16.0 | Auto-link by exact contact e-mail, `email` activities from linked messages, open / click signal, reply detection; HubSpot e-mails (metadata; bodies on opt-in) | `mail_link.enabled` | **MailKit B1: Graph delegated personal mailboxes** (spec 236 kit side); **MailKit B2: Gmail provider** (off until Google's review); **TimeTrack: OAuth helpers with extra scopes** (Q-254-15); MailKit tracking + ShortLink clicks (as is) | v1.177 (Outlook); Gmail by configuration later |
 | **C-1** catalogue + line items | 0.17.0 | Product catalogue, line items on deals, deal amount from items (per funnel), MRR / ARR; HubSpot products and line items | `catalog.enabled` | — (new in CrmKit; CurrencyKit only for an optional reference display) | v1.178 |
 | **C-2** quotes | 0.18.0 | Quotes with series numbering, versions, branded PDF, signed accept / reject link, immutable acceptance, won / lost on answer; HubSpot quotes | `quotes.enabled` | ReportKit PDF runner + brand-contracts (as is); PdfSignable later as a provider (as is) | v1.178 or v1.179 |
@@ -606,7 +607,7 @@ processing, native apps.
 with spec 254, 1.0.0 comes once blocks A–D are released and audited, later blocks as additive 1.x minors (Q-254-14, decided 2026-11-23). Status as of 2026-11-23, latest tag v0.8.0.
 
 - **HubSpot import (H1–H3)** is designed in [design/HUBSPOT_IMPORT.md](design/HUBSPOT_IMPORT.md): H1 0.10.0 (PR #23),
-  H2 0.12.0, H3 0.14.0 (since 2026-11-26: A-1 is 0.11.0 and Z1 0.13.0); numbers move up if another release lands first. Owner questions Q-H1..Q-H13 are listed there.
+  H2 and H3 after A-2 (since 2026-11-27: A-1 is 0.11.0, the activities import 0.12.0, A-2 0.13.0, then H2, Z1, H3); numbers move up if another release lands first. Owner questions Q-H1..Q-H13 are listed there.
 - **HubSpot parity (Beacon spec 254)** adds nine blocks A–I after H3 (section below); its owner questions
   Q-254-1..Q-254-14 were decided on 2026-11-23 (all recommendations accepted). Q-254-15 (mailbox OAuth through TimeTrack) and Q-254-16
   (static lists as tags) were decided the same day, as were AutomationKit's Q-AK-1..17.

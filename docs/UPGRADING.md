@@ -26,7 +26,7 @@
 
 ## Unreleased
 
-Planned as **0.13.0** (HubSpot activities, Beacon spec 254 T004). Nothing to do: no schema change (the external
+Planned as **0.12.0** (HubSpot activities, Beacon spec 254 T004). Nothing to do: no schema change (the external
 references and the activity, note and next-action tables exist), no configuration key, no new HubSpot scope. With
 `import.hubspot.enabled` and `activities.enabled` on, the HubSpot start step offers notes, calls and meetings, and
 tasks too with `pipeline.enabled`; existing credentials keep working (`crm.objects.contacts.read` covers the

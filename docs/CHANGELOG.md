@@ -30,7 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Planned as **0.13.0** (Beacon spec 254 T004, FR-100 block A; the version may move when the queue is rebased). No BC
+Planned as **0.12.0** (Beacon spec 254 T004, FR-100 block A; ships before A-2 templates, which waits for MailKit stored templates and moves to 0.13.0). No BC
 break, no schema change, no new configuration key and no new HubSpot scope.
 
 ### Added

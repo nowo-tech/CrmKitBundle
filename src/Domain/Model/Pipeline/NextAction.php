@@ -131,7 +131,7 @@ class NextAction
     }
 
     /**
-     * Changes the title, the due time and the assignee (0.13.0: a HubSpot re-run of the task it was imported from).
+     * Changes the title, the due time and the assignee (0.12.0: a HubSpot re-run of the task it was imported from).
      */
     public function revise(string $title, DateTimeImmutable $dueAt, ?string $assigneeId): void
     {

@@ -24,7 +24,7 @@ use const ENT_HTML5;
 use const ENT_QUOTES;
 
 /**
- * Turns HubSpot engagement values into what the activities model stores (0.13.0), pure: HTML bodies become plain
+ * Turns HubSpot engagement values into what the activities model stores (0.12.0), pure: HTML bodies become plain
  * text (scripts and styles dropped, block ends kept as line breaks, entities decoded, control and format characters
  * removed, at most `$max` characters with an ellipsis), titles one line, times UTC. Every result is shown escaped.
  *

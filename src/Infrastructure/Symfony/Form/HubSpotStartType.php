@@ -18,7 +18,7 @@ use function is_string;
 
 /**
  * What a HubSpot import reads (0.10.0): the objects, the lists (their names are HubSpot text, shown escaped and not
- * translated) and the duplicate policy; 0.13.0: the engagements (notes, calls, meetings, tasks) the configuration
+ * translated) and the duplicate policy; 0.12.0: the engagements (notes, calls, meetings, tasks) the configuration
  * imports.
  *
  * @extends AbstractType<mixed>
@@ -37,7 +37,7 @@ final class HubSpotStartType extends AbstractType
     {
         $this->withBuilder($builder, function () use ($options): void {
             $activities = is_array($options['activities']) ? $options['activities'] : [];
-            // 0.13.0: with engagements on offer, an import may read engagements only (onto records of an earlier run).
+            // 0.12.0: with engagements on offer, an import may read engagements only (onto records of an earlier run).
             $this->addTypedField('objects', ChoiceType::class, ['label' => 'import.hubspot.form.objects', 'help' => 'import.hubspot.form.objects_help', 'multiple' => true, 'expanded' => true, 'required' => $activities === [], 'choices' => ['import.hubspot.object.companies' => 'companies', 'import.hubspot.object.contacts' => 'contacts'], 'constraints' => $activities === [] ? [new Count(min: 1)] : []]);
             if ($activities !== []) {
                 $choices = [];
@@ -54,7 +54,7 @@ final class HubSpotStartType extends AbstractType
     }
 
     /**
-     * Array data, CSRF token `nowo_crm_kit_hubspot_start`; `lists`: list name => list id; `activities` (0.13.0): the
+     * Array data, CSRF token `nowo_crm_kit_hubspot_start`; `lists`: list name => list id; `activities` (0.12.0): the
      * engagement kinds on offer.
      */
     public function configureOptions(OptionsResolver $resolver): void

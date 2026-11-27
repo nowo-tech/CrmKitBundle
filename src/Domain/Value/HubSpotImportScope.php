@@ -17,7 +17,7 @@ use function substr;
 
 /**
  * What a HubSpot import reads (0.10.0): the objects (at least one; contacts imply companies, which are read first so
- * that a contact's company resolves) and up to 50 lists whose members get a tag. 0.13.0: the engagements too (notes,
+ * that a contact's company resolves) and up to 50 lists whose members get a tag. 0.12.0: the engagements too (notes,
  * calls, meetings, tasks), read after the objects; an import may read engagements only (they attach to records an
  * earlier run imported).
  */
@@ -32,13 +32,13 @@ final readonly class HubSpotImportScope
     /** @var list<HubSpotObjectId> */
     public array $lists;
 
-    /** @var list<HubSpotActivity> in reading order (0.13.0) */
+    /** @var list<HubSpotActivity> in reading order (0.12.0) */
     public array $activities;
 
     /**
      * @param list<HubSpotObject> $objects
      * @param list<HubSpotObjectId> $lists distinct list ids
-     * @param list<HubSpotActivity> $activities 0.13.0: the engagements to read
+     * @param list<HubSpotActivity> $activities 0.12.0: the engagements to read
      */
     public function __construct(array $objects, array $lists = [], array $activities = [])
     {
@@ -89,7 +89,7 @@ final readonly class HubSpotImportScope
     }
 
     /**
-     * The scope as the import's `columns`: the object values, then `list:<id>`, then `activity:<kind>` (0.13.0).
+     * The scope as the import's `columns`: the object values, then `list:<id>`, then `activity:<kind>` (0.12.0).
      *
      * @return list<string>
      */

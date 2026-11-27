@@ -32,7 +32,7 @@ use function str_contains;
 use const JSON_THROW_ON_ERROR;
 
 /**
- * HubSpot engagements (0.13.0, Beacon spec 254 FR-100 A): notes ⇒ notes, calls and meetings ⇒ logged activities,
+ * HubSpot engagements (0.12.0, Beacon spec 254 FR-100 A): notes ⇒ notes, calls and meetings ⇒ logged activities,
  * tasks ⇒ next actions, on the records an import of the same account made; HTML bodies as plain text, owners as
  * authors and assignees, associations as subject rows and attendees; a re-run updates and never duplicates; the
  * switches (`activities.enabled`, `pipeline.enabled`) refuse at start and skip at run; access per record, attended and

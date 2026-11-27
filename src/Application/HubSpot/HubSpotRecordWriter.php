@@ -319,7 +319,7 @@ final readonly class HubSpotRecordWriter
     }
 
     /**
-     * The final record id behind each live reference (merges followed; the reference moves to the survivor). 0.13.0:
+     * The final record id behind each live reference (merges followed; the reference moves to the survivor). 0.12.0:
      * also how the engagements import finds the records of their associations.
      *
      * @param array<string, ExternalRef> $refs

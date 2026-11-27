@@ -516,7 +516,7 @@ final class ServiceDefinitions
     }
 
     /**
-     * The HubSpot engagement kinds the configuration imports (0.13.0): notes, calls and meetings with
+     * The HubSpot engagement kinds the configuration imports (0.12.0): notes, calls and meetings with
      * `activities.enabled`, tasks (as next actions) with `pipeline.enabled` too.
      *
      * @return list<string>
@@ -534,7 +534,7 @@ final class ServiceDefinitions
     /**
      * The HubSpot import (0.10.0, only with `import.hubspot.enabled`): the kit's own HttpClient, the reader, the store,
      * the default secret box (the secret box alias and the OutboundUrlGuard pin are set by CrmPortsPass), the services
-     * and the rotation command. 0.13.0: the engagements writer, with the activities and pipeline stores when on.
+     * and the rotation command. 0.12.0: the engagements writer, with the activities and pipeline stores when on.
      *
      * @param array<string, mixed> $config
      * @param list<string> $activities the engagement kinds imported

@@ -61,7 +61,7 @@ final class FakeHubSpot
     public array $lists = [];
 
     /**
-     * 0.13.0: engagements per kind (`notes`, `calls`, `meetings`, `tasks`): id => properties + associated ids.
+     * 0.12.0: engagements per kind (`notes`, `calls`, `meetings`, `tasks`): id => properties + associated ids.
      *
      * @var array<string, array<array-key, array{properties: array<string, string|null>, contacts?: list<string>, companies?: list<string>}>>
      */

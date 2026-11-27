@@ -53,7 +53,7 @@ final readonly class HubSpotImportController
     /**
      * Wires the collaborators.
      *
-     * @param list<string> $activities 0.13.0: the engagement kinds the start step offers (empty: none)
+     * @param list<string> $activities 0.12.0: the engagement kinds the start step offers (empty: none)
      */
     public function __construct(
         private UiSupport $ui,
@@ -307,7 +307,7 @@ final readonly class HubSpotImportController
     }
 
     /**
-     * The scope of a valid start form (0.13.0: no object and no engagement is a `required` error on the objects).
+     * The scope of a valid start form (0.12.0: no object and no engagement is a `required` error on the objects).
      *
      * @param array<string, mixed> $data
      *

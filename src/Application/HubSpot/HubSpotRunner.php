@@ -201,7 +201,7 @@ final readonly class HubSpotRunner
     }
 
     /**
-     * A page of notes, calls, meetings or tasks (0.13.0) with their contact and company associations. A kind the
+     * A page of notes, calls, meetings or tasks (0.12.0) with their contact and company associations. A kind the
      * configuration does not import (`activities.enabled` or, for tasks, `pipeline.enabled` off) is skipped without
      * asking HubSpot, with one row that says why.
      *

@@ -32,7 +32,7 @@
   - [Credential and scopes](#credential-and-scopes)
   - [How the credential is checked](#how-the-credential-is-checked)
   - [Steps and rules](#steps-and-rules)
-  - [Activities: notes, calls, meetings, tasks (0.13.0)](#activities-notes-calls-meetings-tasks-0130)
+  - [Activities: notes, calls, meetings, tasks (0.12.0)](#activities-notes-calls-meetings-tasks-0120)
   - [Background runs (Messenger)](#background-runs-messenger)
 - [The API (0.3.0)](#the-api-030)
 - [Activities (0.11.0)](#activities-0110)
@@ -936,7 +936,7 @@ their own.
 | `crm.objects.deals.read` | H2 | Deals | not called by H1 |
 | `crm.schemas.deals.read` | H2 | Deal properties | not called by H1 |
 
-0.13.0 (activities): no new scope. HubSpot's legacy v3 reference names `crm.objects.contacts.read` (already required)
+0.12.0 (activities): no new scope. HubSpot's legacy v3 reference names `crm.objects.contacts.read` (already required)
 for `GET /crm/v3/objects/{notes,calls,meetings,tasks}`; its date-versioned reference (`2026-09`) accepts any CRM read
 scope, including the granular `crm.objects.notes.read`, `crm.objects.calls.read`, `crm.objects.meetings.read` and
 `crm.objects.tasks.read`, which a credential may hold (they are read-only, so they are not refused). Checked on
@@ -1046,7 +1046,7 @@ Optional host port `CrmActorEmailLookupInterface` (`actor_email_lookup`): the ac
 e-mail. Without it the kit filters `CrmActorDirectoryInterface::owners()` by `ActorProfile::$email`. Returned keys are
 re-checked with `===` against the requested ones.
 
-### Activities: notes, calls, meetings, tasks (0.13.0)
+### Activities: notes, calls, meetings, tasks (0.12.0)
 
 Beacon spec 254 FR-100 block A. The start step also offers **Activities** when the configuration imports them: notes,
 calls and meetings with `activities.enabled`, tasks with `pipeline.enabled` too. No configuration key of its own, no new

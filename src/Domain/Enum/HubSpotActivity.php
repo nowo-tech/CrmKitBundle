@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Domain\Enum;
 
 /**
- * A HubSpot engagement kind the import reads (0.13.0, Beacon spec 254 FR-100 A): notes become notes, calls and
+ * A HubSpot engagement kind the import reads (0.12.0, Beacon spec 254 FR-100 A): notes become notes, calls and
  * meetings logged activities, tasks next actions. The value is HubSpot's path segment (`/crm/v3/objects/{value}`).
  * Read with the parent object scope (`crm.objects.contacts.read`, already required by every connection); the
  * granular `crm.objects.{notes,calls,meetings,tasks}.read` scopes are read-only and accepted when a token holds them.

@@ -47,7 +47,7 @@ use function sort;
 use function strtoupper;
 
 /**
- * Settles one page of HubSpot notes, calls, meetings or tasks inside the caller's unit (0.13.0, Beacon spec 254
+ * Settles one page of HubSpot notes, calls, meetings or tasks inside the caller's unit (0.12.0, Beacon spec 254
  * FR-100 A): notes become notes, calls and meetings logged activities (`activities.enabled`), tasks next actions on
  * the built-in list (`pipeline.enabled`). Per item the external reference first (a re-run updates the item it made;
  * empty HubSpot values never clear a value; associations and attendees only add), else a new item on its primary

@@ -1065,7 +1065,8 @@ with one row `import.hubspot.activities_off` (or `import.hubspot.tasks_off`).
 
 Each page is one `GET /crm/v3/objects/{notes|calls|meetings|tasks}` with `associations=contacts,companies` (at most
 25 items per page whatever `page_size`, so HTML bodies stay under `max_response_bytes`; at most 20 ids of each kind
-per item; the association's own paging is not followed), settled in one write unit like the records.
+per item used as records, every inline contact id checked against erased people; the association's own paging is not
+followed), settled in one write unit like the records.
 
 - **Where it lands.** The primary record is the first associated contact that has a live record of the same account,
   else the first company, that the run may write on (`edit` when a person runs the page; unattended under

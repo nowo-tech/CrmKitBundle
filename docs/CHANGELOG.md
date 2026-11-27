@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.12.1] - 2026-11-27](#0121---2026-11-27)
 - [[0.12.0] - 2026-11-27](#0120---2026-11-27)
 - [[0.11.0] - 2026-11-27](#0110---2026-11-27)
 - [[0.10.3] - 2026-11-25](#0103---2026-11-25)
@@ -32,9 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 Planned as **0.13.0** (Beacon spec 254, block A-2, task T003, FR-015 / FR-016; owner D-20261127-02). 0.12.0 (the
-HubSpot activity import) is released. No BC break: everything new is behind `templates.enabled` (off by default; it
-needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.7); with it off no table is mapped and no
-route or service is added.
+HubSpot activity import) and 0.12.1 are released. No BC break: everything new is behind `templates.enabled` (off by
+default; it needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.7); with it off no table is
+mapped and no route or service is added.
 
 ### Added
 
@@ -81,6 +82,21 @@ route or service is added.
 
 - `PipelineDialogs::render()` takes other fragment / page templates and extra variables (internal).
 - `ConflictException::MAIL_SENT` (`crm_mail_already_sent`).
+
+## [0.12.1] - 2026-11-27
+
+Planned as **0.12.1** (patch, follow-ups of audit ZDE-v). No BC break, no schema change.
+
+### Fixed
+
+- HubSpot activities import (ZDE-v-1, Q-H6): the erased-person check looks up every contact id HubSpot gives inline
+  with an item, not only the first 20 used as records, so an item associated with more than 20 contacts whose erased
+  person comes later is skipped too (`error.record_erased`). `HubSpotEngagement::$allContacts` (read model) holds them.
+
+### Documentation
+
+- SECURITY: erasures tombstone HubSpot references only while `import.hubspot.enabled` is on (the reference table is
+  mapped only then); what to do when the import was switched off (ZDE-v-2).
 
 ## [0.12.0] - 2026-11-27
 

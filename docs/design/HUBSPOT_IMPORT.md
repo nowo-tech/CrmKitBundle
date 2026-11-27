@@ -362,7 +362,8 @@ preselected; custom HubSpot properties default to "skip". Values go through the 
 | H2 `dealname`, `amount`, `deal_currency_code`, `closedate`, `dealstage`, `pipeline`, `hubspot_owner_id`, `closed_lost_reason` | `title`, `amount` (decimal string, `Decimal`), `currency` (ISO 4217; missing ⇒ the account's `companyCurrency`), `expected_close` (date in UTC), stage / status from the stage kind, owner, lost reason = `import.hubspot.lost_reason` with the HubSpot text in `lost_note` (≤ 500) (Q-H8) |
 | H2 deal ↔ company / contact | `company_id` / `contact_id` | CrmKit keeps one of each: the primary company (type 5) else the lowest HubSpot id; the lowest contact id (Q-H9) |
 
-Not imported in v1: engagements (e-mails, calls, meetings, notes, tasks), tickets, files, quotes, line items,
+0.13.0 (Beacon spec 254 FR-100 A): notes, calls, meetings and tasks are imported (USAGE "Activities: notes, calls,
+meetings, tasks"). Not imported in v1: e-mail engagements (block B), tickets, files, quotes, line items,
 products, `lifecyclestage` (party funnels; Q-H10), consent / subscription status, archived objects.
 
 ## 12. Matching, duplicate policy, idempotency and atomicity

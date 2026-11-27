@@ -8,8 +8,11 @@ use InvalidArgumentException;
 use JsonException;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotException;
 use Nowo\CrmKitBundle\Application\HubSpot\Port\HubSpotReaderInterface;
+use Nowo\CrmKitBundle\Domain\Enum\HubSpotActivity;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotAssociation;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotEngagement;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotEngagementPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotIdPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotList;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotOwner;
@@ -29,6 +32,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 use function array_map;
 use function array_slice;
+use function array_values;
 use function count;
 use function implode;
 use function in_array;
@@ -79,6 +83,9 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
         'crm.schemas.contacts.read'  => ['GET', '/crm/v3/properties/contacts', []],
         'crm.lists.read'             => ['POST', '/crm/v3/lists/search', []],
     ];
+
+    /** Most associated ids of one kind kept per engagement (0.13.0). */
+    public const MAX_ASSOCIATED = 100;
 
     /** HubSpot's primary company association (contact ⇒ company, HUBSPOT_DEFINED). */
     private const PRIMARY_COMPANY = 1;
@@ -147,7 +154,7 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
     /**
      * {@inheritDoc}
      */
-    public function count(HubSpotToken $token, HubSpotObject $object): int
+    public function count(HubSpotToken $token, HubSpotObject|HubSpotActivity $object): int
     {
         $data  = $this->call($token, 'POST', '/crm/v3/objects/' . rawurlencode($object->value) . '/search', [], ['limit' => 1, 'properties' => ['hs_object_id']]);
         $total = $data['total'] ?? null;
@@ -191,16 +198,30 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
         $data    = $this->call($token, 'GET', '/crm/v3/objects/' . rawurlencode($object->value), $query);
         $records = [];
         foreach ($this->results($data) as $row) {
-            $values = [];
-            $raw    = is_array($row['properties'] ?? null) ? $row['properties'] : [];
-            foreach ($names as $name) {
-                $value         = $raw[$name] ?? null;
-                $values[$name] = is_string($value) ? $value : (is_int($value) || is_float($value) ? (string) $value : (is_bool($value) ? ($value ? 'true' : 'false') : null));
-            }
-            $records[] = new HubSpotRecord($this->objectId($row['id'] ?? null), $values);
+            $records[] = new HubSpotRecord($this->objectId($row['id'] ?? null), $this->values($row, $names));
         }
 
         return new HubSpotPage($records, $this->next($data));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function engagements(HubSpotToken $token, HubSpotActivity $kind, ?HubSpotCursor $after, int $limit): HubSpotEngagementPage
+    {
+        $names = $kind->properties();
+        $query = ['limit' => (string) $limit, 'archived' => 'false', 'properties' => implode(',', $names), 'associations' => 'contacts,companies'];
+        if ($after instanceof HubSpotCursor) {
+            $query['after'] = $after->value;
+        }
+        $data        = $this->call($token, 'GET', '/crm/v3/objects/' . rawurlencode($kind->value), $query);
+        $engagements = [];
+        foreach ($this->results($data) as $row) {
+            $associations  = is_array($row['associations'] ?? null) ? $row['associations'] : [];
+            $engagements[] = new HubSpotEngagement($this->objectId($row['id'] ?? null), $this->values($row, $names), $this->associated($associations['contacts'] ?? null), $this->associated($associations['companies'] ?? null));
+        }
+
+        return new HubSpotEngagementPage($engagements, $this->next($data));
     }
 
     /**
@@ -295,6 +316,51 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
         }
 
         return new HubSpotIdPage($ids, $this->next($data));
+    }
+
+    /**
+     * The requested properties of a result row as strings (null: no value).
+     *
+     * @param array<array-key, mixed> $row
+     * @param list<string> $names
+     *
+     * @return array<string, string|null>
+     */
+    private function values(array $row, array $names): array
+    {
+        $values = [];
+        $raw    = is_array($row['properties'] ?? null) ? $row['properties'] : [];
+        foreach ($names as $name) {
+            $value         = $raw[$name] ?? null;
+            $values[$name] = is_string($value) ? $value : (is_int($value) || is_float($value) ? (string) $value : (is_bool($value) ? ($value ? 'true' : 'false') : null));
+        }
+
+        return $values;
+    }
+
+    /**
+     * The distinct ids of one association kind of a v3 result (`{"results": [{"id": …, "type": …}]}`), at most
+     * {@see self::MAX_ASSOCIATED}; the association's own paging is not followed.
+     *
+     * @throws HubSpotException
+     *
+     * @return list<HubSpotObjectId>
+     */
+    private function associated(mixed $block): array
+    {
+        if ($block === null) {
+            return [];
+        }
+        $rows = is_array($block) && is_array($block['results'] ?? null) ? $block['results'] : throw new HubSpotException(HubSpotException::BAD_RESPONSE, 200);
+        $ids  = [];
+        foreach ($rows as $row) {
+            $id = $this->objectId(is_array($row) ? ($row['id'] ?? null) : null);
+            if (count($ids) < self::MAX_ASSOCIATED) {
+                $ids[$id->value] = $id;
+            }
+        }
+
+        return array_values($ids);
     }
 
     /**

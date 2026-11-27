@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Controller;
 
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\DuplicatePolicy;
+use Nowo\CrmKitBundle\Domain\Enum\HubSpotActivity;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
@@ -51,6 +52,8 @@ final readonly class HubSpotImportController
 {
     /**
      * Wires the collaborators.
+     *
+     * @param list<string> $activities 0.13.0: the engagement kinds the start step offers (empty: none)
      */
     public function __construct(
         private UiSupport $ui,
@@ -58,6 +61,7 @@ final readonly class HubSpotImportController
         private HubSpotImportServiceInterface $imports,
         private ImportServiceInterface $runs,
         private int $syncChunks = 5,
+        private array $activities = [],
     ) {
     }
 
@@ -159,7 +163,7 @@ final readonly class HubSpotImportController
             } catch (InvalidInputException $e) {
                 $alert = $this->firstError($e);
             }
-            $form = $this->ui->form(HubSpotStartType::class, ['objects' => ['companies', 'contacts'], 'policy' => 'skip'], ['lists' => $lists], 'crm_hubspot_start');
+            $form = $this->ui->form(HubSpotStartType::class, ['objects' => ['companies', 'contacts'], 'activities' => [], 'policy' => 'skip'], ['lists' => $lists, 'activities' => $this->activities], 'crm_hubspot_start');
             $form->handleRequest($request);
             $status = $alert === null ? Response::HTTP_OK : Response::HTTP_UNPROCESSABLE_ENTITY;
             if ($form->isSubmitted()) {
@@ -303,9 +307,11 @@ final readonly class HubSpotImportController
     }
 
     /**
-     * The scope of a valid start form.
+     * The scope of a valid start form (0.13.0: no object and no engagement is a `required` error on the objects).
      *
      * @param array<string, mixed> $data
+     *
+     * @throws InvalidInputException
      */
     private function scope(array $data): HubSpotImportScope
     {
@@ -322,8 +328,19 @@ final readonly class HubSpotImportController
                 $lists[] = new HubSpotObjectId($list);
             }
         }
+        $activities = [];
+        foreach (is_array($data['activities'] ?? null) ? $data['activities'] : [] as $activity) {
+            $kind = is_string($activity) ? HubSpotActivity::tryFrom($activity) : null;
+            if ($kind instanceof HubSpotActivity) {
+                $activities[] = $kind;
+            }
+        }
 
-        return new HubSpotImportScope($objects, $lists);
+        if ($objects === [] && $activities === []) {
+            throw InvalidInputException::field('objects', 'error.required');
+        }
+
+        return new HubSpotImportScope($objects, $lists, $activities);
     }
 
     /**

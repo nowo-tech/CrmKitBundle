@@ -355,11 +355,18 @@ import:
             confirm_account_change: 'Der Schlüssel darf zu einem anderen HubSpot-Konto gehören'
             objects: 'Objekte'
             objects_help: 'Deals folgen in einer späteren Version.'
+            activities: 'Aktivitäten'
+            activities_help: 'Notizen, Anrufe, Meetings und Aufgaben (als nächste Schritte) von Datensätzen, die aus diesem Konto importiert wurden, jetzt oder in einem früheren Lauf.'
             lists: 'Listen (ihre Mitglieder bekommen ein Tag)'
             lists_help: 'Höchstens 50.'
         object:
             companies: 'Firmen'
             contacts: 'Kontakte'
+        activity:
+            notes: 'Notizen'
+            calls: 'Anrufe'
+            meetings: 'Besprechungen'
+            tasks: 'Aufgaben (als nächste Schritte)'
         list:
             skip: 'Nicht taggen'
             create: 'Neues Tag mit dem Namen der Liste'
@@ -400,6 +407,9 @@ import:
             object: 'Objekt'
             id: 'HubSpot-ID'
         country_unknown: 'Land nicht gesetzt (kein Zweibuchstabencode)'
+        activities_off: 'Nicht importiert: Aktivitäten sind ausgeschaltet.'
+        tasks_off: 'Nicht importiert: nächste Schritte (Trichter) sind ausgeschaltet.'
+        no_record: 'Kein importiertes Unternehmen und kein importierter Kontakt dieses Kontos, dem es zugeordnet werden kann.'
     steps: 'Importschritte'
     step:
         file: 'Datei'
@@ -531,6 +541,7 @@ error:
     hubspot_too_many: 'Das HubSpot-Konto enthält mehr Datensätze als der Import erlaubt: er wurde beendet.'
     hubspot_key_unavailable: 'Der HubSpot-Schlüssel kann mit den konfigurierten geheimen Schlüsseln weder geöffnet noch versiegelt werden. Es wurde nichts geändert: Ein Administrator muss den Schlüssel wieder konfigurieren (siehe Anleitung zur Schlüsselrotation).'
     hubspot_browse_limited: 'Zu viele HubSpot-Abfragen für diese Organisation. Warten Sie einige Minuten.'
+    hubspot_activities_off: 'Der Import von Aktivitäten ist nicht eingeschaltet.'
     record_erased: 'Die Person wurde gelöscht (DSGVO): kein erneuter Import.'
     record_trashed: 'Der Datensatz ist im Papierkorb: unverändert.'
     record_merged: 'Der Datensatz wurde inzwischen zusammengeführt: erneut versuchen.'

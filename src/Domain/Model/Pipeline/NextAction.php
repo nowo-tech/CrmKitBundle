@@ -130,6 +130,16 @@ class NextAction
         return $this->version;
     }
 
+    /**
+     * Changes the title, the due time and the assignee (0.13.0: a HubSpot re-run of the task it was imported from).
+     */
+    public function revise(string $title, DateTimeImmutable $dueAt, ?string $assigneeId): void
+    {
+        $this->title      = $title;
+        $this->dueAt      = $dueAt;
+        $this->assigneeId = $assigneeId;
+    }
+
     /** Closes it (done or cancelled). */
     public function close(NextActionStatus $status, DateTimeImmutable $now): void
     {

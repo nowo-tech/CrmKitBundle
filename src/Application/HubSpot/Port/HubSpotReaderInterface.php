@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Application\HubSpot\Port;
 
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotException;
+use Nowo\CrmKitBundle\Domain\Enum\HubSpotActivity;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotAssociation;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotEngagementPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotIdPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotList;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotOwnerPage;
@@ -54,11 +56,11 @@ interface HubSpotReaderInterface
     public function probe(HubSpotToken $token, string $scope): bool;
 
     /**
-     * How many objects of the kind the account holds (not archived).
+     * How many objects of the kind the account holds (not archived); 0.13.0: engagements of a kind too.
      *
      * @throws HubSpotException
      */
-    public function count(HubSpotToken $token, HubSpotObject $object): int;
+    public function count(HubSpotToken $token, HubSpotObject|HubSpotActivity $object): int;
 
     /**
      * The object's properties (for the mapping step).
@@ -77,6 +79,14 @@ interface HubSpotReaderInterface
      * @throws HubSpotException
      */
     public function records(HubSpotToken $token, HubSpotObject $object, array $properties, ?HubSpotCursor $after, int $limit): HubSpotPage;
+
+    /**
+     * One page of engagements of a kind (0.13.0) with the kind's fixed properties and their contact and company
+     * associations, in one request.
+     *
+     * @throws HubSpotException
+     */
+    public function engagements(HubSpotToken $token, HubSpotActivity $kind, ?HubSpotCursor $after, int $limit): HubSpotEngagementPage;
 
     /**
      * The companies of the given contacts (at most 100 ids).

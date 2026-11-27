@@ -30,6 +30,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as **0.13.0** (Beacon spec 254 T004, FR-100 block A; the version may move when the queue is rebased). No BC
+break, no schema change, no new configuration key and no new HubSpot scope.
+
+### Added
+
+- **HubSpot import of activities**: notes (→ notes), calls and meetings (→ logged activities, `activities.enabled`)
+  and tasks (→ next actions on the built-in list, `pipeline.enabled` too), offered in the start step when the
+  configuration imports them (`HubSpotImportScope::$activities`, new enum `HubSpotActivity`; an import may read
+  activities only). One `GET /crm/v3/objects/{kind}?associations=contacts,companies` per page with fixed properties;
+  the item lands on the first associated contact of the same account (else company), a call or meeting also on the
+  other associated records (subject rows, meeting contacts as attendees). HTML bodies become plain text, owners map
+  to authors and assignees by e-mail, the HubSpot id is an external reference (`note` / `call` / `meeting` / `task`)
+  and a next action's dedupe key is derived from it, so re-runs update and never duplicate; empty values never clear,
+  associations only add. Rows `import.hubspot.no_record`, `import.hubspot.activities_off`, `import.hubspot.tasks_off`;
+  input error `error.hubspot_activities_off`; 7 locales. Same access rules as records (attended `edit`, unattended
+  owner rule), same pages, limits (`max_records` per kind), pauses and resume. Read with the already required
+  `crm.objects.contacts.read` (granular `crm.objects.{notes,calls,meetings,tasks}.read` accepted).
+- `NextAction::revise()` (title, due time, assignee) for re-runs; `HubSpotRecordWriter::targets()` is now callable by
+  the engagements writer (internal).
+
+### Changed
+
+- The `crm.hubspot.import_started` audit entry also counts the activities (`activities`).
+
 ## [0.11.0] - 2026-11-27
 
 Planned as **0.11.0** (Beacon spec 254, block A-1, tasks T001 and T002; Beacon priority moves it before H2). No BC

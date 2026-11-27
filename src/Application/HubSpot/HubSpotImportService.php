@@ -69,6 +69,8 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
      *                         start and mapping pages per tenant in a window
      * @param int $browseInterval `import.hubspot.browse_rate_limit.interval`: the window in seconds
      * @param LoggerInterface|null $logger where an unavailable secret key is reported (0.10.1, audit ZAW-I2)
+     * @param list<string> $activities 0.13.0: the engagement kinds the configuration imports (`notes`, `calls`,
+     *                                 `meetings` with `activities.enabled`; `tasks` with `pipeline.enabled` too)
      */
     public function __construct(
         private WriteSupport $support,
@@ -79,6 +81,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
         private int $browseLimit = 60,
         private int $browseInterval = 600,
         private ?LoggerInterface $logger = null,
+        private array $activities = [],
     ) {
     }
 
@@ -113,6 +116,12 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
         foreach ($scope->objects as $object) {
             $scopes = [...$scopes, ...$object->scopes()];
         }
+        foreach ($scope->activities as $activity) {
+            if (!in_array($activity->value, $this->activities, true)) {
+                throw InvalidInputException::field('activities', 'error.hubspot_activities_off');
+            }
+            $scopes = [...$scopes, ...$activity->scopes()];
+        }
         if ($scope->lists !== []) {
             $scopes[] = self::LISTS_SCOPE;
         }
@@ -124,7 +133,7 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
 
         try {
             $total = 0;
-            foreach ($scope->objects as $object) {
+            foreach ([...$scope->objects, ...$scope->activities] as $object) {
                 $total += $this->reader->count($token, $object);
             }
             $kinds = [];
@@ -155,11 +164,11 @@ final readonly class HubSpotImportService implements HubSpotImportServiceInterfa
                 throw new ConflictException(ConflictException::IMPORT_RUNNING);
             }
             $id     = $this->support->id();
-            $import = new Import($id, $context->tenant->value, $scope->objects[0]->subjectType(), ImportFormat::HubSpot, $locked->getLabel(), $scope->columns(), (new HubSpotMapping($defaults))->flat(), $total, $context->actor->value, $context->now, $locked->getId());
+            $import = new Import($id, $context->tenant->value, $scope->subjectType(), ImportFormat::HubSpot, $locked->getLabel(), $scope->columns(), (new HubSpotMapping($defaults))->flat(), $total, $context->actor->value, $context->now, $locked->getId());
             $import->startCursor($state->toArray());
             $import->choosePolicy($policy);
             $this->support->store->add($import); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
-            $this->support->audit($effects, $context, 'crm.hubspot.import_started', $scope->objects[0]->subjectType(), $id, ['objects' => count($scope->objects), 'lists' => count($scope->lists), 'rows' => $total]);
+            $this->support->audit($effects, $context, 'crm.hubspot.import_started', $scope->subjectType(), $id, ['objects' => count($scope->objects), 'activities' => count($scope->activities), 'lists' => count($scope->lists), 'rows' => $total]);
 
             return $id;
         });

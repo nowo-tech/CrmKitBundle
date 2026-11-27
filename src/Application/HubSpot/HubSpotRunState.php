@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Application\HubSpot;
 
 use InvalidArgumentException;
 use JsonException;
+use Nowo\CrmKitBundle\Domain\Enum\HubSpotActivity;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotAccountId;
 use Nowo\CrmKitBundle\Domain\Value\HubSpotCursor;
@@ -27,7 +28,8 @@ use const JSON_THROW_ON_ERROR;
  * The run cursor of a HubSpot import (0.10.0, `crm_import.run_cursor`): the account, the stage, HubSpot's `after`
  * token and page number, the owner map (HubSpot owner id ⇒ actor id), the lists and their member kinds, the records
  * read per object and the skipped associations. Ids and counts only, never a value from a record. Advanced in the same
- * unit that settles the page, compared before (compare-and-set under the import row's lock).
+ * unit that settles the page, compared before (compare-and-set under the import row's lock). 0.13.0: the engagement
+ * kinds are stages after the objects.
  *
  * @internal
  */
@@ -76,6 +78,10 @@ final readonly class HubSpotRunState
         $stages = [self::OWNERS];
         foreach ($scope->objects as $object) {
             $stages[] = $object->value;
+        }
+        foreach ($scope->activities as $activity) {
+            // 0.13.0: the engagements after the records they attach to.
+            $stages[] = $activity->value;
         }
         $lists = [];
         foreach ($scope->lists as $list) {
@@ -179,6 +185,14 @@ final readonly class HubSpotRunState
     }
 
     /**
+     * The stage's engagement kind, or null (0.13.0).
+     */
+    public function activity(): ?HubSpotActivity
+    {
+        return HubSpotActivity::tryFrom($this->stage);
+    }
+
+    /**
      * The `after` token of the stage.
      */
     public function cursor(): ?HubSpotCursor
@@ -204,8 +218,8 @@ final readonly class HubSpotRunState
     public function advance(?HubSpotCursor $next, int $read = 0, int $skipped = 0, int $tagged = 0, array $owners = []): self
     {
         $seen = $this->seen;
-        $obj  = $this->object();
-        if ($obj instanceof HubSpotObject) {
+        $obj  = $this->object() ?? $this->activity();
+        if ($obj !== null) {
             $seen[$obj->value] = ($seen[$obj->value] ?? 0) + $read;
         }
         $stage = $this->stage;

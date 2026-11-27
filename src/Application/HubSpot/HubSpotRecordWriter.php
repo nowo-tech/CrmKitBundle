@@ -319,13 +319,14 @@ final readonly class HubSpotRecordWriter
     }
 
     /**
-     * The final record id behind each live reference (merges followed; the reference moves to the survivor).
+     * The final record id behind each live reference (merges followed; the reference moves to the survivor). 0.13.0:
+     * also how the engagements import finds the records of their associations.
      *
      * @param array<string, ExternalRef> $refs
      *
      * @return array<string, string> HubSpot id => record id
      */
-    private function targets(CrmContext $context, SubjectType $type, array $refs): array
+    public function targets(CrmContext $context, SubjectType $type, array $refs): array
     {
         $targets = [];
         foreach ($refs as $hid => $ref) {

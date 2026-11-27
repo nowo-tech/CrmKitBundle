@@ -53,6 +53,18 @@ break, no schema change, no new configuration key and no new HubSpot scope.
 ### Changed
 
 - The `crm.hubspot.import_started` audit entry also counts the activities (`activities`).
+- `HubSpotRecordWriter::targets()` loads the first hop of every reference in one query (audit ZDE-L1).
+
+### Security
+
+- Pre-tag audit ZDE (unreleased code, no GHSA): the records an imported activity also shows on and a meeting's
+  attendees need the same access as the records import's associations (`view` attended, owner rule unattended),
+  others are skipped and counted (ZDE-M1); an item associated with an erased contact is skipped
+  (`error.record_erased`) and an erasure tombstones the HubSpot references of the contact's deleted notes, activities
+  and next actions (`ExternalRefHooksInterface::tombstoneItems()`, internal), so a re-run never brings them back
+  (ZDE-M2, Q-H6); at most 20 associated ids per kind and 25 items per engagement page (ZDE-L1, ZDE-L2); an HTML body
+  past PCRE's backtracking limit keeps its text (ZDE-I1); unattended runs pick the first writable record instead of
+  pausing on the first one owned by someone else (ZDE-I2).
 
 ### Fixed
 

@@ -10,6 +10,7 @@
 - [Merge](#merge)
 - [Import](#import)
 - [HubSpot import (0.10.0)](#hubspot-import-0100)
+- [HubSpot activities import (0.12.0)](#hubspot-activities-import-0120)
 - [Isolation and locks](#isolation-and-locks)
 - [Tests](#tests)
 
@@ -226,6 +227,19 @@ A page that fails (HubSpot error, deadlock, crash) commits nothing: the cursor s
 again is an upsert keyed by the reference. The entity manager is cleared after every unit (no host entity manager is
 reset). Race tests on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16: two runners on one import, a racing first connect,
 a racing start ([Tests](#tests)).
+
+## HubSpot activities import (0.12.0)
+
+Engagement stages settle their pages in the same unit as records (claim and cursor compare-and-set under the import
+row's lock; HubSpot asked before, outside the unit). Inside the unit: the references of the page's items and of their
+associated contacts and companies (merges followed, first hop in one query), then the records locked `FOR UPDATE`
+contacts first, then companies, each in id order: the associated records and the records of items an earlier run made
+(the order of `EngagementService` and of the records import). Then per item: create or update the note, the activity
+with its subject rows and attendees, or the next action, and its reference. A racing reference insert or a racing next
+action with the same dedupe key (`sha256("hubspot|<account>|task|<id>")`, unique per tenant) is refused by its unique
+key: the page settles once more and finds the other writer's row. Notes, activities and next actions carry Doctrine
+versions, so a person's edit after the page meets a new version (409 stale). An erasure tombstones the item
+references inside its own unit, under the contact's lock, before it deletes the items.
 
 ## Isolation and locks
 

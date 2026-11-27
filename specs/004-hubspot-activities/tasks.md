@@ -12,4 +12,5 @@
 - [x] T004.8 Tests: unit (text, kinds, scope, cursor, reader), database (create, re-run, trashed / merged / erased,
       access attended and unattended, switches, `max_records`); 100% coverage
 - [x] T004.9 Docs: CHANGELOG, UPGRADING, USAGE, CONFIGURATION, design, ROADMAP row, code inventory
-- [ ] T004.10 Pre-tag REQ-SEC-004 audit (coordinator)
+- [x] T004.10 Pre-tag REQ-SEC-004 audit ZDE: PASS with fixes; M1 (access on every associated record), M2 (erased
+      contacts, item tombstones), L1 (20 ids, batched lookups), L2 (25 per page), L3 (docs), I1, I2 fixed; I3, I4 documented

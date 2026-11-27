@@ -43,7 +43,8 @@ final class HubSpotText
         if ($html === null || preg_match('//u', $html) !== 1) {
             return null;
         }
-        $text = (string) preg_replace('#<(script|style)\b[^>]*>.*?</\1\s*>#isu', '', $html);
+        // Audit ZDE-I1: past PCRE's backtracking limit the body is kept and only its tags are dropped below.
+        $text = preg_replace('#<(script|style)\b[^>]*>.*?</\1\s*>#isu', '', $html) ?? $html;
         $text = (string) preg_replace('#<br\s*/?>|</(p|div|li|tr|h[1-6]|blockquote)\s*>#iu', "\n", $text);
         $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $text = (string) preg_replace('/\r\n?/u', "\n", $text);

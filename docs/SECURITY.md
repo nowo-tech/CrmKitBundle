@@ -11,6 +11,7 @@
 - [Imports and exports](#imports-and-exports)
 - [HubSpot credential](#hubspot-credential)
 - [HubSpot import (0.10.0)](#hubspot-import-0100)
+- [HubSpot activities import (0.12.0)](#hubspot-activities-import-0120)
 - [GDPR](#gdpr)
 - [Host extension points](#host-extension-points)
 - [Shared entity manager](#shared-entity-manager)
@@ -195,6 +196,31 @@ stylesheet and `nowo-crm-kit.css`, both self-hosted (`style-src 'self'`).
   person's "Continue" (`hubspot_needs_person`), as CSV imports do (UP-M-2 / UP2-1); ownerless and own records are
   written. An unattended run never changes the owner of an existing record. Hosts that scope records in their own
   access checker set `security.resource_scoping: true` to get this rule.
+
+## HubSpot activities import (0.12.0)
+
+Notes, calls, meetings and tasks (Beacon spec 254 T004; audit ZDE, PASS with fixes).
+
+- **Scopes and data**: no new scope (`crm.objects.contacts.read`, read-only); each kind asks for a fixed list of
+  properties (USAGE); association paging is not followed and at most 20 associated ids of each kind are kept per item
+  (ZDE-L1); engagement pages hold at most 25 items (ZDE-L2). Import rows hold the kind and the HubSpot id only.
+- **Output**: HTML bodies become plain text (scripts and styles dropped, tags stripped, entities decoded, control and
+  format characters removed; past PCRE's backtracking limit only the tags are stripped, ZDE-I1) and are rendered
+  escaped; a meeting place is text or an https link (`MeetingPlace`, `javascript:` stays text).
+- **Tenant and account**: an association resolves to a record only through a reference of the same tenant and HubSpot
+  account; references, dedupe keys and every lookup carry the tenant.
+- **Authorisation** (ZDE-M1, as the records import, ZAM-1): the primary record is the first associated record the run
+  may write on: `edit` when a person runs the page, the owner rule unattended under `security.resource_scoping` (none
+  ⇒ the row is `error.forbidden` attended, the page waits for a person unattended, `hubspot_needs_person`). Every other
+  associated record (an activity's subject rows, a meeting's attendees) needs `view` attended and the owner rule
+  unattended; any other is left out and counted in `associations_skipped`.
+- **GDPR** (ZDE-M2, Q-H6): an item associated with a contact whose reference is a tombstone is skipped
+  (`error.record_erased`), on every record it was associated with; erasing a contact also turns the references of its
+  deleted notes, activities and next actions into tombstones, so a re-run never recreates them, even when HubSpot no
+  longer associates them with the person.
+- **Re-runs** (ZDE-I4): HubSpot wins: a non-empty HubSpot value overwrites a CRM-side edit of an imported note, call,
+  meeting or next action (as for records); an item a person deleted is made again (ZDE-I3: its reference is kept, with
+  HubSpot ids only).
 
 ## GDPR
 

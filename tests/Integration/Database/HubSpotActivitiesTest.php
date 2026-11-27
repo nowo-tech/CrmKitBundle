@@ -166,7 +166,7 @@ final class HubSpotActivitiesTest extends HubSpotTestCase
         $this->ctx()->denied = [];
         $this->service(CrmPersonalDataInterface::class)->erase($cy);
         $fake->engagements['notes'] = ['3009' => ['properties' => ['hs_note_body' => 'After'], 'contacts' => ['2003']]];
-        self::assertSame('import.hubspot.no_record', $this->finish($this->activities([HubSpotActivity::Note]))->rows[0]->message);
+        self::assertSame('error.record_erased', $this->finish($this->activities([HubSpotActivity::Note]))->rows[0]->message);
     }
 
     public function testAPersonWithoutEditOnTheContactPutsItOnTheCompany(): void
@@ -184,6 +184,75 @@ final class HubSpotActivitiesTest extends HubSpotTestCase
         self::assertStringStartsWith('2025-12-31 23:00:00', $this->text('SELECT occurred_at FROM nowo_crm_engagement WHERE id = ?', [$call]));
     }
 
+    public function testOtherAssociatedRecordsNeedTheSameAccessAsTheRecordsImport(): void
+    {
+        $fake = $this->hubspot(self::ON + ['import' => ['hubspot' => ['page_size' => 50]]]);
+        $this->seed($fake);
+        $this->importRecords($fake);
+        $fake->engagements['calls']    = ['4001' => ['properties' => ['hs_timestamp' => '2026-01-01T00:00:00Z'], 'contacts' => ['2001'], 'companies' => ['1001']]];
+        $fake->engagements['meetings'] = ['5001' => ['properties' => ['hs_timestamp' => '2026-01-01T00:00:00Z', 'hs_meeting_title' => 'M'], 'contacts' => ['2001', '2002']]];
+        // Attended: a record the person may not view gets no subject row and no attendee; it is counted as skipped.
+        $this->ctx()->denied = ['view:' . $this->target('1001'), 'view:' . $this->target('2002')];
+        $id                  = $this->activities([HubSpotActivity::Call, HubSpotActivity::Meeting]);
+        $this->finish($id);
+        $call    = $this->target('4001', 'call');
+        $meeting = $this->target('5001', 'meeting');
+        self::assertSame([1, 1, 1, 2], [$this->int('SELECT COUNT(*) FROM nowo_crm_engagement_subject WHERE engagement_id = ?', [$call]), $this->int('SELECT COUNT(*) FROM nowo_crm_engagement_subject WHERE engagement_id = ?', [$meeting]), $this->int('SELECT COUNT(*) FROM nowo_crm_engagement_attendee WHERE engagement_id = ?', [$meeting]), $this->cursor($id)['skipped']]);
+        // A re-run by a person who may view them adds them.
+        $this->ctx()->denied = [];
+        $again               = $this->activities([HubSpotActivity::Call, HubSpotActivity::Meeting]);
+        $this->finish($again);
+        self::assertSame([2, 2, 0], [$this->int('SELECT COUNT(*) FROM nowo_crm_engagement_subject WHERE engagement_id = ?', [$call]), $this->int('SELECT COUNT(*) FROM nowo_crm_engagement_attendee WHERE engagement_id = ?', [$meeting]), $this->cursor($again)['skipped']]);
+        // Engagement pages ask for at most 25 items (audit ZDE-L2), whatever the page size.
+        $limits = [];
+        foreach ($fake->requests as [, $url]) {
+            if (str_contains($url, '/crm/v3/objects/calls?')) {
+                $limits[] = str_contains($url, 'limit=25');
+            }
+        }
+        self::assertSame([true, true], $limits);
+    }
+
+    public function testUnattendedRunsSkipOtherOwnersRecordsAndPickAWritableOne(): void
+    {
+        $fake = $this->hubspot(self::ON + ['security' => ['resource_scoping' => true]]);
+        $this->seed($fake);
+        $this->importRecords($fake);
+        $this->connection()->executeStatement("UPDATE nowo_crm_contact SET owner_id = 'leo' WHERE id = ?", [$this->target('2001')]);
+        $this->connection()->executeStatement("UPDATE nowo_crm_company SET owner_id = 'leo'");
+        $fake->engagements['calls'] = ['4001' => ['properties' => ['hs_timestamp' => '2026-01-01T00:00:00Z'], 'contacts' => ['2001', '2002'], 'companies' => ['1001']]];
+        $id                         = $this->activities([HubSpotActivity::Call]);
+        $this->resume($id);
+        self::assertSame(ImportStatus::Done, $this->imports()->preview($id)->status, 'no person needed: 2002 is writable');
+        $call = $this->target('4001', 'call');
+        self::assertSame($this->target('2002'), $this->text('SELECT subject_id FROM nowo_crm_engagement_subject WHERE engagement_id = ? AND is_primary = ?', [$call, true]));
+        self::assertSame([1, 2], [$this->int('SELECT COUNT(*) FROM nowo_crm_engagement_subject WHERE engagement_id = ?', [$call]), $this->cursor($id)['skipped']], 'leo\'s contact and company are left out');
+    }
+
+    public function testAnErasedContactsActivitiesNeverComeBack(): void
+    {
+        $fake = $this->hubspot(self::ON);
+        $this->seed($fake);
+        $this->importRecords($fake);
+        $fake->engagements['notes'] = ['3001' => ['properties' => ['hs_note_body' => 'About Ada'], 'contacts' => ['2001']]];
+        $fake->engagements['calls'] = [
+            '4001' => ['properties' => ['hs_timestamp' => '2026-01-01T00:00:00Z', 'hs_call_title' => 'Ada health'], 'contacts' => ['2001'], 'companies' => ['1001']],
+            '4002' => ['properties' => ['hs_timestamp' => '2026-01-01T00:00:00Z', 'hs_call_title' => 'Company only'], 'companies' => ['1001']],
+        ];
+        $fake->engagements['tasks'] = ['6001' => ['properties' => ['hs_timestamp' => '2026-01-01T00:00:00Z', 'hs_task_subject' => 'Call Ada'], 'contacts' => ['2001']]];
+        $this->finish($this->activities([HubSpotActivity::Note, HubSpotActivity::Call, HubSpotActivity::Task]));
+        self::assertSame([1, 2, 1], [$this->int('SELECT COUNT(*) FROM nowo_crm_note'), $this->int('SELECT COUNT(*) FROM nowo_crm_engagement'), $this->int('SELECT COUNT(*) FROM nowo_crm_next_action')]);
+        $this->service(CrmPersonalDataInterface::class)->erase($this->target('2001'));
+        self::assertSame(4, $this->int('SELECT COUNT(*) FROM nowo_crm_external_ref WHERE erased = ?', [true]), 'the contact and its note, call and task');
+        // Even when HubSpot no longer associates the call with the person, its tombstone keeps it out.
+        $fake->engagements['calls']['4001']['contacts'] = [];
+        $fake->engagements['calls']['4009']             = ['properties' => ['hs_timestamp' => '2026-01-02T00:00:00Z', 'hs_call_title' => 'New with Ada'], 'contacts' => ['2001'], 'companies' => ['1001']];
+        $view                                           = $this->finish($this->activities([HubSpotActivity::Note, HubSpotActivity::Call, HubSpotActivity::Task]));
+        self::assertSame(['created' => 0, 'updated' => 1, 'duplicate' => 4, 'invalid' => 0, 'limit' => 0], $view->counts);
+        self::assertSame(0, $this->int("SELECT COUNT(*) FROM nowo_crm_engagement WHERE title LIKE '%Ada%'"));
+        self::assertSame([0, 1, 0], [$this->int('SELECT COUNT(*) FROM nowo_crm_note'), $this->int('SELECT COUNT(*) FROM nowo_crm_engagement'), $this->int('SELECT COUNT(*) FROM nowo_crm_next_action')]);
+    }
+
     public function testUnattendedRunsNeedAPersonForSomeoneElsesRecord(): void
     {
         $fake = $this->hubspot(self::ON + ['security' => ['resource_scoping' => true]]);
@@ -198,6 +267,11 @@ final class HubSpotActivitiesTest extends HubSpotTestCase
         // A person's "Continue" settles it with their own access.
         self::assertTrue($this->imports()->run($id));
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_note'));
+        // An unattended re-run does not update an item on someone else's record either.
+        $rerun = $this->activities([HubSpotActivity::Note]);
+        $this->resume($rerun);
+        self::assertSame(NeedsPersonException::CODE, $this->imports()->preview($rerun)->errorCode);
+        self::assertTrue($this->imports()->run($rerun));
         // Unattended rows name no record.
         $fake->engagements['notes']['3002'] = ['properties' => ['hs_note_body' => 'Hi'], 'contacts' => ['2002']];
         $this->connection()->executeStatement("UPDATE nowo_crm_contact SET owner_id = 'ana'");

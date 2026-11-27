@@ -108,7 +108,8 @@ final readonly class HubSpotEngagementWriter
         $hids     = array_map(static fn (HubSpotEngagement $e): string => $e->id->value, $items);
         $refs     = $this->store->refs($context->tenant, $account, $kind->refType(), $hids);
         $existing = $this->existing($context, $account, $kind, $items, $refs);
-        $contacts = $this->records->targets($context, SubjectType::Contact, $this->store->refs($context->tenant, $account, 'contact', $this->ids($items, true)));
+        $people   = $this->store->refs($context->tenant, $account, 'contact', $this->ids($items, true));
+        $contacts = $this->records->targets($context, SubjectType::Contact, $people);
         $partners = $this->records->targets($context, SubjectType::Company, $this->store->refs($context->tenant, $account, 'company', $this->ids($items, false)));
         $lock     = [SubjectType::Contact->value => array_values($contacts), SubjectType::Company->value => array_values($partners)];
         foreach ($existing as $item) {
@@ -124,7 +125,14 @@ final readonly class HubSpotEngagementWriter
         $rows    = [];
         $skipped = 0;
         foreach ($items as $item) {
-            $hid        = $item->id->value;
+            $hid = $item->id->value;
+            if ($this->erased($item, $refs[$hid] ?? null, $people)) {
+                // Q-H6 (audit ZDE-M2): nothing said with or about an erased person comes back, not even on the other
+                // records it was associated with.
+                $rows[] = [RowOutcome::Duplicate, null, 'error.record_erased', $hid, null];
+
+                continue;
+            }
             $subjects   = [];
             $associated = 0;
             foreach ([[SubjectType::Contact, $item->contacts, $contacts], [SubjectType::Company, $item->companies, $partners]] as [$type, $ids, $targets]) {
@@ -141,6 +149,7 @@ final readonly class HubSpotEngagementWriter
             $current  = $found === null ? null : ($locked[$found->getSubjectType()->value][$found->getSubjectId()] ?? null);
             if ($found !== null && $current instanceof CrmRecord) {
                 $row = $this->update($context, $kind, $item, $found, $current, $subjects, $owners, $attended);
+                $skipped += $row[5];
             } else {
                 [$row, $written] = $this->create($context, $kind, $item, $subjects, $owners, $account, $attended);
                 // The associations of a new item it could not carry (its other side has no live record, or a note or a
@@ -196,14 +205,15 @@ final readonly class HubSpotEngagementWriter
     }
 
     /**
-     * Updates an item an earlier run made, on its own record (never moved): [outcome, record id, message, -, type].
+     * Updates an item an earlier run made, on its own record (never moved): [outcome, record id, message, -, type,
+     * associations it could not add].
      *
      * @param list<CrmRecord> $subjects
      * @param array<string, string> $owners
      *
      * @throws NeedsPersonException
      *
-     * @return array{RowOutcome, string|null, string|null, null, SubjectType|null, null}
+     * @return array{RowOutcome, string|null, string|null, null, SubjectType|null, int}
      */
     private function update(CrmContext $context, HubSpotActivity $kind, HubSpotEngagement $item, Note|Engagement|NextAction $found, CrmRecord $record, array $subjects, array $owners, bool $attended): array
     {
@@ -214,17 +224,22 @@ final readonly class HubSpotEngagementWriter
             RecordStatus::Active  => null,
         };
         if ($refused !== null) {
-            return [RowOutcome::Duplicate, null, $refused, null, null, null];
+            return [RowOutcome::Duplicate, null, $refused, null, null, 0];
         }
-        if (!$this->writable($context, $record, $attended)) {
-            return [RowOutcome::Invalid, null, 'error.forbidden', null, null, null];
+        if (!$this->allowed($context, $record, $attended, CrmPermission::Edit)) {
+            if (!$attended) {
+                throw new NeedsPersonException();
+            }
+
+            return [RowOutcome::Invalid, null, 'error.forbidden', null, null, 0];
         }
-        $author = $this->author($item, $owners);
+        $author  = $this->author($item, $owners);
+        $skipped = 0;
         if ($found instanceof Note) {
             $found->edit(HubSpotText::plain($item->value('hs_note_body'), NoteService::MAX) ?? $found->getBody(), $found->isPinned(), $context->now);
         } elseif ($found instanceof Engagement) {
             $this->describe($found, $kind, $item, $context->now, false);
-            $this->associate($context, $found, $subjects);
+            $skipped = $this->associate($context, $found, $subjects, $attended)[1];
         } else {
             $found->revise(
                 HubSpotText::line($item->value('hs_task_subject'), NextActionService::MAX_TITLE) ?? $found->getTitle(),
@@ -235,7 +250,7 @@ final readonly class HubSpotEngagementWriter
             $this->closeIfDone($found, $item, $context->now);
         }
 
-        return [RowOutcome::Updated, $this->visible($record, $attended), null, null, $record::type(), null];
+        return [RowOutcome::Updated, $this->visible($record, $attended), null, null, $record::type(), $skipped];
     }
 
     /**
@@ -253,13 +268,19 @@ final readonly class HubSpotEngagementWriter
         if ($subjects === []) {
             return [[RowOutcome::Invalid, null, 'import.hubspot.no_record', null, null, null], 0];
         }
+        // The first record the run may write on (audit ZDE-I2: past records it may not, attended or unattended).
         $primary = null;
         foreach ($subjects as $subject) {
-            if ($primary === null && $this->writable($context, $subject, $attended)) {
+            if ($primary === null && $this->allowed($context, $subject, $attended, CrmPermission::Edit)) {
                 $primary = $subject;
             }
         }
         if (!$primary instanceof CrmRecord) {
+            if (!$attended) {
+                // Unattended: only records owned by someone else are left; a person's "Continue" decides.
+                throw new NeedsPersonException();
+            }
+
             return [[RowOutcome::Invalid, null, 'error.forbidden', null, null, null], 0];
         }
         $type   = $primary::type();
@@ -277,7 +298,7 @@ final readonly class HubSpotEngagementWriter
         $written = 1;
         if ($made instanceof Engagement) {
             $this->support->store->add(new EngagementSubject($this->support->id(), $context->tenant->value, $id, $type, $primary->getId(), true)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
-            $written += $this->associate($context, $made, $subjects, [$type->value . ':' . $primary->getId() => true]);
+            $written += $this->associate($context, $made, $subjects, $attended, [$type->value . ':' . $primary->getId() => true])[0];
         }
 
         return [[RowOutcome::Created, $this->visible($primary, $attended), null, null, $type, $made], $written];
@@ -398,12 +419,16 @@ final readonly class HubSpotEngagementWriter
     }
 
     /**
-     * Adds the subject rows (and a meeting's contact attendees) an activity does not have yet; how many were added.
+     * Adds the subject rows (and a meeting's contact attendees) an activity does not have yet: how many were added and
+     * how many were left out. Audit ZDE-M1 (as an affiliation of the records import, ZAM-1): each new record needs `view`
+     * when a person runs the page and passes the owner rule unattended; any other is skipped and counted.
      *
      * @param list<CrmRecord> $subjects
      * @param array<string, true> $have `type:id` of the subject rows already there
+     *
+     * @return array{int, int}
      */
-    private function associate(CrmContext $context, Engagement $engagement, array $subjects, array $have = []): int
+    private function associate(CrmContext $context, Engagement $engagement, array $subjects, bool $attended, array $have = []): array
     {
         $id        = $engagement->getId();
         $attendees = [];
@@ -416,10 +441,16 @@ final readonly class HubSpotEngagementWriter
             }
         }
         $added   = 0;
+        $denied  = 0;
         $meeting = $engagement->getKind() === ActivityKind::Meeting;
         foreach ($subjects as $subject) {
             $key = $subject::type()->value . ':' . $subject->getId();
             if (!isset($have[$key])) {
+                if (!$this->allowed($context, $subject, $attended, CrmPermission::View)) {
+                    ++$denied;
+
+                    continue;
+                }
                 $have[$key] = true;
                 $this->support->store->add(new EngagementSubject($this->support->id(), $context->tenant->value, $id, $subject::type(), $subject->getId(), false)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
                 ++$added;
@@ -430,7 +461,7 @@ final readonly class HubSpotEngagementWriter
             }
         }
 
-        return $added;
+        return [$added, $denied];
     }
 
     /**
@@ -457,25 +488,42 @@ final readonly class HubSpotEngagementWriter
     }
 
     /**
-     * Whether the run may write on the record: `edit` when a person runs the page; unattended, the owner rule.
-     *
-     * @throws NeedsPersonException
+     * Whether the run may write on the record: the permission when a person runs the page; unattended, the owner rule
+     * of `security.resource_scoping` (records without an owner or owned by the person who confirmed).
      */
-    private function writable(CrmContext $context, CrmRecord $record, bool $attended): bool
+    private function allowed(CrmContext $context, CrmRecord $record, bool $attended, CrmPermission $permission): bool
     {
-        if (!$attended) {
-            $this->records->mayWriteUnattended($context, $record);
-
-            return true;
-        }
-
         try {
-            $this->support->access->require($context, CrmPermission::Edit, SubjectRef::of($record::type(), $record->getId(), $record->getOwnerId()));
-        } catch (AccessDeniedException) {
+            if ($attended) {
+                $this->support->access->require($context, $permission, SubjectRef::of($record::type(), $record->getId(), $record->getOwnerId()));
+            } else {
+                $this->records->mayWriteUnattended($context, $record);
+            }
+        } catch (AccessDeniedException|NeedsPersonException) {
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Whether the item was made by an import before its HubSpot reference became a tombstone (its CRM item was deleted
+     * with an erased contact), or is associated with a contact whose reference is one.
+     *
+     * @param array<string, ExternalRef> $people the contact references of the page, by HubSpot id
+     */
+    private function erased(HubSpotEngagement $item, ?ExternalRef $ref, array $people): bool
+    {
+        if ($ref instanceof ExternalRef && $ref->isErased()) {
+            return true;
+        }
+        foreach ($item->contacts as $contact) {
+            if (($people[$contact->value] ?? null)?->isErased() === true) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

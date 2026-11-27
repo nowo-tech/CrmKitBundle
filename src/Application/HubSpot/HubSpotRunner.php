@@ -88,6 +88,12 @@ final readonly class HubSpotRunner
     /** Wait after an outage before the next attempt (seconds). */
     private const OUTAGE_WAIT = 60;
 
+    /**
+     * Most engagements per page (0.12.0, audit ZDE-L2): notes and call / meeting bodies are HTML of up to 64 KiB each,
+     * so a page of `page_size` (up to 100) could pass `max_response_bytes` on every retry.
+     */
+    public const ENGAGEMENT_PAGE = 25;
+
     /** Burst wait without `Retry-After` (seconds; HubSpot's window is ten). */
     private const BURST_WAIT = 10;
 
@@ -222,7 +228,7 @@ final readonly class HubSpotRunner
             });
         }
         /** @var HubSpotEngagementPage $page */
-        $page = $this->ask(fn (): HubSpotEngagementPage => $this->reader->engagements($secret, $kind, $state->cursor(), $this->pageSize), $attended);
+        $page = $this->ask(fn (): HubSpotEngagementPage => $this->reader->engagements($secret, $kind, $state->cursor(), min($this->pageSize, self::ENGAGEMENT_PAGE)), $attended);
         if (($state->seen[$kind->value] ?? 0) + count($page->engagements) > $this->maxRecords) {
             return $this->fail($import->getId(), $context->now, 'hubspot_too_many');
         }

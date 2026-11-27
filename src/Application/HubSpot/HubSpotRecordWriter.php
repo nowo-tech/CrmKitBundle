@@ -328,6 +328,8 @@ final readonly class HubSpotRecordWriter
      */
     public function targets(CrmContext $context, SubjectType $type, array $refs): array
     {
+        // Audit ZDE-L1: one query loads the first hop of every reference; record() then reads the identity map.
+        $this->support->store->records($type, $context->tenant, array_values(array_unique(array_map(static fn (ExternalRef $r): string => $r->getTargetId(), $refs))));
         $targets = [];
         foreach ($refs as $hid => $ref) {
             if ($ref->isErased()) {

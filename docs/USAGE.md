@@ -1063,13 +1063,14 @@ with one row `import.hubspot.activities_off` (or `import.hubspot.tasks_off`).
 | task | a next action on the built-in list (task type `crm`; never a host task), done when HubSpot's status is `COMPLETED` | `hs_timestamp` (due), `hubspot_owner_id`, `hs_task_subject`, `hs_task_status` |
 
 Each page is one `GET /crm/v3/objects/{notes|calls|meetings|tasks}` with `associations=contacts,companies` (at most
-100 ids of each kind per item; the association's own paging is not followed), settled in one write unit like the
-records.
+25 items per page whatever `page_size`, so HTML bodies stay under `max_response_bytes`; at most 20 ids of each kind
+per item; the association's own paging is not followed), settled in one write unit like the records.
 
 - **Where it lands.** The primary record is the first associated contact that has a live record of the same account,
-  else the first company; when a person runs the page, the first one they may `edit`. A call or a meeting also shows
-  on every other associated record (subject rows; a meeting's contacts become its attendees, at most 50); the feed
-  checks each viewer as for logged activities. A note or a next action has one record: the other associations are
+  else the first company, that the run may write on (`edit` when a person runs the page; unattended under
+  `security.resource_scoping`, ownerless or the confirming person's). A call or a meeting also shows on every other
+  associated record the run may reach (subject rows; a meeting's contacts become its attendees, at most 50): `view`
+  when a person runs the page, the owner rule unattended; the others are left out and counted as skipped. A note or a next action has one record: the other associations are
   counted as skipped. No associated record ⇒ row `invalid` with `import.hubspot.no_record`. Deals are not associated
   until the HubSpot deals import (H2) exists.
 - **Content.** HTML bodies become plain text (scripts and styles dropped, block ends kept as line breaks, entities
@@ -1082,12 +1083,15 @@ records.
   `target_type` `note`, `engagement`, `next_action`), and a next action also carries the dedupe key
   `sha256("hubspot|<account>|task|<id>")`, so a re-run updates the same item and never creates a second one. An empty
   HubSpot value keeps the stored one, associations and attendees are only added, an item stays on its record, and a
-  done next action is never reopened. An item a person deleted is made again. Trashed, erased and merged records are
+  done next action is never reopened. HubSpot wins: a non-empty HubSpot value overwrites a CRM-side edit of an
+  imported item. An item a person deleted is made again (its reference is kept). Trashed, erased and merged records are
   handled as for records (`error.record_trashed`, …). Timeline entries and per-item events are not written: the
   import's `ImportCompleted` event and `crm.import.completed` audit entry cover the run.
-- **Permissions.** As for records: `edit` on the primary record when a person runs the page; unattended under
-  `security.resource_scoping`, a record owned by someone else waits for a person (`hubspot_needs_person`).
-- **GDPR.** Imported notes and activities are personal data like logged ones: exported, erased with the contact and
+- **Permissions.** As for records: when no associated record is writable, the row is `error.forbidden` (a person runs
+  the page) or the page waits for a person (`hubspot_needs_person`, unattended).
+- **GDPR.** An item associated with an erased contact is never imported again, on any record (`error.record_erased`);
+  erasing a contact also tombstones the references of its imported notes, activities and next actions. Imported
+  notes and activities are personal data like logged ones: exported, erased with the contact and
   purged with the tenant's `timeline_years` (an old HubSpot call may be purged at the next `nowo:crm-kit:purge`).
 
 ### Background runs (Messenger)

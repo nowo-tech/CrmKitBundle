@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.12.0](#to-0120)
 - [To 0.11.0](#to-0110)
 - [To 0.10.3](#to-0103)
 - [To 0.10.2](#to-0102)
@@ -25,6 +26,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.12.0
+
+From **0.11.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 Planned as **0.12.0** (HubSpot activities, Beacon spec 254 T004). Nothing to do: no schema change (the external
 references and the activity, note and next-action tables exist), no configuration key, no new HubSpot scope. With

@@ -355,11 +355,18 @@ import:
             confirm_account_change: 'La clave puede ser de otra cuenta de HubSpot'
             objects: 'Objetos'
             objects_help: 'Las oportunidades llegan en una versión posterior.'
+            activities: 'Actividades'
+            activities_help: 'Notas, llamadas, reuniones y tareas (como próximas acciones) de registros importados de esta cuenta, ahora o en una importación anterior.'
             lists: 'Listas (sus miembros reciben una etiqueta)'
             lists_help: 'Como máximo 50.'
         object:
             companies: 'Empresas'
             contacts: 'Contactos'
+        activity:
+            notes: 'Notas'
+            calls: 'Llamadas'
+            meetings: 'Reuniones'
+            tasks: 'Tareas (como próximas acciones)'
         list:
             skip: 'No etiquetar'
             create: 'Etiqueta nueva con el nombre de la lista'
@@ -400,6 +407,9 @@ import:
             object: 'Objeto'
             id: 'Id de HubSpot'
         country_unknown: 'País sin poner (no es un código de dos letras)'
+        activities_off: 'No importado: las actividades están desactivadas.'
+        tasks_off: 'No importado: las próximas acciones (embudos) están desactivadas.'
+        no_record: 'Ninguna empresa o contacto importado de esta cuenta al que asociarlo.'
     steps: 'Pasos de la importación'
     step:
         file: 'Archivo'
@@ -531,6 +541,7 @@ error:
     hubspot_too_many: 'La cuenta de HubSpot tiene más registros de los que permite la importación: se detuvo.'
     hubspot_key_unavailable: 'La clave de HubSpot no se puede abrir ni sellar con las claves secretas configuradas. No se ha cambiado nada: un administrador debe volver a configurar la clave (consulta la guía de rotación de claves).'
     hubspot_browse_limited: 'Demasiadas consultas a HubSpot para esta organización. Espera unos minutos y vuelve a intentarlo.'
+    hubspot_activities_off: 'La importación de actividades no está activada.'
     record_erased: 'La persona fue borrada (RGPD): no se vuelve a importar.'
     record_trashed: 'El registro está en la papelera: se deja igual.'
     record_merged: 'El registro se fusionó mientras tanto: vuelve a intentarlo.'

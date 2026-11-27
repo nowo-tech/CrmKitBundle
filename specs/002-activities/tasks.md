@@ -14,4 +14,4 @@
 - [x] T002 `CrmHostActivitySourceInterface` with the default and the kit's filtering
 - [x] Docs: CHANGELOG, UPGRADING "To 0.11.0", CONFIGURATION, USAGE, ROADMAP, code inventory
 - [ ] Follow-up (MailKit 2.3): ICS invite part on outgoing mail, `CrmMailSenderInterface`
-- [ ] Follow-up (HubSpot part 4): import of notes, calls, meetings and tasks
+- [x] Follow-up (HubSpot part 4): import of notes, calls, meetings and tasks (`specs/004-hubspot-activities/`, 0.12.0)

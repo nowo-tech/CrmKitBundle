@@ -117,6 +117,9 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
                 return;
             }
             $store = $this->support->store;
+            // 0.12.0 (audit ZDE-M2, Q-H6): the HubSpot references of the notes, activities and next actions deleted
+            // below become tombstones first, so a re-run never brings what was said about the person back.
+            $this->refs?->tombstoneItems($context->tenant, $contactId, $this->engagements instanceof EngagementHousekeeping, $this->pipeline instanceof PipelineHousekeeping);
             foreach ($store->taggings($context->tenant, SubjectType::Contact, [$contactId]) as $row) {
                 $store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
             }

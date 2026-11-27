@@ -15,8 +15,10 @@ use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Application\WriteSupport;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
+use Nowo\CrmKitBundle\Domain\Enum\HubSpotActivity;
 use Nowo\CrmKitBundle\Domain\Enum\HubSpotObject;
 use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
+use Nowo\CrmKitBundle\Domain\Enum\RowOutcome;
 use Nowo\CrmKitBundle\Domain\Event\ImportCompleted;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
@@ -30,6 +32,7 @@ use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorEmailLookupInterface;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotAssociation;
+use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotEngagementPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotIdPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotOwnerPage;
 use Nowo\CrmKitBundle\Domain\Read\HubSpot\HubSpotPage;
@@ -85,6 +88,12 @@ final readonly class HubSpotRunner
     /** Wait after an outage before the next attempt (seconds). */
     private const OUTAGE_WAIT = 60;
 
+    /**
+     * Most engagements per page (0.12.0, audit ZDE-L2): notes and call / meeting bodies are HTML of up to 64 KiB each,
+     * so a page of `page_size` (up to 100) could pass `max_response_bytes` on every retry.
+     */
+    public const ENGAGEMENT_PAGE = 25;
+
     /** Burst wait without `Retry-After` (seconds; HubSpot's window is ten). */
     private const BURST_WAIT = 10;
 
@@ -105,6 +114,7 @@ final readonly class HubSpotRunner
         private int $maxRecords = 50000,
         private int $maxAttempts = 5,
         private int $maxRetryAfter = 60,
+        private ?HubSpotEngagementWriter $engagements = null,
     ) {
     }
 
@@ -138,13 +148,15 @@ final readonly class HubSpotRunner
         if (!$secret instanceof HubSpotToken) {
             return $this->pause($id, $token, $now, null, HubSpotException::TOKEN_INVALID);
         }
-        $context = new CrmContext($tenant, new ActorRef($actor), $now);
-        $object  = $state->object();
-        $started = hrtime(true);
+        $context  = new CrmContext($tenant, new ActorRef($actor), $now);
+        $object   = $state->object();
+        $activity = $state->activity();
+        $started  = hrtime(true);
 
         try {
             $result = match (true) {
                 $object instanceof HubSpotObject          => $this->records($context, $import, $state, $object, $secret, $token, $attended),
+                $activity instanceof HubSpotActivity      => $this->activities($context, $import, $state, $activity, $secret, $token, $attended),
                 $state->stage === HubSpotRunState::OWNERS => $this->owners($context, $import, $state, $secret, $token, $attended),
                 default                                   => $this->lists($context, $import, $state, $secret, $token, $attended),
             };
@@ -191,6 +203,47 @@ final readonly class HubSpotRunner
             }
 
             return [$state->advance($page->next, count($page->records), $settled['skipped']), count($settled['rows']), $counts];
+        });
+    }
+
+    /**
+     * A page of notes, calls, meetings or tasks (0.12.0) with their contact and company associations. A kind the
+     * configuration does not import (`activities.enabled` or, for tasks, `pipeline.enabled` off) is skipped without
+     * asking HubSpot, with one row that says why.
+     *
+     * @throws HubSpotException
+     * @throws NeedsPersonException
+     */
+    private function activities(CrmContext $context, Import $import, HubSpotRunState $state, HubSpotActivity $kind, HubSpotToken $secret, string $token, bool $attended): string
+    {
+        $writer = $this->engagements;
+        $off    = $writer instanceof HubSpotEngagementWriter ? $writer->unavailable($kind) : 'import.hubspot.activities_off';
+        if ($off !== null || !$writer instanceof HubSpotEngagementWriter) {
+            return $this->unit($context, $import, $state, $token, function (Effects $effects, int $rowsDone) use ($context, $import, $state, $kind, $off): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+                $row = new ImportRow($this->support->id(), $import->getId(), $context->tenant->value, $rowsDone + 1, ['object' => $kind->refType(), 'id' => ''], $import->getSubjectType());
+                $row->settle(RowOutcome::Invalid, null, $off);
+                $this->support->store->add($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+
+                return [$state->advance(null), 1, [RowOutcome::Invalid->value => 1]];
+            });
+        }
+        /** @var HubSpotEngagementPage $page */
+        $page = $this->ask(fn (): HubSpotEngagementPage => $this->reader->engagements($secret, $kind, $state->cursor(), min($this->pageSize, self::ENGAGEMENT_PAGE)), $attended);
+        if (($state->seen[$kind->value] ?? 0) + count($page->engagements) > $this->maxRecords) {
+            return $this->fail($import->getId(), $context->now, 'hubspot_too_many');
+        }
+
+        return $this->unit($context, $import, $state, $token, function (Effects $effects, int $rowsDone) use ($context, $import, $state, $kind, $page, $writer, $attended): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $settled = $writer->settle($context, $state->account, $kind, $page->engagements, $state->owners, $attended);
+            $counts  = [];
+            foreach ($settled['rows'] as $i => [$outcome, $recordId, $message, $hid, $type]) {
+                $row = new ImportRow($this->support->id(), $import->getId(), $context->tenant->value, $rowsDone + $i + 1, ['object' => $kind->refType(), 'id' => $hid], $type ?? $import->getSubjectType());
+                $row->settle($outcome, $recordId, $message);
+                $this->support->store->add($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                $counts[$outcome->value] = ($counts[$outcome->value] ?? 0) + 1;
+            }
+
+            return [$state->advance($page->next, count($page->engagements), $settled['skipped']), count($settled['rows']), $counts];
         });
     }
 

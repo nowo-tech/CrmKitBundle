@@ -26,6 +26,14 @@
 
 ## Unreleased
 
+Planned as **0.12.0** (HubSpot activities, Beacon spec 254 T004). Nothing to do: no schema change (the external
+references and the activity, note and next-action tables exist), no configuration key, no new HubSpot scope. With
+`import.hubspot.enabled` and `activities.enabled` on, the HubSpot start step offers notes, calls and meetings, and
+tasks too with `pipeline.enabled`; existing credentials keep working (`crm.objects.contacts.read` covers the
+engagement endpoints). A host that builds `HubSpotImportScope` itself may pass the new third argument
+(`list<HubSpotActivity>`); a scope may now hold activities and no object. Imported items do not raise per-item events
+(`EngagementLogged`, `NoteAdded`) nor timeline entries: listen to `ImportCompleted` if you need to react to a run.
+
 ## To 0.11.0
 
 From **0.10.3**:

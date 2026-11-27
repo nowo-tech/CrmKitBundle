@@ -19,13 +19,17 @@ use Nowo\CrmKitBundle\Domain\Enum\ImportFormat;
 use Nowo\CrmKitBundle\Domain\Enum\ImportStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Model\Counter;
+use Nowo\CrmKitBundle\Domain\Model\Engagement\Engagement;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\ExternalRef;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\HubSpotConnection;
 use Nowo\CrmKitBundle\Domain\Model\Import;
+use Nowo\CrmKitBundle\Domain\Model\Note;
+use Nowo\CrmKitBundle\Domain\Model\Pipeline\NextAction;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType;
 
+use function implode;
 use function in_array;
 use function is_array;
 use function is_numeric;
@@ -259,6 +263,34 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
         $this->db()->executeStatement(
             'UPDATE ' . $this->table(ExternalRef::class) . ' SET erased = ? WHERE tenant_id = ? AND target_type = ? AND target_id = ?',
             [true, $tenant->value, SubjectType::Contact->value, $contactId],
+            [0 => ParameterType::BOOLEAN],
+        );
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function tombstoneItems(TenantRef $tenant, string $contactId, bool $activities, bool $nextActions): void
+    {
+        $items = ['note' => Note::class];
+        if ($activities) {
+            $items['engagement'] = Engagement::class;
+        }
+        if ($nextActions) {
+            $items['next_action'] = NextAction::class;
+        }
+        $parts  = [];
+        $params = [true, $tenant->value];
+        foreach ($items as $type => $class) {
+            $parts[]  = '(target_type = ? AND target_id IN (SELECT id FROM ' . $this->table($class) . ' WHERE tenant_id = ? AND subject_type = ? AND subject_id = ?))';
+            $params[] = $type;
+            $params[] = $tenant->value;
+            $params[] = SubjectType::Contact->value;
+            $params[] = $contactId;
+        }
+        $this->db()->executeStatement(
+            'UPDATE ' . $this->table(ExternalRef::class) . ' SET erased = ? WHERE tenant_id = ? AND (' . implode(' OR ', $parts) . ')',
+            $params,
             [0 => ParameterType::BOOLEAN],
         );
     }

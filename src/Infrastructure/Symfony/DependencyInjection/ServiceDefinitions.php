@@ -34,6 +34,7 @@ use Nowo\CrmKitBundle\Application\Engagement\Port\EngagementStoreInterface;
 use Nowo\CrmKitBundle\Application\FieldService;
 use Nowo\CrmKitBundle\Application\HostLinkService;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotConnectionService;
+use Nowo\CrmKitBundle\Application\HubSpot\HubSpotEngagementWriter;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotImportService;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotRecordWriter;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotRunner;
@@ -76,6 +77,7 @@ use Nowo\CrmKitBundle\Bridge\SearchKit\CrmDealSearchDefinition;
 use Nowo\CrmKitBundle\Bridge\SearchKit\CrmEngagementSearchDefinition;
 use Nowo\CrmKitBundle\Bridge\SearchKit\CrmRecordSearchDefinition;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\CrmMeetingCalendarSource;
+use Nowo\CrmKitBundle\Domain\Enum\HubSpotActivity;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Event\NoteMentioned;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
@@ -222,6 +224,7 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigura
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 use function class_exists;
+use function in_array;
 use function intdiv;
 use function interface_exists;
 use function is_array;
@@ -429,7 +432,7 @@ final class ServiceDefinitions
             self::activities($container, $config, $pipeline, $mentions);
         }
         if ($hubspot) {
-            self::hubspot($container, $config);
+            self::hubspot($container, $config, self::hubspotActivities($activities, $pipeline));
         }
         if ($messenger) {
             $s->set(ImportRunDispatcherInterface::class, MessengerImportRunDispatcher::class)->args([service('messenger.default_bus'), $clock]);
@@ -454,7 +457,7 @@ final class ServiceDefinitions
             self::activitiesUi($container, $mentions);
         }
         if ($ui && $hubspot) {
-            $s->set(HubSpotImportController::class)->args([service(UiSupport::class), service(HubSpotConnectionServiceInterface::class), service(HubSpotImportServiceInterface::class), service(ImportServiceInterface::class), param($p . 'import.sync_chunks')])->public()->tag('controller.service_arguments');
+            $s->set(HubSpotImportController::class)->args([service(UiSupport::class), service(HubSpotConnectionServiceInterface::class), service(HubSpotImportServiceInterface::class), service(ImportServiceInterface::class), param($p . 'import.sync_chunks'), self::hubspotActivities($activities, $pipeline)])->public()->tag('controller.service_arguments');
             foreach ([HubSpotConnectType::class, HubSpotStartType::class, HubSpotMappingType::class] as $type) {
                 $s->set($type)->tag('form.type');
             }
@@ -513,13 +516,30 @@ final class ServiceDefinitions
     }
 
     /**
+     * The HubSpot engagement kinds the configuration imports (0.12.0): notes, calls and meetings with
+     * `activities.enabled`, tasks (as next actions) with `pipeline.enabled` too.
+     *
+     * @return list<string>
+     */
+    public static function hubspotActivities(bool $activities, bool $pipeline): array
+    {
+        if (!$activities) {
+            return [];
+        }
+        $kinds = [HubSpotActivity::Note->value, HubSpotActivity::Call->value, HubSpotActivity::Meeting->value];
+
+        return $pipeline ? [...$kinds, HubSpotActivity::Task->value] : $kinds;
+    }
+
+    /**
      * The HubSpot import (0.10.0, only with `import.hubspot.enabled`): the kit's own HttpClient, the reader, the store,
      * the default secret box (the secret box alias and the OutboundUrlGuard pin are set by CrmPortsPass), the services
-     * and the rotation command.
+     * and the rotation command. 0.12.0: the engagements writer, with the activities and pipeline stores when on.
      *
      * @param array<string, mixed> $config
+     * @param list<string> $activities the engagement kinds imported
      */
-    private static function hubspot(ContainerConfigurator $container, array $config): void
+    private static function hubspot(ContainerConfigurator $container, array $config, array $activities = []): void
     {
         $s       = $container->services();
         $p       = self::P;
@@ -536,6 +556,13 @@ final class ServiceDefinitions
         }
         $s->set(HubSpotTokenOpener::class)->args([service(CrmSecretBoxInterface::class), service(HubSpotStoreInterface::class), service(TransactionRunnerInterface::class)]);
         $s->set(HubSpotRecordWriter::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(PlanCounter::class), param($p . 'security.resource_scoping')]);
+        $s->set(HubSpotEngagementWriter::class)->args([
+            service(WriteSupport::class),
+            service(HubSpotStoreInterface::class),
+            service(HubSpotRecordWriter::class),
+            $activities === [] ? null : service(EngagementStoreInterface::class),
+            in_array(HubSpotActivity::Task->value, $activities, true) ? service(PipelineStoreInterface::class) : null,
+        ]);
         $s->set(HubSpotRunner::class)->args([
             service(WriteSupport::class),
             service(HubSpotStoreInterface::class),
@@ -550,10 +577,11 @@ final class ServiceDefinitions
             param($p . 'import.hubspot.max_records'),
             param($p . 'import.hubspot.rate_limit.max_attempts'),
             param($p . 'import.hubspot.rate_limit.max_retry_after'),
+            service(HubSpotEngagementWriter::class),
         ]);
         $s->set(HubSpotConnectionService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(CrmSecretBoxInterface::class), param($p . 'import.hubspot.connect_rate_limit.limit'), param($p . 'import.hubspot.connect_rate_limit.interval'), service('logger')->nullOnInvalid()]);
         $s->alias(HubSpotConnectionServiceInterface::class, HubSpotConnectionService::class)->public();
-        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled'), param($p . 'import.hubspot.browse_rate_limit.limit'), param($p . 'import.hubspot.browse_rate_limit.interval'), service('logger')->nullOnInvalid()]);
+        $s->set(HubSpotImportService::class)->args([service(WriteSupport::class), service(HubSpotStoreInterface::class), service(HubSpotReaderInterface::class), service(HubSpotTokenOpener::class), param($p . 'import.messenger.enabled'), param($p . 'import.hubspot.browse_rate_limit.limit'), param($p . 'import.hubspot.browse_rate_limit.interval'), service('logger')->nullOnInvalid(), $activities]);
         $s->alias(HubSpotImportServiceInterface::class, HubSpotImportService::class)->public();
         $s->set(SecretsRotateCommand::class)->args([service(HubSpotStoreInterface::class), service(CrmSecretBoxInterface::class), service(TransactionRunnerInterface::class), $clock, service('logger')->nullOnInvalid()])->tag('console.command');
     }

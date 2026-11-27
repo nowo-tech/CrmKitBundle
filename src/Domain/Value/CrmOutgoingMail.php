@@ -13,8 +13,9 @@ use function trim;
 
 /**
  * One plain-text message to one contact (0.13.0, *Write e-mail*): who sends it (tenant and person), the recipient's
- * address and name, the subject, the text and the MailKit template key used for the sent-mail log tag (or null). The
- * kit sends no HTML part: the person wrote or changed the text, and an HTML part would have to be rebuilt from it.
+ * address and name, the subject, the text, the MailKit template key (or null) and the sent-mail log tag of the tenant
+ * (`logTag`, audit ZDI-M1: a sender that goes through Symfony Mailer must put it on the message with MailKit's
+ * `MailHeaders::tag()`, or the contact's export and erasure do not find the logged row). The kit sends no HTML part: the person wrote or changed the text, and an HTML part would have to be rebuilt from it.
  */
 final readonly class CrmOutgoingMail
 {
@@ -30,6 +31,8 @@ final readonly class CrmOutgoingMail
     /**
      * @param EmailAddress|null $replyTo the sender's own address (the actor's e-mail, when the host shares it)
      * @param string|null $tag the MailKit template key of the message, or null
+     * @param string|null $logTag the tenant's sent-mail log tag (`crm:` + 32 hex characters), or null when the CRM
+     *                            does not log through MailKit
      *
      * @throws InvalidArgumentException a subject or a name that is not one safe line, or a text that is empty or too long
      */
@@ -42,6 +45,7 @@ final readonly class CrmOutgoingMail
         public string $text,
         public ?EmailAddress $replyTo = null,
         public ?string $tag = null,
+        public ?string $logTag = null,
     ) {
         if (!self::isLine($subject, self::MAX_SUBJECT, false)) {
             throw new InvalidArgumentException('A subject is 1 to 255 characters on one line.');
@@ -54,6 +58,9 @@ final readonly class CrmOutgoingMail
         }
         if ($tag !== null && preg_match('/\A[a-z0-9][a-z0-9._-]{0,63}\z/D', $tag) !== 1) {
             throw new InvalidArgumentException('A tag is a MailKit template key.');
+        }
+        if ($logTag !== null && preg_match('/\Acrm:[0-9a-f]{32}\z/D', $logTag) !== 1) {
+            throw new InvalidArgumentException('A log tag is crm: and 32 hex characters.');
         }
     }
 

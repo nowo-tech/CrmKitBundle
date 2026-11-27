@@ -654,7 +654,7 @@ It needs:
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `mail_sender` | `null` | Service id of a host `CrmMailSenderInterface` (for instance the person's own mailbox through MailKit's delegated mailboxes); `null` = `Bridge\MailKit\MailKitCrmMailSender`: a plain-text message through Symfony Mailer, the person's e-mail (from the actor directory) as Reply-To, the tenant's tag (`Bridge\MailKit\CrmMailLogTag`) as MailKit's log tag and the template key as its tracking template id; From comes from MailKit's settings |
+| `mail_sender` | `null` | Service id of a host `CrmMailSenderInterface` (for instance the person's own mailbox through MailKit's delegated mailboxes). A host sender that sends through Symfony Mailer must tag the message with `MailHeaders::tag($email, $mail->logTag)`, or the contact's export and erasure do not find its sent-mail log rows (SECURITY.md); `null` = `Bridge\MailKit\MailKitCrmMailSender`: a plain-text message through Symfony Mailer, the person's e-mail (from the actor directory) as Reply-To, the tenant's tag (`Bridge\MailKit\CrmMailLogTag`) as MailKit's log tag and the template key (`crm` without one) as its tracking template id; From comes from MailKit's settings |
 | `send_rate_limit.limit` | `30` | *Write e-mail* sends per person and window (1–1000); beyond it the dialog says to wait |
 | `send_rate_limit.interval` | `300` | Window in seconds (60–86 400, rounded up to minutes) |
 

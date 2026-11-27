@@ -1325,10 +1325,11 @@ $outcome->engagementId;   // the email activity, or null when the mail went out 
 - A message without a template is a service message (no consent needed). The template that applies is the one last
   inserted, not the picker's current value.
 - The default sender sends plain text with Symfony Mailer (MailKit decorates it: From and Reply-To from its settings
-  when missing, the sent-mail log with the tenant's tag `CrmMailLogTag::of()`, the template key as the tracking
-  template id). Reply-To is the person's e-mail when the actor
-  directory shares it. To send from the person's own mailbox, implement `CrmMailSenderInterface` and set
-  `templates.mail_sender`.
+  when missing, the sent-mail log with the tenant's tag `$mail->logTag`, the template key, or `crm` without one, as
+  the tracking template id). Reply-To is the person's e-mail when the actor directory shares it. To send from the
+  person's own mailbox, implement `CrmMailSenderInterface` and set `templates.mail_sender`. A host sender that sends
+  through Symfony Mailer must call `MailHeaders::tag($email, $mail->logTag)`: the contact's export and erasure only
+  find tagged rows of MailKit's sent-mail log.
 
 ## SearchKit
 

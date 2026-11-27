@@ -32,7 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Planned as **0.13.0** (Beacon spec 254, block A-2, task T003, FR-015 / FR-016; owner D-20261127-02). 0.12.0 (the
+Planned as **0.13.0** (block A-2: e-mail templates and *Write e-mail*). 0.12.0 (the
 HubSpot activity import) and 0.12.1 are released. No BC break: everything new is behind `templates.enabled` (off by
 default; it needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.8); with it off no table is
 mapped and no route or service is added.
@@ -53,8 +53,10 @@ mapped and no route or service is added.
   (`Bridge\MailKit\TemplatePurposeCleaner`, inside MailKit's delete transaction on a shared connection).
 - **Contact export and erasure cover the tenant's rows of MailKit's sent-mail log** (pre-tag audit ZDI-M1, MailKit
   >= 2.8): every *Write e-mail* sent through Symfony Mailer carries the tenant's log tag
-  (`Bridge\MailKit\CrmMailLogTag`, `crm:` + 32 hex characters of a SHA-256 of the tenant; the template key goes to
-  MailKit's tracking policy as the template id). With `templates.enabled`, `CrmPersonalDataInterface::export()` lists
+  (`Bridge\MailKit\CrmMailLogTag`, `crm:` + 32 hex characters of a SHA-256 of the tenant, passed to every sender as
+  `CrmOutgoingMail::$logTag`; the template key, or `crm` without one, goes to MailKit's tracking policy as the
+  template id). A host `templates.mail_sender` that sends through Symfony Mailer must apply the tag
+  (`CrmMailSenderInterface`); untagged rows stay the host's. With `templates.enabled`, `CrmPersonalDataInterface::export()` lists
   (`sent_mail`) and `erase()` erases, in the erasure's unit, the log rows with that tag (MailKit's tag-scoped
   `SentMailTaggedPersonalDataExporterInterface` / `SentMailTaggedPersonalDataEraserInterface`) of the contact's address
   and those its merge traces keep (contacts merged into it); rows another tenant or the host sent to the same address

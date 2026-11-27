@@ -81,7 +81,7 @@ final class MailComposerTest extends TemplatesTestCase
         $this->composer()->send(new MailDraft($ada, 'Plain', 'Text', null, MailDraft::newKey()));
         self::assertSame([], $this->lastMail()->getReplyTo());
         $this->actAs('ana');
-        self::assertNull($plain->getHeaders()->get(MailHeaders::TEMPLATE));
+        self::assertSame('crm', $plain->getHeaders()->get(MailHeaders::TEMPLATE)?->getBodyAsString(), 'no template: not the log tag');
         self::assertSame(CrmMailLogTag::of(new TenantRef('acme')), $plain->getHeaders()->get(MailHeaders::TAG)?->getBodyAsString());
     }
 
@@ -128,6 +128,27 @@ final class MailComposerTest extends TemplatesTestCase
         $this->expectThrows(SentMailLogTableMissingException::class, fn () => $this->service(CrmPersonalDataInterface::class)->erase($bob));
         self::assertSame('active', $this->text('SELECT status FROM nowo_crm_contact WHERE id = ?', [$bob]));
         self::assertSame(['Someone else'], array_column($log->rows['bob@example.test'], 'subject'));
+    }
+
+    public function testAHostSenderThroughSymfonyMailerGetsTheLogTag(): void
+    {
+        // Audit ZDI-M1: a host templates.mail_sender is handed the tenant's log tag; when it applies it, the rows MailKit
+        // logs for its sends are exported and erased with the contact like the default sender's.
+        $this->boot(['templates' => ['mail_sender' => 'test.host_sender']]);
+        $this->admin();
+        $ada = $this->contact('Ada', 'Lovelace', 'ada@example.test');
+        $this->composer()->send(new MailDraft($ada, 'From the host', 'Text', null, MailDraft::newKey()));
+        $tag = $this->lastMail()->getHeaders()->get(MailHeaders::TAG)?->getBodyAsString();
+        self::assertSame(CrmMailLogTag::of(new TenantRef('acme')), $tag);
+
+        $log = $this->sentMailLog();
+        $log->log('ada@example.test', 'From the host', $tag);
+        $log->log('ada@example.test', 'Host mail');
+        $sent = $this->service(CrmPersonalDataInterface::class)->export($ada)['sent_mail'] ?? null;
+        self::assertIsArray($sent);
+        self::assertSame(['From the host'], array_column($sent, 'subject'));
+        $this->service(CrmPersonalDataInterface::class)->erase($ada);
+        self::assertSame(['Host mail'], array_column($log->rows['ada@example.test'], 'subject'));
     }
 
     public function testConsentAndClassificationDecideWhetherATemplateMaySend(): void

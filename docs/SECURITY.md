@@ -360,9 +360,12 @@ Report vulnerabilities privately through GitHub Security Advisories of `nowo-tec
   sent message's subject and first 500 characters are stored as the `email` activity (A-1's GDPR paths cover it).
 - **MailKit's sent-mail log (audit ZDI-M1).** Every *Write e-mail* sent through Symfony Mailer also writes a row of
   MailKit's sent-mail log (the contact's address and the subject; the body too with MailKit's `log.store_bodies`).
-  MailKit's log has no tenant column, so the CRM tags every message it sends with the tenant's tag
-  (`Bridge\MailKit\CrmMailLogTag`: `crm:` and 32 hex characters of a SHA-256 of the tenant; the template key goes to
-  MailKit's tracking policy as the template id instead). With `templates.enabled`, `CrmPersonalDataInterface::export()`
+  MailKit's log has no tenant column, so every message the CRM hands to its sender carries the tenant's log tag
+  (`CrmOutgoingMail::$logTag` = `Bridge\MailKit\CrmMailLogTag::of()`: `crm:` and 32 hex characters of a SHA-256 of
+  the tenant). The default sender puts it on the message (the template key, or `crm` without one, goes to MailKit's
+  tracking policy as the template id instead). **A host sender (`templates.mail_sender`) that sends through Symfony
+  Mailer must do the same** (`MailHeaders::tag($email, $mail->logTag)`): rows it leaves untagged are not found by the
+  contact's export and erasure and stay the host's to export and erase. With `templates.enabled`, `CrmPersonalDataInterface::export()`
   lists (`sent_mail`: status, subject, dates) and `erase()` erases, in the same unit, only the log rows with that tag
   (MailKit >= 2.8 `SentMailTaggedPersonalDataExporterInterface` / `SentMailTaggedPersonalDataEraserInterface`: rows of
   the address deleted, or unlinked and masked when they have other recipients), for the contact's current address and
@@ -372,4 +375,5 @@ Report vulnerabilities privately through GitHub Security Advisories of `nowo-tec
   them complete. Rows logged under an address the contact no longer has (changed before the erasure, or kept only by a
   purged merge trace) are not found: the host erases them with `nowo:mail-kit:log:forget <address>` and keeps
   `nowo:mail-kit:log:purge` scheduled. A host sender (`templates.mail_sender`) that does not go through Symfony Mailer
-  keeps its own records: their export and erasure are the host's.
+  (for example MailKit's delegated mailboxes, which write no sent-mail log row) keeps its own records: their export
+  and erasure are the host's. The export and erasure cover a host sender's rows only when it applied the log tag.

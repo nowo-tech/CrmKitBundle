@@ -9,14 +9,17 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Types\Types;
 use Nowo\CrmKitBundle\Bridge\MailKit\CrmMailLogTag;
 use Nowo\CrmKitBundle\Domain\Enum\EmailTemplateKind;
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
 use Nowo\CrmKitBundle\Domain\Exception\ConflictException;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\EmailTemplateInput;
 use Nowo\CrmKitBundle\Domain\Service\EmailTemplatesInterface;
 use Nowo\CrmKitBundle\Domain\Service\MailComposerInterface;
 use Nowo\CrmKitBundle\Domain\Service\MailDraft;
+use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailer;
 use Nowo\MailKitBundle\Log\NullSentMailErasure;
@@ -42,6 +45,8 @@ use Throwable;
 
 use function array_column;
 use function array_map;
+use function count;
+use function sort;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
 
@@ -108,26 +113,69 @@ final class RealMailKitTest extends CrmTestCase
 
         $this->admin();
         $ada = $this->contact('Ada', 'Lovelace', 'ada@example.test');
-        $this->service(MailComposerInterface::class)->send(new MailDraft($ada, 'Your quote', 'Text', null, MailDraft::newKey()));
-        $mailer = $this->kernel->getContainer()->get('test.mailer');
-        self::assertInstanceOf(TestMailer::class, $mailer);
-        // What MailKit's mailer decoration does with the message the CRM sent.
-        $recorder->sent(null, $mailer->sent[0], 'smtp', null, null);
+        $dup = $this->contact('Ada', 'L.', 'ada.old@example.test');
+        // A mail to the duplicate, then the duplicate merged into Ada: its old address is in Ada's merge trace.
+        $this->sendAndLog($recorder, $dup, 'To the old address');
+        $this->service(MergeServiceInterface::class)->merge(SubjectType::Contact, $ada, $dup, [], $this->service(CrmReaderInterface::class)->record(SubjectType::Contact, $ada)->version, 1);
+        $this->sendAndLog($recorder, $ada, 'Your quote');
         $globex = (new Email())->from('app@example.test')->to('ada@example.test')->subject('Other tenant')->text('t');
         MailHeaders::tag($globex, CrmMailLogTag::of(new TenantRef('globex')));
         $recorder->sent(null, $globex, 'smtp', null, null);
         $recorder->sent(null, (new Email())->from('app@example.test')->to('ADA@example.test')->subject('Host mail')->text('t'), 'smtp', null, null);
+        $recorder->sent(null, (new Email())->from('app@example.test')->to('ada.old@example.test')->subject('Host to old')->text('t'), 'smtp', null, null);
 
         $personalData = $this->service(CrmPersonalDataInterface::class);
         $sent         = $personalData->export($ada)['sent_mail'] ?? null;
         self::assertIsArray($sent);
-        self::assertSame(['Your quote'], array_column($sent, 'subject'));
+        $subjects = array_column($sent, 'subject');
+        sort($subjects);
+        self::assertSame(['To the old address', 'Your quote'], $subjects);
 
         $personalData->erase($ada);
-        self::assertSame(['Host mail', 'Other tenant'], $db->fetchFirstColumn('SELECT subject FROM mail_kit_sent_mail ORDER BY subject'));
+        self::assertSame(['Host mail', 'Host to old', 'Other tenant'], $db->fetchFirstColumn('SELECT subject FROM mail_kit_sent_mail ORDER BY subject'));
         self::assertSame([], $recorder->exportTagged(SentMailPersonalDataSubject::fromEmail('ada@example.test'), CrmMailLogTag::of(new TenantRef('acme'))));
         $db->executeStatement('DROP TABLE mail_kit_sent_mail_body');
         $db->executeStatement('DROP TABLE mail_kit_sent_mail');
+    }
+
+    /**
+     * Audit ZDI-M1: a single-tenant host (`TenantRef::default()`) has one stable tag; erasure works on it and leaves the
+     * host's untagged mail.
+     */
+    public function testTheSingleTenantTagIsTheDefaultTenants(): void
+    {
+        $this->bootWithMailKit(true);
+        $db = $this->connection();
+        $this->createSentMailLog($db);
+        $recorder = $this->kernel->getContainer()->get(SentMailRecorder::class);
+        self::assertInstanceOf(SentMailRecorder::class, $recorder);
+        $this->ctx()->tenant = TenantRef::DEFAULT;
+        $this->admin();
+        $ada = $this->contact('Ada', 'Lovelace', 'ada@example.test');
+        $this->sendAndLog($recorder, $ada, 'Single tenant');
+        $recorder->sent(null, (new Email())->from('app@example.test')->to('ada@example.test')->subject('Host mail')->text('t'), 'smtp', null, null);
+        self::assertSame(CrmMailLogTag::of(TenantRef::default()), $db->fetchOne("SELECT tag FROM mail_kit_sent_mail WHERE subject = 'Single tenant'"));
+
+        $sent = $this->service(CrmPersonalDataInterface::class)->export($ada)['sent_mail'] ?? null;
+        self::assertIsArray($sent);
+        self::assertSame(['Single tenant'], array_column($sent, 'subject'));
+        $this->service(CrmPersonalDataInterface::class)->erase($ada);
+        self::assertSame(['Host mail'], $db->fetchFirstColumn('SELECT subject FROM mail_kit_sent_mail'));
+        $db->executeStatement('DROP TABLE mail_kit_sent_mail_body');
+        $db->executeStatement('DROP TABLE mail_kit_sent_mail');
+    }
+
+    /**
+     * Sends a *Write e-mail* to the contact and records the sent message as MailKit's mailer decoration does.
+     */
+    private function sendAndLog(SentMailRecorder $recorder, string $contactId, string $subject): void
+    {
+        $this->service(MailComposerInterface::class)->send(new MailDraft($contactId, $subject, 'Text', null, MailDraft::newKey()));
+        $mailer = $this->kernel->getContainer()->get('test.mailer');
+        self::assertInstanceOf(TestMailer::class, $mailer);
+        $message = $mailer->sent[count($mailer->sent) - 1] ?? null;
+        self::assertInstanceOf(Email::class, $message);
+        $recorder->sent(null, $message, 'smtp', null, null);
     }
 
     /**

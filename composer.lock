@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "47e32eb30bc12c8fba689301eda58af4",
+    "content-hash": "1bbe1b0a80452b33e5c3d674e6b5b1cf",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -7236,16 +7236,16 @@
         },
         {
             "name": "nowo-tech/mail-kit-bundle",
-            "version": "v2.7.0",
+            "version": "v2.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/MailKitBundle.git",
-                "reference": "95c46bd7dd9f608d6a527f15919d77d532be8f11"
+                "reference": "c52753f39db60ec104535517f123efb67ac8e854"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/MailKitBundle/zipball/95c46bd7dd9f608d6a527f15919d77d532be8f11",
-                "reference": "95c46bd7dd9f608d6a527f15919d77d532be8f11",
+                "url": "https://api.github.com/repos/nowo-tech/MailKitBundle/zipball/c52753f39db60ec104535517f123efb67ac8e854",
+                "reference": "c52753f39db60ec104535517f123efb67ac8e854",
                 "shasum": ""
             },
             "require": {
@@ -7398,8 +7398,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-27T09:13:01+00:00",
-            "published-time": "2026-11-27T09:16:47+00:00"
+            "time": "2026-11-27T19:34:08+00:00",
+            "published-time": "2026-11-27T19:37:55+00:00"
         },
         {
             "name": "nowo-tech/migrations-kit-contracts",

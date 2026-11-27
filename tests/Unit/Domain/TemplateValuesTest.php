@@ -40,6 +40,17 @@ final class TemplateValuesTest extends TestCase
         self::assertTrue(CrmOutgoingMail::isLine('', 10, true));
         self::assertFalse(CrmOutgoingMail::isLine("\xff", 10, true));
         self::assertTrue(CrmOutgoingMail::isText("line\n\ttab"));
+        $tag = 'crm:' . str_repeat('0a', 16);
+        self::assertSame($tag, (new CrmOutgoingMail(new TenantRef('acme'), new ActorRef('ana'), new EmailAddress('ada@example.test'), '', 'S', 'T', null, null, $tag))->logTag);
+        self::assertNull($this->mail('S', 'T', '', null)->logTag);
+        foreach (['crm:XYZ', 'other:' . str_repeat('0', 32), 'crm:' . str_repeat('0', 33)] as $bad) {
+            try {
+                new CrmOutgoingMail(new TenantRef('acme'), new ActorRef('ana'), new EmailAddress('ada@example.test'), '', 'S', 'T', null, null, $bad);
+                self::fail('log tag accepted: ' . $bad);
+            } catch (InvalidArgumentException $e) {
+                self::assertSame('A log tag is crm: and 32 hex characters.', $e->getMessage());
+            }
+        }
     }
 
     public function testRefsKeysAndViews(): void

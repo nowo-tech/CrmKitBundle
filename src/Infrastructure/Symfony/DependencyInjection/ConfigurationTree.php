@@ -399,7 +399,7 @@ final class ConfigurationTree
     }
 
     /**
-     * The e-mail templates and *Write e-mail* (0.13.0, Beacon spec 254 A-2): stored by MailKit (>= 2.8, optional), the
+     * The e-mail templates and *Write e-mail* (0.13.0, block A-2): stored by MailKit (>= 2.8, optional), the
      * CRM's placeholders, consent classification and sending.
      */
     private static function templates(NodeBuilder $children): void

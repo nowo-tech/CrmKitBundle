@@ -183,7 +183,7 @@ final readonly class MailKitMailComposer implements MailComposerInterface
         try {
             $profile = $this->directory->actor($context->tenant, $context->actor);
             $replyTo = is_string($profile?->email) ? $this->address($profile->email) : null;
-            $this->sender->send(new CrmOutgoingMail($context->tenant, $context->actor, new EmailAddress($recipient[0]), $this->line($recipient[1], 200), $draft->subject, $draft->text, $replyTo, $template?->key));
+            $this->sender->send(new CrmOutgoingMail($context->tenant, $context->actor, new EmailAddress($recipient[0]), $this->line($recipient[1], 200), $draft->subject, $draft->text, $replyTo, $template?->key, CrmMailLogTag::of($context->tenant)));
         } catch (Throwable $e) {
             $this->logger?->warning('nowo_crm_kit: an e-mail to a contact was not sent.', ['contact' => $draft->contactId, 'exception' => $e]);
             $this->store->release($context->tenant, $draft->sendKey);

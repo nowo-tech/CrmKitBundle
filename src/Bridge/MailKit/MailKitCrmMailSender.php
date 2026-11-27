@@ -41,10 +41,9 @@ final readonly class MailKitCrmMailSender implements CrmMailSenderInterface
         if ($mail->replyTo instanceof EmailAddress) {
             $email->replyTo(new Address($mail->replyTo->value));
         }
-        MailHeaders::tag($email, CrmMailLogTag::of($mail->tenant));
-        if ($mail->tag !== null) {
-            MailHeaders::template($email, $mail->tag);
-        }
+        MailHeaders::tag($email, $mail->logTag ?? CrmMailLogTag::of($mail->tenant));
+        // Without a template the tracking policy gets `crm`, not the tenant's log tag (its fallback).
+        MailHeaders::template($email, $mail->tag ?? 'crm');
         $this->mailer->send($email);
 
         return new CrmSentMailRef();

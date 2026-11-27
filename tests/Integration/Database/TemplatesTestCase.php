@@ -11,6 +11,7 @@ use Nowo\CrmKitBundle\Domain\Service\MailComposerInterface;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailer;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailTemplates;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestSentMailLog;
+use Nowo\CrmKitBundle\Tests\Fixtures\TestTaggingHostSender;
 use Nowo\MailKitBundle\Log\SentMailTaggedPersonalDataEraserInterface;
 use Nowo\MailKitBundle\Log\SentMailTaggedPersonalDataExporterInterface;
 use Nowo\MailKitBundle\Template\Service\TemplateLibraryInterface;
@@ -26,7 +27,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 
 /**
- * 0.13.0 (Beacon spec 254, A-2): a kernel with the activities, the e-mail templates and an in-memory MailKit (library,
+ * 0.13.0 (A-2): a kernel with the activities, the e-mail templates and an in-memory MailKit (library,
  * renderer, the CRM's permission port, the tagged placeholder providers) and mailer.
  */
 abstract class TemplatesTestCase extends CrmTestCase
@@ -44,6 +45,7 @@ abstract class TemplatesTestCase extends CrmTestCase
             $s->set('test.mail_templates', TestMailTemplates::class)->args([service('nowo_crm_kit.template_permission'), service('event_dispatcher'), tagged_iterator('nowo_mail_kit.template_placeholder_provider')])->public();
             $s->alias(TemplateLibraryInterface::class, 'test.mail_templates')->public();
             $s->alias(TemplateRendererInterface::class, 'test.mail_templates')->public();
+            $s->set('test.host_sender', TestTaggingHostSender::class)->args([service('test.mailer')])->public();
             $s->set('test.sent_mail_log', TestSentMailLog::class)->public();
             $s->alias(SentMailTaggedPersonalDataEraserInterface::class, 'test.sent_mail_log')->public();
             $s->alias(SentMailTaggedPersonalDataExporterInterface::class, 'test.sent_mail_log')->public();

@@ -30,6 +30,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as **0.13.0** (Beacon spec 254, block A-2, task T003, FR-015 / FR-016; owner D-20261127-02: for Beacon
+v1.182). 0.12.0 is the HubSpot activity import, built in parallel. No BC break: everything new is behind
+`templates.enabled` (off by default; it needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.7);
+with it off no table is mapped and no route or service is added.
+
+### Added
+
+- **E-mail templates** (`templates.enabled`) on MailKit 2.7's stored templates: personal and organisation templates
+  and snippets through `EmailTemplatesInterface` (`list`, `get`, `create`, `update`, `delete`, `compose`,
+  `placeholders`), acting as the session's CRM tenant and person (`edit`; `manage` for the organisation's rows), with
+  MailKit's errors mapped to the CRM's (404, 403, 409 `crm_record_stale`, input errors per field `template_error.*`).
+  Audit entries `crm.template.created`, `crm.template.saved`, `crm.template.deleted`.
+- **Consent purpose per template**: table `crm_template_purpose` (mapping group `NowoCrmKitBundleTemplates`), keyed
+  by MailKit's template id: a `gdpr.purposes` key (commercial) or a service message. Templates written elsewhere are
+  unclassified and cannot be sent until classified (deny by default). The row goes with the template on MailKit's
+  `TemplateDeletedEvent` (`Bridge\MailKit\TemplatePurposeCleaner`, inside MailKit's delete transaction on a shared
+  connection).
+- **CRM placeholders** for MailKit's closed registry (tag `nowo_mail_kit.template_placeholder_provider`):
+  `contact.*`, `company.*` (the contact's primary company), `deal.*` (`amount` only with `amounts_view`) and `me.*`,
+  read through the CRM's readers (tenant, `view`, the host's record checks), only for the exact CRM tenant and person
+  of the call; unknown or hidden values stay as literal text.
+- **MailKit permission port** `nowo_crm_kit.template_permission` (`Bridge\MailKit\CrmTemplatePermission`): the MailKit
+  actor must be the call's CRM tenant and person; `edit` for personal templates and the use of shared ones, `manage`
+  to manage shared ones.
+- **Write e-mail** on a contact's 360° page (in the activity dialog, loaded on demand; a page without JavaScript):
+  template and snippet inserts rendered by the server for the contact and an optional open deal, Send through
+  `MailComposerInterface::send(MailDraft)`: the checks in one write unit on the locked contact (address, the template's
+  consent purpose, the per-person `templates.send_rate_limit`, a one-time send key), the send outside any transaction
+  through the new port `CrmMailSenderInterface` (default: plain text with Symfony Mailer, decorated by MailKit; host
+  sender `templates.mail_sender`), then an `email` activity on the contact and the event `CrmMailSent`
+  (`CrmKitEvents::MAIL_SENT`). Audit entry `crm.mail.claimed`.
+- **Templates page** (`/crm/templates`, area tab "Templates", icon `templates` in `ui.tab_icons`): the person's and
+  the organisation's templates and snippets with their consent column, create / edit forms loaded on demand into a
+  remote dialog, delete with a confirm.
+- Configuration `templates.*` (CONFIGURATION.md), translations in the seven locales, MailKit test stand-ins
+  (`tests/Stubs/MailKit`), `symfony/mailer` and `symfony/mime` for the tests, `nowo-tech/mail-kit-bundle` suggested.
+
+### Changed
+
+- `PipelineDialogs::render()` takes other fragment / page templates and extra variables (internal).
+- `ConflictException::MAIL_SENT` (`crm_mail_already_sent`).
+
 ### Fixed
 
 - Tests only: `ApiModelTest::testSealedCursors` sealed the value `Ada` and asserted that the random base64 cursor

@@ -14,7 +14,7 @@ contract revision (tables, services, concurrency) before it is built.
   - [Release plan](#release-plan)
   - [Reuse matrix](#reuse-matrix)
   - [Old phases and spec 254](#old-phases-and-spec-254)
-  - [Block A — activities and templates (A-1 0.11.0, A-2 0.15.0)](#block-a--activities-and-templates-a-1-0110-a-2-0150)
+  - [Block A — activities and templates (A-1 0.11.0, A-2 0.13.0)](#block-a--activities-and-templates-a-1-0110-a-2-0130)
   - [Block B — mailbox sync and tracking (CrmKit 0.16.0)](#block-b--mailbox-sync-and-tracking-crmkit-0160)
   - [Block C — products, line items and quotes (C-1 0.17.0, C-2 0.18.0)](#block-c--products-line-items-and-quotes-c-1-0170-c-2-0180)
   - [Block D — tickets, SLA and support inbox (D-1 0.19.0, D-2 0.20.0, D-3 later)](#block-d--tickets-sla-and-support-inbox-d-1-0190-d-2-0200-d-3-later)
@@ -55,7 +55,8 @@ earlier order B → C → D → E → F → G.
 **2026-11-26 (Beacon priority):** A-1 activities (Beacon spec 254) moves first and is built as **0.11.0**; H2 follows
 as 0.12.0, the Zoho import Z1 (Beacon spec 253 block Z, owner decisions Q-Z1..18 of 2026-11-24, design in the Zoho
 design note) as 0.13.0 and H3 as 0.14.0. Z2 / Z3 and the later spec 254 slices take their numbers when they are
-scheduled, in the order below.
+scheduled, in the order below. **2026-11-27:** the HubSpot activity import takes 0.12.0 and A-2 templates 0.13.0
+(owner D-20261127-02, Beacon v1.182); H2, Z1 and H3 move to the next free minors.
 
 Status as of 2026-11-23 (latest tag v0.8.0; 0.8.1 is being released; 0.9.0, the pipeline dialogs, is PR #22; H1 is
 built as 0.10.0 in draft PR #23). Tags v0.4.0 to v0.8.1 were not the phases of the plan: they are UI and
@@ -103,15 +104,16 @@ Q-O questions) in [CONTRACT.md](CONTRACT.md) before it is built.
 
 ### Release plan
 
-Version numbers as of 2026-11-26: A-1 moved first (Beacon priority) and is **0.11.0**; then H2 0.12.0, Z1 (Zoho
-companies and contacts) 0.13.0, H3 0.14.0; the slices after them take the next free minor in the order of this table
+Version numbers as of 2026-11-27: A-1 moved first (Beacon priority) and is **0.11.0**; the HubSpot activity import
+is 0.12.0 and **A-2 templates 0.13.0** (owner D-20261127-02: for Beacon v1.182); H2, Z1 (Zoho companies and contacts)
+and H3 follow with the next free minors; the slices after them take the next free minor in the order of this table
 when they are scheduled (numbers move up when another release lands first; the order does not change). "Kit option" is the configuration switch; off means no tables mapped, no routes, no services, no menu entries.
 
 | Slice | CrmKit | Content | Kit option | Other bundles (new work in **bold**) | Beacon release (target) |
 | --- | --- | --- | --- | --- | --- |
 | **A-1** activities | 0.11.0 | Kinds `call`, `meeting`, `email`; log dialogs; timeline filter by kind and person; fan-out contact → companies / deals; pinned notes; @mentions; host activity source; meetings on TaskBoard's calendar + ICS download (MailKit invite part a follow-up); HubSpot notes / calls / meetings / tasks in a later slice (HubSpot part 4) | `activities.enabled` | TaskBoard (event source, as is), NotifyKit 0.3 (as is), MilkdownEditor mentions (as is), **MailKit: ICS invites** (follow-up), SearchKit | v1.176 |
 | H1 / H2 / Z1 / H3 | 0.10.0 / 0.12.0 / 0.13.0 / 0.14.0 | HubSpot import (spec 253), Zoho import Z1 (spec 253 block Z) | `import.hubspot.*`, `import.zoho.*` | — | v1.174 (H1) |
-| **A-2** templates | 0.15.0 | Personal and shared e-mail templates, snippets, closed merge-field resolver, consent purpose per template; *Write e-mail* insert; sent mail logged as `email` | `templates.enabled` | **MailKit: stored templates + placeholder registry** (CrmKit adds the CRM placeholders) | v1.176 or v1.177 |
+| **A-2** templates | 0.13.0 | Personal and shared e-mail templates, snippets, closed merge-field resolver, consent purpose per template; *Write e-mail* insert; sent mail logged as `email` | `templates.enabled` | **MailKit 2.7: stored templates + placeholder registry** (CrmKit adds the CRM placeholders) | v1.182 (D-20261127-02) |
 | **B** mailbox sync + tracking | 0.16.0 | Auto-link by exact contact e-mail, `email` activities from linked messages, open / click signal, reply detection; HubSpot e-mails (metadata; bodies on opt-in) | `mail_link.enabled` | **MailKit B1: Graph delegated personal mailboxes** (spec 236 kit side); **MailKit B2: Gmail provider** (off until Google's review); **TimeTrack: OAuth helpers with extra scopes** (Q-254-15); MailKit tracking + ShortLink clicks (as is) | v1.177 (Outlook); Gmail by configuration later |
 | **C-1** catalogue + line items | 0.17.0 | Product catalogue, line items on deals, deal amount from items (per funnel), MRR / ARR; HubSpot products and line items | `catalog.enabled` | — (new in CrmKit; CurrencyKit only for an optional reference display) | v1.178 |
 | **C-2** quotes | 0.18.0 | Quotes with series numbering, versions, branded PDF, signed accept / reject link, immutable acceptance, won / lost on answer; HubSpot quotes | `quotes.enabled` | ReportKit PDF runner + brand-contracts (as is); PdfSignable later as a provider (as is) | v1.178 or v1.179 |
@@ -199,7 +201,7 @@ created, README only).
 | E2 circulars | **F-2** (needs the verified domain of FR-064) |
 | G reports | Forecast and goals become **G**; velocity, cohorts and deal scoring stay in phase G "reports" later |
 
-### Block A — activities and templates (A-1 0.11.0, A-2 0.15.0)
+### Block A — activities and templates (A-1 0.11.0, A-2 0.13.0)
 
 - **A-1 as built (0.11.0, Beacon tasks T001 and T002; spec in `specs/002-activities/`).** `activities.enabled` (off by
   default); calls, meetings and e-mails (`Engagement`, its records and attendees, three tables) with log / edit dialogs
@@ -217,6 +219,20 @@ created, README only).
   - NotifyKit reminders (Q-254-2) are not part of 0.11.0; they reuse `CrmNotifierInterface` in a later slice.
   - `ActivityDirection` (in / out) serves calls and e-mails instead of a `CallDirection` of calls only.
 
+- **A-2 as built (0.13.0, Beacon task T003, FR-015 / FR-016; spec in `specs/003-templates/`).** `templates.enabled`
+  (off by default; needs `activities.enabled` and MailKit >= 2.7, an optional dependency) on MailKit 2.7's stored
+  templates (contract C1–C12): `EmailTemplatesInterface` over MailKit's library and renderer; the `contact.*`,
+  `company.*`, `deal.*`, `me.*` providers (only the exact CRM tenant and person, only what the record view shows);
+  MailKit's permission port on the CRM gate (`nowo_crm_kit.template_permission`: `edit` / `manage`); the consent
+  classification per template (`crm_template_purpose`, cleaned on `TemplateDeletedEvent`; unclassified templates
+  cannot be sent); *Write e-mail* on a contact's 360° page (server-side template / snippet inserts, the checks under the
+  contact's lock, a one-time send key, a per-person rate limit, the send outside the transaction through
+  `CrmMailSenderInterface`, an `email` activity and `CrmMailSent`); the Templates page. Deviations from the plan below:
+  - `MergeField` is not a CRM value object: MailKit's registry owns the grammar (`{{ ns.name }}`) and each provider
+    has a closed name list. `TemplateRef` is the MailKit id.
+  - *Write e-mail* is on contacts only (one recipient, plain text); company and deal pages, attachments, cc and the
+    person's own mailbox as sender are spec 248's composer in Beacon (or `templates.mail_sender`).
+  - The CRM's form edits the text body; HTML bodies written elsewhere are replaced when saved in the CRM.
 - **Reuse (owner rule).**
   - Meetings on a calendar: **reuse TaskBoard as is** (`CalendarEventSourceInterface`, timed events since 2.24;
     CrmKit's `Bridge/TaskBoard` adds a source). Meetings already in a person's Outlook / Google calendar: **reuse

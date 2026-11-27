@@ -1,5 +1,6 @@
 # CRM kit, phase A (sociétés et contacts). Domaine NowoCrmKitBundle. Les paramètres sont entourés de %.
 nav:
+    templates: 'Modèles'
     funnels: 'Entonnoirs'
     deals: 'Affaires'
     label: CRM
@@ -504,6 +505,7 @@ search:
     see_all: 'Voir les %count%'
 flash:
     conflict:
+        crm_mail_already_sent: 'Cet e-mail a déjà été envoyé. Fermez la fenêtre pour le voir sur le contact.'
         crm_hubspot_rate_limited: 'Trop de vérifications de clé pour cette organisation. Patientez quelques minutes.'
         crm_stage_invalid: 'Cette étape ne peut pas être utilisée : elle appartient à un autre entonnoir, ou l’étape ou l’entonnoir est archivé ou clos.'
         crm_record_stale: 'Quelqu''un a modifié cette fiche au même moment. Le formulaire affiche les valeurs actuelles : vérifiez-les et enregistrez à nouveau.'
@@ -851,3 +853,92 @@ notify:
         title: "%actor% vous a mentionné dans une note du CRM"
     category:
         crm: "CRM"
+templates:
+    title: 'Modèles d''e-mail'
+    intro: 'Vos modèles et extraits, et ceux de l''organisation. Écrire un e-mail sur un contact les insère.'
+    empty: 'Aucun modèle pour l''instant.'
+    empty_hint: 'Créez un modèle pour les messages que vous envoyez souvent, ou un extrait comme votre signature.'
+template:
+    new_template: 'Nouveau modèle'
+    new_snippet: 'Nouvel extrait'
+    edit_template: 'Modifier le modèle'
+    edit_snippet: 'Modifier l''extrait'
+    edit: 'Modifier'
+    delete: 'Supprimer'
+    delete_confirm: 'Supprimer définitivement ce modèle ?'
+    save: 'Enregistrer'
+    created: 'Le modèle a été enregistré.'
+    saved: 'Le modèle a été enregistré.'
+    deleted: 'Le modèle a été supprimé.'
+    unclassified: 'Non classé (ne peut pas être envoyé)'
+    html_notice: 'Ce modèle a un corps HTML écrit ailleurs. L''enregistrer ici le remplace par le texte ci-dessous.'
+    kind:
+        template: 'Modèle'
+        snippet: 'Extrait'
+    scope:
+        personal: 'Moi seul'
+        shared: 'Organisation'
+    form:
+        name: 'Nom'
+        key: 'Clé'
+        key_help: 'Minuscules, chiffres, ".", "_" et "-", unique par langue.'
+        locale: 'Langue'
+        locale_help: 'Par exemple "fr" ou "fr_FR".'
+        scope: 'Qui peut l''utiliser'
+        subject: 'Objet'
+        purpose: 'Consentement'
+        purpose_help: 'Un modèle commercial nécessite le consentement du contact pour cette finalité ; un message de service n''en nécessite aucun.'
+        service: 'Message de service (sans consentement)'
+        text: 'Texte'
+        text_help: 'Les champs sont remplacés par les valeurs de la fiche à l''insertion du modèle : %placeholders%. Les inconnus restent en texte.'
+        kind: 'Type'
+    placeholder:
+        full_name: 'Nom complet'
+        owner_name: 'Responsable'
+        deal_title: 'Titre de l''affaire'
+        deal_amount: 'Montant de l''affaire'
+        deal_expected_close: 'Clôture prévue'
+        me_name: 'Mon nom'
+        me_email: 'Mon e-mail'
+template_error:
+    key: 'Utilisez 1 à 64 minuscules, chiffres, ".", "_" ou "-".'
+    locale: 'Utilisez un code de langue comme "fr" ou "fr_FR".'
+    name: 'Utilisez 1 à 190 caractères sans caractères de contrôle.'
+    subject: 'Utilisez 1 à 255 caractères sur une ligne.'
+    body: 'Le texte est vide ou trop long.'
+    html: 'Les champs ne sont pas autorisés dans les liens ou les images.'
+    placeholders: 'Trop de champs.'
+    scope: 'La portée d''un modèle ne peut pas changer.'
+    output: 'Le texte obtenu est trop long.'
+    key_taken: 'Un modèle avec cette clé et cette langue existe déjà.'
+    kind: 'Le type d''un modèle ne peut pas changer.'
+mail:
+    write: 'Écrire un e-mail'
+    title: 'E-mail à %name%'
+    send: 'Envoyer'
+    sent: 'L''e-mail a été envoyé et enregistré.'
+    sent_not_logged: 'L''e-mail a été envoyé, mais il n''a pas pu être enregistré comme activité.'
+    unresolved: 'Laissés en texte (aucune valeur que vous pouvez voir) : %placeholders%.'
+    form:
+        stay: 'Actualiser'
+        to: 'À :'
+        template: 'Modèle'
+        no_template: 'Sans modèle'
+        insert_template: 'Insérer le modèle'
+        deal: 'Affaire'
+        deal_help: 'Pour les champs {{ deal.* }}.'
+        no_deal: 'Sans affaire'
+        subject: 'Objet'
+        text: 'Message'
+        snippet: 'Extrait'
+        no_snippet: 'Choisissez un extrait'
+        insert_snippet: 'Insérer l''extrait'
+mail_error:
+    no_consent: 'Ce contact n''a pas donné son consentement pour « %purpose% ». Utilisez un modèle de service ou rédigez le message vous-même.'
+    no_address: 'Ce contact n''a pas d''adresse e-mail.'
+    unclassified: 'Ce modèle n''est pas encore classé : un responsable doit choisir son consentement.'
+    template: 'Choisissez un modèle que vous pouvez utiliser.'
+    subject: 'Écrivez un objet de 255 caractères au plus sur une ligne.'
+    text: 'Écrivez un message (100 000 caractères au plus).'
+    not_sent: 'L''e-mail n''a pas pu être envoyé. Réessayez plus tard.'
+    rate_limited: 'Vous avez envoyé beaucoup d''e-mails en peu de temps. Patientez quelques minutes.'

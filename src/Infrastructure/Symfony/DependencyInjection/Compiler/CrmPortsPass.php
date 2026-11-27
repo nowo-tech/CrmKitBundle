@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler;
 
 use LogicException;
 use Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox;
+use Nowo\CrmKitBundle\Bridge\MailKit\MailKitCrmMailSender;
 use Nowo\CrmKitBundle\Bridge\NotifyKit\NotifyKitCrmNotifier;
 use Nowo\CrmKitBundle\Bridge\OutboundUrlGuard\GuardedHubSpotRequestOptions;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\CrmTaskBoardUserResolverInterface;
@@ -15,6 +16,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmActorEmailLookupInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostActivitySourceInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmMailSenderInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmNotifierInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmRecordAudienceInterface;
@@ -38,6 +40,7 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Mailer\MailerInterface;
 
 use function array_values;
 use function class_exists;
@@ -110,6 +113,9 @@ final class CrmPortsPass implements CompilerPassInterface
         if ($container->hasParameter($p . 'activities.enabled') && $container->getParameter($p . 'activities.enabled') === true) {
             $this->activities($container);
         }
+        if ($container->hasParameter($p . 'templates.enabled') && $container->getParameter($p . 'templates.enabled') === true) {
+            $this->templates($container);
+        }
         if ($container->getParameter($p . 'import.messenger.enabled') === true && !$container->has('messenger.default_bus')) {
             throw new LogicException('nowo_crm_kit.import.messenger.enabled needs symfony/messenger with a default bus (framework.messenger).');
         }
@@ -146,6 +152,30 @@ final class CrmPortsPass implements CompilerPassInterface
             $container->setDefinition(NotifyKitCrmNotifier::class, (new Definition(NotifyKitCrmNotifier::class))->setArguments([new Reference(NotifierInterface::class), new Reference('router'), $container->getParameter($p . 'activities.notify_kit.recipient_type')]));
             $container->setAlias(CrmNotifierInterface::class, NotifyKitCrmNotifier::class);
         }
+    }
+
+    /**
+     * The e-mail templates (0.13.0): MailKit's template services must exist (`nowo_mail_kit.templates.enabled`), and
+     * the mail sender is `templates.mail_sender` or the MailKit bridge on Symfony Mailer.
+     */
+    private function templates(ContainerBuilder $container): void
+    {
+        foreach ([ServiceDefinitions::MAIL_KIT_LIBRARY, ServiceDefinitions::MAIL_KIT_RENDERER] as $service) {
+            if (!$container->has($service)) {
+                throw new LogicException('nowo_crm_kit.templates.enabled needs MailKit\'s stored templates: set nowo_mail_kit.templates.enabled: true (nowo-tech/mail-kit-bundle >= 2.7).');
+            }
+        }
+        $sender = $container->getParameter(ServiceDefinitions::P . 'templates.mail_sender');
+        if (is_string($sender) && $sender !== '') {
+            $container->setAlias(CrmMailSenderInterface::class, $sender);
+
+            return;
+        }
+        if (!$container->has(MailerInterface::class)) {
+            throw new LogicException('nowo_crm_kit.templates.enabled sends with Symfony Mailer (framework.mailer) unless templates.mail_sender names a CrmMailSenderInterface service.');
+        }
+        $container->setDefinition(MailKitCrmMailSender::class, (new Definition(MailKitCrmMailSender::class))->setArguments([new Reference(MailerInterface::class)]));
+        $container->setAlias(CrmMailSenderInterface::class, MailKitCrmMailSender::class);
     }
 
     /**

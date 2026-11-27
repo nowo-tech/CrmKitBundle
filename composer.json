@@ -88,13 +88,16 @@
         "symfony/dom-crawler": "^7.4 || ^8.0",
         "symfony/filesystem": "^7.4 || ^8.0",
         "symfony/http-client": "^7.4 || ^8.0",
+        "symfony/mailer": "^7.4 || ^8.0",
         "symfony/messenger": "^7.4 || ^8.0",
+        "symfony/mime": "^7.4 || ^8.0",
         "symfony/phpunit-bridge": "^7.4 || ^8.0",
         "symfony/process": "^7.4 || ^8.0",
         "symfony/security-bundle": "^7.4 || ^8.0",
         "symfony/yaml": "^7.4 || ^8.0"
     },
     "suggest": {
+        "nowo-tech/mail-kit-bundle": "^2.7 — e-mail templates, snippets and Write e-mail (templates.enabled, 0.13.0; with nowo_mail_kit.templates.enabled)",
         "nowo-tech/search-kit-bundle": "^1.9 — header search groups for companies, contacts and deals (needs PHP >= 8.3)",
         "symfony/http-client": "Required by the HubSpot import (import.hubspot.enabled, 0.10.0)",
         "symfony/messenger": "Background import runs (import.messenger.enabled, 0.10.0)",

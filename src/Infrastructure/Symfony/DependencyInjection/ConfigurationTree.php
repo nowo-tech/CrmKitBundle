@@ -21,6 +21,7 @@ use function class_exists;
 use function count;
 use function implode;
 use function in_array;
+use function interface_exists;
 use function is_array;
 use function is_int;
 use function is_string;
@@ -35,6 +36,9 @@ final class ConfigurationTree
 {
     /** Phases after A: switch => release that brings it. */
     public const LATER_PHASES = ['quotes' => '0.5.0', 'invoices' => '0.6.0', 'portal' => '0.7.0', 'campaigns' => '0.10.0', 'reports' => 'phase G (after 0.10.0)'];
+
+    /** MailKit's template library (a literal: MailKit is optional; 0.13.0). */
+    public const MAIL_KIT_LIBRARY = 'Nowo\\MailKitBundle\\Template\\Service\\TemplateLibraryInterface';
 
     /** Built-in party roles (`distributor` is translated too, but opt-in). */
     public const DEFAULT_ROLES = ['customer', 'supplier', 'partner'];
@@ -161,7 +165,7 @@ final class ConfigurationTree
             ->scalarNode('per_page_row_class')->defaultNull()->info('0.10.2: extra CSS classes on the row of the compact "Rows per page" select (UiKit FilterField rowClass), e.g. a host pager class ("issue-filters__pager"). null = none.')
                 ->validate()->ifTrue(static fn (mixed $v): bool => $v !== null && (!is_string($v) || preg_match('/^[A-Za-z0-9_-]+(?: [A-Za-z0-9_-]+)*$/D', $v) !== 1))->thenInvalid('ui.per_page_row_class holds CSS class names separated by single spaces; got %s.')->end()
             ->end()
-            ->arrayNode('tab_icons')->info('0.7.0: the icon of an area tab, by area (' . implode(', ', array_keys(UiOptions::DEFAULT_TAB_ICONS)) . '), merged over the built-in Tabler set (companies: tabler:building, contacts: tabler:users, deals: tabler:briefcase, tags: tabler:tags, fields: tabler:forms, settings: tabler:settings, funnels: tabler:filter). An icon name "[prefix:]name" as UiKit takes it; "" or null = no icon (the tab shows its label in every tab style). Name only the areas you change. Decoration only: the access checks decide which tabs show.')
+            ->arrayNode('tab_icons')->info('0.7.0: the icon of an area tab, by area (' . implode(', ', array_keys(UiOptions::DEFAULT_TAB_ICONS)) . '), merged over the built-in Tabler set (companies: tabler:building, contacts: tabler:users, deals: tabler:briefcase, tags: tabler:tags, fields: tabler:forms, settings: tabler:settings, funnels: tabler:filter; 0.13.0 templates: tabler:mail). An icon name "[prefix:]name" as UiKit takes it; "" or null = no icon (the tab shows its label in every tab style). Name only the areas you change. Decoration only: the access checks decide which tabs show.')
                 ->useAttributeAsKey('area')->normalizeKeys(false)
                 ->scalarPrototype()->end()
                 ->defaultValue([])
@@ -172,7 +176,10 @@ final class ConfigurationTree
         ->end();
         self::pipeline($children);
         self::activities($children);
+        self::templates($children);
         self::api($children);
+        $root->validate()->ifTrue(static fn (array $v): bool => self::on($v, 'templates') && !self::on($v, 'activities'))->thenInvalid('nowo_crm_kit.templates.enabled needs activities.enabled: a sent e-mail is logged as an email activity.')->end();
+        $root->validate()->ifTrue(static fn (array $v): bool => self::on($v, 'templates') && !interface_exists(self::MAIL_KIT_LIBRARY))->thenInvalid('nowo_crm_kit.templates.enabled needs nowo-tech/mail-kit-bundle >= 2.7 with nowo_mail_kit.templates.enabled: composer require nowo-tech/mail-kit-bundle.')->end();
         $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !class_exists(HttpClient::class))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs symfony/http-client: composer require symfony/http-client.')->end();
         $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !self::hasSecretBox($v))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs a secret box: set secrets.box, or secrets.keys with secrets.current_key one of them.')->end();
         foreach (self::LATER_PHASES as $phase => $release) {
@@ -247,6 +254,16 @@ final class ConfigurationTree
         $import = is_array($root['import'] ?? null) ? $root['import'] : [];
 
         return is_array($import['hubspot'] ?? null) && ($import['hubspot']['enabled'] ?? false) === true;
+    }
+
+    /**
+     * Whether a section's `enabled` is true (0.13.0).
+     *
+     * @param array<mixed> $root
+     */
+    private static function on(array $root, string $section): bool
+    {
+        return is_array($root[$section] ?? null) && ($root[$section]['enabled'] ?? false) === true;
     }
 
     /**
@@ -376,6 +393,22 @@ final class ConfigurationTree
         ->end()->end();
         $activities->booleanNode('taskboard_calendar')->defaultTrue()->info('Meetings on TaskBoard\'s calendar (a CalendarEventSourceInterface source, when TaskBoard >= 2.24 is installed).')->end();
         $activities->end()->end();
+    }
+
+    /**
+     * The e-mail templates and *Write e-mail* (0.13.0, Beacon spec 254 A-2): stored by MailKit (>= 2.7, optional), the
+     * CRM's placeholders, consent classification and sending.
+     */
+    private static function templates(NodeBuilder $children): void
+    {
+        $templates = $children->arrayNode('templates')->addDefaultsIfNotSet()->info('0.13.0: personal and shared e-mail templates and snippets stored by MailKit (nowo-tech/mail-kit-bundle >= 2.7 with nowo_mail_kit.templates.enabled), the contact.*, company.*, deal.*, me.* placeholders, a consent purpose per template, and Write e-mail on a contact\'s 360° page (sent mail logged as an email activity). Needs activities.enabled. Table and routes only while enabled.')->children();
+        $templates->booleanNode('enabled')->defaultFalse()->end();
+        $templates->scalarNode('mail_sender')->defaultNull()->info('Service id of a host CrmMailSenderInterface (e.g. a person\'s own mailbox); null = MailKit\'s mailer (Symfony Mailer, plain text, the person\'s e-mail as Reply-To when the actor directory shares it).')->end();
+        $templates->arrayNode('send_rate_limit')->addDefaultsIfNotSet()->info('Write e-mail sends per person; beyond it 429 with Retry-After.')->children()
+            ->integerNode('limit')->defaultValue(30)->min(1)->max(1000)->end()
+            ->integerNode('interval')->defaultValue(300)->min(60)->max(86400)->info('Seconds (rounded up to minutes).')->end()
+        ->end()->end();
+        $templates->end()->end();
     }
 
     /**

@@ -1,0 +1,10 @@
+{#
+  *Write e-mail* as its own page (0.13.0): the no-JS fallback and the deep link of the dialog. UiKit form scaffold
+  (Send first, then Cancel); the fields are templates/_write_fields.html.twig. Variables: page (FormPage), crm_mail_to,
+  crm_mail_name, crm_mail_notice.
+#}
+{% extends '@NowoUiKit/page/form.html.twig' %}
+
+{% block nowo_ui_form_body %}
+    {{ include('@NowoCrmKit/templates/_write_fields.html.twig', {form: page.form, testid: 'crm-mail'}) }}
+{% endblock %}

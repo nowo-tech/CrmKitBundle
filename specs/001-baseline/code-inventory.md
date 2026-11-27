@@ -2,9 +2,9 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/crm-kit-bundle`  
-**Last audited**: 2026-11-26 (0.11.0: 572 files, the 60 activity files mapped, ZCR fixes included; earlier 2026-11-27: 512/512 re-verified; earlier: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped))
+**Last audited**: 2026-11-27 (0.13.0: 608 files, the 36 template files mapped; earlier 2026-11-26, 0.11.0: 572 files, the 60 activity files mapped, ZCR fixes included; earlier 2026-11-27: 512/512 re-verified; earlier: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped))
 
-Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **572** (0.11.0, 60 new activity files; **512** on 2026-11-27, 0.10.3; 506 before the 0.10.2-0.10.3 files) (428 PHP files, 26 Doctrine XML
+Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **608** (0.13.0, 36 new template files; **572** with 0.11.0, 60 new activity files; **512** on 2026-11-27, 0.10.3; 506 before the 0.10.2-0.10.3 files) (428 PHP files, 26 Doctrine XML
 mappings, 36 Twig views, 7 translation files, assets and CSS). Sections headed `0.3.0-0.6.0` were added by the
 2026-11-22 refresh, sections headed `0.7.0-0.10.x` by the 2026-11-24 refresh.
 
@@ -784,3 +784,50 @@ lost-savepoint pattern, the configuration tree, routes and service definitions a
 **Total production sources**: 572 (every file under `src/`; 0.11.0 added the 60 activity files; the `0.7.0-0.10.x` sections were added by the 2026-11-24
 refresh, 85 files; 0.10.2 added `ListFilters.php`, `DealListResult.php` and `partials/_empty.html.twig`; 0.10.3 added
 `ImportDialogPageResolver.php`, `import/_primary.html.twig` and `import/hubspot/_mapping_table.html.twig`)
+
+### 0.13.0: e-mail templates (A-2, [spec 003](../003-templates/spec.md)) (36)
+
+Requirement ids `FR-T*` are those of [`../003-templates/spec.md`](../003-templates/spec.md#requirements). Files
+changed in 0.13.0 that were already listed keep their row (configuration, services, compiler pass, route loader,
+`ActivityRecordBlock`, `PipelineDialogs`, `UiSupport`, `UiOptions`, `ConflictException`, `CrmKitEvents`, the bundle
+class, the translations).
+
+| Source file | Requirement IDs |
+| --- | --- |
+| `src/Application/Templates/Port/TemplateMailStoreInterface.php` | FR-T4, FR-T5 |
+| `src/Bridge/MailKit/CompanyPlaceholders.php` | FR-T3 |
+| `src/Bridge/MailKit/ContactPlaceholders.php` | FR-T3 |
+| `src/Bridge/MailKit/CrmPlaceholders.php` | FR-T3 |
+| `src/Bridge/MailKit/CrmTemplateActors.php` | FR-T2, FR-T3 |
+| `src/Bridge/MailKit/CrmTemplatePermission.php` | FR-T2 |
+| `src/Bridge/MailKit/DealPlaceholders.php` | FR-T3 |
+| `src/Bridge/MailKit/MailKitCrmMailSender.php` | FR-T5 |
+| `src/Bridge/MailKit/MailKitEmailTemplates.php` | FR-T2, FR-T4 |
+| `src/Bridge/MailKit/MailKitMailComposer.php` | FR-T5 |
+| `src/Bridge/MailKit/MePlaceholders.php` | FR-T3 |
+| `src/Bridge/MailKit/RecordPlaceholderValues.php` | FR-T3 |
+| `src/Bridge/MailKit/TemplatePurposeCleaner.php` | FR-T4 |
+| `src/Domain/Enum/EmailTemplateKind.php` | FR-T2 |
+| `src/Domain/Event/CrmMailSent.php` | FR-T5 |
+| `src/Domain/Model/Template/TemplatePurpose.php` | FR-T4 |
+| `src/Domain/Port/CrmMailSenderInterface.php` | FR-T5 |
+| `src/Domain/Read/ComposedText.php` | FR-T3, FR-T5 |
+| `src/Domain/Read/EmailTemplateView.php` | FR-T2, FR-T4 |
+| `src/Domain/Read/MailOutcome.php` | FR-T5 |
+| `src/Domain/Service/EmailTemplateInput.php` | FR-T2, FR-T4 |
+| `src/Domain/Service/EmailTemplatesInterface.php` | FR-T2, FR-T3, FR-T4 |
+| `src/Domain/Service/MailComposerInterface.php` | FR-T5 |
+| `src/Domain/Service/MailDraft.php` | FR-T5 |
+| `src/Domain/Value/CrmOutgoingMail.php` | FR-T5 |
+| `src/Domain/Value/CrmSentMailRef.php` | FR-T5 |
+| `src/Domain/Value/TemplateRef.php` | FR-T4 |
+| `src/Infrastructure/Doctrine/DoctrineTemplateMailStore.php` | FR-T4, FR-T5 |
+| `src/Infrastructure/Symfony/Controller/TemplateController.php` | FR-T5, FR-T6 |
+| `src/Infrastructure/Symfony/Form/EmailTemplateType.php` | FR-T6 |
+| `src/Infrastructure/Symfony/Form/WriteEmailType.php` | FR-T5, FR-T6 |
+| `src/Resources/config/doctrine-templates/TemplatePurpose.orm.xml` | FR-T4 |
+| `src/Resources/views/templates/_write.html.twig` | FR-T5, FR-T6 |
+| `src/Resources/views/templates/_write_fields.html.twig` | FR-T5, FR-T6 |
+| `src/Resources/views/templates/list.html.twig` | FR-T6 |
+| `src/Resources/views/templates/write.html.twig` | FR-T5, FR-T6 |
+

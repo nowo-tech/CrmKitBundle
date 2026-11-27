@@ -10,6 +10,7 @@
 - [Merge](#merge)
 - [Import](#import)
 - [HubSpot import (0.10.0)](#hubspot-import-0100)
+- [Write e-mail (0.13.0)](#write-e-mail-0130)
 - [Isolation and locks](#isolation-and-locks)
 - [Tests](#tests)
 
@@ -226,6 +227,28 @@ A page that fails (HubSpot error, deadlock, crash) commits nothing: the cursor s
 again is an upsert keyed by the reference. The entity manager is cleared after every unit (no host entity manager is
 reset). Race tests on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16: two runners on one import, a racing first connect,
 a racing start ([Tests](#tests)).
+
+## Write e-mail (0.13.0)
+
+`MailComposerInterface::send()` is three steps, never one transaction around the network call:
+
+1. **Checks (one write unit).** The contact is locked `FOR UPDATE` (the lock `ConsentService::record()` takes too), so
+   a consent withdrawal and a send are serialised: the send sees the latest decision or waits for it. Under the lock:
+   `edit`, the address, the template's purpose, the per-person send window (`DoctrineCounterWindow`, window row then
+   count row) and the send key: `INSERT IGNORE` / `ON CONFLICT DO NOTHING` / `INSERT OR IGNORE` of `m:<key>` in
+   `crm_counter` (one statement that never fails, so a PostgreSQL transaction is not aborted); 0 rows = the form was sent
+   already (`crm_mail_already_sent`). A deadlock replays the unit (transaction-doctrine), which only re-checks.
+2. **Send** through `CrmMailSenderInterface` outside any transaction: a replay of step 1 can never send twice, and no
+   row lock is held during the network call. A failure releases the key (a unit of its own) and nothing is logged.
+3. **Log** the `email` activity with A-1's `EngagementService::log()` (its own unit, the contact locked again). If it
+   fails after the mail went out, the failure is logged as an error and the outcome says "sent, not logged".
+
+Two people sending from the same form at once: one claims the key, the other gets `crm_mail_already_sent`. A withdrawal
+committed between step 1 and step 2 is not seen by that send (it was granted when the send was decided).
+
+Template classification: written after MailKit stored the row, in a CRM unit (`classify` upserts by template id; a
+concurrent first classification of the same id ends as a stale-row conflict, 409). The delete listener runs one
+`DELETE` statement inside MailKit's delete transaction when the connection is shared.
 
 ## Isolation and locks
 

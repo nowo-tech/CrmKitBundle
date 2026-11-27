@@ -31,6 +31,11 @@ if (!class_exists('Nowo\\MilkdownEditorBundle\\Form\\MilkdownEditorType')) {
     require_once __DIR__ . '/Stubs/MilkdownEditor/MilkdownEditorType.php';
 }
 
+// 0.13.0: MailKit's stored templates API (2.7+), for the e-mail templates' bridge.
+if (!interface_exists('Nowo\\MailKitBundle\\Template\\Service\\TemplateLibraryInterface')) {
+    require_once __DIR__ . '/Stubs/MailKit/MailKit.php';
+}
+
 if (!interface_exists(EncryptorRegistryInterface::class)) {
     require_once __DIR__ . '/Stubs/DoctrineEncrypt/DoctrineEncrypt.php';
 }

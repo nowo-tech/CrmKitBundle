@@ -19,6 +19,7 @@
   - [Import steps opened directly (0.10.3)](#import-steps-opened-directly-0103)
   - [Area tab icons](#area-tab-icons)
 - [Activities (0.11.0)](#activities-0110)
+- [E-mail templates (0.13.0)](#e-mail-templates-0130)
 - [Later phases](#later-phases)
 - [Per-tenant settings](#per-tenant-settings)
 - [Container parameters](#container-parameters)
@@ -131,6 +132,12 @@ nowo_crm_kit:
         mentions: { enabled: true, max_per_note: 20, rate_limit: { limit: 60, interval: 60 } }   # @mentions in notes (MilkdownEditor >= 1.19); per-person limit of the mention endpoints
         notify_kit: { recipient_type: user }            # NotifyKit's RecipientRef type of the CRM's actor ids
         taskboard_calendar: true   # meetings on TaskBoard's calendar (TaskBoard >= 2.24 installed)
+    templates:                     # 0.13.0: e-mail templates (MailKit >= 2.7) and Write e-mail (see "E-mail templates")
+        enabled: false             # needs activities.enabled and nowo_mail_kit.templates.enabled
+        mail_sender: null          # service id of a CrmMailSenderInterface; null = Symfony Mailer (MailKit's)
+        send_rate_limit:
+            limit: 30              # Write e-mail sends per person and window
+            interval: 300          # seconds (60-86400, rounded up to minutes)
     api:                           # 0.3.0: see API.md
         enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)
         page_size: 25              # 10..100: default page of the keyset lists
@@ -625,6 +632,50 @@ Retention: activities follow the per-tenant `timeline_years` (purged by `nowo:cr
 **Keep it on once used.** With `activities.enabled: false` the three tables are not mapped, so contact erasure, the
 trash purge, merges, retention and actor anonymisation no longer reach rows stored while it was on. Switch it off only
 after exporting and dropping the tables (UPGRADING "To 0.11.0").
+
+## E-mail templates (0.13.0)
+
+`templates.enabled: true` (Beacon spec 254, A-2) maps one table (mapping group `NowoCrmKitBundleTemplates`:
+`crm_template_purpose`, the consent classification per MailKit template id; see UPGRADING "To 0.13.0"), registers the
+`contact`, `company`, `deal` and `me` placeholder providers of MailKit, the templates service, *Write e-mail* and, with
+`ui.enabled`, the Templates page (`/crm/templates`, area tab "Templates") and the "Write e-mail" opener on a contact's
+360° page. With it off nothing of it exists.
+
+It needs:
+
+- `activities.enabled: true` (a sent e-mail is logged as an `email` activity); otherwise the configuration is refused;
+- `nowo-tech/mail-kit-bundle` **>= 2.7** (an optional dependency: `composer require nowo-tech/mail-kit-bundle`) with
+  `nowo_mail_kit.templates.enabled: true`; otherwise the container build fails with that fix;
+- a mail sender: Symfony Mailer (`framework.mailer`, which MailKit decorates), or `templates.mail_sender`.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `mail_sender` | `null` | Service id of a host `CrmMailSenderInterface` (for instance the person's own mailbox through MailKit's delegated mailboxes); `null` = `Bridge\MailKit\MailKitCrmMailSender`: a plain-text message through Symfony Mailer, the person's e-mail (from the actor directory) as Reply-To, the template key as MailKit's log tag; From comes from MailKit's settings |
+| `send_rate_limit.limit` | `30` | *Write e-mail* sends per person and window (1–1000); beyond it the dialog says to wait |
+| `send_rate_limit.interval` | `300` | Window in seconds (60–86 400, rounded up to minutes) |
+
+MailKit's side (its own configuration):
+
+```yaml
+nowo_mail_kit:
+    templates:
+        enabled: true
+        permission: nowo_crm_kit.template_permission   # the CRM's access gate (see below), or your own port
+        connection: null                               # the same connection as the CRM's entity manager is best
+```
+
+`nowo_crm_kit.template_permission` (`Bridge\MailKit\CrmTemplatePermission`) implements MailKit's
+`TemplatePermissionInterface` on the CRM's gate: the MailKit actor must be exactly the call's CRM tenant and person
+(otherwise refused), personal templates and the use of shared ones need `edit` (tenant-wide), managing shared ones needs
+`manage`; the host's access checker and its events decide as everywhere in the CRM. A host that maps the permissions
+itself (Beacon: `crm.manage` for shared templates) keeps its own port; it must also check that the person belongs to
+the actor's tenant (MailKit contract C3).
+
+The classification row is deleted with its template by MailKit's `TemplateDeletedEvent` (inside MailKit's delete
+transaction when `nowo_mail_kit.templates.connection` is the CRM's connection; on another connection it is one statement
+of its own, and when it fails the listener's exception still rolls MailKit's delete back).
+
+The consent purposes offered for a template are `gdpr.purposes` (labels `consent.purpose.<key>`).
 
 ## Later phases
 

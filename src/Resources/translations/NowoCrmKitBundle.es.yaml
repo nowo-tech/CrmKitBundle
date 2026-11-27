@@ -1,5 +1,6 @@
 # CRM kit, fase A (empresas y contactos). Dominio NowoCrmKitBundle. Los parámetros van entre %.
 nav:
+    templates: 'Plantillas'
     funnels: 'Embudos'
     deals: 'Oportunidades'
     label: CRM
@@ -504,6 +505,7 @@ search:
     see_all: 'Ver los %count%'
 flash:
     conflict:
+        crm_mail_already_sent: 'Este correo ya se envió. Cierra el diálogo para verlo en el contacto.'
         crm_hubspot_rate_limited: 'Demasiadas comprobaciones de clave para esta organización. Espera unos minutos y vuelve a intentarlo.'
         crm_stage_invalid: 'Esta etapa no se puede usar: pertenece a otro embudo, o la etapa o el embudo están archivados o cerrados.'
         crm_record_stale: 'Alguien ha modificado este registro al mismo tiempo. El formulario muestra los valores actuales: revísalos y vuelve a guardar.'
@@ -851,3 +853,92 @@ notify:
         title: "%actor% te ha mencionado en una nota del CRM"
     category:
         crm: "CRM"
+templates:
+    title: 'Plantillas de correo'
+    intro: 'Tus plantillas y fragmentos, y los de la organización. Escribir correo en un contacto los inserta.'
+    empty: 'Aún no hay plantillas.'
+    empty_hint: 'Crea una plantilla para los mensajes que envías a menudo, o un fragmento como tu firma.'
+template:
+    new_template: 'Nueva plantilla'
+    new_snippet: 'Nuevo fragmento'
+    edit_template: 'Editar plantilla'
+    edit_snippet: 'Editar fragmento'
+    edit: 'Editar'
+    delete: 'Eliminar'
+    delete_confirm: '¿Eliminar esta plantilla definitivamente?'
+    save: 'Guardar'
+    created: 'La plantilla se ha guardado.'
+    saved: 'La plantilla se ha guardado.'
+    deleted: 'La plantilla se ha eliminado.'
+    unclassified: 'Sin clasificar (no se puede enviar)'
+    html_notice: 'Esta plantilla tiene un cuerpo HTML escrito en otro sitio. Guardar aquí lo sustituye por el texto de abajo.'
+    kind:
+        template: 'Plantilla'
+        snippet: 'Fragmento'
+    scope:
+        personal: 'Solo yo'
+        shared: 'Organización'
+    form:
+        name: 'Nombre'
+        key: 'Clave'
+        key_help: 'Minúsculas, dígitos, ".", "_" y "-", única por idioma.'
+        locale: 'Idioma'
+        locale_help: 'Por ejemplo "es" o "es_ES".'
+        scope: 'Quién puede usarla'
+        subject: 'Asunto'
+        purpose: 'Consentimiento'
+        purpose_help: 'Una plantilla comercial necesita el consentimiento del contacto para esta finalidad; un mensaje de servicio no.'
+        service: 'Mensaje de servicio (sin consentimiento)'
+        text: 'Texto'
+        text_help: 'Los marcadores se sustituyen por los valores de la ficha al insertar la plantilla: %placeholders%. Los desconocidos quedan como texto.'
+        kind: 'Tipo'
+    placeholder:
+        full_name: 'Nombre completo'
+        owner_name: 'Responsable'
+        deal_title: 'Título de la oportunidad'
+        deal_amount: 'Importe de la oportunidad'
+        deal_expected_close: 'Cierre previsto'
+        me_name: 'Mi nombre'
+        me_email: 'Mi correo'
+template_error:
+    key: 'Usa de 1 a 64 minúsculas, dígitos, ".", "_" o "-".'
+    locale: 'Usa un código de idioma como "es" o "es_ES".'
+    name: 'Usa de 1 a 190 caracteres sin caracteres de control.'
+    subject: 'Usa de 1 a 255 caracteres en una línea.'
+    body: 'El texto está vacío o es demasiado largo.'
+    html: 'No se permiten marcadores en enlaces ni imágenes.'
+    placeholders: 'Demasiados marcadores.'
+    scope: 'El ámbito de una plantilla no puede cambiar.'
+    output: 'El texto resultante es demasiado largo.'
+    key_taken: 'Ya existe una plantilla con esta clave e idioma.'
+    kind: 'El tipo de una plantilla no puede cambiar.'
+mail:
+    write: 'Escribir correo'
+    title: 'Correo a %name%'
+    send: 'Enviar'
+    sent: 'El correo se ha enviado y registrado.'
+    sent_not_logged: 'El correo se ha enviado, pero no se pudo registrar como actividad.'
+    unresolved: 'Quedan como texto (sin un valor que puedas ver): %placeholders%.'
+    form:
+        stay: 'Actualizar'
+        to: 'Para:'
+        template: 'Plantilla'
+        no_template: 'Sin plantilla'
+        insert_template: 'Insertar plantilla'
+        deal: 'Oportunidad'
+        deal_help: 'Para los marcadores {{ deal.* }}.'
+        no_deal: 'Sin oportunidad'
+        subject: 'Asunto'
+        text: 'Mensaje'
+        snippet: 'Fragmento'
+        no_snippet: 'Elige un fragmento'
+        insert_snippet: 'Insertar fragmento'
+mail_error:
+    no_consent: 'Este contacto no ha dado su consentimiento para "%purpose%". Usa una plantilla de servicio o escribe tú el mensaje.'
+    no_address: 'Este contacto no tiene correo electrónico.'
+    unclassified: 'Esta plantilla aún no está clasificada: un responsable debe elegir su consentimiento.'
+    template: 'Elige una plantilla que puedas usar.'
+    subject: 'Escribe un asunto de hasta 255 caracteres en una línea.'
+    text: 'Escribe un mensaje (hasta 100 000 caracteres).'
+    not_sent: 'No se pudo enviar el correo. Inténtalo más tarde.'
+    rate_limited: 'Has enviado muchos correos en poco tiempo. Espera unos minutos y vuelve a intentarlo.'

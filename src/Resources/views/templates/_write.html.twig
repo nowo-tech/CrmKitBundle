@@ -1,0 +1,16 @@
+{#
+  *Write e-mail* as the fragment of the record page's remote form dialog (0.13.0): the fields
+  (templates/_write_fields.html.twig) and the dialog actions, Send first (primary) then Cancel. An insert answers 200
+  with the form filled (re-rendered in place), a refused send 422, a sent one 204 + X-Nowo-Redirect. Variables: form,
+  action, dialog, testid, submit, crm_mail_to, crm_mail_name, crm_mail_notice.
+#}
+{%- set _b = 'NowoCrmKitBundle' -%}
+<div data-testid="{{ testid }}">
+    {{ form_start(form, {action: action, attr: {class: nowo_ui_class('form', _b), 'aria-labelledby': dialog ~ '-title', id: dialog ~ '-form'}}) }}
+    {{ include('@NowoCrmKit/templates/_write_fields.html.twig') }}
+    <div class="{{ nowo_ui_class('form_actions', _b) }}" data-nowo-ui-dialog-actions>
+        <button type="submit" class="{{ nowo_ui_class('btn_primary', _b) }}" data-testid="{{ testid }}-submit">{{ submit|trans({}, _b) }}</button>
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-nowo-ui-dialog-close data-testid="{{ testid }}-cancel">{{ 'form.cancel'|trans({}, _b) }}</button>
+    </div>
+    {{ form_end(form, {render_rest: false}) }}
+</div>

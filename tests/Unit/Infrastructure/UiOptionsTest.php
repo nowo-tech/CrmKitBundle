@@ -14,7 +14,7 @@ use function array_keys;
  */
 final class UiOptionsTest extends TestCase
 {
-    private const AREAS = ['companies', 'contacts', 'deals', 'tags', 'fields', 'settings', 'funnels'];
+    private const AREAS = ['companies', 'contacts', 'deals', 'tags', 'fields', 'settings', 'funnels', 'templates'];
 
     public function testEveryAreaHasADefaultIcon(): void
     {

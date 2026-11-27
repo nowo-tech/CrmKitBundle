@@ -76,6 +76,7 @@ final readonly class UiSupport
         public int $pageSize = 25,
         private bool $pipeline = false,
         public UiOptions $options = new UiOptions(),
+        private bool $templates = false,
     ) {
     }
 
@@ -465,6 +466,10 @@ final readonly class UiSupport
         ];
         if ($this->pipeline) {
             $items[] = new AreaNavItem(self::label('nav.deals'), $this->url('nowo_crm_kit_deals'), $current === 'deals', icon: $this->options->tabIcon('deals'));
+        }
+        if ($this->templates && $this->can(CrmPermission::Edit)) {
+            // 0.13.0: the e-mail templates (the person's own and the organisation's).
+            $items[] = new AreaNavItem(self::label('nav.templates'), $this->url('nowo_crm_kit_templates'), $current === 'templates', icon: $this->options->tabIcon('templates'));
         }
         if ($this->can(CrmPermission::Manage)) {
             $items[] = new AreaNavItem(self::label('nav.tags'), $this->url('nowo_crm_kit_tags'), $current === 'tags', icon: $this->options->tabIcon('tags'));

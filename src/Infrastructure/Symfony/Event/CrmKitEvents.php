@@ -7,6 +7,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Event;
 use Nowo\CrmKitBundle\Domain\Event\ActorAnonymised;
 use Nowo\CrmKitBundle\Domain\Event\ConsentRecorded;
 use Nowo\CrmKitBundle\Domain\Event\ContactErased;
+use Nowo\CrmKitBundle\Domain\Event\CrmMailSent;
 use Nowo\CrmKitBundle\Domain\Event\EngagementChanged;
 use Nowo\CrmKitBundle\Domain\Event\EngagementDeleted;
 use Nowo\CrmKitBundle\Domain\Event\EngagementLogged;
@@ -110,4 +111,7 @@ final class CrmKitEvents
 
     /** {@see NoteMentioned}: members were newly mentioned in a note (0.11.0; the ids, never the text). */
     public const NOTE_MENTIONED = NoteMentioned::class;
+
+    /** 0.13.0: an e-mail was sent to a contact from *Write e-mail* (after the sender accepted it). */
+    public const MAIL_SENT = CrmMailSent::class;
 }

@@ -45,7 +45,7 @@ use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistry;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
 use Nowo\DoctrineEncryptBundle\Encryptors\HaliteEncryptor;
 use Nowo\DoctrineEncryptBundle\Encryptors\MysqlAesEncryptor;
-use Nowo\OutboundUrlGuardBundle\Exception\UnsafeOutboundUrlException;
+use Nowo\OutboundUrlGuardBundle\Dns\HostnameDnsLookupInterface;
 use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
 use ParagonIE\Halite\Alerts\CannotPerformOperation;
 use ParagonIE\Halite\Alerts\InvalidKey;
@@ -63,8 +63,12 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Throwable;
 
+use function array_keys;
 use function base64_encode;
+use function is_array;
 use function str_repeat;
+
+use const DNS_A;
 
 /**
  * The HubSpot infrastructure (0.10.0): the reader against the fake account and hostile answers, the secret boxes,
@@ -200,12 +204,18 @@ final class HubSpotInfrastructureTest extends TestCase
 
             return new MockResponse('{"portalId": 1}');
         });
-        $guard  = new OutboundUrlGuard(static fn (string $url): array => ['resolve' => ['api.hubapi.com' => '203.0.113.9']]);
+        // The real guard (nowo-tech/outbound-url-guard-bundle, require-dev through MailKit) on a fixed DNS answer. Its
+        // service defaults allow private targets and skip DNS: the bridge overrides both on every call.
+        $guard  = new OutboundUrlGuard(true, false, $this->dns('93.184.215.14'));
         $reader = new HttpHubSpotReader($client, 8388608, new GuardedHubSpotRequestOptions($guard));
         self::assertSame('1', $reader->accountId(new HubSpotToken('fake-key-12345678'))->value);
-        self::assertSame([['api.hubapi.com' => '203.0.113.9']], $seen);
-        self::assertSame([[HttpHubSpotReader::BASE_URL . '/account-info/v3/details', false, true]], $guard->calls, 'private addresses never allowed, DNS always resolved');
-        $unsafe = new GuardedHubSpotRequestOptions(new OutboundUrlGuard(static fn (): array => throw new UnsafeOutboundUrlException('private')));
+        $pin = $seen[0] ?? null;
+        self::assertIsArray($pin);
+        self::assertContains('api.hubapi.com', array_keys($pin), 'the address is pinned');
+        foreach ($pin as $ip) {
+            self::assertSame('93.184.215.14', is_array($ip) ? ($ip[0] ?? null) : $ip);
+        }
+        $unsafe = new GuardedHubSpotRequestOptions(new OutboundUrlGuard(true, false, $this->dns('10.0.0.7')));
         $this->fails(static fn (): HubSpotAccountId => (new HttpHubSpotReader($client, 8388608, $unsafe))->accountId(new HubSpotToken('fake-key-12345678')), HubSpotException::BAD_RESPONSE);
         $plain = new HttpHubSpotReader($client, 8388608, new class implements HubSpotRequestOptionsInterface {
             public function options(string $url): array
@@ -446,5 +456,27 @@ final class HubSpotInfrastructureTest extends TestCase
             return $e;
         }
         self::fail('Expected ' . $code);
+    }
+
+    /**
+     * A DNS lookup that answers every host with one IPv4 address.
+     */
+    private function dns(string $ip): HostnameDnsLookupInterface
+    {
+        return new class($ip) implements HostnameDnsLookupInterface {
+            public function __construct(private readonly string $ip)
+            {
+            }
+
+            public function dnsGetRecord(string $hostname, int $type): array
+            {
+                return $type === DNS_A ? [['ip' => $this->ip]] : [];
+            }
+
+            public function hostByNameL(string $hostname): array
+            {
+                return [$this->ip];
+            }
+        };
     }
 }

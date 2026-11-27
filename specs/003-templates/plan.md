@@ -3,7 +3,9 @@
 ## Technical context
 
 PHP 8.2–8.5, Symfony 7.4 / 8, Doctrine ORM 3 on the CRM's private entity manager, MailKit 2.7 (optional: only
-`src/Bridge/MailKit` uses it; test stand-ins in `tests/Stubs/MailKit`), UiKit remote dialogs, FormKit forms.
+`src/Bridge/MailKit` uses it; the tests run on the real `nowo-tech/mail-kit-bundle` ^2.7 from require-dev, with an
+in-memory library for most of them and MailKit's own services in `RealMailKitTest`), UiKit remote dialogs, FormKit
+forms.
 
 ## Design
 

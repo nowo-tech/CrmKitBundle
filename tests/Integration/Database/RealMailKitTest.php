@@ -7,7 +7,11 @@ namespace Nowo\CrmKitBundle\Tests\Integration\Database;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Types\Types;
+use Nowo\CrmKitBundle\Bridge\MailKit\CompanyPlaceholders;
+use Nowo\CrmKitBundle\Bridge\MailKit\ContactPlaceholders;
 use Nowo\CrmKitBundle\Bridge\MailKit\CrmMailLogTag;
+use Nowo\CrmKitBundle\Bridge\MailKit\DealPlaceholders;
+use Nowo\CrmKitBundle\Bridge\MailKit\MePlaceholders;
 use Nowo\CrmKitBundle\Domain\Enum\EmailTemplateKind;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\AccessDeniedException;
@@ -48,7 +52,7 @@ use function array_map;
 use function count;
 use function sort;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
-use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service_locator;
 
 /**
  * Audit ZDI-L2: the bridge against MailKit's own template library, renderer, store and placeholder resolver (the real
@@ -188,7 +192,13 @@ final class RealMailKitTest extends CrmTestCase
             $s->alias(MailerInterface::class, 'test.mailer')->public();
             $s->set(TemplateStore::class)->args([service('doctrine')])->public();
             $s->alias(TemplatePermissionInterface::class, 'nowo_crm_kit.template_permission');
-            $s->set(PlaceholderResolver::class)->args([tagged_locator('nowo_mail_kit.template_placeholder_provider', null, 'placeholderNamespace'), 50, 1_048_576]);
+            // The registry keyed by each provider's placeholderNamespace(), as MailKit's TemplatePlaceholderPass builds it.
+            // Not tagged_locator(..., 'placeholderNamespace'): Symfony 8.1 reads that third argument as $exclude.
+            $providers = [];
+            foreach ([ContactPlaceholders::class, CompanyPlaceholders::class, DealPlaceholders::class, MePlaceholders::class] as $provider) {
+                $providers[$provider::placeholderNamespace()] = service($provider);
+            }
+            $s->set(PlaceholderResolver::class)->args([service_locator($providers), 50, 1_048_576]);
             $s->set('test.mail_kit_sanitizer', MailHtmlSanitizer::class)->args([RemoteImages::HttpsOnly, 1_048_576]);
             $s->set(TemplateLibrary::class)->args([service(TemplateStore::class), service(TemplatePermissionInterface::class), service(PlaceholderResolver::class), service('test.mail_kit_sanitizer'), 65_536, 200, service('event_dispatcher'), null]);
             $s->alias(TemplateLibraryInterface::class, TemplateLibrary::class)->public();

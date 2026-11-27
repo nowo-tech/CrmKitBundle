@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.12.1](#to-0121)
 - [To 0.12.0](#to-0120)
 - [To 0.11.0](#to-0110)
 - [To 0.10.3](#to-0103)
@@ -26,6 +27,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.12.1
+
+From **0.12.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 Planned as **0.12.1**: nothing to do. If you ever imported from HubSpot and switched `import.hubspot.enabled` off, read
 SECURITY "GDPR" (tombstones are written only while the import is on).

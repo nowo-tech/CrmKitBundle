@@ -24,4 +24,11 @@ interface ExternalRefHooksInterface
 
     /** The references of an erased contact become tombstones (`erased`, kept to skip the person on re-runs). */
     public function tombstone(TenantRef $tenant, string $contactId): void;
+
+    /**
+     * 0.12.0 (audit ZDE-M2): the references of the imported notes, the activities whose primary record is the contact
+     * (`$activities`: `activities.enabled`) and its next actions (`$nextActions`: `pipeline.enabled`) become tombstones,
+     * before the erasure deletes them.
+     */
+    public function tombstoneItems(TenantRef $tenant, string $contactId, bool $activities, bool $nextActions): void;
 }

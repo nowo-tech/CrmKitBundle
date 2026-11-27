@@ -356,11 +356,18 @@ import:
             confirm_account_change: 'De sleutel mag bij een ander HubSpot-account horen'
             objects: 'Objecten'
             objects_help: 'Deals volgen in een latere versie.'
+            activities: 'Activiteiten'
+            activities_help: 'Notities, gesprekken, afspraken en taken (als volgende acties) van records die uit dit account zijn geïmporteerd, nu of in een eerdere run.'
             lists: 'Lijsten (hun leden krijgen een label)'
             lists_help: 'Hoogstens 50.'
         object:
             companies: 'Bedrijven'
             contacts: 'Contacten'
+        activity:
+            notes: 'Notities'
+            calls: 'Gesprekken'
+            meetings: 'Afspraken'
+            tasks: 'Taken (als volgende acties)'
         list:
             skip: 'Geen label'
             create: 'Nieuw label met de naam van de lijst'
@@ -401,6 +408,9 @@ import:
             object: 'Object'
             id: 'HubSpot-id'
         country_unknown: 'Land niet ingevuld (geen tweeletterige code)'
+        activities_off: 'Niet geïmporteerd: activiteiten staan uit.'
+        tasks_off: 'Niet geïmporteerd: volgende acties (trechters) staan uit.'
+        no_record: 'Geen geïmporteerd bedrijf of contact van dit account om het aan te koppelen.'
     steps: 'Importstappen'
     step:
         file: 'Bestand'
@@ -533,6 +543,7 @@ error:
     hubspot_too_many: 'Het HubSpot-account bevat meer records dan de import toestaat: hij is gestopt.'
     hubspot_key_unavailable: 'De HubSpot-sleutel kan met de ingestelde geheime sleutels niet worden geopend of verzegeld. Er is niets gewijzigd: een beheerder moet de sleutel opnieuw instellen (zie de handleiding voor sleutelrotatie).'
     hubspot_browse_limited: 'Te veel HubSpot-aanvragen voor deze organisatie. Wacht een paar minuten.'
+    hubspot_activities_off: 'Het importeren van activiteiten staat niet aan.'
     record_erased: 'De persoon is gewist (AVG): niet opnieuw geïmporteerd.'
     record_trashed: 'Het record staat in de prullenbak: ongewijzigd gelaten.'
     record_merged: 'Het record is intussen samengevoegd: probeer opnieuw.'

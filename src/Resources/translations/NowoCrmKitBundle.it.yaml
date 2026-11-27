@@ -356,11 +356,18 @@ import:
             confirm_account_change: 'La chiave può appartenere a un altro account HubSpot'
             objects: 'Oggetti'
             objects_help: 'Le trattative arrivano in una versione successiva.'
+            activities: 'Attività'
+            activities_help: 'Note, chiamate, riunioni e compiti (come prossime azioni) dei record importati da questo account, ora o in un’importazione precedente.'
             lists: 'Liste (i loro membri ricevono un’etichetta)'
             lists_help: 'Al massimo 50.'
         object:
             companies: 'Aziende'
             contacts: 'Contatti'
+        activity:
+            notes: 'Note'
+            calls: 'Chiamate'
+            meetings: 'Riunioni'
+            tasks: 'Compiti (come prossime azioni)'
         list:
             skip: 'Non etichettare'
             create: 'Nuova etichetta con il nome della lista'
@@ -401,6 +408,9 @@ import:
             object: 'Oggetto'
             id: 'Id HubSpot'
         country_unknown: 'Paese non impostato (non è un codice di due lettere)'
+        activities_off: 'Non importato: le attività sono disattivate.'
+        tasks_off: 'Non importato: le prossime azioni (funnel) sono disattivate.'
+        no_record: 'Nessuna azienda o contatto importato da questo account a cui collegarlo.'
     steps: 'Passaggi dell''importazione'
     step:
         file: 'File'
@@ -533,6 +543,7 @@ error:
     hubspot_too_many: 'L’account HubSpot contiene più record di quanti l’importazione ne consenta: si è fermata.'
     hubspot_key_unavailable: 'La chiave HubSpot non può essere aperta né sigillata con le chiavi segrete configurate. Non è stato modificato nulla: un amministratore deve configurare di nuovo la chiave (vedi la guida alla rotazione delle chiavi).'
     hubspot_browse_limited: 'Troppe letture HubSpot per questa organizzazione. Attendi qualche minuto.'
+    hubspot_activities_off: 'L’importazione delle attività non è attivata.'
     record_erased: 'La persona è stata cancellata (GDPR): non viene reimportata.'
     record_trashed: 'Il record è nel cestino: lasciato com’è.'
     record_merged: 'Il record è stato unito nel frattempo: riprova.'

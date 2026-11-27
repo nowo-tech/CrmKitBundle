@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.12.0](#to-0120)
 - [To 0.11.0](#to-0110)
 - [To 0.10.3](#to-0103)
 - [To 0.10.2](#to-0102)
@@ -65,6 +66,22 @@ No BC break: everything new is behind `templates.enabled` (default `false`); wit
    (with `nowo_crm_kit.template_permission`). Hosts with their own MailKit permission port keep their mapping.
 6. Keep it on once used, as for the activities: with it off the classification table is not mapped (it holds no
    personal data; the activities stay).
+
+## To 0.12.0
+
+From **0.11.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
+
+Planned as **0.12.0** (HubSpot activities, Beacon spec 254 T004). Nothing to do: no schema change (the external
+references and the activity, note and next-action tables exist), no configuration key, no new HubSpot scope. With
+`import.hubspot.enabled` and `activities.enabled` on, the HubSpot start step offers notes, calls and meetings, and
+tasks too with `pipeline.enabled`; existing credentials keep working (`crm.objects.contacts.read` covers the
+engagement endpoints). A host that builds `HubSpotImportScope` itself may pass the new third argument
+(`list<HubSpotActivity>`); a scope may now hold activities and no object. Imported items do not raise per-item events
+(`EngagementLogged`, `NoteAdded`) nor timeline entries: listen to `ImportCompleted` if you need to react to a run.
 
 ## To 0.11.0
 

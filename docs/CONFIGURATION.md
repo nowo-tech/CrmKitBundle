@@ -364,6 +364,10 @@ asking HubSpot. The confirm step counts too, but only after the checks it can ma
 version, the mapping's keys and lists), so a stale or invalid retry costs nothing; the import's own pages are not
 counted.
 
+0.12.0: no key for the activities import. The start step offers notes, calls and meetings when `activities.enabled`
+is on and tasks (as next actions) when `pipeline.enabled` is on too; see
+[USAGE.md](USAGE.md#activities-notes-calls-meetings-tasks-0120).
+
 There is no base-URL key: the HubSpot host is the constant `https://api.hubapi.com`. In a demo or an end-to-end test,
 decorate the kit's client service `nowo_crm_kit.hubspot.http_client` with a fake (a `MockHttpClient` or a local fake
 server); never use a real credential in tests. `outbound_url_guard: auto` pins the resolved public address of the host

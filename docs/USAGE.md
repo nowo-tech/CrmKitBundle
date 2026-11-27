@@ -32,6 +32,7 @@
   - [Credential and scopes](#credential-and-scopes)
   - [How the credential is checked](#how-the-credential-is-checked)
   - [Steps and rules](#steps-and-rules)
+  - [Activities: notes, calls, meetings, tasks (0.12.0)](#activities-notes-calls-meetings-tasks-0120)
   - [Background runs (Messenger)](#background-runs-messenger)
 - [The API (0.3.0)](#the-api-030)
 - [Activities (0.11.0)](#activities-0110)
@@ -936,6 +937,12 @@ their own.
 | `crm.objects.deals.read` | H2 | Deals | not called by H1 |
 | `crm.schemas.deals.read` | H2 | Deal properties | not called by H1 |
 
+0.12.0 (activities): no new scope. HubSpot's legacy v3 reference names `crm.objects.contacts.read` (already required)
+for `GET /crm/v3/objects/{notes,calls,meetings,tasks}`; its date-versioned reference (`2026-09`) accepts any CRM read
+scope, including the granular `crm.objects.notes.read`, `crm.objects.calls.read`, `crm.objects.meetings.read` and
+`crm.objects.tasks.read`, which a credential may hold (they are read-only, so they are not refused). Checked on
+2026-11-27.
+
 Answers to the questions about the scopes. Source: HubSpot's developer documentation, read on 2026-11-23. Where
 HubSpot does not state the scope of an endpoint, this table says so.
 
@@ -1039,6 +1046,54 @@ every record:
 Optional host port `CrmActorEmailLookupInterface` (`actor_email_lookup`): the actors who may own records, keyed by
 e-mail. Without it the kit filters `CrmActorDirectoryInterface::owners()` by `ActorProfile::$email`. Returned keys are
 re-checked with `===` against the requested ones.
+
+### Activities: notes, calls, meetings, tasks (0.12.0)
+
+Beacon spec 254 FR-100 block A. The start step also offers **Activities** when the configuration imports them: notes,
+calls and meetings with `activities.enabled`, tasks with `pipeline.enabled` too. No configuration key of its own, no new
+table, no new scope. An import may read activities only: they attach to companies and contacts that an import of the
+same HubSpot account made, now (the records are read first) or in an earlier run. A kind the configuration does not
+import is refused at start (`error.hubspot_activities_off`); a kind switched off after the start is skipped at run
+with one row `import.hubspot.activities_off` (or `import.hubspot.tasks_off`).
+
+| HubSpot | CrmKit | Properties read (fixed, nothing else is asked for) |
+| --- | --- | --- |
+| note | a note (`NoteServiceInterface` model; written at HubSpot's time) | `hs_timestamp`, `hubspot_owner_id`, `hs_note_body` |
+| call | a logged `call` activity | `hs_timestamp`, `hubspot_owner_id`, `hs_call_title`, `hs_call_body`, `hs_call_direction` (INBOUND / OUTBOUND), `hs_call_duration` (ms ⇒ minutes, rounded up, at most 1440) |
+| meeting | a logged `meeting` activity (UTC; cancelled when HubSpot's outcome is `CANCELED`) | `hs_timestamp`, `hubspot_owner_id`, `hs_meeting_title`, `hs_meeting_body`, `hs_meeting_start_time`, `hs_meeting_end_time` (missing, before the start or more than 7 days later ⇒ 30 minutes), `hs_meeting_location` (text or an https link, else left out), `hs_meeting_outcome` |
+| task | a next action on the built-in list (task type `crm`; never a host task), done when HubSpot's status is `COMPLETED` | `hs_timestamp` (due), `hubspot_owner_id`, `hs_task_subject`, `hs_task_status` |
+
+Each page is one `GET /crm/v3/objects/{notes|calls|meetings|tasks}` with `associations=contacts,companies` (at most
+25 items per page whatever `page_size`, so HTML bodies stay under `max_response_bytes`; at most 20 ids of each kind
+per item; the association's own paging is not followed), settled in one write unit like the records.
+
+- **Where it lands.** The primary record is the first associated contact that has a live record of the same account,
+  else the first company, that the run may write on (`edit` when a person runs the page; unattended under
+  `security.resource_scoping`, ownerless or the confirming person's). A call or a meeting also shows on every other
+  associated record the run may reach (subject rows; a meeting's contacts become its attendees, at most 50): `view`
+  when a person runs the page, the owner rule unattended; the others are left out and counted as skipped. A note or a next action has one record: the other associations are
+  counted as skipped. No associated record ⇒ row `invalid` with `import.hubspot.no_record`. Deals are not associated
+  until the HubSpot deals import (H2) exists.
+- **Content.** HTML bodies become plain text (scripts and styles dropped, block ends kept as line breaks, entities
+  decoded, control and format characters removed), at most 10 000 characters with an ellipsis; titles are one line
+  of at most 200 characters. Everything is shown escaped. A missing time ⇒ `activity_error.time`; an empty note body or
+  task subject ⇒ `error.required`.
+- **People.** The HubSpot owner becomes the author of a note or an activity and the assignee of a next action, by
+  e-mail as for record owners (unmatched: none). A re-run changes an assignee only when a person runs the page.
+- **Re-runs.** The HubSpot id is kept as an external reference (`object_type` `note`, `call`, `meeting`, `task`;
+  `target_type` `note`, `engagement`, `next_action`), and a next action also carries the dedupe key
+  `sha256("hubspot|<account>|task|<id>")`, so a re-run updates the same item and never creates a second one. An empty
+  HubSpot value keeps the stored one, associations and attendees are only added, an item stays on its record, and a
+  done next action is never reopened. HubSpot wins: a non-empty HubSpot value overwrites a CRM-side edit of an
+  imported item. An item a person deleted is made again (its reference is kept). Trashed, erased and merged records are
+  handled as for records (`error.record_trashed`, …). Timeline entries and per-item events are not written: the
+  import's `ImportCompleted` event and `crm.import.completed` audit entry cover the run.
+- **Permissions.** As for records: when no associated record is writable, the row is `error.forbidden` (a person runs
+  the page) or the page waits for a person (`hubspot_needs_person`, unattended).
+- **GDPR.** An item associated with an erased contact is never imported again, on any record (`error.record_erased`);
+  erasing a contact also tombstones the references of its imported notes, activities and next actions. Imported
+  notes and activities are personal data like logged ones: exported, erased with the contact and
+  purged with the tenant's `timeline_years` (an old HubSpot call may be purged at the next `nowo:crm-kit:purge`).
 
 ### Background runs (Messenger)
 

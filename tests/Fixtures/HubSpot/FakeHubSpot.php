@@ -60,6 +60,13 @@ final class FakeHubSpot
     /** @var array<array-key, array{name: string, type: string, members: list<string>}> */
     public array $lists = [];
 
+    /**
+     * 0.12.0: engagements per kind (`notes`, `calls`, `meetings`, `tasks`): id => properties + associated ids.
+     *
+     * @var array<string, array<array-key, array{properties: array<string, string|null>, contacts?: list<string>, companies?: list<string>}>>
+     */
+    public array $engagements = ['notes' => [], 'calls' => [], 'meetings' => [], 'tasks' => []];
+
     /** @var array<array-key, list<array{string, bool}>> contact id => [company id, primary] */
     public array $associations = [];
 
@@ -172,16 +179,18 @@ final class FakeHubSpot
         $body = is_array($body) ? $body : [];
 
         return match (true) {
-            $path === '/account-info/v3/details'                                             => $this->json(['portalId' => (int) $this->account, 'timeZone' => 'UTC', 'companyCurrency' => 'EUR']),
-            $path === '/oauth/v2/private-apps/get/access-token-info'                         => $this->introspect ? $this->json(['hubId' => (int) $this->account, 'scopes' => $this->scopes, 'userId' => 7]) : $this->json(['status' => 'error'], 400),
-            preg_match('#\A/crm/v3/objects/(companies|contacts)/search\z#', $path, $m) === 1 => $this->scoped('crm.objects.' . $m[1] . '.read', fn (): MockResponse => $this->json(['total' => count($m[1] === 'companies' ? $this->companies : $this->contacts), 'results' => []])),
-            preg_match('#\A/crm/v3/objects/(companies|contacts)\z#', $path, $m) === 1        => $this->scoped('crm.objects.' . $m[1] . '.read', fn (): MockResponse => $this->page($m[1] === 'companies' ? $this->companies : $this->contacts, $query)),
-            preg_match('#\A/crm/v3/properties/(companies|contacts)\z#', $path, $m) === 1     => $this->scoped('crm.schemas.' . $m[1] . '.read', fn (): MockResponse => $this->json(['results' => $this->properties[$m[1]]])),
-            $path === '/crm/v3/owners'                                                       => $this->scoped('crm.objects.owners.read', fn (): MockResponse => $this->owners($query)),
-            $path === '/crm/v4/associations/contacts/companies/batch/read'                   => $this->scoped('crm.objects.contacts.read', fn (): MockResponse => $this->associationsOf($body)),
-            $path === '/crm/v3/lists/search'                                                 => $this->scoped('crm.lists.read', fn (): MockResponse => $this->listsOf($body)),
-            preg_match('#\A/crm/v3/lists/([0-9]+)/memberships\z#', $path, $m) === 1          => $this->scoped('crm.lists.read', fn (): MockResponse => $this->members($m[1], $query)),
-            default                                                                          => $this->json(['status' => 'error'], 404),
+            $path === '/account-info/v3/details'                                                     => $this->json(['portalId' => (int) $this->account, 'timeZone' => 'UTC', 'companyCurrency' => 'EUR']),
+            $path === '/oauth/v2/private-apps/get/access-token-info'                                 => $this->introspect ? $this->json(['hubId' => (int) $this->account, 'scopes' => $this->scopes, 'userId' => 7]) : $this->json(['status' => 'error'], 400),
+            preg_match('#\A/crm/v3/objects/(companies|contacts)/search\z#', $path, $m) === 1         => $this->scoped('crm.objects.' . $m[1] . '.read', fn (): MockResponse => $this->json(['total' => count($m[1] === 'companies' ? $this->companies : $this->contacts), 'results' => []])),
+            preg_match('#\A/crm/v3/objects/(notes|calls|meetings|tasks)/search\z#', $path, $m) === 1 => $this->scoped('crm.objects.contacts.read', fn (): MockResponse => $this->json(['total' => count($this->engagements[$m[1]]), 'results' => []])),
+            preg_match('#\A/crm/v3/objects/(notes|calls|meetings|tasks)\z#', $path, $m) === 1        => $this->scoped('crm.objects.contacts.read', fn (): MockResponse => $this->engagementPage($this->engagements[$m[1]], $query)),
+            preg_match('#\A/crm/v3/objects/(companies|contacts)\z#', $path, $m) === 1                => $this->scoped('crm.objects.' . $m[1] . '.read', fn (): MockResponse => $this->page($m[1] === 'companies' ? $this->companies : $this->contacts, $query)),
+            preg_match('#\A/crm/v3/properties/(companies|contacts)\z#', $path, $m) === 1             => $this->scoped('crm.schemas.' . $m[1] . '.read', fn (): MockResponse => $this->json(['results' => $this->properties[$m[1]]])),
+            $path === '/crm/v3/owners'                                                               => $this->scoped('crm.objects.owners.read', fn (): MockResponse => $this->owners($query)),
+            $path === '/crm/v4/associations/contacts/companies/batch/read'                           => $this->scoped('crm.objects.contacts.read', fn (): MockResponse => $this->associationsOf($body)),
+            $path === '/crm/v3/lists/search'                                                         => $this->scoped('crm.lists.read', fn (): MockResponse => $this->listsOf($body)),
+            preg_match('#\A/crm/v3/lists/([0-9]+)/memberships\z#', $path, $m) === 1                  => $this->scoped('crm.lists.read', fn (): MockResponse => $this->members($m[1], $query)),
+            default                                                                                  => $this->json(['status' => 'error'], 404),
         };
     }
 
@@ -216,6 +225,45 @@ final class FakeHubSpot
         $next = $offset + $limit < count($rows) ? ['next' => ['after' => (string) ($offset + $limit), 'link' => 'http://169.254.169.254/latest/meta-data']] : null;
 
         return $this->json(['results' => $out] + ($next === null ? [] : ['paging' => $next]));
+    }
+
+    /**
+     * A page of engagements with their requested properties and `associations=contacts,companies` (v3 shape).
+     *
+     * @param array<array-key, array{properties: array<string, string|null>, contacts?: list<string>, companies?: list<string>}> $rows
+     * @param array<array-key, mixed> $query
+     */
+    private function engagementPage(array $rows, array $query): MockResponse
+    {
+        $limit  = $this->int($query['limit'] ?? 100);
+        $offset = $this->int($query['after'] ?? 0);
+        $wanted = is_string($query['properties'] ?? null) ? explode(',', $query['properties']) : [];
+        $out    = [];
+        foreach (array_slice($rows, $offset, $limit, true) as $id => $row) {
+            $kept = [];
+            foreach ($wanted as $name) {
+                if (array_key_exists($name, $row['properties'])) {
+                    $kept[$name] = $row['properties'][$name];
+                }
+            }
+            $associations = [];
+            foreach (['contacts', 'companies'] as $kind) {
+                $ids = $row[$kind] ?? [];
+                if ($ids !== [] && is_string($query['associations'] ?? null) && in_array($kind, explode(',', $query['associations']), true)) {
+                    $results = [];
+                    foreach ($ids as $other) {
+                        // HubSpot repeats an id per association type.
+                        $results[] = ['id' => $other, 'type' => 'engagement_to_' . $kind];
+                        $results[] = ['id' => $other, 'type' => 'engagement_to_' . $kind . '_unlabeled'];
+                    }
+                    $associations[$kind] = ['results' => $results];
+                }
+            }
+            $out[] = ['id' => (string) $id, 'properties' => $kept + ['hs_object_id' => (string) $id], 'archived' => false] + ($associations === [] ? [] : ['associations' => $associations]);
+        }
+        $next = $offset + $limit < count($rows) ? ['paging' => ['next' => ['after' => (string) ($offset + $limit)]]] : [];
+
+        return $this->json(['results' => $out] + $next);
     }
 
     /**

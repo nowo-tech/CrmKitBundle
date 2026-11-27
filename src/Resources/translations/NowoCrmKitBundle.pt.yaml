@@ -356,11 +356,18 @@ import:
             confirm_account_change: 'A chave pode pertencer a outra conta HubSpot'
             objects: 'Objetos'
             objects_help: 'Os negócios chegam numa versão posterior.'
+            activities: 'Atividades'
+            activities_help: 'Notas, chamadas, reuniões e tarefas (como próximas ações) de registos importados desta conta, agora ou numa importação anterior.'
             lists: 'Listas (os membros recebem uma etiqueta)'
             lists_help: 'No máximo 50.'
         object:
             companies: 'Empresas'
             contacts: 'Contactos'
+        activity:
+            notes: 'Notas'
+            calls: 'Chamadas'
+            meetings: 'Reuniões'
+            tasks: 'Tarefas (como próximas ações)'
         list:
             skip: 'Não etiquetar'
             create: 'Nova etiqueta com o nome da lista'
@@ -401,6 +408,9 @@ import:
             object: 'Objeto'
             id: 'Id HubSpot'
         country_unknown: 'País não definido (não é um código de duas letras)'
+        activities_off: 'Não importado: as atividades estão desligadas.'
+        tasks_off: 'Não importado: as próximas ações (funis) estão desligadas.'
+        no_record: 'Nenhuma empresa ou contacto importado desta conta ao qual associar.'
     steps: 'Passos da importação'
     step:
         file: 'Ficheiro'
@@ -533,6 +543,7 @@ error:
     hubspot_too_many: 'A conta HubSpot tem mais registos do que a importação permite: parou.'
     hubspot_key_unavailable: 'A chave do HubSpot não pode ser aberta nem selada com as chaves secretas configuradas. Nada foi alterado: um administrador tem de voltar a configurar a chave (ver o guia de rotação de chaves).'
     hubspot_browse_limited: 'Demasiadas leituras do HubSpot para esta organização. Aguarde alguns minutos.'
+    hubspot_activities_off: 'A importação de atividades não está ligada.'
     record_erased: 'A pessoa foi apagada (RGPD): não é importada de novo.'
     record_trashed: 'O registo está no lixo: fica como está.'
     record_merged: 'O registo foi fundido entretanto: tente de novo.'

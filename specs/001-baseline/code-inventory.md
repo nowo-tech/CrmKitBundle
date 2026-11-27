@@ -2,9 +2,9 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/crm-kit-bundle`  
-**Last audited**: 2026-11-27 (0.13.0: 608 files, the 36 template files mapped; earlier 2026-11-26, 0.11.0: 572 files, the 60 activity files mapped, ZCR fixes included; earlier 2026-11-27: 512/512 re-verified; earlier: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped))
+**Last audited**: 2026-11-27 (0.13.0: 613 files, the 36 template files and the 5 HubSpot activities files of 0.12.0 mapped; earlier 2026-11-26, 0.11.0: 572 files, the 60 activity files mapped, ZCR fixes included; earlier 2026-11-27: 512/512 re-verified; earlier: 2026-11-24 (0.10.1: HubSpot import, secret box, Messenger runs, host object picker and UI files mapped))
 
-Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **608** (0.13.0, 36 new template files; **572** with 0.11.0, 60 new activity files; **512** on 2026-11-27, 0.10.3; 506 before the 0.10.2-0.10.3 files) (428 PHP files, 26 Doctrine XML
+Scope: every file under `src/`. Audit command: `find src -type f | wc -l` → **613** (0.13.0, 36 new template files; 0.12.0, 5 HubSpot activities files; **572** with 0.11.0, 60 new activity files; **512** on 2026-11-27, 0.10.3; 506 before the 0.10.2-0.10.3 files) (428 PHP files, 26 Doctrine XML
 mappings, 36 Twig views, 7 translation files, assets and CSS). Sections headed `0.3.0-0.6.0` were added by the
 2026-11-22 refresh, sections headed `0.7.0-0.10.x` by the 2026-11-24 refresh.
 
@@ -781,7 +781,17 @@ lost-savepoint pattern, the configuration tree, routes and service definitions a
 | `src/Resources/config/doctrine-activities/EngagementSubject.orm.xml` | FR-ACT-001, FR-ACT-003 |
 | `src/Resources/views/record/_activities.html.twig` | FR-ACT-013 |
 
-**Total production sources**: 572 (every file under `src/`; 0.11.0 added the 60 activity files; the `0.7.0-0.10.x` sections were added by the 2026-11-24
+### 0.12.0: HubSpot activities import (5)
+
+| File | Requirements |
+| --- | --- |
+| `src/Application/HubSpot/HubSpotEngagementWriter.php` | FR-HUB-002, FR-ACT-001, FR-ACT-002 (spec 004) |
+| `src/Application/HubSpot/HubSpotText.php` | FR-HUB-002, FR-ACT-002 (spec 004) |
+| `src/Domain/Enum/HubSpotActivity.php` | FR-HUB-002 (spec 004) |
+| `src/Domain/Read/HubSpot/HubSpotEngagement.php` | FR-HUB-002 (spec 004) |
+| `src/Domain/Read/HubSpot/HubSpotEngagementPage.php` | FR-HUB-002 (spec 004) |
+
+**Total production sources**: 613 (every file under `src/`; 0.13.0 added the 36 template files; 0.12.0 added the 5 HubSpot activities files; 0.11.0 added the 60 activity files; the `0.7.0-0.10.x` sections were added by the 2026-11-24
 refresh, 85 files; 0.10.2 added `ListFilters.php`, `DealListResult.php` and `partials/_empty.html.twig`; 0.10.3 added
 `ImportDialogPageResolver.php`, `import/_primary.html.twig` and `import/hubspot/_mapping_table.html.twig`)
 

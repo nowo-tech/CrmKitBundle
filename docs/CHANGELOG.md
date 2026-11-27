@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[0.12.0] - 2026-11-27](#0120---2026-11-27)
 - [[0.11.0] - 2026-11-27](#0110---2026-11-27)
 - [[0.10.3] - 2026-11-25](#0103---2026-11-25)
 - [[0.10.2] - 2026-11-24](#0102---2026-11-24)
@@ -31,7 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 Planned as **0.13.0** (Beacon spec 254, block A-2, task T003, FR-015 / FR-016; owner D-20261127-02: for Beacon
-v1.182). 0.12.0 is the HubSpot activity import, built in parallel. No BC break: everything new is behind
+v1.182). 0.12.0 (the HubSpot activity import) is released. No BC break: everything new is behind
 `templates.enabled` (off by default; it needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.7);
 with it off no table is mapped and no route or service is added.
 
@@ -71,6 +72,44 @@ with it off no table is mapped and no route or service is added.
 
 - `PipelineDialogs::render()` takes other fragment / page templates and extra variables (internal).
 - `ConflictException::MAIL_SENT` (`crm_mail_already_sent`).
+
+## [0.12.0] - 2026-11-27
+
+Planned as **0.12.0** (Beacon spec 254 T004, FR-100 block A; ships before A-2 templates, which waits for MailKit stored templates and moves to 0.13.0). No BC
+break, no schema change, no new configuration key and no new HubSpot scope.
+
+### Added
+
+- **HubSpot import of activities**: notes (→ notes), calls and meetings (→ logged activities, `activities.enabled`)
+  and tasks (→ next actions on the built-in list, `pipeline.enabled` too), offered in the start step when the
+  configuration imports them (`HubSpotImportScope::$activities`, new enum `HubSpotActivity`; an import may read
+  activities only). One `GET /crm/v3/objects/{kind}?associations=contacts,companies` per page with fixed properties;
+  the item lands on the first associated contact of the same account (else company), a call or meeting also on the
+  other associated records (subject rows, meeting contacts as attendees). HTML bodies become plain text, owners map
+  to authors and assignees by e-mail, the HubSpot id is an external reference (`note` / `call` / `meeting` / `task`)
+  and a next action's dedupe key is derived from it, so re-runs update and never duplicate; empty values never clear,
+  associations only add. Rows `import.hubspot.no_record`, `import.hubspot.activities_off`, `import.hubspot.tasks_off`;
+  input error `error.hubspot_activities_off`; 7 locales. Same access rules as records (attended `edit`, unattended
+  owner rule), same pages, limits (`max_records` per kind), pauses and resume. Read with the already required
+  `crm.objects.contacts.read` (granular `crm.objects.{notes,calls,meetings,tasks}.read` accepted).
+- `NextAction::revise()` (title, due time, assignee) for re-runs; `HubSpotRecordWriter::targets()` is now callable by
+  the engagements writer (internal).
+
+### Changed
+
+- The `crm.hubspot.import_started` audit entry also counts the activities (`activities`).
+- `HubSpotRecordWriter::targets()` loads the first hop of every reference in one query (audit ZDE-L1).
+
+### Security
+
+- Pre-tag audit ZDE (unreleased code, no GHSA): the records an imported activity also shows on and a meeting's
+  attendees need the same access as the records import's associations (`view` attended, owner rule unattended),
+  others are skipped and counted (ZDE-M1); an item associated with an erased contact is skipped
+  (`error.record_erased`) and an erasure tombstones the HubSpot references of the contact's deleted notes, activities
+  and next actions (`ExternalRefHooksInterface::tombstoneItems()`, internal), so a re-run never brings them back
+  (ZDE-M2, Q-H6); at most 20 associated ids per kind and 25 items per engagement page (ZDE-L1, ZDE-L2); an HTML body
+  past PCRE's backtracking limit keeps its text (ZDE-I1); unattended runs pick the first writable record instead of
+  pausing on the first one owned by someone else (ZDE-I2).
 
 ### Fixed
 

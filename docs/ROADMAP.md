@@ -105,7 +105,7 @@ Q-O questions) in [CONTRACT.md](CONTRACT.md) before it is built.
 ### Release plan
 
 Version numbers as of 2026-11-27: A-1 moved first (Beacon priority) and is **0.11.0**; the HubSpot activity import
-is 0.12.0 and **A-2 templates 0.13.0** (owner D-20261127-02: for Beacon v1.182); H2, Z1 (Zoho companies and contacts)
+is 0.12.0 and **A-2 templates 0.13.0** (owner D-20261127-02); H2, Z1 (Zoho companies and contacts)
 and H3 follow with the next free minors; the slices after them take the next free minor in the order of this table
 when they are scheduled (numbers move up when another release lands first; the order does not change). "Kit option" is the configuration switch; off means no tables mapped, no routes, no services, no menu entries.
 

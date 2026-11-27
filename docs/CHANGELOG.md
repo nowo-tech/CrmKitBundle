@@ -31,10 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Planned as **0.13.0** (Beacon spec 254, block A-2, task T003, FR-015 / FR-016; owner D-20261127-02: for Beacon
-v1.182). 0.12.0 (the HubSpot activity import) is released. No BC break: everything new is behind
-`templates.enabled` (off by default; it needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.7);
-with it off no table is mapped and no route or service is added.
+Planned as **0.13.0** (Beacon spec 254, block A-2, task T003, FR-015 / FR-016; owner D-20261127-02). 0.12.0 (the
+HubSpot activity import) is released. No BC break: everything new is behind `templates.enabled` (off by default; it
+needs `activities.enabled` and the optional `nowo-tech/mail-kit-bundle` >= 2.7); with it off no table is mapped and no
+route or service is added.
 
 ### Added
 
@@ -45,9 +45,16 @@ with it off no table is mapped and no route or service is added.
   Audit entries `crm.template.created`, `crm.template.saved`, `crm.template.deleted`.
 - **Consent purpose per template**: table `crm_template_purpose` (mapping group `NowoCrmKitBundleTemplates`), keyed
   by MailKit's template id: a `gdpr.purposes` key (commercial) or a service message. Templates written elsewhere are
-  unclassified and cannot be sent until classified (deny by default). The row goes with the template on MailKit's
-  `TemplateDeletedEvent` (`Bridge\MailKit\TemplatePurposeCleaner`, inside MailKit's delete transaction on a shared
-  connection).
+  unclassified and cannot be sent until classified (deny by default). The row names the MailKit template version it
+  classifies (pre-tag audit ZDI-L1): it is written only over an older version's, and another version's classification
+  counts as none, so racing saves or a crash between MailKit's commit and the CRM's never pair a text with another
+  text's purpose. The row goes with the template on MailKit's `TemplateDeletedEvent`
+  (`Bridge\MailKit\TemplatePurposeCleaner`, inside MailKit's delete transaction on a shared connection).
+- **Contact erasure covers MailKit's sent-mail log** (pre-tag audit ZDI-M1): with `templates.enabled`,
+  `CrmPersonalDataInterface::erase()` erases the log rows (MailKit's `SentMailPersonalDataEraserInterface`) of the
+  contact's address and those its merge traces keep (contacts merged into it), in the erasure's unit (new internal port
+  `Application\Port\ContactMailLogInterface`, `Bridge\MailKit\MailKitContactMailLog`). The export does not list the
+  log, which has no tenant: the host's data-subject export covers it (SECURITY.md).
 - **CRM placeholders** for MailKit's closed registry (tag `nowo_mail_kit.template_placeholder_provider`):
   `contact.*`, `company.*` (the contact's primary company), `deal.*` (`amount` only with `amounts_view`) and `me.*`,
   read through the CRM's readers (tenant, `view`, the host's record checks), only for the exact CRM tenant and person
@@ -56,17 +63,19 @@ with it off no table is mapped and no route or service is added.
   actor must be the call's CRM tenant and person; `edit` for personal templates and the use of shared ones, `manage`
   to manage shared ones.
 - **Write e-mail** on a contact's 360° page (in the activity dialog, loaded on demand; a page without JavaScript):
-  template and snippet inserts rendered by the server for the contact and an optional open deal, Send through
-  `MailComposerInterface::send(MailDraft)`: the checks in one write unit on the locked contact (address, the template's
-  consent purpose, the per-person `templates.send_rate_limit`, a one-time send key), the send outside any transaction
-  through the new port `CrmMailSenderInterface` (default: plain text with Symfony Mailer, decorated by MailKit; host
-  sender `templates.mail_sender`), then an `email` activity on the contact and the event `CrmMailSent`
-  (`CrmKitEvents::MAIL_SENT`). Audit entry `crm.mail.claimed`.
+  template and snippet inserts rendered by the server for the contact and an optional deal of the contact (another
+  deal is refused, audit ZDI-I3), Send through `MailComposerInterface::send(MailDraft)`: the checks in one write unit
+  on the locked contact (address, the template's consent purpose, the per-person `templates.send_rate_limit`, a
+  one-time send key), the send outside any transaction through the new port `CrmMailSenderInterface` (default: plain
+  text with Symfony Mailer, decorated by MailKit; host sender `templates.mail_sender`), then an `email` activity on
+  the contact and the event `CrmMailSent` (`CrmKitEvents::MAIL_SENT`). Audit entry `crm.mail.claimed`.
 - **Templates page** (`/crm/templates`, area tab "Templates", icon `templates` in `ui.tab_icons`): the person's and
   the organisation's templates and snippets with their consent column, create / edit forms loaded on demand into a
   remote dialog, delete with a confirm.
-- Configuration `templates.*` (CONFIGURATION.md), translations in the seven locales, MailKit test stand-ins
-  (`tests/Stubs/MailKit`), `symfony/mailer` and `symfony/mime` for the tests, `nowo-tech/mail-kit-bundle` suggested.
+- Configuration `templates.*` (CONFIGURATION.md), translations in the seven locales, `nowo-tech/mail-kit-bundle` ^2.7
+  in `require-dev` (the tests run on the real MailKit: an in-memory library for most of them and MailKit's own
+  library, renderer, store and permission port for the bridge test, audit ZDI-L2), `symfony/mailer` and `symfony/mime`
+  for the tests, `nowo-tech/mail-kit-bundle` suggested.
 
 ### Changed
 

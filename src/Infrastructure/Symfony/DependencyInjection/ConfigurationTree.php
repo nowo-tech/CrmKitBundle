@@ -404,7 +404,7 @@ final class ConfigurationTree
         $templates = $children->arrayNode('templates')->addDefaultsIfNotSet()->info('0.13.0: personal and shared e-mail templates and snippets stored by MailKit (nowo-tech/mail-kit-bundle >= 2.7 with nowo_mail_kit.templates.enabled), the contact.*, company.*, deal.*, me.* placeholders, a consent purpose per template, and Write e-mail on a contact\'s 360° page (sent mail logged as an email activity). Needs activities.enabled. Table and routes only while enabled.')->children();
         $templates->booleanNode('enabled')->defaultFalse()->end();
         $templates->scalarNode('mail_sender')->defaultNull()->info('Service id of a host CrmMailSenderInterface (e.g. a person\'s own mailbox); null = MailKit\'s mailer (Symfony Mailer, plain text, the person\'s e-mail as Reply-To when the actor directory shares it).')->end();
-        $templates->arrayNode('send_rate_limit')->addDefaultsIfNotSet()->info('Write e-mail sends per person; beyond it 429 with Retry-After.')->children()
+        $templates->arrayNode('send_rate_limit')->addDefaultsIfNotSet()->info('Write e-mail sends per person; beyond it the form shows an error asking to wait (422, no 429 / Retry-After).')->children()
             ->integerNode('limit')->defaultValue(30)->min(1)->max(1000)->end()
             ->integerNode('interval')->defaultValue(300)->min(60)->max(86400)->info('Seconds (rounded up to minutes).')->end()
         ->end()->end();

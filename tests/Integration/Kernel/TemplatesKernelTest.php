@@ -13,7 +13,9 @@ use Nowo\CrmKitBundle\Domain\Port\CrmMailSenderInterface;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestHostSender;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailer;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestMailTemplates;
+use Nowo\CrmKitBundle\Tests\Fixtures\TestSentMailLog;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestServices;
+use Nowo\MailKitBundle\Log\SentMailPersonalDataEraserInterface;
 use Nowo\MailKitBundle\Template\Service\TemplateLibraryInterface;
 use Nowo\MailKitBundle\Template\Service\TemplateRendererInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -46,6 +48,14 @@ final class TemplatesKernelTest extends KernelTestCase
         $this->bootKernel(TestServices::PORTS + self::ON);
     }
 
+    public function testTheTemplatesNeedMailKitsSentMailLogErasure(): void
+    {
+        // Audit ZDI-M1: the contact's erasure covers MailKit's sent-mail log.
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('needs MailKit\'s sent-mail log erasure port');
+        $this->bootKernel(TestServices::PORTS + self::ON, $this->host(true, false, false));
+    }
+
     public function testTheDefaultSenderNeedsSymfonyMailer(): void
     {
         $this->expectException(LogicException::class);
@@ -70,16 +80,20 @@ final class TemplatesKernelTest extends KernelTestCase
     /**
      * The standard host with an in-memory MailKit, and optionally Symfony Mailer and a host sender.
      */
-    private function host(bool $mailer, bool $sender = false): Closure
+    private function host(bool $mailer, bool $sender = false, bool $log = true): Closure
     {
         $base = Host::standard()->configure();
 
-        return static function (ContainerConfigurator $container, string $url) use ($base, $mailer, $sender): void {
+        return static function (ContainerConfigurator $container, string $url) use ($base, $mailer, $sender, $log): void {
             $base($container, $url);
             $s = $container->services();
             $s->set('test.mail_templates', TestMailTemplates::class)->args([service('nowo_crm_kit.template_permission'), service('event_dispatcher'), tagged_iterator('nowo_mail_kit.template_placeholder_provider')])->public();
             $s->alias(TemplateLibraryInterface::class, 'test.mail_templates')->public();
             $s->alias(TemplateRendererInterface::class, 'test.mail_templates')->public();
+            if ($log) {
+                $s->set('test.sent_mail_log', TestSentMailLog::class)->public();
+                $s->alias(SentMailPersonalDataEraserInterface::class, 'test.sent_mail_log')->public();
+            }
             if ($mailer) {
                 $s->set('test.mailer', TestMailer::class)->public();
                 $s->alias(MailerInterface::class, 'test.mailer')->public();

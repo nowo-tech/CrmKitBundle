@@ -150,7 +150,7 @@ final class RaceInjector
             $object instanceof ExternalRef       => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'source' => $object->getSource(), 'account_id' => $object->getAccountId(), 'object_type' => $object->getObjectType(), 'external_id' => $object->getExternalId(), 'target_type' => $object->getTargetType(), 'target_id' => '01900000-0000-7000-8000-ffffffffffff', 'erased' => 0, 'created_at' => $at, 'updated_at' => $at],
             $object instanceof HubSpotConnection => ['id' => $id, 'tenant_id' => $object->getTenantId(), 'kind' => 'private_app', 'status' => 'active', 'account_id' => '1', 'label' => 'Racer', 'token_last4' => 'abcd', 'token_key_id' => 'k1', 'token_sealed' => 'AAAA', 'scopes' => '[]', 'scopes_verified' => 1, 'validated_at' => $at, 'created_at' => $at, 'updated_at' => $at, 'version' => 1],
             // 0.13.0: another person's first classification of the same template.
-            $object instanceof TemplatePurpose => ['id' => $object->getId(), 'tenant_id' => $object->getTenantId(), 'purpose' => null, 'updated_at' => $at],
+            $object instanceof TemplatePurpose => ['id' => $object->getId(), 'tenant_id' => $object->getTenantId(), 'purpose' => null, 'version' => $object->getVersion(), 'updated_at' => $at],
             default                            => null,
         };
         if ($row !== null) {

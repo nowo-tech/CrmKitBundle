@@ -28,8 +28,10 @@ use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTemplateMailStore;
 use Nowo\MailKitBundle\Template\Placeholder\PlaceholderContext;
 use Nowo\MailKitBundle\Template\Value\StoredTemplate;
 use Nowo\MailKitBundle\Template\Value\TemplateActor;
+use Nowo\MailKitBundle\Template\Value\TemplateDraft;
 use Nowo\MailKitBundle\Template\Value\TemplateKind;
 use Nowo\MailKitBundle\Template\Value\TemplatePermission;
+use Nowo\MailKitBundle\Template\Value\TemplateScope;
 
 use function array_filter;
 use function array_values;
@@ -95,6 +97,15 @@ final class TemplatesTest extends TemplatesTestCase
         $this->expectErrors(['shared' => 'template_error.scope'], fn () => $this->templates()->update($legacy, new EmailTemplateInput(EmailTemplateKind::Template, false, 'legacy', 'Legacy', 'en', 'New', 'New text'), 2));
         $this->templates()->update($legacy, new EmailTemplateInput(EmailTemplateKind::Template, true, 'legacy', 'Legacy', 'en', 'New', 'New text'), 2);
         self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_template_purpose WHERE id = ? AND purpose IS NULL', [$legacy]));
+        self::assertSame(3, $this->int('SELECT version FROM nowo_crm_template_purpose WHERE id = ?', [$legacy]));
+
+        // Audit ZDI-L1: a text saved in MailKit without the CRM (or a crash between the two commits) leaves the
+        // classification on an older version: the template is unclassified until it is saved here again.
+        $this->mailKit()->update(new TemplateActor('acme', 'ana'), $legacy, 3, new TemplateDraft(TemplateKind::Template, TemplateScope::Shared, 'legacy', 'Legacy', 'en', 'Buy now', '', 'Commercial text'));
+        self::assertFalse($this->templates()->get($legacy)->classified);
+        self::assertFalse(array_values(array_filter($this->templates()->list(), static fn (EmailTemplateView $t): bool => $t->id === $legacy))[0]->classified);
+        $this->templates()->update($legacy, new EmailTemplateInput(EmailTemplateKind::Template, true, 'legacy', 'Legacy', 'en', 'Buy now', 'Commercial text', 'newsletter'), 4);
+        self::assertSame('newsletter', $this->templates()->get($legacy)->purpose);
 
         // Without manage the shared rows can be used, not changed.
         $this->ctx()->grants = [];
@@ -143,9 +154,13 @@ final class TemplatesTest extends TemplatesTestCase
         $text                  = $this->templates()->compose($id, $ada, $deal);
         self::assertStringContainsString('at {{ company.name }}, {{ company.city }}', $text->text);
         self::assertStringContainsString('Engines {{ deal.amount }}', $text->text);
+        // Audit ZDI-I3: only a visible deal of the contact.
+        $bob   = $this->contact('Bob', 'Babbage', 'bob@example.test');
+        $other = $this->service(DealService::class)->create(new DealInput('Other', $funnel, contactId: $bob));
+        $this->expectThrows(NotAvailableException::class, fn (): object => $this->templates()->compose($id, $ada, $other));
+        $this->expectThrows(NotAvailableException::class, fn (): object => $this->templates()->compose($id, $ada, 'not-a-deal'));
         $this->ctx()->denied[] = 'view:' . $deal;
-        self::assertStringContainsString('{{ deal.title }}', $this->templates()->compose($id, $ada, $deal)->text);
-        self::assertStringContainsString('{{ deal.title }}', $this->templates()->compose($id, $ada, 'not-a-deal')->text);
+        $this->expectThrows(NotAvailableException::class, fn (): object => $this->templates()->compose($id, $ada, $deal));
         $this->ctx()->denied[] = 'view:' . $ada;
         $this->expectThrows(AccessDeniedException::class, fn (): object => $this->templates()->compose($id, $ada));
         $this->expectThrows(NotAvailableException::class, fn (): object => $this->templates()->compose('bad', $ada));
@@ -202,12 +217,20 @@ final class TemplatesTest extends TemplatesTestCase
         $acme  = new TenantRef('acme');
         $other = new TenantRef('globex');
         $id    = '0190a000-0000-7000-8000-00000000beef';
-        $this->runner()->write(static fn () => $store->classify($other, $id, null, new DateTimeImmutable('2026-11-18')));
-        $this->expectThrows(NotAvailableException::class, fn () => $this->runner()->write(static fn () => $store->classify($acme, $id, 'newsletter', new DateTimeImmutable('2026-11-18'))));
-        self::assertSame([], $store->classifications($acme, [$id]));
+        $this->runner()->write(static fn () => $store->classify($other, $id, null, 1, new DateTimeImmutable('2026-11-18')));
+        $this->expectThrows(NotAvailableException::class, fn () => $this->runner()->write(static fn () => $store->classify($acme, $id, 'newsletter', 2, new DateTimeImmutable('2026-11-18'))));
+        self::assertSame([], $store->classifications($acme, [$id => 1]));
         self::assertSame([], $store->classifications($acme, []));
         $store->forget('acme', $id);
-        self::assertSame([$id => null], $store->classifications($other, [$id]), 'forget names the tenant');
+        self::assertSame([$id => null], $store->classifications($other, [$id => 1]), 'forget names the tenant');
+
+        // Audit ZDI-L1: a classification belongs to one MailKit version; a late write of an older version is ignored.
+        $this->runner()->write(static fn () => $store->classify($other, $id, 'newsletter', 3, new DateTimeImmutable('2026-11-18')));
+        self::assertSame([$id => 'newsletter'], $store->classifications($other, [$id => 3]));
+        $this->runner()->write(static fn () => $store->classify($other, $id, null, 2, new DateTimeImmutable('2026-11-18')));
+        self::assertSame([$id => 'newsletter'], $store->classifications($other, [$id => 3]), 'an older version never replaces a newer one');
+        self::assertSame([], $store->classifications($other, [$id => 4]), 'another version is unclassified');
+        self::assertSame([], $store->classifications($other, [$id => 2]));
 
         $old = new DateTimeImmutable('2026-11-16 09:00');
         $now = new DateTimeImmutable('2026-11-18 10:00');

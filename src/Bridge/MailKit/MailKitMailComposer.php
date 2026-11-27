@@ -151,7 +151,7 @@ final readonly class MailKitMailComposer implements MailComposerInterface
         if ($template->kind !== TemplateKind::Template) {
             throw InvalidInputException::field('template', 'mail_error.template');
         }
-        $classes = $this->support->read(fn (): array => $this->store->classifications($context->tenant, [$template->id])); // @igor-ignore - the runner calls this closure at once and keeps nothing
+        $classes = $this->support->read(fn (): array => $this->store->classifications($context->tenant, [$template->id => $template->version])); // @igor-ignore - the runner calls this closure at once and keeps nothing
         if (!array_key_exists($template->id, $classes)) {
             throw InvalidInputException::field('template', 'mail_error.unclassified');
         }

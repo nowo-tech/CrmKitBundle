@@ -16,10 +16,13 @@ use Nowo\CrmKitBundle\Domain\Model\Counter;
 use Nowo\CrmKitBundle\Domain\Model\Template\TemplatePurpose;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 
+use function array_key_exists;
+use function array_keys;
 use function hash;
-use function in_array;
 use function intdiv;
 use function is_array;
+use function is_numeric;
+use function is_string;
 use function substr;
 
 /**
@@ -49,19 +52,27 @@ final readonly class DoctrineTemplateMailStore implements TemplateMailStoreInter
     /**
      * {@inheritDoc}
      */
-    public function classifications(TenantRef $tenant, array $ids): array
+    public function classifications(TenantRef $tenant, array $versions): array
     {
-        if ($ids === []) {
+        if ($versions === []) {
             return [];
         }
-        $rows = $this->runner->manager()->createQueryBuilder()->select('p')->from(TemplatePurpose::class, 'p')
+        $ids = array_keys($versions);
+        // Scalars, not entities: a row changed by classify()'s UPDATE in the same request is never read stale.
+        $rows = $this->runner->manager()->createQueryBuilder()->select('p.id, p.tenantId, p.purpose, p.version')->from(TemplatePurpose::class, 'p')
             ->where('p.tenantId = :tenant')->andWhere('p.id IN (:ids)')
             ->setParameter('tenant', $tenant->value)->setParameter('ids', $ids, ArrayParameterType::STRING)
-            ->getQuery()->getResult();
+            ->getQuery()->getScalarResult();
         $out = [];
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            if ($row instanceof TemplatePurpose && $row->getTenantId() === $tenant->value && in_array($row->getId(), $ids, true)) {
-                $out[$row->getId()] = $row->getPurpose();
+        foreach ($rows as $row) {
+            $id = is_array($row) ? ($row['id'] ?? null) : null;
+            if (!is_array($row) || !is_string($id) || ($row['tenantId'] ?? null) !== $tenant->value || !array_key_exists($id, $versions)) {
+                continue;
+            }
+            // Audit ZDI-L1: the classification of another version is none.
+            if (is_numeric($row['version'] ?? null) && (int) $row['version'] === $versions[$id]) {
+                $purpose  = $row['purpose'] ?? null;
+                $out[$id] = is_string($purpose) ? $purpose : null;
             }
         }
 
@@ -71,20 +82,33 @@ final readonly class DoctrineTemplateMailStore implements TemplateMailStoreInter
     /**
      * {@inheritDoc}
      */
-    public function classify(TenantRef $tenant, string $id, ?string $purpose, DateTimeImmutable $now): void
+    public function classify(TenantRef $tenant, string $id, ?string $purpose, int $version, DateTimeImmutable $now): void
     {
         $manager = $this->runner->manager();
-        $row     = $manager->find(TemplatePurpose::class, $id);
-        if ($row instanceof TemplatePurpose) {
-            if ($row->getTenantId() !== $tenant->value || $row->getId() !== $id) {
+        // One conditional statement (audit ZDI-L1): the row of an older version takes the new classification; a row of
+        // this or a newer version (another save committed after ours) is left as it is.
+        $updated = $manager->createQueryBuilder()->update(TemplatePurpose::class, 'p')
+            ->set('p.purpose', ':purpose')->set('p.version', ':version')->set('p.updatedAt', ':now')
+            ->where('p.id = :id')->andWhere('p.tenantId = :tenant')->andWhere('p.version < :version')
+            ->setParameter('purpose', $purpose)->setParameter('version', $version, ParameterType::INTEGER)
+            ->setParameter('now', $now, 'nowo_crm_utc_datetime')
+            ->setParameter('id', $id)->setParameter('tenant', $tenant->value)
+            ->getQuery()->execute();
+        if ($updated !== 0) {
+            return;
+        }
+        $owner = $manager->createQueryBuilder()->select('p.tenantId')->from(TemplatePurpose::class, 'p')
+            ->where('p.id = :id')->setParameter('id', $id)->getQuery()->getScalarResult();
+        if ($owner !== []) {
+            $first = $owner[0] ?? null;
+            if (!is_array($first) || ($first['tenantId'] ?? null) !== $tenant->value) {
                 // Another tenant's row under the same id (template ids are UUIDs: never expected).
                 throw new NotAvailableException();
             }
-            $row->classify($purpose, $now);
 
             return;
         }
-        $manager->persist(new TemplatePurpose($id, $tenant->value, $purpose, $now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+        $manager->persist(new TemplatePurpose($id, $tenant->value, $purpose, $version, $now)); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
     }
 
     /**

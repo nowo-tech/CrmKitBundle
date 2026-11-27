@@ -55,9 +55,9 @@ final class TemplateValuesTest extends TestCase
             self::assertTrue((new MailOutcome('x'))->logged());
             $view = new EmailTemplateView('id', EmailTemplateKind::Snippet, false, 'k', 'n', 'en', '', '', false, 1, false, null, true, new DateTimeImmutable());
             self::assertTrue($view->sendable());
-            $purpose = new TemplatePurpose('id', 'acme', null, new DateTimeImmutable('2026-11-18'));
-            $purpose->classify('newsletter', new DateTimeImmutable('2026-11-19'));
-            self::assertSame(['newsletter', '2026-11-19'], [$purpose->getPurpose(), $purpose->getUpdatedAt()->format('Y-m-d')]);
+            $purpose = new TemplatePurpose('id', 'acme', null, 1, new DateTimeImmutable('2026-11-18'));
+            $purpose->classify('newsletter', 2, new DateTimeImmutable('2026-11-19'));
+            self::assertSame(['newsletter', 2, '2026-11-19'], [$purpose->getPurpose(), $purpose->getVersion(), $purpose->getUpdatedAt()->format('Y-m-d')]);
         }
     }
 

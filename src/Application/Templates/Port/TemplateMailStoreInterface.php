@@ -16,19 +16,21 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 interface TemplateMailStoreInterface
 {
     /**
-     * The classifications of the given templates: id ⇒ consent purpose, or null for a service message; a template
-     * without a classification is absent.
+     * The classifications of the given templates at their current MailKit versions: id ⇒ consent purpose, or null for a
+     * service message. A template without a classification, or whose classification was written for another version
+     * (audit ZDI-L1: fail closed), is absent.
      *
-     * @param list<string> $ids
+     * @param array<string, int> $versions template id ⇒ its current MailKit version
      *
      * @return array<string, string|null>
      */
-    public function classifications(TenantRef $tenant, array $ids): array;
+    public function classifications(TenantRef $tenant, array $versions): array;
 
     /**
-     * Sets a template's classification (inside a write unit).
+     * Sets the classification of a template version (inside a write unit): written only when no row exists or the row
+     * classifies an older version, so a late write never replaces the classification of a newer text.
      */
-    public function classify(TenantRef $tenant, string $id, ?string $purpose, DateTimeImmutable $now): void;
+    public function classify(TenantRef $tenant, string $id, ?string $purpose, int $version, DateTimeImmutable $now): void;
 
     /**
      * Deletes a template's classification at once (one statement: inside MailKit's delete transaction when both share

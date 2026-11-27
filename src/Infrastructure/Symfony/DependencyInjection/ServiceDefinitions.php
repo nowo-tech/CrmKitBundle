@@ -58,6 +58,7 @@ use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
 use Nowo\CrmKitBundle\Application\Pipeline\PipelineSupport;
 use Nowo\CrmKitBundle\Application\Pipeline\Port\PipelineStoreInterface;
 use Nowo\CrmKitBundle\Application\PlanCounter;
+use Nowo\CrmKitBundle\Application\Port\ContactMailLogInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmActorDataStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmBatchLookupStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
@@ -78,6 +79,7 @@ use Nowo\CrmKitBundle\Bridge\MailKit\ContactPlaceholders;
 use Nowo\CrmKitBundle\Bridge\MailKit\CrmTemplateActors;
 use Nowo\CrmKitBundle\Bridge\MailKit\CrmTemplatePermission;
 use Nowo\CrmKitBundle\Bridge\MailKit\DealPlaceholders;
+use Nowo\CrmKitBundle\Bridge\MailKit\MailKitContactMailLog;
 use Nowo\CrmKitBundle\Bridge\MailKit\MailKitEmailTemplates;
 use Nowo\CrmKitBundle\Bridge\MailKit\MailKitMailComposer;
 use Nowo\CrmKitBundle\Bridge\MailKit\MePlaceholders;
@@ -288,6 +290,9 @@ final class ServiceDefinitions
     /** MailKit's tag of placeholder providers (0.13.0). */
     public const MAIL_KIT_PLACEHOLDER_TAG = 'nowo_mail_kit.template_placeholder_provider';
 
+    /** MailKit's erasure port of the sent-mail log (audit ZDI-M1). */
+    public const MAIL_KIT_LOG_ERASER = 'Nowo\\MailKitBundle\\Log\\SentMailPersonalDataEraserInterface';
+
     /** MailKit's event after a template was deleted (its class name; 0.13.0). */
     public const MAIL_KIT_TEMPLATE_DELETED = 'Nowo\\MailKitBundle\\Template\\Event\\TemplateDeletedEvent';
 
@@ -432,7 +437,9 @@ final class ServiceDefinitions
         $s->alias(CrmActorDataStoreInterface::class, DoctrineCrmActorDataStore::class);
         $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $activities ? [...CrmActorDataStoreInterface::KINDS, ...CrmActorDataStoreInterface::ACTIVITY_KINDS, ...($mentions ? [CrmActorDataStoreInterface::MENTION_KIND] : [])] : CrmActorDataStoreInterface::KINDS]);
         $s->alias(CrmActorPersonalDataInterface::class, ActorPersonalData::class)->public();
-        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping, $refs, $keeping]);
+        // 0.13.0 (audit ZDI-M1): with the e-mail templates, the contact's erasure covers MailKit's sent-mail log.
+        $templatesOn = $activities && is_array($config['templates'] ?? null) && ($config['templates']['enabled'] ?? false) === true;
+        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping, $refs, $keeping, $templatesOn ? service(ContactMailLogInterface::class) : null]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
@@ -704,9 +711,12 @@ final class ServiceDefinitions
         $s->set(CompanyPlaceholders::class)->args([service(CrmTemplateActors::class), service(CrmReaderInterface::class)])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
         $s->set(DealPlaceholders::class)->args([service(CrmTemplateActors::class), $pipeline ? service(DealReader::class) : null])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
         $s->set(MePlaceholders::class)->args([service(CrmTemplateActors::class), service(CrmActorDirectoryInterface::class)])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
+        // Audit ZDI-M1: MailKit's sent-mail log erasure port (always registered by MailKit) for the contact's erasure.
+        $s->set(MailKitContactMailLog::class)->args([service(self::MAIL_KIT_LOG_ERASER)]);
+        $s->alias(ContactMailLogInterface::class, MailKitContactMailLog::class);
         $s->set(TemplatePurposeCleaner::class)->args([service(TemplateMailStoreInterface::class)])
             ->tag('kernel.event_listener', ['event' => self::MAIL_KIT_TEMPLATE_DELETED, 'method' => '__invoke']);
-        $s->set(MailKitEmailTemplates::class)->args([service(CrmTemplateActors::class), $library, service(self::MAIL_KIT_RENDERER), service(TemplateMailStoreInterface::class), service(WriteSupport::class), service(CrmReaderInterface::class), param($p . 'gdpr.purposes')]);
+        $s->set(MailKitEmailTemplates::class)->args([service(CrmTemplateActors::class), $library, service(self::MAIL_KIT_RENDERER), service(TemplateMailStoreInterface::class), service(WriteSupport::class), service(CrmReaderInterface::class), param($p . 'gdpr.purposes'), $pipeline ? service(DealReader::class) : null]);
         $s->alias(EmailTemplatesInterface::class, MailKitEmailTemplates::class)->public();
         $s->set(MailKitMailComposer::class)->args([
             service(CrmTemplateActors::class),

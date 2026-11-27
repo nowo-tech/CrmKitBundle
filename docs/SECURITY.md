@@ -339,10 +339,28 @@ Report vulnerabilities privately through GitHub Security Advisories of `nowo-tec
   *Write e-mail* needs `edit` on the contact, checked under the contact's lock.
 - **Consent (GDPR, spec 248 FR-007).** A commercial template carries a consent purpose; the send is refused unless the
   contact's latest decision for it is a grant, read under the same row lock a consent change takes. Templates without a
-  CRM classification (written through MailKit's API) cannot be sent (deny by default). A message written by hand is a
-  service message: the person, not the CRM, decides its nature.
+  CRM classification (written through MailKit's API) cannot be sent (deny by default). The classification names the
+  MailKit template version it was decided for (audit ZDI-L1): it is written only over an older version's, and a
+  template whose current version differs (edited elsewhere, two saves racing, a crash between MailKit's commit and the
+  CRM's) counts as unclassified until it is saved again in the CRM. A message written by hand is a service message: the
+  person, not the CRM, decides its nature. *Write e-mail* fills `{{ deal.* }}` only from a deal of the contact.
 - **Abuse limits.** Per-person send window (`templates.send_rate_limit`), one send per form (a random send key claimed
   in the write unit), CSRF tokens on every form (`nowo_crm_kit_template`, `nowo_crm_kit_mail`) and the delete action.
 - **Data.** `crm_template_purpose` holds template ids, tenant and purpose only (no personal data). The counter rows of
   the send window are keyed by a hash of the person's id; send keys are random. `CrmMailSent` carries ids only. The
   sent message's subject and first 500 characters are stored as the `email` activity (A-1's GDPR paths cover it).
+- **MailKit's sent-mail log (audit ZDI-M1).** Every *Write e-mail* sent through Symfony Mailer also writes a row of
+  MailKit's sent-mail log (the contact's address and the subject; the body too with MailKit's `log.store_bodies`).
+  With `templates.enabled`, `CrmPersonalDataInterface::erase()` erases them in the same unit (MailKit's
+  `SentMailPersonalDataEraserInterface`: rows of the address deleted, or unlinked and masked when they have other
+  recipients), for the contact's current address and those its merge traces keep of the contacts merged into it, by
+  exact (normalised) address; a
+  missing log table fails the erasure (the CRM's unit rolls back) instead of reporting it complete. MailKit's log has
+  no tenant: the erasure removes every row of the address, also mail other tenants or the host sent to it. For the
+  same reason `export()` does **not** list the log (a tenant would see other tenants' mail): the host's data-subject
+  export covers it (MailKit's `SentMailPersonalDataExporterInterface`). Rows logged
+  under an address the contact no longer has (changed before the erasure, or kept only by a purged merge trace) are not
+  found by it: the host erases them
+  with `nowo:mail-kit:log:forget <address>` and keeps `nowo:mail-kit:log:purge` scheduled. A host sender
+  (`templates.mail_sender`) that does not go through Symfony Mailer keeps its own records: their export and erasure
+  are the host's.

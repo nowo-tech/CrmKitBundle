@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Bridge\MailKit;
 
 use Nowo\CrmKitBundle\Application\CrmContext;
+use Nowo\CrmKitBundle\Application\Pipeline\DealReader;
 use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Application\Templates\Port\TemplateMailStoreInterface;
@@ -19,6 +20,7 @@ use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Read\ComposedText;
 use Nowo\CrmKitBundle\Domain\Read\EmailTemplateView;
+use Nowo\CrmKitBundle\Domain\Read\Pipeline\DealView;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\EmailTemplateInput;
 use Nowo\CrmKitBundle\Domain\Service\EmailTemplatesInterface;
@@ -67,6 +69,7 @@ final readonly class MailKitEmailTemplates implements EmailTemplatesInterface
         private WriteSupport $support,
         private CrmReaderInterface $reader,
         private array $purposes,
+        private ?DealReader $deals = null,
     ) {
     }
 
@@ -83,8 +86,11 @@ final readonly class MailKitEmailTemplates implements EmailTemplatesInterface
                 $rows[] = $summary;
             }
         }
-        $ids     = array_map(static fn (TemplateSummary $s): string => $s->id, $rows);
-        $classes = $this->support->read(fn (): array => $this->store->classifications($context->tenant, $ids)); // @igor-ignore - the runner calls this closure at once and keeps nothing
+        $versions = [];
+        foreach ($rows as $summary) {
+            $versions[$summary->id] = $summary->version;
+        }
+        $classes = $this->support->read(fn (): array => $this->store->classifications($context->tenant, $versions)); // @igor-ignore - the runner calls this closure at once and keeps nothing
         $manage  = $this->actors->access()->can(CrmPermission::Manage);
 
         return array_map(fn (TemplateSummary $s): EmailTemplateView => $this->view($s, '', false, $classes, $manage), $rows);
@@ -97,7 +103,7 @@ final readonly class MailKitEmailTemplates implements EmailTemplatesInterface
     {
         $context = $this->context();
         $stored  = $this->stored($context, $id);
-        $classes = $this->support->read(fn (): array => $this->store->classifications($context->tenant, [$stored->id])); // @igor-ignore - the runner calls this closure at once and keeps nothing
+        $classes = $this->support->read(fn (): array => $this->store->classifications($context->tenant, [$stored->id => $stored->version])); // @igor-ignore - the runner calls this closure at once and keeps nothing
 
         return $this->view($stored->summary(), $stored->text, trim($stored->html) !== '', $classes, $this->actors->access()->can(CrmPermission::Manage));
     }
@@ -166,7 +172,11 @@ final readonly class MailKitEmailTemplates implements EmailTemplatesInterface
                 $subjects['company'] = $affiliation->companyId;
             }
         }
-        if ($dealId !== null && RecordId::isValid($dealId)) {
+        if ($dealId !== null && $this->deals instanceof DealReader) {
+            // Audit ZDI-I3: only a deal of the contact (what Write e-mail offers).
+            if (!RecordId::isValid($dealId) || !in_array($dealId, array_map(static fn (DealView $d): string => $d->id, $this->deals->ofRecord(SubjectType::Contact, $contact->id)), true)) {
+                throw new NotAvailableException();
+            }
             $subjects['deal'] = $dealId;
         }
         $rendered = $this->call(fn (): RenderedTemplate => $this->renderer->render($this->actors->actor($context), $id, $subjects), $id); // @igor-ignore - the runner calls this closure at once and keeps nothing
@@ -229,7 +239,8 @@ final readonly class MailKitEmailTemplates implements EmailTemplatesInterface
         try {
             $this->support->write(function (Effects $effects) use ($context, $stored, $purpose, $action): void { // @igor-ignore - the runner calls this closure at once and keeps nothing
                 if ($stored->kind === TemplateKind::Template) {
-                    $this->store->classify($context->tenant, $stored->id, $purpose, $context->now);
+                    // Audit ZDI-L1: tied to the version MailKit just stored (a newer save's classification is kept).
+                    $this->store->classify($context->tenant, $stored->id, $purpose, $stored->version, $context->now);
                 }
                 $this->support->audit($effects, $context, $action, null, null, ['template' => $stored->id, 'kind' => $stored->kind->value, 'shared' => $stored->scope === TemplateScope::Shared, 'purpose' => $purpose]);
             });

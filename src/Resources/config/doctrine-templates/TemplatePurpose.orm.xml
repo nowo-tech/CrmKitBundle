@@ -9,6 +9,7 @@
         <id name="id" column="id" type="string" length="36"><generator strategy="NONE"/></id>
         <field name="tenantId" column="tenant_id" type="string" length="128"/>
         <field name="purpose" column="purpose" type="string" length="64" nullable="true"/>
+        <field name="version" column="version" type="integer"/>
         <field name="updatedAt" column="updated_at" type="nowo_crm_utc_datetime"/>
     </entity>
 </doctrine-mapping>

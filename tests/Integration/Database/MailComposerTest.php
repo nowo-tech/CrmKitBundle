@@ -15,15 +15,20 @@ use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
 use Nowo\CrmKitBundle\Domain\Exception\RateLimitedException;
 use Nowo\CrmKitBundle\Domain\Read\MailOutcome;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\EmailTemplateInput;
 use Nowo\CrmKitBundle\Domain\Service\MailDraft;
+use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\CrmKitEvents;
+use Nowo\MailKitBundle\Log\SentMailLogTableMissingException;
 use Nowo\MailKitBundle\Mailer\MailHeaders;
 use Nowo\MailKitBundle\Template\Value\TemplateKind;
 use Symfony\Component\Mime\Address;
 
 use function array_filter;
+use function array_keys;
+use function array_map;
 use function array_values;
 
 /**
@@ -72,6 +77,38 @@ final class MailComposerTest extends TemplatesTestCase
         self::assertSame([], $this->lastMail()->getReplyTo());
         $this->actAs('ana');
         self::assertNull($plain->getHeaders()->get(MailHeaders::TAG));
+    }
+
+    public function testTheContactsErasureCoversMailKitsSentMailLog(): void
+    {
+        // Audit ZDI-M1: the rows MailKit's sent-mail log holds for the contact's addresses (its own and those its merge
+        // traces keep of the contacts merged into it) are erased with the contact; other people's rows stay.
+        $this->boot();
+        $this->admin();
+        $reader = $this->service(CrmReaderInterface::class);
+        $ada    = $this->contact('Ada', 'Lovelace', 'ada@example.test');
+        $dup    = $this->contact('Ada', 'L.', 'ada.old@example.test');
+        $this->service(MergeServiceInterface::class)->merge(SubjectType::Contact, $ada, $dup, [], $reader->record(SubjectType::Contact, $ada)->version, 1);
+        $this->composer()->send(new MailDraft($ada, 'Your quote', 'Text', null, MailDraft::newKey()));
+        $log = $this->sentMailLog();
+        $log->log('Ada@Example.test', 'Your quote');
+        $log->log('ada.old@example.test', 'Older');
+        $log->log('bob@example.test', 'Someone else');
+
+        self::assertArrayNotHasKey('sent_mail', $this->service(CrmPersonalDataInterface::class)->export($ada), 'the log is host-wide: the host exports it');
+
+        $this->service(CrmPersonalDataInterface::class)->erase($ada);
+        self::assertSame(['ada@example.test', 'ada.old@example.test'], $log->erased);
+        self::assertSame(['bob@example.test'], array_keys($log->rows));
+        $this->service(CrmPersonalDataInterface::class)->erase($ada);
+        self::assertCount(2, $log->erased, 'an erased contact is not erased again');
+
+        // A missing log table fails the erasure: the CRM's unit rolls back, the contact stays as it was.
+        $bob          = $this->contact('Bob', 'Babbage', 'bob@example.test');
+        $log->missing = true;
+        $this->expectThrows(SentMailLogTableMissingException::class, fn () => $this->service(CrmPersonalDataInterface::class)->erase($bob));
+        self::assertSame('active', $this->text('SELECT status FROM nowo_crm_contact WHERE id = ?', [$bob]));
+        self::assertSame(['bob@example.test'], array_keys($log->rows));
     }
 
     public function testConsentAndClassificationDecideWhetherATemplateMaySend(): void

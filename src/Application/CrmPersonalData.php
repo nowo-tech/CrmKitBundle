@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Application;
 
 use Nowo\CrmKitBundle\Application\Engagement\EngagementHousekeeping;
 use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
+use Nowo\CrmKitBundle\Application\Port\ContactMailLogInterface;
 use Nowo\CrmKitBundle\Application\Port\ExternalRefHooksInterface;
 use Nowo\CrmKitBundle\Application\Shared\Effects;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
@@ -26,8 +27,11 @@ use Nowo\CrmKitBundle\Domain\Model\Tagging;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 
 use function array_filter;
+use function array_keys;
 use function array_map;
 use function array_values;
+use function is_array;
+use function is_string;
 
 use const DATE_ATOM;
 
@@ -35,7 +39,8 @@ use const DATE_ATOM;
  * GDPR export and erasure of a contact (contract section 16). Erasure blanks the personal columns, deletes notes,
  * taggings, links, affiliations, timeline entries, logged activities (0.11.0) and merge traces of the contact, keeps consent rows without their
  * evidence, blanks the merge tombstones that point at it (recursively, under lock) with their merge traces, and is
- * idempotent. Stateless.
+ * idempotent. 0.13.0 (audit ZDI-M1): with `templates.enabled`, the erasure erases MailKit's sent-mail log rows of the
+ * contact's addresses (its own and those its merge traces keep of the contacts merged into it). Stateless.
  */
 final readonly class CrmPersonalData implements CrmPersonalDataInterface
 {
@@ -45,7 +50,7 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
     /**
      * Wires the collaborators.
      */
-    public function __construct(private WriteSupport $support, private PlanCounter $counter, private ?PipelineHousekeeping $pipeline = null, private ?ExternalRefHooksInterface $refs = null, private ?EngagementHousekeeping $engagements = null)
+    public function __construct(private WriteSupport $support, private PlanCounter $counter, private ?PipelineHousekeeping $pipeline = null, private ?ExternalRefHooksInterface $refs = null, private ?EngagementHousekeeping $engagements = null, private ?ContactMailLogInterface $mailLog = null)
     {
     }
 
@@ -117,6 +122,9 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
                 return;
             }
             $store = $this->support->store;
+            // 0.13.0 (audit ZDI-M1): the sent-mail log rows of its addresses, before the addresses are blanked. MailKit
+            // joins this unit when both share the connection; erasing again on a replay is a no-op.
+            $this->mailLog?->erase($this->addresses($context, $record));
             // 0.12.0 (audit ZDE-M2, Q-H6): the HubSpot references of the notes, activities and next actions deleted
             // below become tombstones first, so a re-run never brings what was said about the person back.
             $this->refs?->tombstoneItems($context->tenant, $contactId, $this->engagements instanceof EngagementHousekeeping, $this->pipeline instanceof PipelineHousekeeping);
@@ -172,5 +180,40 @@ final readonly class CrmPersonalData implements CrmPersonalDataInterface
             $effects->event(new ContactErased($context->tenant, $context->actor, $context->now, $contactId));
             $this->support->audit($effects, $context, 'crm.contact.erased', SubjectType::Contact, $contactId);
         });
+    }
+
+    /**
+     * The contact's address and the addresses its merge traces keep of the contacts merged into it (recursively through
+     * its merge tombstones, locked), distinct.
+     *
+     * @return list<string>
+     */
+    private function addresses(CrmContext $context, CrmRecord $record): array
+    {
+        $out = [];
+        $add = static function (mixed $email) use (&$out): void {
+            if (is_string($email) && $email !== '') {
+                $out[$email] = true;
+            }
+        };
+        $add($record->value('email'));
+        $seen  = [$record->getId() => true];
+        $level = [$record->getId()];
+        while ($level !== []) {
+            foreach ($level as $id) {
+                foreach ($this->support->store->mergesOf($context->tenant, $id) as $merge) {
+                    $values = $merge->getSnapshot()['values'] ?? null;
+                    $add(is_array($values) ? ($values['email'] ?? null) : null);
+                }
+            }
+            $found = array_values(array_filter($this->support->store->lockTombstones(SubjectType::Contact, $context->tenant, $level), static fn (CrmRecord $t): bool => !isset($seen[$t->getId()])));
+            $level = [];
+            foreach ($found as $tombstone) {
+                $seen[$tombstone->getId()] = true;
+                $level[]                   = $tombstone->getId();
+            }
+        }
+
+        return array_keys($out);
     }
 }

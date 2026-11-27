@@ -44,6 +44,7 @@ use Nowo\CrmKitBundle\Domain\Value\MeetingSlot;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 
+use function array_map;
 use function array_values;
 use function count;
 use function in_array;
@@ -127,8 +128,14 @@ final readonly class EngagementService implements EngagementServiceInterface
             $attendees = $this->attendees($context, $input);
             $this->describe($engagement, $values, $context->now, false);
             if ($engagement->getKind() === ActivityKind::Meeting) {
-                foreach ($this->engagements->attendeesOf($context->tenant, [$id])[$id] ?? [] as $row) {
-                    $this->support->store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                // Audit ZCR-L2: the attendee contacts the editor may not view stay as they are (the form never showed
+                // them); only the rest is replaced by the submitted attendees.
+                $rows   = $this->engagements->attendeesOf($context->tenant, [$id])[$id] ?? [];
+                $hidden = $this->hiddenContacts($context, $rows);
+                foreach ($rows as $row) {
+                    if (!isset($hidden[(string) $row->getContactId()])) {
+                        $this->support->store->remove($row); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
+                    }
                 }
                 // The removals go first: a kept attendee is written again as a new row.
                 $this->support->store->flush();
@@ -263,6 +270,37 @@ final readonly class EngagementService implements EngagementServiceInterface
         }
 
         return array_values($unique);
+    }
+
+    /**
+     * The contact ids among attendee rows that the actor may not view (missing contacts included), keyed by id.
+     *
+     * @param list<EngagementAttendee> $rows
+     *
+     * @return array<string, true>
+     */
+    private function hiddenContacts(CrmContext $context, array $rows): array
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            $contact = $row->getContactId();
+            if ($contact !== null) {
+                $ids[$contact] = $contact;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $records = $this->support->store->records(SubjectType::Contact, $context->tenant, array_values($ids));
+        $granted = $this->support->access->viewable($context, array_values(array_map(static fn (CrmRecord $r): SubjectRef => SubjectRef::of(SubjectType::Contact, $r->getId(), $r->getOwnerId()), $records)));
+        $hidden  = [];
+        foreach ($ids as $contact) {
+            if (!isset($granted[SubjectType::Contact->value . ':' . $contact])) {
+                $hidden[$contact] = true;
+            }
+        }
+
+        return $hidden;
     }
 
     /**

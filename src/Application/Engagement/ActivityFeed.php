@@ -32,6 +32,7 @@ use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TimelineFilter;
 use Nowo\CrmKitBundle\Domain\Value\TimelineWindow;
 
+use function array_filter;
 use function array_map;
 use function array_slice;
 use function array_values;
@@ -47,6 +48,9 @@ use function usort;
  */
 final readonly class ActivityFeed implements ActivityFeedInterface
 {
+    /** Most store pages one feed page reads past hidden activities (audit ZCR-M1). */
+    public const SCAN_ROUNDS = 5;
+
     /**
      * Wires the collaborators.
      */
@@ -65,11 +69,12 @@ final readonly class ActivityFeed implements ActivityFeedInterface
      */
     public function feed(SubjectType $type, string $id, TimelineFilter $filter, TimelineWindow $window): Feed
     {
-        $context           = $this->support->access->base();
-        [$subject, $items] = $this->support->read(function () use ($context, $type, $id, $filter, $window): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
-            $subject = $this->subject($context, $type, $id);
-            $items   = [];
-            $kinds   = [];
+        $context                      = $this->support->access->base();
+        [$subject, $items, $boundary] = $this->support->read(function () use ($context, $type, $id, $filter, $window): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
+            $subject  = $this->subject($context, $type, $id);
+            $items    = [];
+            $boundary = null;
+            $kinds    = [];
             foreach (ActivityKind::LOGGABLE as $kind) {
                 $feedKind = FeedKind::ofActivity($kind);
                 if ($feedKind instanceof FeedKind && $filter->shows($feedKind)) {
@@ -77,8 +82,8 @@ final readonly class ActivityFeed implements ActivityFeedInterface
                 }
             }
             if ($kinds !== []) {
-                $rows = $this->engagements->feed($context->tenant, $type, $id, $kinds, $filter->person?->value, $window->before, $window->beforeId, $window->limit + 1);
-                foreach ($this->engagementViews($context, $this->viewableEngagements($context, $rows), $subject) as $view) {
+                [$visible, $boundary] = $this->scan($context, $type, $id, $kinds, $filter, $window);
+                foreach ($this->engagementViews($context, $visible, $subject) as $view) {
                     $items[] = new FeedItem(FeedKind::ofActivity($view->kind) ?? FeedKind::Call, $view->id, $view->occurredAt, $view->authorId, $view->authorName, engagement: $view);
                 }
             }
@@ -86,17 +91,56 @@ final readonly class ActivityFeed implements ActivityFeedInterface
                 $items = [...$items, ...$this->notes($context, $type, $id, $filter, $window)];
             }
 
-            return [$subject, $items];
+            return [$subject, $items, $boundary];
         });
         if ($filter->shows(FeedKind::Host)) {
             // Asked outside the read unit: a host source may run its own queries.
             $items = [...$items, ...$this->hostItems($context, $subject, $filter, $window)];
         }
+        if ($boundary instanceof TimelineWindow) {
+            // The scan stopped on hidden activities: this page ends at the last scanned row, everything older (notes and
+            // host items included) waits for the next page, which continues from there.
+            $items = array_values(array_filter($items, static fn (FeedItem $i): bool => !$boundary->admits($i->at, $i->id)));
+        }
         usort($items, static fn (FeedItem $a, FeedItem $b): int => [(int) $b->at->format('U'), (int) $b->at->format('u'), $b->id] <=> [(int) $a->at->format('U'), (int) $a->at->format('u'), $a->id]);
         $page = array_slice($items, 0, $window->limit);
         $last = $page[count($page) - 1] ?? null;
 
-        return new Feed($page, count($items) > $window->limit && $last instanceof FeedItem ? TimelineWindow::cursor($last->at, $last->id) : null);
+        if (count($items) > $window->limit && $last instanceof FeedItem) {
+            return new Feed($page, TimelineWindow::cursor($last->at, $last->id));
+        }
+
+        return new Feed($page, $boundary instanceof TimelineWindow && $boundary->before instanceof DateTimeImmutable && $boundary->beforeId !== null ? TimelineWindow::cursor($boundary->before, $boundary->beforeId) : null);
+    }
+
+    /**
+     * The visible activities of a feed page (audit ZCR-M1): the store is read in pages of `limit + 1` rows and the
+     * hidden ones (a primary record the viewer may not view) are dropped; while fewer than `limit + 1` are left and the
+     * store still had a full page, the next one is read, at most {@see self::SCAN_ROUNDS} times. When the scan stops
+     * with rows left, the position of its last row is returned (the page ends there and the next one starts there), so
+     * hidden activities never end the feed early.
+     *
+     * @param list<ActivityKind> $kinds
+     *
+     * @return array{list<Engagement>, TimelineWindow|null}
+     */
+    private function scan(CrmContext $context, SubjectType $type, string $id, array $kinds, TimelineFilter $filter, TimelineWindow $window): array
+    {
+        $visible  = [];
+        $before   = $window->before;
+        $beforeId = $window->beforeId;
+        for ($round = 1; $round <= self::SCAN_ROUNDS; ++$round) {
+            $rows    = $this->engagements->feed($context->tenant, $type, $id, $kinds, $filter->person?->value, $before, $beforeId, $window->limit + 1);
+            $visible = [...$visible, ...$this->viewableEngagements($context, $rows)];
+            $last    = $rows[count($rows) - 1] ?? null;
+            if (count($rows) <= $window->limit || count($visible) > $window->limit || !$last instanceof Engagement) {
+                return [$visible, null];
+            }
+            $before   = $last->getOccurredAt();
+            $beforeId = $last->getId();
+        }
+
+        return [$visible, new TimelineWindow($window->limit, $before, $beforeId)];
     }
 
     /**
@@ -319,10 +363,10 @@ final readonly class ActivityFeed implements ActivityFeedInterface
     {
         $kept = [];
         foreach ($this->hosts->items($context->tenant, $context->actor, $subject, $window) as $item) {
-            $id = 'host:' . $item->id;
             if (!$item instanceof HostActivityItem || $item->subject->type !== $subject->type || $item->subject->id->value !== $subject->id->value) {
                 continue;
             }
+            $id = 'host:' . $item->id;
             if (!$window->admits($item->at, $id) || !$filter->by($item->actor?->value)) {
                 continue;
             }

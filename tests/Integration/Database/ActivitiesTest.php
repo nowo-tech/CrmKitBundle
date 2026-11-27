@@ -48,6 +48,7 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Domain\Value\TimelineFilter;
 use Nowo\CrmKitBundle\Domain\Value\TimelineWindow;
 use Nowo\CrmKitBundle\Tests\Fixtures\TestActivitySources;
+use Nowo\TransactionDoctrine\WriteUnit\ConcurrencyConflict;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -58,6 +59,7 @@ use function array_map;
 use function array_replace_recursive;
 use function array_unique;
 use function array_values;
+use function count;
 use function end;
 use function is_scalar;
 use function str_pad;
@@ -328,7 +330,9 @@ final class ActivitiesTest extends CrmTestCase
         self::assertMatchesRegularExpression('/\Au[0-9a-f]{24}\z/', $leo);
         $candidates = $this->service(MentionDirectoryInterface::class)->candidates(SubjectType::Contact, $ada, '');
         self::assertSame(['Ana', 'Eva', 'Leo'], array_map(static fn (MentionCandidate $c): string => $c->name, $candidates));
-        self::assertSame([$leo], array_map(static fn (MentionCandidate $c): string => $c->handle, $this->service(MentionDirectoryInterface::class)->candidates(SubjectType::Contact, $ada, 'LEO@EXAMPLE')));
+        self::assertSame([$leo], array_map(static fn (MentionCandidate $c): string => $c->handle, $this->service(MentionDirectoryInterface::class)->candidates(SubjectType::Contact, $ada, ' LEO@EXAMPLE.TEST ')));
+        self::assertSame([], $this->service(MentionDirectoryInterface::class)->candidates(SubjectType::Contact, $ada, 'LEO@EXAMPLE'), 'no part of an address matches (ZCR-L1)');
+        self::assertSame([], $this->service(MentionDirectoryInterface::class)->candidates(SubjectType::Contact, $ada, 'example'));
         self::assertSame([$leo => 'Leo'], $this->service(MentionDirectoryInterface::class)->names(SubjectType::Contact, $ada, [$leo, 'u' . str_repeat('0', 24), 'bad']));
 
         $sources = $this->sources();
@@ -383,6 +387,8 @@ final class ActivitiesTest extends CrmTestCase
         self::assertSame([$call], array_map(static fn (array $r): mixed => $r['id'], $activities));
         self::assertSame('Private notes', $activities[0]['body'] ?? null);
         self::assertSame([$meeting], array_map(static fn (array $r): mixed => $r['id'], $attended));
+        self::assertArrayNotHasKey('body', $attended[0] ?? [], 'only what concerns the person (ZCR-I6)');
+        self::assertArrayHasKey('body', $activities[0] ?? []);
 
         // Merge Bob into Ada: Bob's attendance of the meeting is the same as Ada's (dropped), his own call moves.
         $bobs = $this->engagements()->log(SubjectType::Contact, $bob, $this->email());
@@ -406,7 +412,8 @@ final class ActivitiesTest extends CrmTestCase
 
         // Retention: older than the timeline's years, deleted; a purged company takes its activities along.
         $this->admin();
-        $old    = $this->engagements()->log(SubjectType::Company, $acme, $this->call(at: new DateTimeImmutable('2019-01-01 10:00', new DateTimeZone('UTC'))));
+        $old = $this->engagements()->log(SubjectType::Company, $acme, $this->call(at: new DateTimeImmutable('2019-01-01 10:00', new DateTimeZone('UTC'))));
+        self::assertSame(1, $this->service(RecordPurger::class)->purge(new TenantRef('acme'), true)['engagements'] ?? null, 'the dry run counts them');
         $counts = $this->service(RecordPurger::class)->purge(new TenantRef('acme'));
         self::assertSame(1, $counts['engagements'] ?? null);
         self::assertSame(0, $this->int('SELECT COUNT(*) FROM nowo_crm_engagement WHERE id = ?', [$old]));
@@ -486,6 +493,102 @@ final class ActivitiesTest extends CrmTestCase
         self::assertStringContainsString('logged activities: 1', $tester->getDisplay());
         $tester->execute([]);
         self::assertStringNotContainsString('logged activities', $tester->getDisplay());
+    }
+
+    public function testHiddenActivitiesNeverEndTheFeedEarly(): void
+    {
+        $this->boot(['pipeline' => ['enabled' => false]]);
+        $this->admin();
+        $acme   = $this->company('Acme');
+        $hidden = $this->contact('Hidden', 'Contact');
+        $shown  = $this->contact('Shown', 'Contact');
+        $this->records()->affiliate($hidden, $acme, null, false);
+        $this->records()->affiliate($shown, $acme, null, false);
+        $base = new DateTimeImmutable('2026-11-10 08:00', new DateTimeZone('UTC'));
+        for ($i = 0; $i < 3; ++$i) {
+            $this->engagements()->log(SubjectType::Contact, $shown, $this->call(at: $base->modify('+' . $i . ' minute')));
+        }
+        for ($i = 0; $i < 25; ++$i) {
+            $this->engagements()->log(SubjectType::Contact, $hidden, $this->call(at: $base->modify('+1 day +' . $i . ' minute')));
+        }
+        $this->ctx()->denied[] = 'view:' . $hidden;
+        // A page of 20: the scan reads past the 25 hidden rows and shows the 3 visible ones (ZCR-M1).
+        $page = $this->feed(SubjectType::Company, $acme, null, new TimelineWindow(20));
+        self::assertCount(3, $page->items);
+        self::assertNull($page->next);
+        // A page of 2: five store pages hold hidden rows only; the page ends empty with a cursor that continues.
+        $page = $this->feed(SubjectType::Company, $acme, null, new TimelineWindow(2));
+        self::assertSame([], $page->items);
+        self::assertNotNull($page->next);
+        $seen   = 0;
+        $cursor = $page->next;
+        for ($guard = 0; $cursor !== null && $guard < 20; ++$guard) {
+            $page = $this->feed(SubjectType::Company, $acme, null, TimelineWindow::after($cursor, 2));
+            $seen += count($page->items);
+            $cursor = $page->next;
+        }
+        self::assertSame(3, $seen, 'every visible activity is reachable through "Show older"');
+    }
+
+    public function testAMeetingEditKeepsTheAttendeesTheEditorCannotSee(): void
+    {
+        $this->boot();
+        $this->admin();
+        $acme                  = $this->company('Acme');
+        $seen                  = $this->contact('Seen', 'Person');
+        $private               = $this->contact('Private', 'Person');
+        $at                    = new DateTimeImmutable('2026-11-20 10:00', new DateTimeZone('UTC'));
+        $meeting               = $this->engagements()->log(SubjectType::Company, $acme, new EngagementInput(ActivityKind::Meeting, $at, 'Review', endsAt: $at->modify('+1 hour'), timezone: 'UTC', attendees: [MeetingAttendee::contact(new RecordId($seen)), MeetingAttendee::contact(new RecordId($private))]));
+        $this->ctx()->denied[] = 'view:' . $private;
+        $this->actAs('leo', 'view', 'edit', 'manage');
+        $view = $this->service(ActivityFeedInterface::class)->engagement($meeting);
+        self::assertSame(['Seen Person'], array_map(static fn (AttendeeView $a): string => $a->name, $view->attendees));
+        $this->engagements()->edit($meeting, new EngagementInput(ActivityKind::Meeting, $at, 'Review', endsAt: $at->modify('+1 hour'), timezone: 'UTC', attendees: [MeetingAttendee::contact(new RecordId($seen)), MeetingAttendee::member(new ActorRef('ana'))]), 1);
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_engagement_attendee WHERE contact_id = ?', [$private]), 'kept (ZCR-L2)');
+        self::assertSame(1, $this->int('SELECT COUNT(*) FROM nowo_crm_engagement_attendee WHERE contact_id = ?', [$seen]));
+        self::assertSame(1, $this->int("SELECT COUNT(*) FROM nowo_crm_engagement_attendee WHERE actor_id = 'ana'"));
+    }
+
+    public function testAnonymisationRewritesTheMembersMentionHandles(): void
+    {
+        $this->boot();
+        $this->admin();
+        $ada    = $this->contact();
+        $handle = $this->service(Mentions::class)->handle(new TenantRef('acme'), 'leo');
+        $note   = $this->service(NoteServiceInterface::class)->add(SubjectType::Contact, $ada, 'Ask @' . $handle . ' and @' . $handle . '.');
+        $other  = $this->service(NoteServiceInterface::class)->add(SubjectType::Contact, $ada, 'No mention of @u' . str_repeat('0', 24));
+        $data   = $this->service(CrmActorPersonalDataInterface::class);
+        self::assertSame([$note], $data->exportActor('leo')['tenants']['acme']['note.mention'] ?? null);
+        self::assertGreaterThan(0, $data->anonymiseActor('leo'));
+        self::assertSame('Ask @anonymised and @anonymised.', $this->text('SELECT body FROM nowo_crm_note WHERE id = ?', [$note]));
+        self::assertSame(2, $this->int('SELECT version FROM nowo_crm_note WHERE id = ?', [$note]), 'a form opened before is stale (ZCR-L4)');
+        self::assertSame(1, $this->int('SELECT version FROM nowo_crm_note WHERE id = ?', [$other]));
+        self::assertArrayNotHasKey('note.mention', $data->exportActor('leo')['tenants']['acme'] ?? []);
+    }
+
+    public function testALostSavepointIsRepairedAndReplayed(): void
+    {
+        $this->boot();
+        $this->admin();
+        $ada = $this->contact();
+        $id  = $this->engagements()->log(SubjectType::Contact, $ada, $this->call(title: 'First'));
+        // Once: the write unit replays after the deadlock (found in the chain) on a repaired connection (ZCR-L6).
+        $this->ctx()->races['LostSavepoint'] = 1;
+        $this->engagements()->edit($id, $this->call(title: 'Second'), 1);
+        self::assertSame('Second', $this->text('SELECT title FROM nowo_crm_engagement WHERE id = ?', [$id]));
+        self::assertSame(0, $this->connection()->getTransactionNestingLevel());
+        // Every attempt: the house conflict (409 + Retry-After), nothing written, the next write works.
+        $this->ctx()->races['LostSavepoint'] = 20;
+        try {
+            $this->engagements()->edit($id, $this->call(title: 'Third'), 2);
+            self::fail('no conflict');
+        } catch (ConcurrencyConflict $e) {
+            self::assertFalse($e->committed);
+        }
+        $this->ctx()->races['LostSavepoint'] = 0;
+        self::assertSame(0, $this->connection()->getTransactionNestingLevel());
+        $this->engagements()->edit($id, $this->call(title: 'Fourth'), 2);
+        self::assertSame('Fourth', $this->text('SELECT title FROM nowo_crm_engagement WHERE id = ?', [$id]));
     }
 
     /**

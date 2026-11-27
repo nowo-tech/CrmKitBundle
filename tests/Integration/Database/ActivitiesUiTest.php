@@ -339,6 +339,40 @@ final class ActivitiesUiTest extends CrmTestCase
         self::assertNull(iterator_to_array($source->events(new CalendarViewer('1', 'board', 'acme'), $range))[0]->url);
     }
 
+    public function testTheMentionEndpointsHaveAPerPersonLimitAndFanOutRowsNoButtons(): void
+    {
+        $this->boot(['activities' => ['mentions' => ['rate_limit' => ['limit' => 2, 'interval' => 60]]]]);
+        $this->admin();
+        $ada = $this->contact();
+        self::assertSame(200, $this->httpStatus('GET', '/crm/contacts/' . $ada . '/mentions?q=a'));
+        self::assertSame(200, $this->httpStatus('GET', '/crm/contacts/' . $ada . '/mentions/names?handles='));
+        $this->client->request('GET', '/crm/contacts/' . $ada . '/mentions?q=a');
+        self::assertSame(429, $this->client->getResponse()->getStatusCode());
+        self::assertSame('60', $this->client->getResponse()->headers->get('Retry-After'));
+        self::assertSame(429, $this->httpStatus('GET', '/crm/contacts/' . $ada . '/mentions/names?handles='));
+        $this->actAs('leo', 'view', 'edit');
+        self::assertSame(200, $this->httpStatus('GET', '/crm/contacts/' . $ada . '/mentions?q=a'), 'per person');
+        $this->admin();
+        $this->clock()->modify('+2 minutes');
+        self::assertSame(200, $this->httpStatus('GET', '/crm/contacts/' . $ada . '/mentions?q=a'), 'a new window');
+
+        // An activity of the contact on its company's page: no edit or delete there (ZCR-I7).
+        $acme = $this->company('Acme');
+        $this->records()->affiliate($ada, $acme, null, true);
+        $this->engagements()->log(SubjectType::Contact, $ada, new EngagementInput(ActivityKind::Call, new DateTimeImmutable('2026-11-18 09:00', new DateTimeZone('UTC')), null, null, ActivityDirection::Out));
+        $page = $this->client->request('GET', '/crm/companies/' . $acme);
+        self::assertCount(1, $page->filter('[data-testid="crm-feed-item"]'));
+        self::assertCount(0, $page->filter('[data-testid="crm-activity-edit"]'));
+
+        // The .ics of a request with an odd Host: no URL, a neutral UID host (ZCR-I3).
+        $at      = new DateTimeImmutable('2026-11-20 10:00', new DateTimeZone('UTC'));
+        $meeting = $this->engagements()->log(SubjectType::Contact, $ada, new EngagementInput(ActivityKind::Meeting, $at, 'Demo', endsAt: $at->modify('+1 hour'), timezone: 'UTC'));
+        $this->client->request('GET', '/crm/activities/' . $meeting . '/meeting.ics', [], [], ['HTTP_HOST' => 'odd_host.test']);
+        $ics = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('UID:' . $meeting . '@crm.invalid', $ics);
+        self::assertStringNotContainsString('URL:', $ics);
+    }
+
     private function engagements(): EngagementServiceInterface
     {
         return $this->service(EngagementServiceInterface::class);

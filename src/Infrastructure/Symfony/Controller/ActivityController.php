@@ -14,6 +14,7 @@ use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Exception\InvalidInputException;
 use Nowo\CrmKitBundle\Domain\Exception\NotAvailableException;
+use Nowo\CrmKitBundle\Domain\Exception\RateLimitedException;
 use Nowo\CrmKitBundle\Domain\Read\EngagementView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
 use Nowo\CrmKitBundle\Domain\Service\ActivityFeedInterface;
@@ -189,9 +190,12 @@ final readonly class ActivityController
             if ($meeting->kind !== ActivityKind::Meeting || !$meeting->endsAt instanceof DateTimeImmutable) {
                 throw new NotAvailableException();
             }
+            // The UID and the URL use the same checked host (audit ZCR-I3); an odd Host keeps no URL. Configure
+            // framework.trusted_hosts in production.
             $host   = strtolower($request->getHost());
-            $url    = $request->getSchemeAndHttpHost() . $this->ui->url('nowo_crm_kit_show', ['type' => $meeting->subjectType->segment(), 'id' => $meeting->subjectId]);
-            $invite = new IcsInvite($meeting->id . '@' . (preg_match('/\A[a-z0-9.-]{1,200}\z/D', $host) === 1 ? $host : 'crm.invalid'), $meeting->sequence, 'PUBLISH', $meeting->occurredAt, $meeting->endsAt, $meeting->title ?? '', $meeting->place, $url, $meeting->cancelled, $meeting->updatedAt);
+            $valid  = preg_match('/\A[a-z0-9.-]{1,200}\z/D', $host) === 1;
+            $url    = $valid ? $request->getSchemeAndHttpHost() . $this->ui->url('nowo_crm_kit_show', ['type' => $meeting->subjectType->segment(), 'id' => $meeting->subjectId]) : null;
+            $invite = new IcsInvite($meeting->id . '@' . ($valid ? $host : 'crm.invalid'), $meeting->sequence, 'PUBLISH', $meeting->occurredAt, $meeting->endsAt, $meeting->title ?? '', $meeting->place, $url, $meeting->cancelled, $meeting->updatedAt);
 
             return new Response(IcsWriter::write($invite), Response::HTTP_OK, [
                 'Content-Type'           => 'text/calendar; charset=utf-8',
@@ -211,8 +215,12 @@ final readonly class ActivityController
             $mentions = $this->mentions ?? throw new NotAvailableException();
             $query    = $request->query->get('q');
             $out      = [];
-            foreach ($mentions->candidates(RecordController::type($type), $id, is_string($query) ? $query : '') as $candidate) {
-                $out[] = ['id' => $candidate->handle, 'label' => $candidate->name];
+            try {
+                foreach ($mentions->candidates(RecordController::type($type), $id, is_string($query) ? $query : '') as $candidate) {
+                    $out[] = ['id' => $candidate->handle, 'label' => $candidate->name];
+                }
+            } catch (RateLimitedException $e) {
+                return $this->tooMany($e);
             }
 
             return $this->json($out);
@@ -234,8 +242,12 @@ final readonly class ActivityController
                 }
             }
             $out = [];
-            foreach ($mentions->names(RecordController::type($type), $id, $handles) as $handle => $name) {
-                $out[] = ['handle' => $handle, 'name' => $name];
+            try {
+                foreach ($mentions->names(RecordController::type($type), $id, $handles) as $handle => $name) {
+                    $out[] = ['handle' => $handle, 'name' => $name];
+                }
+            } catch (RateLimitedException $e) {
+                return $this->tooMany($e);
             }
 
             return $this->json($out);
@@ -397,6 +409,18 @@ final readonly class ActivityController
         $subject = (string) $request->query->get('subject', '');
 
         return $type instanceof SubjectType && RecordId::isValid($subject) ? $this->ui->toRecord($type, $subject) : $this->ui->redirect('nowo_crm_kit_home');
+    }
+
+    /**
+     * 429 with `Retry-After` (the mention endpoints' per-person limit).
+     */
+    private function tooMany(RateLimitedException $e): JsonResponse
+    {
+        $response = $this->json([]);
+        $response->setStatusCode(Response::HTTP_TOO_MANY_REQUESTS);
+        $response->headers->set('Retry-After', (string) $e->retryAfter);
+
+        return $response;
     }
 
     /**

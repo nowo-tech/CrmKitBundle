@@ -1113,6 +1113,12 @@ $next = $page->next;   // the cursor of the next page, or null
 - `edit` on the record to log; `manage` too to change or delete someone else's activity. Input errors come back per
   field (`InvalidInputException::$errors`: `occurred_at`, `ends_at`, `timezone`, `title`, `body`, `direction`,
   `outcome`, `duration`, `place`, `attendees`, `kind`).
+- The feed's pages are read past activities the viewer may not view (up to five store pages per page); when they still
+  hide more, the page ends early and "Show older" continues from the last row read, so older visible history is always
+  reachable.
+- Editing a meeting keeps its attendee contacts the editor may not view (the form does not show them).
+- The GDPR export of a contact lists the activities logged on it in full and, for the meetings it attends on other
+  records, only the meeting's title, time, place and record (not their notes).
 - A contact's activity is associated, when it is logged, with the contact's companies and open deals (a company's with
   its open deals); it shows on their feeds too, but only to viewers who may view the contact (the primary record).
 - Timeline entries `call`, `meeting`, `email`, `activity_edited`, `activity_deleted`; audit `crm.activity.logged`,
@@ -1127,9 +1133,13 @@ $next = $page->next;   // the cursor of the next page, or null
 With MilkdownEditor (>= 1.19) installed, the note field of the 360° page is MilkdownEditor's, with
 `suggestions['@']` = `GET <crm>/{companies|contacts}/{id}/mentions?q=` (`[{id: <handle>, label: <name>}]`, at most 10)
 and `user_title_url` = `.../mentions/names?handles=a,b` (`mention_display: name`). Candidates are the tenant's members
-(`CrmActorDirectoryInterface::owners()`) whose name or e-mail contains the query and who may view the record
-(`CrmRecordAudienceInterface`, see CONFIGURATION). A handle is `u` + 24 hexadecimal characters of an HMAC (kernel
-secret, tenant, actor): the note's text never holds an id or an address, and the page shows `@Name`.
+(`CrmActorDirectoryInterface::owners()`) whose name contains the query, or whose e-mail is exactly the query (no part of
+an address is ever matched), and who may view the record (`CrmRecordAudienceInterface`, see CONFIGURATION). Both
+endpoints count against a per-person limit (`activities.mentions.rate_limit`, 429 with `Retry-After` beyond it). A
+handle is `u` + 24 hexadecimal characters of an HMAC (kernel secret, tenant, actor): the note's text never holds an id
+or an address, and the page shows `@Name`. **Rotating `kernel.secret` changes every handle:** mentions written before
+show as the raw `@u…` text and notify nobody again (there is no migration). When a member's account is anonymised
+(`anonymiseActor()`), their handles in note text become `@anonymised`.
 
 When a note is saved, the members newly mentioned in it (not the author, at most `mentions.max_per_note`, re-checked
 inside the write) are announced after the commit (`NoteMentioned`) and handed to `CrmNotifierInterface`. With
@@ -1166,7 +1176,8 @@ the CRM's tenant gets nothing (a board without tenancy gets the CRM tenant's mee
 
 Every meeting has "Add to calendar (.ics)": `GET <crm>/activities/{id}/meeting.ics` (`view` on its record),
 `METHOD:PUBLISH`, UID `<id>@<host>`, a SEQUENCE that moves when its time, place, title or cancellation changes,
-`STATUS:CANCELLED` once cancelled, no notes and no addresses. Invites by e-mail (`METHOD:REQUEST` / `CANCEL`) wait for
+`STATUS:CANCELLED` once cancelled, no notes and no addresses. The UID's host and the `URL` come from the request's
+host when it is a plain host name (`[a-z0-9.-]`), else `crm.invalid` and no `URL`: set `framework.trusted_hosts`. Invites by e-mail (`METHOD:REQUEST` / `CANCEL`) wait for
 MailKit's invite part (MailKit 2.3, follow-up).
 
 ## SearchKit

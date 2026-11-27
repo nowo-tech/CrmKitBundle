@@ -35,8 +35,8 @@ composer update nowo-tech/crm-kit-bundle
 ```
 
 Planned as **0.11.0** (Beacon spec 254, A-1 activities). No BC break in the public PHP API: every new piece is behind
-`activities.enabled` (default `false`). With it off there is no schema change and nothing to do; two things apply to
-every host:
+`activities.enabled` (default `false`). With it off there is no schema change and nothing to do; these apply to every
+host:
 
 - `DoctrineTransactionRunner` rolls a failed unit back to the level it started at and closes the connection when that
   rollback itself fails (a lost savepoint), then rethrows the original failure (REQ-RUNTIME-003).
@@ -46,6 +46,15 @@ every host:
   `PinnedNotesInterface`, `CrmHostActivitySourceInterface`, `CrmNotifierInterface`, `CrmRecordAudienceInterface`);
   `ActivityKind` gains cases (`call`, `meeting`, `email`, `activity_edited`, `activity_deleted`, reserved
   `form_submitted`, `sms`): a host `match` over `ActivityKind` without a default arm needs them.
+
+**No way back to 0.10.x once used.** After activities were logged the timeline holds the kinds `call`, `meeting`,
+`email`, `activity_edited` and `activity_deleted`; 0.10.x cannot read them (`ValueError` on the timeline and record
+pages). Downgrade only before enabling activities, or delete those timeline rows first.
+
+**Do not switch activities off after using them** (audit ZCR-L3). The three tables stay in the database, but with
+`activities.enabled: false` the kit no longer maps them: contact erasure, the trash purge, merges, retention
+(`timeline_years`) and actor anonymisation then skip the stored activities. Once enabled, keep it enabled, or export
+and drop the three tables (`nowo_crm_engagement*`) when you switch it off.
 
 **Activities (opt-in).** With `activities.enabled: true`:
 
@@ -169,7 +178,12 @@ every host:
       (T002), only what the viewer may see.
 - [ ] Manual pages and e2e: log a call / meeting / e-mail, filter the feed, pin a note, mention a colleague, download
       the `.ics`; menus and breadcrumbs unchanged (the card lives on the record page).
-- [ ] REQ-SEC-004 audit of 0.11.0 before the tag (mentions, ICS, GDPR, tenant isolation, races).
+- [ ] Retention: logged activities follow the per-tenant `timeline_years` (deleted by `nowo:crm-kit:purge` like old
+      timeline entries); confirm the period with the product owner.
+- [ ] SearchKit: the group `crm_activities` is sensitive; it runs only while SearchKit's recents are revalidated or off.
+- [ ] Keep `activities.enabled` on once used (see above; switching it off stops GDPR housekeeping on the tables).
+- [ ] Mention endpoints: per-person limit `activities.mentions.rate_limit` (default 60 calls per minute, then 429).
+- [x] REQ-SEC-004 audit of 0.11.0 (ZCR, SHIP after fixes; the fixes are in this release).
 
 ## To 0.10.3
 

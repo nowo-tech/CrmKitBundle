@@ -74,7 +74,7 @@ final class ConfigurationTreeTest extends TestCase
     public function testActivitiesAreOffByDefault(): void
     {
         $activities = $this->process([])['activities'] ?? null;
-        self::assertSame(['enabled' => false, 'call_outcomes' => ['connected', 'left_voicemail', 'no_answer', 'busy', 'wrong_number'], 'max_pinned' => 1, 'host_source' => null, 'audience' => null, 'notifier' => null, 'mentions' => ['enabled' => true, 'max_per_note' => 20], 'notify_kit' => ['recipient_type' => 'user'], 'taskboard_calendar' => true], $activities);
+        self::assertSame(['enabled' => false, 'call_outcomes' => ['connected', 'left_voicemail', 'no_answer', 'busy', 'wrong_number'], 'max_pinned' => 1, 'host_source' => null, 'audience' => null, 'notifier' => null, 'mentions' => ['enabled' => true, 'max_per_note' => 20, 'rate_limit' => ['limit' => 60, 'interval' => 60]], 'notify_kit' => ['recipient_type' => 'user'], 'taskboard_calendar' => true], $activities);
         self::assertSame(['voicemail', 'other_2'], $this->process(['activities' => ['call_outcomes' => ['voicemail', 'other_2']]])['activities']['call_outcomes'] ?? null);
     }
 

@@ -18,9 +18,12 @@ use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
 
 use function array_map;
+use function hash;
 use function in_array;
 use function is_array;
+use function is_numeric;
 use function is_string;
+use function substr;
 
 /**
  * {@see EngagementStoreInterface} on the bundle's entity manager (0.11.0). Every query names the tenant and every
@@ -213,6 +216,30 @@ final readonly class DoctrineEngagementStore implements EngagementStoreInterface
             ->orderBy('e.occurredAt', 'ASC')->addOrderBy('e.id', 'ASC')->setMaxResults($limit)->getQuery()->getResult();
 
         return $this->exact($rows, Engagement::class, $tenant);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function takeMentionCall(TenantRef $tenant, string $actorId, DateTimeImmutable $now, int $limit, int $interval): bool
+    {
+        // One counter pair per person (a hash of the id: the counter key holds 32 characters).
+        $key = substr(hash('sha256', $actorId), 0, 24);
+
+        return (new DoctrineCounterWindow($this->runner))->take($tenant, $now, $limit, $interval, 'mw_' . $key, 'mc_' . $key);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function countBefore(TenantRef $tenant, DateTimeImmutable $before): int
+    {
+        $count = $this->em()->createQueryBuilder()->select('COUNT(e.id)')->from(Engagement::class, 'e')
+            ->where('e.tenantId = :tenant')->andWhere('e.occurredAt < :before')
+            ->setParameter('tenant', $tenant->value)->setParameter('before', $before, UtcDateTimeImmutableType::NAME)
+            ->getQuery()->getSingleScalarResult();
+
+        return is_numeric($count) ? (int) $count : 0;
     }
 
     /**

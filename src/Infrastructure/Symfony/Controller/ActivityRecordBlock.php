@@ -92,7 +92,9 @@ final readonly class ActivityRecordBlock
         foreach ($feed->items as $item) {
             $buttons = [];
             if ($item->engagement instanceof EngagementView) {
-                $buttons = $this->engagementButtons($item->engagement, $edit && $active && ($item->engagement->authorId === $actor || $manage), $token, $back);
+                // Audit ZCR-I7: an activity of another record (fan-out) is changed on its own record's page.
+                $own     = $item->engagement->subjectLabel === null;
+                $buttons = $this->engagementButtons($item->engagement, $own && $edit && $active && ($item->engagement->authorId === $actor || $manage), $token, $back);
             }
             $items[] = ['item' => $item, 'buttons' => $buttons];
         }

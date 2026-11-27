@@ -128,7 +128,7 @@ nowo_crm_kit:
         host_source: null          # a CrmHostActivitySourceInterface service id (host items on the feed); null = none
         audience: null             # a CrmRecordAudienceInterface service id (who may view a record); null = resource_scoping rule
         notifier: null             # a CrmNotifierInterface service id; null = NotifyKit bridge when installed, else none
-        mentions: { enabled: true, max_per_note: 20 }   # @mentions in notes (MilkdownEditor >= 1.19 as the note field)
+        mentions: { enabled: true, max_per_note: 20, rate_limit: { limit: 60, interval: 60 } }   # @mentions in notes (MilkdownEditor >= 1.19); per-person limit of the mention endpoints
         notify_kit: { recipient_type: user }            # NotifyKit's RecipientRef type of the CRM's actor ids
         taskboard_calendar: true   # meetings on TaskBoard's calendar (TaskBoard >= 2.24 installed)
     api:                           # 0.3.0: see API.md
@@ -616,10 +616,15 @@ tabler:users tabler:briefcase tabler:tags tabler:forms tabler:settings tabler:fi
 | `notifier` | `null` | Service id of a `CrmNotifierInterface`; `null` = the NotifyKit bridge when `Nowo\NotifyKitBundle\Contract\NotifierInterface` is a service, else no notifications |
 | `mentions.enabled` | `true` | MilkdownEditor's field (when installed) with the CRM's `@` candidates; notifications of the newly mentioned members |
 | `mentions.max_per_note` | `20` | Most people one save of a note notifies (1–50) |
+| `mentions.rate_limit` | `{limit: 60, interval: 60}` | Calls of the mention endpoints (candidates and names) per person and window (seconds, rounded up to minutes, 60–3600); beyond it 429 with `Retry-After` |
 | `notify_kit.recipient_type` | `user` | `RecipientRef` type of the CRM's actor ids in NotifyKit |
 | `taskboard_calendar` | `true` | Registers the TaskBoard calendar source (`crm-meetings`) when TaskBoard >= 2.24 is installed |
 
 Retention: activities follow the per-tenant `timeline_years` (purged by `nowo:crm-kit:purge`).
+
+**Keep it on once used.** With `activities.enabled: false` the three tables are not mapped, so contact erasure, the
+trash purge, merges, retention and actor anonymisation no longer reach rows stored while it was on. Switch it off only
+after exporting and dropping the tables (UPGRADING "To 0.11.0").
 
 ## Later phases
 

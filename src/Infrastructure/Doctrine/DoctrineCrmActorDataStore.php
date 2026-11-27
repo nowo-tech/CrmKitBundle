@@ -10,6 +10,7 @@ use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
 use LogicException;
+use Nowo\CrmKitBundle\Application\Engagement\Mentions;
 use Nowo\CrmKitBundle\Application\Port\CrmActorDataStoreInterface;
 use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Model\Activity;
@@ -24,6 +25,7 @@ use Nowo\CrmKitBundle\Domain\Model\Import;
 use Nowo\CrmKitBundle\Domain\Model\MergeRecord;
 use Nowo\CrmKitBundle\Domain\Model\Note;
 use Nowo\CrmKitBundle\Domain\Model\RoleAssignment;
+use Nowo\CrmKitBundle\Domain\Value\TenantRef;
 
 use function array_column;
 use function array_map;
@@ -83,7 +85,7 @@ final readonly class DoctrineCrmActorDataStore implements CrmActorDataStoreInter
     /**
      * Wires the collaborators.
      */
-    public function __construct(private DoctrineTransactionRunner $runner)
+    public function __construct(private DoctrineTransactionRunner $runner, private ?Mentions $mentions = null)
     {
     }
 
@@ -92,6 +94,9 @@ final readonly class DoctrineCrmActorDataStore implements CrmActorDataStoreInter
      */
     public function scan(string $kind, string $actorId, ?string $after, int $limit, ?string $replacement = null): array
     {
+        if ($kind === self::MENTION_KIND && $this->mentions instanceof Mentions) {
+            return $this->scanMentions($this->mentions, $actorId, $after, $limit, $replacement);
+        }
         [$class, $column, $key, $versioned, $path] = self::MAP[$kind] ?? throw new LogicException(sprintf('Unknown actor reference kind "%s".', $kind));
         $em                                        = $this->runner->manager();
         $db                                        = $em->getConnection();
@@ -138,6 +143,48 @@ final readonly class DoctrineCrmActorDataStore implements CrmActorDataStoreInter
             $this->replace($db, $table, $column, $key, $versioned, $path, $actorId, $replacement, $found);
         }
         $last = $rows === [] ? null : end($rows)['row_key'];
+
+        return [
+            'rows' => array_map(static fn (array $f): array => ['tenant' => $f['tenant'], 'key' => $f['key']], $found),
+            'next' => count($rows) === $limit && is_string($last) ? $last : null,
+        ];
+    }
+
+    /**
+     * Notes whose text mentions the person (0.11.0, audit ZCR-L4): a keyset page of the notes holding `@u`, kept when
+     * the person's handle of the note's tenant is in the text; with a replacement, the kept notes are locked by primary
+     * key, checked again and rewritten (`@<replacement>`), their version moved.
+     *
+     * @return array{rows: list<array{tenant: string, key: string}>, next: string|null}
+     */
+    private function scanMentions(Mentions $mentions, string $actorId, ?string $after, int $limit, ?string $replacement): array
+    {
+        $em    = $this->runner->manager();
+        $db    = $em->getConnection();
+        $table = $em->getClassMetadata(Note::class)->getTableName();
+        $rows  = $db->fetchAllAssociative(
+            $db->getDatabasePlatform()->modifyLimitQuery('SELECT id, tenant_id, body FROM ' . $table . ' WHERE body LIKE ?' . ($after === null ? '' : ' AND id > ?') . ' ORDER BY id', $limit),
+            $after === null ? ['%@u%'] : ['%@u%', $after],
+        );
+        $found = [];
+        foreach ($rows as $row) {
+            if (is_string($row['id']) && is_string($row['tenant_id']) && is_string($row['body'])) {
+                $handle = $mentions->handle(new TenantRef($row['tenant_id']), $actorId);
+                if (Mentions::replaceHandle($row['body'], $handle, '') !== $row['body']) {
+                    $found[] = ['tenant' => $row['tenant_id'], 'key' => $row['id'], 'handle' => $handle];
+                }
+            }
+        }
+        if ($replacement !== null) {
+            $lock = $db->getDatabasePlatform() instanceof SQLitePlatform ? '' : ' FOR UPDATE';
+            foreach ($found as $note) {
+                $body = $db->fetchOne('SELECT body FROM ' . $table . ' WHERE id = ?' . $lock, [$note['key']]);
+                if (is_string($body)) {
+                    $db->executeStatement('UPDATE ' . $table . ' SET body = ?, version = version + 1 WHERE id = ?', [Mentions::replaceHandle($body, $note['handle'], '@' . $replacement), $note['key']]);
+                }
+            }
+        }
+        $last = $rows === [] ? null : end($rows)['id'];
 
         return [
             'rows' => array_map(static fn (array $f): array => ['tenant' => $f['tenant'], 'key' => $f['key']], $found),

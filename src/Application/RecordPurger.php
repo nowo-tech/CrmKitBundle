@@ -228,8 +228,11 @@ final readonly class RecordPurger
     private function purgeEngagements(TenantRef $tenant, DateTimeImmutable $before, bool $dryRun, PurgeClaim $claim): int
     {
         $engagements = $this->engagements;
-        if (!$engagements instanceof EngagementHousekeeping || $dryRun) {
+        if (!$engagements instanceof EngagementHousekeeping) {
             return 0;
+        }
+        if ($dryRun) {
+            return $this->runner->read(static fn (): int => $engagements->countBefore($tenant, $before));
         }
         $total = 0;
         do {

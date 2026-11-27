@@ -25,6 +25,7 @@ use Nowo\CrmKitBundle\Infrastructure\HubSpot\HttpHubSpotReader;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\ConfiguredCrmApiTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\SecurityUserCrmApiAuthenticator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\CrmKitEvents;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistry;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
@@ -44,6 +45,7 @@ use function in_array;
 use function interface_exists;
 use function is_array;
 use function is_string;
+use function sprintf;
 
 /**
  * Points the port aliases at the host's services and wires the optional infrastructure (contract sections 8 and 10):
@@ -124,6 +126,19 @@ final class CrmPortsPass implements CompilerPassInterface
             $id = $container->getParameter($p . 'activities.' . $key);
             if (is_string($id) && $id !== '') {
                 $container->setAlias($interface, $id);
+            }
+        }
+        $audience = $container->getParameter($p . 'activities.audience');
+        if (!is_string($audience) || $audience === '') {
+            foreach ($container->findTaggedServiceIds('kernel.event_listener') as $id => $tags) {
+                foreach ($tags as $tag) {
+                    if (is_array($tag) && ($tag['event'] ?? null) === CrmKitEvents::RECORD_ACCESS_CHECK) {
+                        // Audit ZCR-L5: the default audience cannot ask the listeners about other people.
+                        $container->log($this, sprintf('nowo_crm_kit: "%s" listens to %s but activities.audience is not set: @mention candidates and recipients follow security.resource_scoping only. Implement CrmRecordAudienceInterface with the same rule.', $id, CrmKitEvents::RECORD_ACCESS_CHECK));
+
+                        break 2;
+                    }
+                }
             }
         }
         $notifier = $container->getParameter($p . 'activities.notifier');

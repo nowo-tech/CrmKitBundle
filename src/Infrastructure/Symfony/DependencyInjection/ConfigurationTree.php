@@ -364,6 +364,10 @@ final class ConfigurationTree
         $activities->arrayNode('mentions')->addDefaultsIfNotSet()->children()
             ->booleanNode('enabled')->defaultTrue()->info('@mentions in notes: MilkdownEditor (>= 1.19) as the note field with the CRM\'s candidates, and notifications to the mentioned members.')->end()
             ->integerNode('max_per_note')->defaultValue(20)->min(1)->max(50)->info('Most members one save of a note notifies.')->end()
+            ->arrayNode('rate_limit')->addDefaultsIfNotSet()->info('Calls of the mention endpoints (candidates and names) per person; beyond it 429 with Retry-After.')->children()
+                ->integerNode('limit')->defaultValue(60)->min(1)->max(1000)->end()
+                ->integerNode('interval')->defaultValue(60)->min(60)->max(3600)->info('Seconds (rounded up to minutes).')->end()
+            ->end()->end()
         ->end()->end();
         $activities->arrayNode('notify_kit')->addDefaultsIfNotSet()->children()
             ->scalarNode('recipient_type')->defaultValue('user')->info('NotifyKit\'s RecipientRef type of the CRM\'s actor ids.')

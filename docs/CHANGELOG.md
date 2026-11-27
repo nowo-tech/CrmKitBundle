@@ -68,15 +68,28 @@ service is added (the runner's lost-savepoint hardening and one more purge count
 - **GDPR**: a contact's export lists its activities and the meetings it attends; erasure deletes its activities and
   its attendance; a purged record takes its activities along; activities older than `timeline_years` are deleted by
   `nowo:crm-kit:purge`; `anonymiseActor()` covers activity authors and member attendees.
+- Audit ZCR fixes before the tag: the feed reads past hidden activities (no early end), the mention candidates match
+  names (or an exact e-mail address) only, a per-person limit on the mention endpoints (429), a meeting edit keeps the
+  attendee contacts the editor cannot see, anonymisation rewrites the member's mention handles, a container warning when
+  `record_access_check` listeners exist without `activities.audience`, a narrower export of meetings on other records.
 - Configuration `activities.*` (CONFIGURATION.md), translations in the seven locales, the TaskBoard calendar, NotifyKit
   and MilkdownEditor test stand-ins.
 
+### Fixed
+
+- Versions up to 0.10.3: after a MySQL / MariaDB deadlock inside the ORM flush's savepoint, the rollback could fail
+  with 1305 (lost savepoint), take the place of the deadlock and leave the connection's nesting level above 0, so on a
+  kept-alive worker later CRM writes failed with "writes in transactions of its own" until a restart. The runner now
+  repairs the connection (see "Changed"); the deadlock stays in the exception chain (replay, else 409).
+
 ### Changed
 
-- REQ-RUNTIME-003 lost-savepoint pattern in `DoctrineTransactionRunner`: a failed unit rolls back to the nesting
-  level it started at; when that rollback fails (a lost savepoint, a broken link) the connection is closed and the
-  original failure is rethrown. The private entity manager is closed on a failure as before.
-- `RecordPurger::purge()` returns an `engagements` count (0 while activities are off); the purge command prints
+- REQ-RUNTIME-003 lost-savepoint pattern in `DoctrineTransactionRunner`: a failed unit is repaired by
+  transaction-doctrine's `ConnectionRepairer` (rolls back to the level the unit started at; closes the connection, with
+  a warning, when that rollback fails; clears a rollback-only flag) and the original failure is rethrown. The private
+  entity manager is closed on a failure as before.
+- The HubSpot check limits and the mention endpoints share one fixed-window counter (`DoctrineCounterWindow`).
+- `RecordPurger::purge()` returns an `engagements` count (also in a dry run) (0 while activities are off); the purge command prints
   "logged activities" only when some were deleted.
 
 ### Documentation

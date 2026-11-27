@@ -90,6 +90,15 @@ interface EngagementStoreInterface
     public function meetingsOf(TenantRef $tenant, string $actorId, DateTimeImmutable $from, DateTimeImmutable $to, int $limit): array;
 
     /**
+     * Counts one call of a person to the mention endpoints in a fixed window (run inside a write unit); false once
+     * `$limit` calls were counted in it.
+     */
+    public function takeMentionCall(TenantRef $tenant, string $actorId, DateTimeImmutable $now, int $limit, int $interval): bool;
+
+    /** How many activities of the tenant happened before the time. */
+    public function countBefore(TenantRef $tenant, DateTimeImmutable $before): int;
+
+    /**
      * Deletes up to `$limit` activities that happened before the time (with their subject and attendee rows); how many.
      */
     public function deleteBefore(TenantRef $tenant, DateTimeImmutable $before, int $limit): int;

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Application\Engagement;
 
 use Nowo\CrmKitBundle\Application\CrmContext;
+use Nowo\CrmKitBundle\Application\Engagement\Port\EngagementStoreInterface;
 use Nowo\CrmKitBundle\Application\WriteSupport;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Exception\RateLimitedException;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmRecordAudienceInterface;
@@ -29,6 +31,8 @@ use function is_string;
 use function mb_strtolower;
 use function mb_substr;
 use function preg_match_all;
+use function preg_quote;
+use function preg_replace;
 use function preg_replace_callback;
 use function str_contains;
 use function substr;
@@ -66,23 +70,29 @@ final readonly class Mentions implements MentionDirectoryInterface
         private CrmRecordAudienceInterface $audience,
         private string $secret,
         private int $maxPerNote = 20,
+        private ?EngagementStoreInterface $calls = null,
+        private int $rateLimit = 60,
+        private int $rateInterval = 60,
     ) {
     }
 
     /**
-     * Members who may view the record and match the query.
+     * Members who may view the record whose name contains the query, or whose e-mail is exactly the query (audit
+     * ZCR-L1: no substring of an address is ever matched, so the endpoint tells nothing about addresses).
+     *
+     * @throws RateLimitedException beyond `activities.mentions.rate_limit` calls of the person
      */
     public function candidates(SubjectType $type, string $id, string $query): array
     {
         $context = $this->support->access->base();
         $text    = mb_strtolower(trim(mb_substr($query, 0, self::MAX_QUERY)));
+        $this->limit($context);
 
         return $this->support->read(function () use ($context, $type, $id, $text): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $record  = $this->support->load($context, $type, $id, CrmPermission::Edit);
             $matches = [];
             foreach ($this->members($context->tenant) as $profile) {
-                $haystack = mb_strtolower($profile->name . "\n" . ($profile->email ?? ''));
-                if ($text === '' || str_contains($haystack, $text)) {
+                if ($text === '' || str_contains(mb_strtolower($profile->name), $text) || ($profile->email !== null && mb_strtolower(trim($profile->email)) === $text)) {
                     $matches[$profile->ref->value] = $profile;
                 }
             }
@@ -105,6 +115,7 @@ final readonly class Mentions implements MentionDirectoryInterface
     public function names(SubjectType $type, string $id, array $handles): array
     {
         $context = $this->support->access->base();
+        $this->limit($context);
 
         return $this->support->read(function () use ($context, $type, $id, $handles): array { // @igor-ignore - the runner calls this closure at once and keeps nothing
             $this->support->load($context, $type, $id, CrmPermission::View, anyStatus: true);
@@ -144,6 +155,14 @@ final readonly class Mentions implements MentionDirectoryInterface
         }
 
         return $out;
+    }
+
+    /**
+     * A text with every `@<handle>` of one handle replaced by `$with` (audit ZCR-L4: an anonymised member's mentions).
+     */
+    public static function replaceHandle(string $text, string $handle, string $with): string
+    {
+        return (string) preg_replace('/(?<![A-Za-z0-9_.@-])@' . preg_quote($handle, '/') . '(?![A-Za-z0-9_])/', $with, $text);
     }
 
     /**
@@ -208,6 +227,19 @@ final readonly class Mentions implements MentionDirectoryInterface
         }
 
         return $out;
+    }
+
+    /**
+     * Counts one call of the person (ZCR, owner 2026-11-27: a per-person limit on the mention endpoints).
+     *
+     * @throws RateLimitedException
+     */
+    private function limit(CrmContext $context): void
+    {
+        $calls = $this->calls;
+        if ($calls instanceof EngagementStoreInterface && !$this->support->write(fn (): bool => $calls->takeMentionCall($context->tenant, $context->actor->value, $context->now, $this->rateLimit, $this->rateInterval))) {
+            throw new RateLimitedException($this->rateInterval);
+        }
     }
 
     /**

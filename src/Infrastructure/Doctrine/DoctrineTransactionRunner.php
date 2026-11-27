@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Infrastructure\Doctrine;
 
-use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
@@ -13,6 +12,7 @@ use LogicException;
 use Nowo\CrmKitBundle\Application\Shared\DuplicateRowException;
 use Nowo\CrmKitBundle\Application\Shared\StaleRowException;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
+use Nowo\TransactionDoctrine\ConnectionRepairer;
 use Nowo\TransactionDoctrine\WriteUnit\WriteUnitInterface;
 use Throwable;
 
@@ -31,7 +31,8 @@ use function str_starts_with;
  *   (Doctrine's `wrapInTransaction`) and it is reset through the registry before the next unit (worker mode: no
  *   managed entity and no broken manager survive a call).
  *
- * **(0.11.0)** Both managers share one transaction path with the lost-savepoint pattern ({@see self::rollBackTo()}).
+ * **(0.11.0)** Both managers share one transaction path with the lost-savepoint pattern (transaction-doctrine's
+ * {@see ConnectionRepairer}).
  *
  * Never flushes the host's entity manager (rule 6): with `entity_manager: null` it is the default one, and the
  * runner opens, flushes and commits its transaction itself; on a failure it rolls back and forgets only the
@@ -54,6 +55,7 @@ final readonly class DoctrineTransactionRunner implements TransactionRunnerInter
         private ManagerRegistry $registry,
         private WriteUnitInterface $writeUnit,
         private ?string $managerName = null,
+        private ConnectionRepairer $repairer = new ConnectionRepairer(),
     ) {
     }
 
@@ -93,7 +95,7 @@ final readonly class DoctrineTransactionRunner implements TransactionRunnerInter
      * started at (REQ-RUNTIME-003, the lost-savepoint pattern): a rollback that fails itself (a MySQL / MariaDB deadlock
      * inside a nested flush drops the savepoints, so `ROLLBACK TO SAVEPOINT` fails with 1305; a broken link) closes the
      * connection, so the worker's next unit never inherits a half-open transaction, and the original failure is
-     * rethrown (never the rollback's). The private entity manager is closed on a failure (Doctrine's
+     * rethrown (never the rollback's). The repair is transaction-doctrine's {@see ConnectionRepairer}. The private entity manager is closed on a failure (Doctrine's
      * `wrapInTransaction` did the same; it is reset before the next unit); the host's shared one stays open.
      *
      * @param callable(): mixed $work
@@ -113,24 +115,11 @@ final readonly class DoctrineTransactionRunner implements TransactionRunnerInter
             if (!$shared) {
                 $manager->close();
             }
-            self::rollBackTo($connection, $level);
+            // transaction-doctrine's repairer: rolls back to the entry level, closes the connection when a rollback fails
+            // (a lost savepoint; logged as a warning), clears a rollback-only flag across the close.
+            $this->repairer->afterFailure($connection, $level);
 
             throw $e;
-        }
-    }
-
-    /**
-     * Rolls back to `$level`; when a rollback fails, closes the connection (its failure is dropped: the caller rethrows
-     * the original one).
-     */
-    public static function rollBackTo(Connection $connection, int $level): void
-    {
-        try {
-            while ($connection->isTransactionActive() && $connection->getTransactionNestingLevel() > $level) {
-                $connection->rollBack();
-            }
-        } catch (Throwable) {
-            $connection->close();
         }
     }
 

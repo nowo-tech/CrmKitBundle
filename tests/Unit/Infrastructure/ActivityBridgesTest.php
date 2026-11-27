@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Tests\Unit\Infrastructure;
 
-use ArrayObject;
-use Doctrine\DBAL\Connection;
 use Nowo\CrmKitBundle\Bridge\NotifyKit\CrmNotifyKitTypes;
 use Nowo\CrmKitBundle\Bridge\NotifyKit\NotifyKitCrmNotifier;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
@@ -13,13 +11,11 @@ use Nowo\CrmKitBundle\Domain\Value\ActorRef;
 use Nowo\CrmKitBundle\Domain\Value\CrmNotification;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 use Nowo\CrmKitBundle\Domain\Value\TenantRef;
-use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
 use Nowo\NotifyKitBundle\Contract\NotificationRequest;
 use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\NotifyKitBundle\Contract\NotifyResult;
 use Nowo\NotifyKitBundle\Contract\TypeDefinition;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -27,7 +23,7 @@ use function is_string;
 use function iterator_to_array;
 
 /**
- * 0.11.0: the NotifyKit bridge, its types and the runner's rollback to the entry level (the lost-savepoint pattern).
+ * 0.11.0: the NotifyKit bridge and its types (the runner's lost-savepoint repair is a Database test).
  */
 final class ActivityBridgesTest extends TestCase
 {
@@ -71,31 +67,5 @@ final class ActivityBridgesTest extends TestCase
         self::assertInstanceOf(TypeDefinition::class, $list[0]);
         self::assertSame(['crm.mention', 'crm', 'NowoCrmKitBundle', null], [$list[0]->key, $list[0]->category, $list[0]->titleDomain, $list[0]->permission]);
         self::assertSame('crm', iterator_to_array($types->categories())[0]->key);
-    }
-
-    public function testRollBackToTheEntryLevel(): void
-    {
-        $connection = $this->createMock(Connection::class);
-        $level      = new ArrayObject(['level' => 2]);
-        $connection->method('isTransactionActive')->willReturn(true);
-        $connection->method('getTransactionNestingLevel')->willReturnCallback(static fn (): int => (int) $level['level']);
-        $connection->expects(self::exactly(2))->method('rollBack')->willReturnCallback(static function () use ($level): void {
-            $level['level'] = (int) $level['level'] - 1;
-        });
-        $connection->expects(self::never())->method('close');
-        DoctrineTransactionRunner::rollBackTo($connection, 0);
-
-        // A lost savepoint: the rollback fails, the connection is closed and the failure dropped.
-        $lost = $this->createMock(Connection::class);
-        $lost->method('isTransactionActive')->willReturn(true);
-        $lost->method('getTransactionNestingLevel')->willReturn(2);
-        $lost->method('rollBack')->willThrowException(new RuntimeException('SAVEPOINT does not exist'));
-        $lost->expects(self::once())->method('close');
-        DoctrineTransactionRunner::rollBackTo($lost, 0);
-
-        $idle = $this->createMock(Connection::class);
-        $idle->method('isTransactionActive')->willReturn(false);
-        $idle->expects(self::never())->method('rollBack');
-        DoctrineTransactionRunner::rollBackTo($idle, 0);
     }
 }

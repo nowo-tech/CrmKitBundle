@@ -215,6 +215,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\IdentifierActorResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
+use Nowo\TransactionDoctrine\ConnectionRepairer;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseFormatterInterface;
 use Nowo\UiKitBundle\Dialog\RemoteDialogResponder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -317,7 +318,9 @@ final class ServiceDefinitions
         }
 
         // Persistence.
-        $s->set(DoctrineTransactionRunner::class)->args([service('doctrine'), service($p . 'write_unit'), param($p . 'doctrine.entity_manager')])->public();
+        // 0.11.0: transaction-doctrine's repairer (logs a closed connection as a warning) after a failed unit.
+        $s->set($p . 'connection_repairer', ConnectionRepairer::class)->args([null, service('logger')]);
+        $s->set(DoctrineTransactionRunner::class)->args([service('doctrine'), service($p . 'write_unit'), param($p . 'doctrine.entity_manager'), service($p . 'connection_repairer')])->public();
         $s->alias(TransactionRunnerInterface::class, DoctrineTransactionRunner::class);
         $s->set(DoctrineCrmStore::class)->args([service(DoctrineTransactionRunner::class)]);
         $s->alias(CrmStoreInterface::class, DoctrineCrmStore::class);
@@ -393,9 +396,9 @@ final class ServiceDefinitions
         $s->set(CrmExporter::class)->args([service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class)]);
         $s->alias(CrmExporterInterface::class, CrmExporter::class)->public();
         // System API (0.2.1): a host person's references across tenants.
-        $s->set(DoctrineCrmActorDataStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->set(DoctrineCrmActorDataStore::class)->args([service(DoctrineTransactionRunner::class), $mentions ? service(Mentions::class) : null]);
         $s->alias(CrmActorDataStoreInterface::class, DoctrineCrmActorDataStore::class);
-        $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $activities ? [...CrmActorDataStoreInterface::KINDS, ...CrmActorDataStoreInterface::ACTIVITY_KINDS] : CrmActorDataStoreInterface::KINDS]);
+        $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $activities ? [...CrmActorDataStoreInterface::KINDS, ...CrmActorDataStoreInterface::ACTIVITY_KINDS, ...($mentions ? [CrmActorDataStoreInterface::MENTION_KIND] : [])] : CrmActorDataStoreInterface::KINDS]);
         $s->alias(CrmActorPersonalDataInterface::class, ActorPersonalData::class)->public();
         $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping, $refs, $keeping]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
@@ -585,7 +588,7 @@ final class ServiceDefinitions
         $s->set(EngagementService::class)->args([service(WriteSupport::class), service(EngagementStoreInterface::class), service(CrmActorDirectoryInterface::class), param($p . 'activities.call_outcomes'), $pipeline ? service(PipelineStoreInterface::class) : null]);
         $s->alias(EngagementServiceInterface::class, EngagementService::class)->public();
         if ($mentions) {
-            $s->set(Mentions::class)->args([service(WriteSupport::class), service(CrmActorDirectoryInterface::class), service(CrmRecordAudienceInterface::class), param('kernel.secret'), param($p . 'activities.mentions.max_per_note')]);
+            $s->set(Mentions::class)->args([service(WriteSupport::class), service(CrmActorDirectoryInterface::class), service(CrmRecordAudienceInterface::class), param('kernel.secret'), param($p . 'activities.mentions.max_per_note'), service(EngagementStoreInterface::class), param($p . 'activities.mentions.rate_limit.limit'), param($p . 'activities.mentions.rate_limit.interval')]);
             $s->alias(MentionDirectoryInterface::class, Mentions::class)->public();
             $s->set(MentionNotifier::class)->args([service(CrmNotifierInterface::class), service('logger')->nullOnInvalid()])
                 ->tag('kernel.event_listener', ['event' => NoteMentioned::class, 'method' => '__invoke']);

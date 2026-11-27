@@ -13,6 +13,7 @@ use Nowo\CrmKitBundle\Domain\Model\Affiliation;
 use Nowo\CrmKitBundle\Domain\Model\Contact;
 use Nowo\CrmKitBundle\Domain\Model\CrmRecord;
 use Nowo\CrmKitBundle\Domain\Model\CrmSettings;
+use Nowo\CrmKitBundle\Domain\Model\Engagement\Engagement;
 use Nowo\CrmKitBundle\Domain\Model\FieldDefinition;
 use Nowo\CrmKitBundle\Domain\Model\HostLink;
 use Nowo\CrmKitBundle\Domain\Model\HubSpot\ExternalRef;
@@ -93,6 +94,14 @@ final class RaceInjector
     public function preUpdate(LifecycleEventArgs $args): void
     {
         $object = $args->getObject();
+        if ($object instanceof Engagement && ($this->context->races['LostSavepoint'] ?? 0) > 0) {
+            // 0.11.0 (audit ZCR-L6): a deadlock inside the ORM flush's savepoint, as MySQL / MariaDB report it: the
+            // server already ended the transaction, so ROLLBACK TO SAVEPOINT fails (1305) and replaces the deadlock.
+            --$this->context->races['LostSavepoint'];
+            $args->getObjectManager()->getConnection()->executeStatement('ROLLBACK');
+
+            throw new DeadlockException(new class('Deadlock found when trying to get lock.') extends AbstractException {}, null);
+        }
         if ($object instanceof Tag && ($this->context->races['TagRename'] ?? 0) > 0) {
             --$this->context->races['TagRename'];
             $this->insertTwin($args->getObjectManager(), $object);

@@ -116,7 +116,7 @@ final readonly class EngagementHousekeeping
 
         return [
             'activities'        => array_map($this->row(...), $this->store->ofPrimary($tenant, SubjectType::Contact, $contactId)),
-            'meetings_attended' => array_values(array_map($this->row(...), $this->store->engagements($tenant, array_values($attended)))),
+            'meetings_attended' => array_values(array_map(fn (Engagement $e): array => $this->row($e, false), $this->store->engagements($tenant, array_values($attended)))),
         ];
     }
 
@@ -126,6 +126,14 @@ final readonly class EngagementHousekeeping
     public function purgeBefore(TenantRef $tenant, DateTimeImmutable $before): int
     {
         return $this->store->deleteBefore($tenant, $before, self::BATCH);
+    }
+
+    /**
+     * How many activities happened before the time (the purge's dry run).
+     */
+    public function countBefore(TenantRef $tenant, DateTimeImmutable $before): int
+    {
+        return $this->store->countBefore($tenant, $before);
     }
 
     /**
@@ -159,9 +167,10 @@ final readonly class EngagementHousekeeping
      *
      * @return array<string, mixed>
      */
-    private function row(Engagement $e): array
+    private function row(Engagement $e, bool $content = true): array
     {
-        return [
+        // Audit ZCR-I6: of a meeting logged on another record (`$content` false) only what concerns the person.
+        $row = [
             'id'          => $e->getId(),
             'kind'        => $e->getKind()->value,
             'record'      => $e->getSubjectType()->value . ':' . $e->getSubjectId(),
@@ -177,5 +186,10 @@ final readonly class EngagementHousekeeping
             'cancelled'   => $e->isCancelled(),
             'created_at'  => $e->getCreatedAt()->format(DATE_ATOM),
         ];
+        if (!$content) {
+            unset($row['body'], $row['direction'], $row['outcome'], $row['duration']);
+        }
+
+        return $row;
     }
 }

@@ -31,6 +31,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as **0.12.1** (patch, follow-ups of audit ZDE-v). No BC break, no schema change.
+
+### Fixed
+
+- HubSpot activities import (ZDE-v-1, Q-H6): the erased-person check looks up every contact id HubSpot gives inline
+  with an item, not only the first 20 used as records, so an item associated with more than 20 contacts whose erased
+  person comes later is skipped too (`error.record_erased`). `HubSpotEngagement::$allContacts` (read model) holds them.
+
+### Documentation
+
+- SECURITY: erasures tombstone HubSpot references only while `import.hubspot.enabled` is on (the reference table is
+  mapped only then); what to do when the import was switched off (ZDE-v-2).
+
 ## [0.12.0] - 2026-11-27
 
 Planned as **0.12.0** (Beacon spec 254 T004, FR-100 block A; ships before A-2 templates, which waits for MailKit stored templates and moves to 0.13.0). No BC

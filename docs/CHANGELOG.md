@@ -30,6 +30,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Tests only: `ApiModelTest::testSealedCursors` sealed the value `Ada` and asserted that the random base64 cursor
+  does not contain it, which failed now and then by chance; it now seals a long unique marker.
+
 ## [0.11.0] - 2026-11-27
 
 Planned as **0.11.0** (Beacon spec 254, block A-1, tasks T001 and T002; Beacon priority moves it before H2). No BC

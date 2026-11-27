@@ -82,6 +82,13 @@ class Note
         $this->updatedAt = $now;
     }
 
+    /** Pins or unpins it (0.11.0). */
+    public function pin(bool $pinned, DateTimeImmutable $now): void
+    {
+        $this->pinned    = $pinned;
+        $this->updatedAt = $now;
+    }
+
     /** Points it at another record (merge). */
     public function moveTo(string $subjectId): void
     {

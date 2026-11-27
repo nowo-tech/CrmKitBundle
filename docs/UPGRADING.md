@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.11.0](#to-0110)
 - [To 0.10.3](#to-0103)
 - [To 0.10.2](#to-0102)
 - [To 0.10.1](#to-0101)
@@ -24,6 +25,165 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.11.0
+
+From **0.10.3**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
+
+Planned as **0.11.0** (Beacon spec 254, A-1 activities). No BC break in the public PHP API: every new piece is behind
+`activities.enabled` (default `false`). With it off there is no schema change and nothing to do; these apply to every
+host:
+
+- `DoctrineTransactionRunner` rolls a failed unit back to the level it started at and closes the connection when that
+  rollback itself fails (a lost savepoint), then rethrows the original failure (REQ-RUNTIME-003).
+- `RecordPurger::purge()` returns one more count, `engagements` (0 while activities are off); `nowo:crm-kit:purge`
+  prints ", logged activities: N" only when it deleted some.
+- New interfaces only (`EngagementServiceInterface`, `ActivityFeedInterface`, `MentionDirectoryInterface`,
+  `PinnedNotesInterface`, `CrmHostActivitySourceInterface`, `CrmNotifierInterface`, `CrmRecordAudienceInterface`);
+  `ActivityKind` gains cases (`call`, `meeting`, `email`, `activity_edited`, `activity_deleted`, reserved
+  `form_submitted`, `sms`): a host `match` over `ActivityKind` without a default arm needs them.
+
+**No way back to 0.10.x once used.** After activities were logged the timeline holds the kinds `call`, `meeting`,
+`email`, `activity_edited` and `activity_deleted`; 0.10.x cannot read them (`ValueError` on the timeline and record
+pages). Downgrade only before enabling activities, or delete those timeline rows first.
+
+**Do not switch activities off after using them** (audit ZCR-L3). The three tables stay in the database, but with
+`activities.enabled: false` the kit no longer maps them: contact erasure, the trash purge, merges, retention
+(`timeline_years`) and actor anonymisation then skip the stored activities. Once enabled, keep it enabled, or export
+and drop the three tables (`nowo_crm_engagement*`) when you switch it off.
+
+**Activities (opt-in).** With `activities.enabled: true`:
+
+1. **Schema.** Three tables (mapping group `NowoCrmKitBundleActivities`; the binary collations come from the kit's
+   listener). Generate a migration with `doctrine:migrations:diff` on the bundle's entity manager, or apply (default
+   prefix `nowo_`):
+
+   ```sql
+   -- MySQL 8.4
+   CREATE TABLE nowo_crm_engagement (tenant_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_0900_bin`, kind VARCHAR(24) NOT NULL, subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36)
+       CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, occurred_at DATETIME NOT NULL, ends_at DATETIME
+       DEFAULT NULL, timezone VARCHAR(64) DEFAULT NULL, title VARCHAR(200) DEFAULT NULL, body LONGTEXT DEFAULT NULL,
+       direction VARCHAR(8) DEFAULT NULL, outcome VARCHAR(32) DEFAULT NULL, duration_minutes INT DEFAULT NULL, place
+       VARCHAR(200) DEFAULT NULL, cancelled TINYINT NOT NULL, ics_sequence INT NOT NULL, author_id VARCHAR(128)
+       CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, version INT DEFAULT 1 NOT NULL, created_at
+       DATETIME NOT NULL, updated_at DATETIME(6) NOT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_0900_bin`, INDEX nowo_crm_engagement_primary (tenant_id, subject_type, subject_id), INDEX
+       nowo_crm_engagement_time (tenant_id, occurred_at), INDEX nowo_crm_engagement_author (tenant_id, author_id,
+       occurred_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
+   CREATE TABLE nowo_crm_engagement_subject (tenant_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_0900_bin`, engagement_id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
+       subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_0900_bin`, is_primary TINYINT NOT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_0900_bin`, INDEX nowo_crm_engagement_subject_record (tenant_id, subject_type, subject_id), UNIQUE INDEX
+       nowo_crm_engagement_subject_unique (engagement_id, subject_type, subject_id), PRIMARY KEY (id)) DEFAULT
+       CHARACTER SET utf8mb4;
+   CREATE TABLE nowo_crm_engagement_attendee (tenant_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_0900_bin`, engagement_id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`,
+       actor_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, contact_id VARCHAR(36)
+       CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_0900_bin`, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL
+       COLLATE `utf8mb4_0900_bin`, INDEX nowo_crm_engagement_attendee_meeting (tenant_id, engagement_id), INDEX
+       nowo_crm_engagement_attendee_actor (tenant_id, actor_id), INDEX nowo_crm_engagement_attendee_contact (tenant_id,
+       contact_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
+   -- MariaDB 11.4
+   CREATE TABLE nowo_crm_engagement (tenant_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_nopad_bin`, kind VARCHAR(24) NOT NULL, subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36)
+       CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`, occurred_at DATETIME NOT NULL, ends_at DATETIME
+       DEFAULT NULL, timezone VARCHAR(64) DEFAULT NULL, title VARCHAR(200) DEFAULT NULL, body LONGTEXT DEFAULT NULL,
+       direction VARCHAR(8) DEFAULT NULL, outcome VARCHAR(32) DEFAULT NULL, duration_minutes INT DEFAULT NULL, place
+       VARCHAR(200) DEFAULT NULL, cancelled TINYINT NOT NULL, ics_sequence INT NOT NULL, author_id VARCHAR(128)
+       CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, version INT DEFAULT 1 NOT NULL, created_at
+       DATETIME NOT NULL, updated_at DATETIME(6) NOT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_nopad_bin`, INDEX nowo_crm_engagement_primary (tenant_id, subject_type, subject_id), INDEX
+       nowo_crm_engagement_time (tenant_id, occurred_at), INDEX nowo_crm_engagement_author (tenant_id, author_id,
+       occurred_at), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
+   CREATE TABLE nowo_crm_engagement_subject (tenant_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_nopad_bin`, engagement_id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`,
+       subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_nopad_bin`, is_primary TINYINT NOT NULL, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_nopad_bin`, INDEX nowo_crm_engagement_subject_record (tenant_id, subject_type, subject_id), UNIQUE
+       INDEX nowo_crm_engagement_subject_unique (engagement_id, subject_type, subject_id), PRIMARY KEY (id)) DEFAULT
+       CHARACTER SET utf8mb4;
+   CREATE TABLE nowo_crm_engagement_attendee (tenant_id VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE
+       `utf8mb4_nopad_bin`, engagement_id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_nopad_bin`,
+       actor_id VARCHAR(128) CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, contact_id VARCHAR(36)
+       CHARACTER SET utf8mb4 DEFAULT NULL COLLATE `utf8mb4_nopad_bin`, id VARCHAR(36) CHARACTER SET utf8mb4 NOT NULL
+       COLLATE `utf8mb4_nopad_bin`, INDEX nowo_crm_engagement_attendee_meeting (tenant_id, engagement_id), INDEX
+       nowo_crm_engagement_attendee_actor (tenant_id, actor_id), INDEX nowo_crm_engagement_attendee_contact (tenant_id,
+       contact_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4;
+   -- PostgreSQL 16
+   CREATE TABLE nowo_crm_engagement (tenant_id VARCHAR(128) NOT NULL, kind VARCHAR(24) NOT NULL, subject_type
+       VARCHAR(16) NOT NULL, subject_id VARCHAR(36) NOT NULL, occurred_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+       ends_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL, timezone VARCHAR(64) DEFAULT NULL, title VARCHAR(200)
+       DEFAULT NULL, body TEXT DEFAULT NULL, direction VARCHAR(8) DEFAULT NULL, outcome VARCHAR(32) DEFAULT NULL,
+       duration_minutes INT DEFAULT NULL, place VARCHAR(200) DEFAULT NULL, cancelled BOOLEAN NOT NULL, ics_sequence INT
+       NOT NULL, author_id VARCHAR(128) DEFAULT NULL, version INT DEFAULT 1 NOT NULL, created_at TIMESTAMP(0) WITHOUT
+       TIME ZONE NOT NULL, updated_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL, id VARCHAR(36) NOT NULL, PRIMARY KEY
+       (id));
+   CREATE INDEX nowo_crm_engagement_primary ON nowo_crm_engagement (tenant_id, subject_type, subject_id);
+   CREATE INDEX nowo_crm_engagement_time ON nowo_crm_engagement (tenant_id, occurred_at);
+   CREATE INDEX nowo_crm_engagement_author ON nowo_crm_engagement (tenant_id, author_id, occurred_at);
+   CREATE TABLE nowo_crm_engagement_subject (tenant_id VARCHAR(128) NOT NULL, engagement_id VARCHAR(36) NOT NULL,
+       subject_type VARCHAR(16) NOT NULL, subject_id VARCHAR(36) NOT NULL, is_primary BOOLEAN NOT NULL, id VARCHAR(36)
+       NOT NULL, PRIMARY KEY (id));
+   CREATE INDEX nowo_crm_engagement_subject_record ON nowo_crm_engagement_subject (tenant_id, subject_type,
+       subject_id);
+   CREATE UNIQUE INDEX nowo_crm_engagement_subject_unique ON nowo_crm_engagement_subject (engagement_id,
+       subject_type, subject_id);
+   CREATE TABLE nowo_crm_engagement_attendee (tenant_id VARCHAR(128) NOT NULL, engagement_id VARCHAR(36) NOT NULL,
+       actor_id VARCHAR(128) DEFAULT NULL, contact_id VARCHAR(36) DEFAULT NULL, id VARCHAR(36) NOT NULL, PRIMARY KEY
+       (id));
+   CREATE INDEX nowo_crm_engagement_attendee_meeting ON nowo_crm_engagement_attendee (tenant_id, engagement_id);
+   CREATE INDEX nowo_crm_engagement_attendee_actor ON nowo_crm_engagement_attendee (tenant_id, actor_id);
+   CREATE INDEX nowo_crm_engagement_attendee_contact ON nowo_crm_engagement_attendee (tenant_id, contact_id);
+   ```
+
+   SQLite: the same columns with `CLOB` / `DATETIME` / `BOOLEAN` / `INTEGER` and the indexes as `CREATE INDEX`.
+2. **Permissions.** `edit` on a record logs activities, adds notes and pins them; `manage` changes or deletes someone
+   else's activity; `view` reads the feed and downloads a meeting's `.ics`.
+3. **Who may view a record (mentions).** Without `security.resource_scoping` every member of the tenant is a mention
+   candidate; with it, the record's owner (every member when it has none). A host with
+   `nowo_crm_kit.record_access_check` listeners or its own access checker implements `CrmRecordAudienceInterface`
+   with the same rule and sets `activities.audience`.
+4. **Optional bundles, used as they are:** MilkdownEditor >= 1.19 (the note field with `@` suggestions; without it the
+   note stays a text area and nobody is notified unless the text carries handles), NotifyKit >= 0.3 (mention
+   notifications; `activities.notify_kit.recipient_type` = the RecipientRef type your NotifyKit uses for people),
+   TaskBoard >= 2.24 (meetings on a board's calendar), SearchKit >= 1.9 (group `crm_activities`).
+5. **Host items on the feed:** implement `CrmHostActivitySourceInterface` and set `activities.host_source`.
+6. **Templates:** a host that overrides `record/show.html.twig` adds the `activities` variable's block
+   (`{{ include('@NowoCrmKit/record/_activities.html.twig') }}` when `activities is not null`), the pin buttons
+   (`activities.pins[note.id]`) and the notes' text with mentions (`activities.texts[note.id]`).
+7. **Translations:** about 90 new keys in the 7 locales (clear the cache).
+
+**Beacon adoption list (v1.176).**
+
+- [ ] Doctrine migration for the three tables (MySQL / MariaDB as above) on the CRM's entity manager.
+- [ ] `nowo_crm_kit.activities.enabled: true` per environment; `max_pinned` (1, as HubSpot) and `call_outcomes`
+      reviewed with the product owner.
+- [ ] `activities.audience`: a `CrmRecordAudienceInterface` with Beacon's CRM record rule (the same as its
+      `record_access_check` listener and organisation membership), so mention candidates and recipients match who may
+      open the record.
+- [ ] NotifyKit: `activities.notify_kit.recipient_type` = Beacon's person type; the `crm.mention` type and the `crm`
+      category appear in the preferences matrix (label key `notify.category.crm`; add it to the domain NotifyKit reads
+      category labels from if it is not `NowoCrmKitBundle`).
+- [ ] MilkdownEditor >= 1.19 enabled for the CRM note field (profile `default`; the kit passes `suggestions`,
+      `mention_display: name` and `user_title_url`).
+- [ ] TaskBoard >= 2.24: a board's tenant key is the CRM's `TenantRef` value (organisation id), or the board has no
+      tenancy; nothing else to wire (the source is autoconfigured by tag).
+- [ ] `activities.host_source`: tasks, time entries, linked mail, tickets and TimeTrack's calendar meetings of a record
+      (T002), only what the viewer may see.
+- [ ] Manual pages and e2e: log a call / meeting / e-mail, filter the feed, pin a note, mention a colleague, download
+      the `.ics`; menus and breadcrumbs unchanged (the card lives on the record page).
+- [ ] Retention: logged activities follow the per-tenant `timeline_years` (deleted by `nowo:crm-kit:purge` like old
+      timeline entries); confirm the period with the product owner.
+- [ ] SearchKit: the group `crm_activities` is sensitive; it runs only while SearchKit's recents are revalidated or off.
+- [ ] Keep `activities.enabled` on once used (see above; switching it off stops GDPR housekeeping on the tables).
+- [ ] Mention endpoints: per-person limit `activities.mentions.rate_limit` (default 60 calls per minute, then 429).
+- [x] REQ-SEC-004 audit of 0.11.0 (ZCR, SHIP after fixes; the fixes are in this release).
 
 ## To 0.10.3
 

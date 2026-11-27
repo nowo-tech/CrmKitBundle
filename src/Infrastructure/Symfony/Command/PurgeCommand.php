@@ -58,7 +58,8 @@ final class PurgeCommand extends Command
             // 0.3.0: the API's expired idempotency keys, outside any write unit.
             $output->writeln(sprintf('expired idempotency keys: %d', ApiPurgeIdempotencyCommand::purge($this->idempotency, $this->clock)));
         }
-        $output->writeln(sprintf('records: %d, merge tombstones: %d, timeline entries: %d, import rows: %d, merge traces: %d, deals: %d', $counts['records'], $counts['tombstones'], $counts['activities'], $counts['import_rows'], $counts['merges'], $counts['deals']));
+        // 0.11.0: the logged activities past the timeline's retention, only when some were deleted (the line is unchanged otherwise).
+        $output->writeln(sprintf('records: %d, merge tombstones: %d, timeline entries: %d, import rows: %d, merge traces: %d, deals: %d', $counts['records'], $counts['tombstones'], $counts['activities'], $counts['import_rows'], $counts['merges'], $counts['deals']) . ($counts['engagements'] > 0 ? sprintf(', logged activities: %d', $counts['engagements']) : ''));
 
         return Command::SUCCESS;
     }

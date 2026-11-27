@@ -25,6 +25,12 @@ use Nowo\CrmKitBundle\Application\CrmBatchLookup;
 use Nowo\CrmKitBundle\Application\CrmExporter;
 use Nowo\CrmKitBundle\Application\CrmPersonalData;
 use Nowo\CrmKitBundle\Application\CrmReader;
+use Nowo\CrmKitBundle\Application\Engagement\ActivityFeed;
+use Nowo\CrmKitBundle\Application\Engagement\EngagementHousekeeping;
+use Nowo\CrmKitBundle\Application\Engagement\EngagementService;
+use Nowo\CrmKitBundle\Application\Engagement\MentionNotifier;
+use Nowo\CrmKitBundle\Application\Engagement\Mentions;
+use Nowo\CrmKitBundle\Application\Engagement\Port\EngagementStoreInterface;
 use Nowo\CrmKitBundle\Application\FieldService;
 use Nowo\CrmKitBundle\Application\HostLinkService;
 use Nowo\CrmKitBundle\Application\HubSpot\HubSpotConnectionService;
@@ -65,22 +71,30 @@ use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\CrmKitBundle\Application\Taggings;
 use Nowo\CrmKitBundle\Application\TagService;
 use Nowo\CrmKitBundle\Application\WriteSupport;
+use Nowo\CrmKitBundle\Bridge\NotifyKit\CrmNotifyKitTypes;
 use Nowo\CrmKitBundle\Bridge\SearchKit\CrmDealSearchDefinition;
+use Nowo\CrmKitBundle\Bridge\SearchKit\CrmEngagementSearchDefinition;
 use Nowo\CrmKitBundle\Bridge\SearchKit\CrmRecordSearchDefinition;
+use Nowo\CrmKitBundle\Bridge\TaskBoard\CrmMeetingCalendarSource;
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
+use Nowo\CrmKitBundle\Domain\Event\NoteMentioned;
 use Nowo\CrmKitBundle\Domain\Port\CrmAccessCheckerInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorEmailLookupInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostActivitySourceInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmNotifierInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmRecordAudienceInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmRecordVisibilityInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
 use Nowo\CrmKitBundle\Domain\Port\IdGeneratorInterface;
+use Nowo\CrmKitBundle\Domain\Service\ActivityFeedInterface;
 use Nowo\CrmKitBundle\Domain\Service\ConsentServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmActorPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmBatchLookupInterface;
@@ -89,14 +103,17 @@ use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmSettingsInterface;
+use Nowo\CrmKitBundle\Domain\Service\EngagementServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostObjectPickerInterface;
 use Nowo\CrmKitBundle\Domain\Service\HubSpotConnectionServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HubSpotImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\MentionDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\PinnedNotesInterface;
 use Nowo\CrmKitBundle\Domain\Service\RecordServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TagServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\TimelineInterface;
@@ -106,6 +123,7 @@ use Nowo\CrmKitBundle\Infrastructure\Doctrine\CrmMetadataListener;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmActorDataStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmBatchLookupStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineEngagementStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineHubSpotStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrinePipelineStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
@@ -124,6 +142,8 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\CountersRebuildCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\ImportResumeCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\PurgeCommand;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Command\SecretsRotateCommand;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ActivityController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ActivityRecordBlock;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\AdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\HubSpotImportController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ImportController;
@@ -144,6 +164,8 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\AffiliationType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ConsentType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\DealFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\DealType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\EngagementType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FeedFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FieldDefinitionType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FunnelType;
@@ -174,7 +196,10 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImport;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Messenger\RunCrmImportHandler;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredFeatureGate;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ConfiguredPlanLimits;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\NoHostActivitySource;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\NullCrmNotifier;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\PsrLogAuditSink;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\ScopedRecordAudience;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SecurityActorDirectory;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SingleTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Port\SymfonyUuidGenerator;
@@ -190,6 +215,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\IdentifierActorResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\ScopedRecordVisibility;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Security\SecurityCrmAccessChecker;
 use Nowo\CrmKitBundle\NowoCrmKitBundle;
+use Nowo\TransactionDoctrine\ConnectionRepairer;
 use Nowo\TransactionDoctrine\Symfony\Conflict\ConflictResponseFormatterInterface;
 use Nowo\UiKitBundle\Dialog\RemoteDialogResponder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -217,6 +243,18 @@ final class ServiceDefinitions
 {
     /** SearchKit's entity search definition (a literal: SearchKit is optional and only `Bridge` imports it). */
     public const SEARCH_DEFINITION_CLASS = 'Nowo\\SearchKitBundle\\Provider\\Entity\\EntitySearchDefinition';
+
+    /** TaskBoard's calendar event source interface (a literal: TaskBoard is optional; 0.11.0). */
+    public const CALENDAR_SOURCE_INTERFACE = 'Nowo\\TaskBoardBundle\\Calendar\\CalendarEventSourceInterface';
+
+    /** TaskBoard's tag of calendar event sources (0.11.0). */
+    public const CALENDAR_SOURCE_TAG = 'nowo_task_board.calendar_event_source';
+
+    /** NotifyKit's type provider interface (a literal: NotifyKit is optional; 0.11.0). */
+    public const NOTIFY_TYPE_PROVIDER_INTERFACE = 'Nowo\\NotifyKitBundle\\Contract\\TypeProviderInterface';
+
+    /** NotifyKit's tag of type providers (0.11.0). */
+    public const NOTIFY_TYPE_PROVIDER_TAG = 'nowo_notify_kit.type_provider';
 
     /** SearchKit's `EntitySearchDefinition::TAG` (a literal: SearchKit is optional). */
     public const SEARCH_DEFINITION_TAG = 'nowo_search_kit.entity_definition';
@@ -280,7 +318,9 @@ final class ServiceDefinitions
         }
 
         // Persistence.
-        $s->set(DoctrineTransactionRunner::class)->args([service('doctrine'), service($p . 'write_unit'), param($p . 'doctrine.entity_manager')])->public();
+        // 0.11.0: transaction-doctrine's repairer (logs a closed connection as a warning) after a failed unit.
+        $s->set($p . 'connection_repairer', ConnectionRepairer::class)->args([null, service('logger')]);
+        $s->set(DoctrineTransactionRunner::class)->args([service('doctrine'), service($p . 'write_unit'), param($p . 'doctrine.entity_manager'), service($p . 'connection_repairer')])->public();
         $s->alias(TransactionRunnerInterface::class, DoctrineTransactionRunner::class);
         $s->set(DoctrineCrmStore::class)->args([service(DoctrineTransactionRunner::class)]);
         $s->alias(CrmStoreInterface::class, DoctrineCrmStore::class);
@@ -305,11 +345,21 @@ final class ServiceDefinitions
         $s->set(RecordViews::class)->args([service(CrmStoreInterface::class), service(CrmActorDirectoryInterface::class), service(PartyCatalogue::class), service(CrmActorResolverInterface::class)]);
         $pipeline     = is_array($config['pipeline'] ?? null) && ($config['pipeline']['enabled'] ?? false) === true;
         $housekeeping = $pipeline ? service(PipelineHousekeeping::class) : null;
-        $hubspot      = self::hubspotOn($config);
-        $messenger    = self::messengerOn($config);
+        // 0.11.0: the logged activities (tables, services and routes only while activities.enabled).
+        $activities = self::activitiesOn($config);
+        $section    = is_array($config['activities'] ?? null) ? $config['activities'] : [];
+        $mentions   = $activities && is_array($section['mentions'] ?? null) && ($section['mentions']['enabled'] ?? false) === true;
+        $keeping    = $activities ? service(EngagementHousekeeping::class) : null;
+        if ($activities) {
+            $s->set(DoctrineEngagementStore::class)->args([service(DoctrineTransactionRunner::class)]);
+            $s->alias(EngagementStoreInterface::class, DoctrineEngagementStore::class);
+            $s->set(EngagementHousekeeping::class)->args([service(EngagementStoreInterface::class), service(CrmStoreInterface::class)]);
+        }
+        $hubspot   = self::hubspotOn($config);
+        $messenger = self::messengerOn($config);
         // 0.10.0: merges, purges and erasures keep the external references in step (only while HubSpot is on).
         $refs = $hubspot ? service(ExternalRefHooksInterface::class) : null;
-        $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $housekeeping, $refs])->public();
+        $s->set(RecordPurger::class)->args([service(CrmStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $housekeeping, $refs, $keeping])->public();
         $s->set(RecordService::class)->args([service(WriteSupport::class), service(PlanCounter::class), service(Taggings::class), service(CrmActorDirectoryInterface::class), service(RecordPurger::class), service(Roles::class), service(PartyCatalogue::class)]);
         $s->alias(RecordServiceInterface::class, RecordService::class)->public();
         $s->set(CrmReader::class)->args([service(WriteSupport::class), service(RecordViews::class), service(CrmActorDirectoryInterface::class), tagged_iterator(CrmPanelProviderInterface::PANEL_TAG), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), $logger])->public();
@@ -318,7 +368,8 @@ final class ServiceDefinitions
         $s->alias(TagServiceInterface::class, TagService::class)->public();
         $s->set(FieldService::class)->args([service(WriteSupport::class), param($p . 'fields.max_per_subject')]);
         $s->alias(FieldServiceInterface::class, FieldService::class)->public();
-        $s->set(NoteService::class)->args([service(WriteSupport::class)]);
+        $s->set(NoteService::class)->args([service(WriteSupport::class), $mentions ? service(Mentions::class) : null, $activities ? param($p . 'activities.max_pinned') : 0]);
+        $s->alias(PinnedNotesInterface::class, NoteService::class)->public();
         $s->alias(NoteServiceInterface::class, NoteService::class)->public();
         $s->set(HostLinkService::class)->args([service(WriteSupport::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG)]);
         $s->alias(HostLinkServiceInterface::class, HostLinkService::class)->public();
@@ -340,16 +391,16 @@ final class ServiceDefinitions
             $messenger ? service(ImportRunDispatcherInterface::class) : null,
         ])->public();
         $s->alias(ImportServiceInterface::class, ImportService::class)->public();
-        $s->set(MergeService::class)->args([service(WriteSupport::class), service(RecordViews::class), service(PlanCounter::class), $housekeeping, $refs]);
+        $s->set(MergeService::class)->args([service(WriteSupport::class), service(RecordViews::class), service(PlanCounter::class), $housekeeping, $refs, $keeping]);
         $s->alias(MergeServiceInterface::class, MergeService::class)->public();
         $s->set(CrmExporter::class)->args([service(WriteSupport::class), service(CrmReader::class), service(RecordViews::class)]);
         $s->alias(CrmExporterInterface::class, CrmExporter::class)->public();
         // System API (0.2.1): a host person's references across tenants.
-        $s->set(DoctrineCrmActorDataStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->set(DoctrineCrmActorDataStore::class)->args([service(DoctrineTransactionRunner::class), $mentions ? service(Mentions::class) : null]);
         $s->alias(CrmActorDataStoreInterface::class, DoctrineCrmActorDataStore::class);
-        $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events]);
+        $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $activities ? [...CrmActorDataStoreInterface::KINDS, ...CrmActorDataStoreInterface::ACTIVITY_KINDS, ...($mentions ? [CrmActorDataStoreInterface::MENTION_KIND] : [])] : CrmActorDataStoreInterface::KINDS]);
         $s->alias(CrmActorPersonalDataInterface::class, ActorPersonalData::class)->public();
-        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping, $refs]);
+        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping, $refs, $keeping]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
@@ -365,14 +416,17 @@ final class ServiceDefinitions
 
         // HTTP.
         $s->set(CrmApiRouteLoader::class)->args([param($p . 'api.http.enabled'), param($p . 'api_path'), param($p . 'pipeline.enabled')])->tag('routing.loader');
-        $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path'), param($p . 'pipeline.enabled'), param($p . 'import.hubspot.enabled')])->tag('routing.loader');
+        $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path'), param($p . 'pipeline.enabled'), param($p . 'import.hubspot.enabled'), param($p . 'activities.enabled')])->tag('routing.loader');
         $s->set(DomainExceptionListener::class)->tag('kernel.event_listener', ['event' => 'kernel.exception', 'method' => 'onKernelException', 'priority' => 32]);
         if (interface_exists(ConflictResponseFormatterInterface::class)) {
             $s->set(CrmConflictFormatter::class)->tag('nowo_transaction_doctrine.conflict_response_formatter', ['priority' => 10]);
         }
         $ui = is_array($config['ui'] ?? null) && ($config['ui']['enabled'] ?? false) === true;
         if ($pipeline) {
-            self::pipeline($container);
+            self::pipeline($container, $activities);
+        }
+        if ($activities) {
+            self::activities($container, $config, $pipeline, $mentions);
         }
         if ($hubspot) {
             self::hubspot($container, $config);
@@ -396,6 +450,9 @@ final class ServiceDefinitions
         if ($ui && $pipeline) {
             self::pipelineUi($container);
         }
+        if ($ui && $activities) {
+            self::activitiesUi($container, $mentions);
+        }
         if ($ui && $hubspot) {
             $s->set(HubSpotImportController::class)->args([service(UiSupport::class), service(HubSpotConnectionServiceInterface::class), service(HubSpotImportServiceInterface::class), service(ImportServiceInterface::class), param($p . 'import.sync_chunks')])->public()->tag('controller.service_arguments');
             foreach ([HubSpotConnectType::class, HubSpotStartType::class, HubSpotMappingType::class] as $type) {
@@ -404,7 +461,7 @@ final class ServiceDefinitions
         }
         $search = is_array($config['search'] ?? null) && ($config['search']['enabled'] ?? false) === true;
         if ($ui && $search && class_exists(self::SEARCH_DEFINITION_CLASS)) {
-            self::search($container, $pipeline);
+            self::search($container, $pipeline, $activities);
         }
     }
 
@@ -413,7 +470,7 @@ final class ServiceDefinitions
      * `crm_contacts` and, with `pipeline.enabled`, `crm_deals`, tagged for SearchKit's entity provider pass. Switch a
      * group off or reorder it with `nowo_search_kit.groups.<key>`.
      */
-    private static function search(ContainerConfigurator $container, bool $pipeline): void
+    private static function search(ContainerConfigurator $container, bool $pipeline, bool $activities = false): void
     {
         $s    = $container->services();
         $p    = self::P;
@@ -424,6 +481,10 @@ final class ServiceDefinitions
         }
         if ($pipeline) {
             $s->set($p . 'search.deal', CrmDealSearchDefinition::class)->args($args)->tag(self::SEARCH_DEFINITION_TAG, ['priority' => 58])->public();
+        }
+        if ($activities) {
+            // 0.11.0: the logged activities (`crm_activities`).
+            $s->set($p . 'search.activity', CrmEngagementSearchDefinition::class)->args($args)->tag(self::SEARCH_DEFINITION_TAG, ['priority' => 57])->public();
         }
     }
 
@@ -498,16 +559,78 @@ final class ServiceDefinitions
     }
 
     /**
+     * Whether `activities.enabled` (0.11.0).
+     *
+     * @param array<string, mixed> $config
+     */
+    public static function activitiesOn(array $config): bool
+    {
+        return is_array($config['activities'] ?? null) && ($config['activities']['enabled'] ?? false) === true;
+    }
+
+    /**
+     * The logged activities (0.11.0, only with `activities.enabled`): the services, the default ports (CrmPortsPass
+     * points them at the host's services or the NotifyKit bridge), the after-commit mention listener, the NotifyKit
+     * types and the TaskBoard calendar source when those bundles are installed.
+     *
+     * @param array<string, mixed> $config
+     */
+    private static function activities(ContainerConfigurator $container, array $config, bool $pipeline, bool $mentions): void
+    {
+        $s = $container->services();
+        $p = self::P;
+        $s->set($p . 'default.host_activity_source', NoHostActivitySource::class);
+        $s->alias(CrmHostActivitySourceInterface::class, $p . 'default.host_activity_source');
+        $s->set($p . 'default.notifier', NullCrmNotifier::class);
+        $s->alias(CrmNotifierInterface::class, $p . 'default.notifier');
+        $s->set($p . 'default.audience', ScopedRecordAudience::class)->args([param($p . 'security.resource_scoping')]);
+        $s->alias(CrmRecordAudienceInterface::class, $p . 'default.audience');
+        $s->set(EngagementService::class)->args([service(WriteSupport::class), service(EngagementStoreInterface::class), service(CrmActorDirectoryInterface::class), param($p . 'activities.call_outcomes'), $pipeline ? service(PipelineStoreInterface::class) : null]);
+        $s->alias(EngagementServiceInterface::class, EngagementService::class)->public();
+        if ($mentions) {
+            $s->set(Mentions::class)->args([service(WriteSupport::class), service(CrmActorDirectoryInterface::class), service(CrmRecordAudienceInterface::class), param('kernel.secret'), param($p . 'activities.mentions.max_per_note'), service(EngagementStoreInterface::class), param($p . 'activities.mentions.rate_limit.limit'), param($p . 'activities.mentions.rate_limit.interval')]);
+            $s->alias(MentionDirectoryInterface::class, Mentions::class)->public();
+            $s->set(MentionNotifier::class)->args([service(CrmNotifierInterface::class), service('logger')->nullOnInvalid()])
+                ->tag('kernel.event_listener', ['event' => NoteMentioned::class, 'method' => '__invoke']);
+            if (interface_exists(self::NOTIFY_TYPE_PROVIDER_INTERFACE)) {
+                $s->set(CrmNotifyKitTypes::class)->tag(self::NOTIFY_TYPE_PROVIDER_TAG);
+            }
+        }
+        $s->set(ActivityFeed::class)->args([service(WriteSupport::class), service(EngagementStoreInterface::class), service(RecordViews::class), service(CrmHostActivitySourceInterface::class), $mentions ? service(Mentions::class) : null, $pipeline ? service(PipelineSupport::class) : null])->public();
+        $s->alias(ActivityFeedInterface::class, ActivityFeed::class)->public();
+        $calendar = is_array($config['activities'] ?? null) && ($config['activities']['taskboard_calendar'] ?? false) === true;
+        if ($calendar && interface_exists(self::CALENDAR_SOURCE_INTERFACE)) {
+            $s->set(CrmMeetingCalendarSource::class)->args([service(CrmAccess::class), service(ActivityFeed::class), service('router')])->tag(self::CALENDAR_SOURCE_TAG)->public();
+        }
+    }
+
+    /**
+     * The activity pages (0.11.0, with `ui.enabled` and `activities.enabled`): the record page's block, the log / edit
+     * pages and actions, and the forms.
+     */
+    private static function activitiesUi(ContainerConfigurator $container, bool $mentions): void
+    {
+        $s = $container->services();
+        $p = self::P;
+        $s->set($p . 'activity_dialogs', PipelineDialogs::class)->args([service(UiSupport::class), service(RemoteDialogResponder::class)->nullOnInvalid(), true, PipelineDialogs::ACTIVITY_DIALOG]);
+        $s->set(ActivityRecordBlock::class)->args([service(UiSupport::class), service(ActivityFeedInterface::class), service(CrmAccess::class), service(CrmReaderInterface::class), service($p . 'activity_dialogs'), service('request_stack'), $mentions ? service(Mentions::class) : null, $mentions]);
+        $s->set(ActivityController::class)->args([service(UiSupport::class), service(EngagementServiceInterface::class), service(ActivityFeedInterface::class), service(PinnedNotesInterface::class), service(CrmReaderInterface::class), service($p . 'activity_dialogs'), param($p . 'activities.call_outcomes'), $mentions ? service(MentionDirectoryInterface::class) : null])->public()->tag('controller.service_arguments');
+        foreach ([EngagementType::class, FeedFilterType::class] as $type) {
+            $s->set($type)->tag('form.type');
+        }
+    }
+
+    /**
      * The funnels (0.3.0, only with `pipeline.enabled`).
      */
-    private static function pipeline(ContainerConfigurator $container): void
+    private static function pipeline(ContainerConfigurator $container, bool $activities = false): void
     {
         $s = $container->services();
         $p = self::P;
         $s->set(DoctrinePipelineStore::class)->args([service(DoctrineTransactionRunner::class)]);
         $s->alias(PipelineStoreInterface::class, DoctrinePipelineStore::class);
         $s->set(PipelineSupport::class)->args([service(WriteSupport::class), service(PipelineStoreInterface::class), param($p . 'pipeline.lost_reasons')]);
-        $s->set(PipelineHousekeeping::class)->args([service(PipelineStoreInterface::class), service(CrmStoreInterface::class), service(PlanCounter::class)]);
+        $s->set(PipelineHousekeeping::class)->args([service(PipelineStoreInterface::class), service(CrmStoreInterface::class), service(PlanCounter::class), $activities ? service(EngagementHousekeeping::class) : null]);
         // The task port: pipeline.task_port, else the TaskBoard bridge (CrmPortsPass), else the built-in list.
         $s->set($p . 'default.task_port', BuiltInCrmTaskPort::class);
         $s->alias(CrmTaskPort::class, $p . 'default.task_port')->public();
@@ -606,7 +729,7 @@ final class ServiceDefinitions
         $s->set(UiOptions::class)->args([param($p . 'ui.row_actions'), param($p . 'ui.header_actions'), param($p . 'ui.record_actions'), param($p . 'ui.record_tabs'), param($p . 'ui.filters_fold'), param($p . 'ui.filters_slot'), param($p . 'ui.list_tabs'), param($p . 'ui.admin_create'), param($p . 'ui.settings_width'), $tabIcons, param($p . 'ui.list_per_page'), param($p . 'ui.record_create'), param($p . 'ui.pipeline_forms'), ['companies' => param($p . 'ui.filters_more.companies'), 'contacts' => param($p . 'ui.filters_more.contacts'), 'deals' => param($p . 'ui.filters_more.deals')], param($p . 'ui.per_page_position'), param($p . 'ui.search_width'), param($p . 'ui.per_page_row_class')]);
         $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size'), param($p . 'pipeline.enabled'), service(UiOptions::class)]);
         $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
-        $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid()]);
+        $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid(), service(ActivityRecordBlock::class)->nullOnInvalid()]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class), service(ImportServiceInterface::class), service(RemoteDialogResponder::class)->nullOnInvalid(), param($p . 'import.hubspot.enabled')])->public()->tag('controller.service_arguments');
         $s->set(RecordPartsController::class)->args([service(UiSupport::class), service(NoteServiceInterface::class), service(TagServiceInterface::class), service(HostLinkServiceInterface::class), service(RecordServiceInterface::class), service(ConsentServiceInterface::class), service(CrmExporterInterface::class), service(CrmPersonalDataInterface::class), service(RecordForms::class), service(HostObjectPickerInterface::class)])->public()->tag('controller.service_arguments');
         // 0.10.3: the owning list of an import step opened directly (import.dialog.direct_get: redirect; the bundle

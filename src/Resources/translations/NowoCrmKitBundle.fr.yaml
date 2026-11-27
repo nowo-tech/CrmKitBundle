@@ -281,6 +281,13 @@ timeline:
     empty: Rien ne s'est encore passé.
     open: Ouvrir
 activity:
+    call: "Appel consigné par %actor%"
+    meeting: "Réunion consignée par %actor%"
+    email: "E-mail consigné par %actor%"
+    activity_edited: "Activité modifiée par %actor%"
+    activity_deleted: "Activité supprimée par %actor%"
+    form_submitted: "Formulaire envoyé"
+    sms: "SMS consigné par %actor%"
     via_token: "via l'agent ‹%token%›"
     lifecycle_stage: 'Étape du cycle de vie changée par %actor%'
     next_action_closed: 'Prochaine action clôturée par %actor%'
@@ -490,6 +497,7 @@ settings:
         merge_keep_days: Jours pendant lesquels une fusion conserve les valeurs de la fiche fusionnée (1-365)
 search:
     group:
+        activities: "Activités"
         companies: Sociétés
         contacts: Contacts
         deals: 'Affaires'
@@ -751,3 +759,95 @@ lost_reason:
     competitor: 'Concurrent'
     no_decision: 'Pas de décision'
     other: 'Autre'
+activity_log:
+    title: "Activités"
+    log_call: "Consigner un appel"
+    log_meeting: "Consigner une réunion"
+    log_email: "Consigner un e-mail"
+    edit_call: "Modifier l'appel"
+    edit_meeting: "Modifier la réunion"
+    edit_email: "Modifier l'e-mail"
+    save: "Enregistrer"
+    logged_call: "Appel consigné."
+    logged_meeting: "Réunion consignée."
+    logged_email: "E-mail consigné."
+    saved: "Activité enregistrée."
+    deleted: "Activité supprimée."
+    edit: "Modifier"
+    delete: "Supprimer"
+    delete_confirm: "Supprimer cette activité ? Cette action est irréversible."
+    ics: "Ajouter au calendrier (.ics)"
+    pin: "Épingler"
+    unpin: "Désépingler"
+    pinned: "Note épinglée."
+    unpinned: "Note désépinglée."
+    empty: "Aucune activité pour l'instant."
+    empty_filtered: "Aucune activité ne correspond au filtre."
+    older: "Afficher les activités plus anciennes"
+    until: "jusqu'à %time%"
+    minutes: "%count% min"
+    cancelled: "Annulée"
+    attendees: "Participants"
+    logged_on: "Consignée sur"
+    kind:
+        note: "Note"
+        call: "Appel"
+        meeting: "Réunion"
+        email: "E-mail"
+        host: "Mise à jour"
+    direction:
+        in: "Entrant"
+        out: "Sortant"
+    filter:
+        kind: "Type"
+        person: "Personne"
+        any_kind: "Tous les types"
+        anybody: "N'importe qui"
+        apply: "Filtrer"
+        clear: "Effacer"
+        kind_note: "Notes"
+        kind_call: "Appels"
+        kind_meeting: "Réunions"
+        kind_email: "E-mails"
+        kind_host: "Mises à jour"
+    form:
+        meeting_title: "Titre"
+        starts_at: "Début"
+        ends_at: "Fin"
+        timezone: "Fuseau horaire"
+        place: "Lieu ou lien de visioconférence"
+        members: "Membres de l'équipe"
+        contacts: "Contacts"
+        notes: "Notes"
+        cancelled: "Annulée"
+        occurred_at: "Quand"
+        direction: "Sens"
+        outcome: "Résultat"
+        no_outcome: "Sans résultat"
+        duration: "Durée (minutes)"
+        call_title: "Résumé"
+        subject: "Objet"
+        excerpt: "Extrait (jusqu'à 500 caractères)"
+activity_error:
+    kind: "Le type d'une activité ne peut pas changer."
+    attendees_limit: "Une réunion compte au plus %max% participants."
+    attendee_unknown: "Choisissez des membres de l'équipe et des contacts que vous pouvez voir."
+    time: "Saisissez une date et une heure valides."
+    title: "Un titre compte jusqu'à 200 caractères de texte."
+    excerpt: "Un extrait compte jusqu'à 500 caractères de texte brut."
+    outcome: "Résultat inconnu."
+    duration: "Une durée va de 0 à 1440 minutes."
+    timezone: "Choisissez un fuseau horaire."
+    slot: "Une réunion se termine après son début, au plus 7 jours plus tard."
+    place: "Un lieu compte jusqu'à 200 caractères, ou est un lien https."
+call_outcome:
+    connected: "Joint"
+    left_voicemail: "Message laissé"
+    no_answer: "Pas de réponse"
+    busy: "Occupé"
+    wrong_number: "Mauvais numéro"
+notify:
+    mention:
+        title: "%actor% vous a mentionné dans une note du CRM"
+    category:
+        crm: "CRM"

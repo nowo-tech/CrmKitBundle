@@ -43,7 +43,10 @@ final readonly class ActorPersonalData implements CrmActorPersonalDataInterface
     public const PLACEHOLDER = ActorRef::ANONYMISED;
 
     /**
-     * Wires the collaborators.
+     * Wires the collaborators. **(0.11.0)** `$kinds`: the kinds of reference scanned (with `activities.enabled`, the
+     * activities' authors and meeting attendees too).
+     *
+     * @param list<string> $kinds
      */
     public function __construct(
         private CrmActorDataStoreInterface $store,
@@ -51,6 +54,7 @@ final readonly class ActorPersonalData implements CrmActorPersonalDataInterface
         private CrmAuditSinkInterface $audit,
         private ClockInterface $clock,
         private ?EventDispatcherInterface $events = null,
+        private array $kinds = CrmActorDataStoreInterface::KINDS,
     ) {
     }
 
@@ -61,7 +65,7 @@ final readonly class ActorPersonalData implements CrmActorPersonalDataInterface
     {
         $this->check($actorId);
         $tenants = [];
-        foreach (CrmActorDataStoreInterface::KINDS as $kind) {
+        foreach ($this->kinds as $kind) {
             $after = null;
             do {
                 $page = $this->runner->read(fn (): array => $this->store->scan($kind, $actorId, $after, self::BATCH));
@@ -85,7 +89,7 @@ final readonly class ActorPersonalData implements CrmActorPersonalDataInterface
         $counts  = [];
         $failure = null;
         try {
-            foreach (CrmActorDataStoreInterface::KINDS as $kind) {
+            foreach ($this->kinds as $kind) {
                 $after = null;
                 do {
                     // One write unit per batch; the batch's rows are its result, so a replayed attempt counts once.

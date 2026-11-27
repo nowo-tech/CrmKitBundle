@@ -32,19 +32,25 @@ final readonly class PipelineDialogs
     /** Id of the one remote form dialog of a funnel page. */
     public const DIALOG = 'crm-pipeline-dialog';
 
+    /** Id of the one remote form dialog of the activity feed (0.11.0). */
+    public const ACTIVITY_DIALOG = 'crm-activity-dialog';
+
     /**
      * Wires the collaborators (the responder is null without UiKit's remote dialog service: inline forms then).
+     * **(0.11.0)** `$always`: the dialogs whatever `ui.pipeline_forms` says (the activity forms, which have no inline
+     * variant), with their own dialog id.
      */
-    public function __construct(private UiSupport $ui, private ?RemoteDialogResponder $dialog = null)
+    public function __construct(private UiSupport $ui, private ?RemoteDialogResponder $dialog = null, private bool $always = false, private string $dialogId = self::DIALOG)
     {
     }
 
     /**
-     * Whether the funnel pages use the dialogs (`ui.pipeline_forms: dialog` and UiKit's responder).
+     * Whether the pages use the dialogs (`ui.pipeline_forms: dialog`, or always for the activity forms, and UiKit's
+     * responder).
      */
     public function enabled(): bool
     {
-        return $this->ui->options->pipelineDialogs() && $this->dialog instanceof RemoteDialogResponder;
+        return ($this->always || $this->ui->options->pipelineDialogs()) && $this->dialog instanceof RemoteDialogResponder;
     }
 
     /**
@@ -54,7 +60,7 @@ final readonly class PipelineDialogs
      */
     public function shell(string $title): ?array
     {
-        return $this->enabled() ? ['id' => self::DIALOG, 'title' => UiSupport::label($title)] : null;
+        return $this->enabled() ? ['id' => $this->dialogId, 'title' => UiSupport::label($title)] : null;
     }
 
     /**
@@ -67,7 +73,7 @@ final readonly class PipelineDialogs
     {
         $href = $this->ui->url($route, $params);
 
-        return new Action($kind, UiSupport::label($label, $labelParams), $href, variant: $variant, attributes: ThemeExtension::remoteFormOpener(self::DIALOG, $this->ui->trans($label, $labelParams), false, $href) + ['aria-haspopup' => 'dialog', 'aria-controls' => self::DIALOG, 'data-testid' => $testid]);
+        return new Action($kind, UiSupport::label($label, $labelParams), $href, variant: $variant, attributes: ThemeExtension::remoteFormOpener($this->dialogId, $this->ui->trans($label, $labelParams), false, $href) + ['aria-haspopup' => 'dialog', 'aria-controls' => $this->dialogId, 'data-testid' => $testid]);
     }
 
     /**
@@ -83,7 +89,7 @@ final readonly class PipelineDialogs
             return $this->vary($this->ui->render('@NowoCrmKit/_dialog_form.html.twig', [
                 'form'    => $form->createView(),
                 'action'  => $action,
-                'dialog'  => self::DIALOG,
+                'dialog'  => $this->dialogId,
                 'testid'  => $testid . '-dialog-form',
                 'submit'  => $submit,
                 'intro'   => $intro === null ? null : $this->ui->trans($intro),

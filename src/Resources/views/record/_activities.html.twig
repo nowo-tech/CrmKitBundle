@@ -1,0 +1,67 @@
+{#
+  The activity feed of a company or contact (0.11.0, `activities.enabled`): the log openers (each dialog loads its
+  form on demand), the kind / person filter (GET, the page's own query), the entries newest first in an ordered list
+  (notes, calls, meetings, e-mails, host items) with their edit / delete / .ics actions, and "Show older". Every text
+  is printed escaped; a host item's or a meeting's link only when it is a local path or https.
+  Variables: activities (items [{item: FeedItem, buttons: list<Action>}], filter (FormView), filtered, clear, older,
+  openers, dialog), segment.
+#}
+{%- set _d = 'NowoCrmKitBundle' -%}
+{%- set _b = 'NowoCrmKitBundle' -%}
+<section class="{{ nowo_ui_class('card', _b) }}" id="crm-activities" data-testid="crm-activities" aria-labelledby="crm-activities-title">
+    <div class="{{ nowo_ui_class('card_body', _b) }}">
+        <h2 class="{{ nowo_ui_class('card_title', _b) }}" id="crm-activities-title">{{ 'activity_log.title'|trans({}, _d) }}</h2>
+        {% if activities.openers is not empty %}
+            <div class="{{ nowo_ui_class('toolbar', _b) }}" data-testid="crm-activity-openers">{% for opener in activities.openers %}{{ include(nowo_ui_partial('action', _b), {action: opener, context: 'toolbar', bundle: _b}) }} {% endfor %}</div>
+        {% endif %}
+        {{ form_start(activities.filter, {method: 'GET', action: activities.clear, attr: {class: nowo_ui_class('form', _b) ~ ' crm-kit-feed-filter', 'data-testid': 'crm-activity-filter'}}) }}
+            {% for child in activities.filter %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
+            <div class="{{ nowo_ui_class('form_actions', _b) }}">
+                <button type="submit" class="{{ nowo_ui_class('btn_primary', _b) }}">{{ 'activity_log.filter.apply'|trans({}, _d) }}</button>
+                {% if activities.filtered %}<a href="{{ activities.clear }}" class="{{ nowo_ui_class('btn_secondary', _b) }}" data-testid="crm-activity-filter-clear">{{ 'activity_log.filter.clear'|trans({}, _d) }}</a>{% endif %}
+            </div>
+        {{ form_end(activities.filter, {render_rest: false}) }}
+        {% if activities.items is empty %}
+            {{ include(nowo_ui_partial('empty', _b), {message: (activities.filtered ? 'activity_log.empty_filtered' : 'activity_log.empty')|trans({}, _d), region: 'empty', bundle: _b}, false) }}
+        {% else %}
+            <ol class="crm-kit-feed" data-testid="crm-feed">
+            {% for row in activities.items %}
+                {%- set item = row.item -%}
+                <li class="crm-kit-feed__item" data-testid="crm-feed-item" data-kind="{{ item.kind.value }}">
+                    <p class="crm-kit-feed__head">
+                        <span class="{{ nowo_ui_class('badge', _b) }}">{{ ('activity_log.kind.' ~ item.kind.value)|trans({}, _d) }}</span>
+                        <time datetime="{{ item.at|date('c') }}">{{ item.at|date('Y-m-d H:i') }}</time>
+                        {% if item.actorName or item.actorId %} · {{ item.actorName ?? item.actorId }}{% endif %}
+                    </p>
+                    {% if item.note %}
+                        <p data-testid="crm-feed-note">{{ (item.text ?? item.note.body)|nl2br }}</p>
+                        {% if item.note.pinned %}<p><small>{{ 'note.pinned'|trans({}, _d) }}</small></p>{% endif %}
+                    {% elseif item.engagement %}
+                        {%- set e = item.engagement -%}
+                        {% if e.title %}<p class="crm-kit-feed__title" data-testid="crm-feed-title">{{ e.title }}</p>{% endif %}
+                        <p class="crm-kit-feed__meta">
+                            {% if e.direction %}{{ ('activity_log.direction.' ~ e.direction.value)|trans({}, _d) }}{% endif %}
+                            {% if e.outcome %} · {{ ('call_outcome.' ~ e.outcome)|trans({}, _d) }}{% endif %}
+                            {% if e.durationMinutes is not null %} · {{ 'activity_log.minutes'|trans({'%count%': e.durationMinutes}, _d) }}{% endif %}
+                            {% if e.endsAt %}{{ 'activity_log.until'|trans({'%time%': e.endsAt|date('Y-m-d H:i')}, _d) }}{% if e.timezone %} ({{ e.timezone }}){% endif %}{% endif %}
+                            {% if e.cancelled %} · <strong data-testid="crm-feed-cancelled">{{ 'activity_log.cancelled'|trans({}, _d) }}</strong>{% endif %}
+                        </p>
+                        {% if e.place %}<p>{{ 'activity_log.form.place'|trans({}, _d) }}: {% if e.placeIsUrl %}<a href="{{ e.place }}" rel="noopener noreferrer" target="_blank">{{ e.place }}</a>{% else %}{{ e.place }}{% endif %}</p>{% endif %}
+                        {% if e.attendees is not empty %}<p data-testid="crm-feed-attendees">{{ 'activity_log.attendees'|trans({}, _d) }}: {% for a in e.attendees %}{{ a.name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+                        {% if e.body %}<p>{{ e.body|nl2br }}</p>{% endif %}
+                        {% if e.subjectLabel %}<p><small>{{ 'activity_log.logged_on'|trans({}, _d) }} <a href="{{ path('nowo_crm_kit_show', {type: e.subjectType.segment(), id: e.subjectId}) }}">{{ e.subjectLabel }}</a></small></p>{% endif %}
+                    {% elseif item.host %}
+                        {%- set h = item.host -%}
+                        <p data-testid="crm-feed-host">{% if h.url and ((h.url starts with '/' and not (h.url starts with '//') and not (h.url starts with '/\\')) or h.url starts with 'https://') %}<a href="{{ h.url }}">{{ h.title }}</a>{% else %}{{ h.title }}{% endif %}</p>
+                    {% endif %}
+                    {% if row.buttons is not empty %}
+                        <div class="{{ nowo_ui_class('toolbar', _b) }}">{% for button in row.buttons %}{{ include(nowo_ui_partial('action', _b), {action: button, context: 'row', bundle: _b}) }} {% endfor %}</div>
+                    {% endif %}
+                </li>
+            {% endfor %}
+            </ol>
+            {% if activities.older %}<p><a href="{{ activities.older }}" data-testid="crm-feed-older">{{ 'activity_log.older'|trans({}, _d) }}</a></p>{% endif %}
+        {% endif %}
+    </div>
+</section>
+{{ include('@NowoCrmKit/pipeline/_dialog.html.twig', {crm_dialog: activities.dialog|default(null)}, false) }}

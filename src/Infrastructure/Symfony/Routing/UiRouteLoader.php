@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\Routing;
 
 use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Value\RecordId;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ActivityController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\AdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\HubSpotImportController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\ImportController;
@@ -38,7 +39,7 @@ final class UiRouteLoader extends Loader
     /**
      * Wires the settings.
      */
-    public function __construct(private readonly bool $enabled = false, private readonly string $path = '/crm', private readonly bool $pipeline = false, private readonly bool $hubspot = false)
+    public function __construct(private readonly bool $enabled = false, private readonly string $path = '/crm', private readonly bool $pipeline = false, private readonly bool $hubspot = false, private readonly bool $activities = false)
     {
         parent::__construct();
     }
@@ -103,6 +104,9 @@ final class UiRouteLoader extends Loader
         if ($this->pipeline) {
             $this->pipeline($routes, $base, $id);
         }
+        if ($this->activities) {
+            $this->activities($routes, $base, $id, $seg);
+        }
 
         return $routes;
     }
@@ -137,6 +141,25 @@ final class UiRouteLoader extends Loader
         $this->add($routes, 'stage_new', $base . '/admin/funnels/{id}/stages/new', $f . 'stageNew', ['GET', 'POST'], $id);
         $this->add($routes, 'stage_edit', $base . '/admin/stages/{id}', $f . 'stage', ['GET', 'POST'], $id);
         $this->add($routes, 'stage_move', $base . '/admin/stages/{id}/move/{direction}', $f . 'moveStage', ['POST'], $id + ['direction' => 'up|down']);
+    }
+
+    /**
+     * The logged activities (0.11.0, `activities.enabled`): the log and edit pages, delete, the `.ics` download, the
+     * pin of a note and MilkdownEditor's mention endpoints.
+     *
+     * @param array<string, string> $id
+     * @param array<string, string> $seg
+     */
+    private function activities(RouteCollection $routes, string $base, array $id, array $seg): void
+    {
+        $c = ActivityController::class . '::';
+        $this->add($routes, 'activity_log', $base . '/{type}/{id}/activities/{kind}', $c . 'log', ['GET', 'POST'], $seg + $id + ['kind' => 'call|meeting|email']);
+        $this->add($routes, 'activity_edit', $base . '/activities/{id}/edit', $c . 'edit', ['GET', 'POST'], $id);
+        $this->add($routes, 'activity_delete', $base . '/activities/{id}/delete', $c . 'delete', ['POST'], $id);
+        $this->add($routes, 'activity_ics', $base . '/activities/{id}/meeting.ics', $c . 'ics', ['GET'], $id);
+        $this->add($routes, 'note_pin', $base . '/notes/{id}/pin/{state}', $c . 'pin', ['POST'], $id + ['state' => 'on|off']);
+        $this->add($routes, 'mentions', $base . '/{type}/{id}/mentions', $c . 'mentions', ['GET'], $seg + $id);
+        $this->add($routes, 'mention_names', $base . '/{type}/{id}/mentions/names', $c . 'mentionNames', ['GET'], $seg + $id);
     }
 
     /**

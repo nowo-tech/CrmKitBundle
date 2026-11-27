@@ -34,7 +34,7 @@ final class PrependExtensionTest extends TestCase
 {
     public function testTheMappingsHaveNoAliasKeyAndEveryClassIsAFqcn(): void
     {
-        $builder = $this->builder(['doctrine' => ['entity_manager' => 'default'], 'api' => ['enabled' => true], 'pipeline' => ['enabled' => true]]);
+        $builder = $this->builder(['doctrine' => ['entity_manager' => 'default'], 'api' => ['enabled' => true], 'pipeline' => ['enabled' => true], 'activities' => ['enabled' => true]]);
         $builder->registerExtension(new DoctrineExtension());
         $this->prepend($builder);
         $mappings = [];
@@ -44,7 +44,7 @@ final class PrependExtensionTest extends TestCase
                 $mappings += is_array($manager) && is_array($manager['mappings'] ?? null) ? $manager['mappings'] : [];
             }
         }
-        self::assertSame([NowoCrmKitBundle::MAPPING_NAME, NowoCrmKitBundle::PIPELINE_MAPPING_NAME, NowoCrmKitBundle::API_MAPPING_NAME], array_keys($mappings));
+        self::assertSame([NowoCrmKitBundle::MAPPING_NAME, NowoCrmKitBundle::PIPELINE_MAPPING_NAME, NowoCrmKitBundle::API_MAPPING_NAME, NowoCrmKitBundle::ACTIVITIES_MAPPING_NAME], array_keys($mappings));
         foreach ($mappings as $name => $mapping) {
             self::assertIsArray($mapping);
             self::assertFalse(array_key_exists('alias', $mapping), $name . ' declares no alias (DoctrineBundle 3.4 deprecation)');

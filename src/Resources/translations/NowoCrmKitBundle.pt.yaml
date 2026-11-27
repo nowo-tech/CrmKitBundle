@@ -281,6 +281,13 @@ timeline:
     empty: Ainda não aconteceu nada.
     open: Abrir
 activity:
+    call: "Chamada registada por %actor%"
+    meeting: "Reunião registada por %actor%"
+    email: "E-mail registado por %actor%"
+    activity_edited: "Atividade editada por %actor%"
+    activity_deleted: "Atividade eliminada por %actor%"
+    form_submitted: "Formulário enviado"
+    sms: "SMS registado por %actor%"
     via_token: "via agente ‹%token%›"
     lifecycle_stage: 'Etapa do ciclo de vida alterada por %actor%'
     next_action_closed: 'Próxima ação fechada por %actor%'
@@ -490,6 +497,7 @@ settings:
         merge_keep_days: Dias em que uma união conserva os valores do registo unido (1-365)
 search:
     group:
+        activities: "Atividades"
         companies: Empresas
         contacts: Contactos
         deals: 'Negócios'
@@ -751,3 +759,95 @@ lost_reason:
     competitor: 'Concorrente'
     no_decision: 'Sem decisão'
     other: 'Outro'
+activity_log:
+    title: "Atividades"
+    log_call: "Registar chamada"
+    log_meeting: "Registar reunião"
+    log_email: "Registar e-mail"
+    edit_call: "Editar chamada"
+    edit_meeting: "Editar reunião"
+    edit_email: "Editar e-mail"
+    save: "Guardar"
+    logged_call: "Chamada registada."
+    logged_meeting: "Reunião registada."
+    logged_email: "E-mail registado."
+    saved: "Atividade guardada."
+    deleted: "Atividade eliminada."
+    edit: "Editar"
+    delete: "Eliminar"
+    delete_confirm: "Eliminar esta atividade? Não é possível anular."
+    ics: "Adicionar ao calendário (.ics)"
+    pin: "Fixar"
+    unpin: "Desafixar"
+    pinned: "Nota fixada."
+    unpinned: "Nota desafixada."
+    empty: "Ainda não há atividades."
+    empty_filtered: "Nenhuma atividade corresponde ao filtro."
+    older: "Mostrar atividades anteriores"
+    until: "até %time%"
+    minutes: "%count% min"
+    cancelled: "Cancelada"
+    attendees: "Participantes"
+    logged_on: "Registada em"
+    kind:
+        note: "Nota"
+        call: "Chamada"
+        meeting: "Reunião"
+        email: "E-mail"
+        host: "Atualização"
+    direction:
+        in: "Recebida"
+        out: "Efetuada"
+    filter:
+        kind: "Tipo"
+        person: "Pessoa"
+        any_kind: "Todos os tipos"
+        anybody: "Qualquer pessoa"
+        apply: "Filtrar"
+        clear: "Limpar"
+        kind_note: "Notas"
+        kind_call: "Chamadas"
+        kind_meeting: "Reuniões"
+        kind_email: "E-mails"
+        kind_host: "Atualizações"
+    form:
+        meeting_title: "Título"
+        starts_at: "Início"
+        ends_at: "Fim"
+        timezone: "Fuso horário"
+        place: "Local ou ligação de videochamada"
+        members: "Membros da equipa"
+        contacts: "Contactos"
+        notes: "Notas"
+        cancelled: "Cancelada"
+        occurred_at: "Quando"
+        direction: "Sentido"
+        outcome: "Resultado"
+        no_outcome: "Sem resultado"
+        duration: "Duração (minutos)"
+        call_title: "Resumo"
+        subject: "Assunto"
+        excerpt: "Excerto (até 500 caracteres)"
+activity_error:
+    kind: "O tipo de uma atividade não pode mudar."
+    attendees_limit: "Uma reunião tem no máximo %max% participantes."
+    attendee_unknown: "Escolha membros da equipa e contactos que possa ver."
+    time: "Introduza uma data e hora válidas."
+    title: "Um título tem até 200 caracteres de texto."
+    excerpt: "Um excerto tem até 500 caracteres de texto simples."
+    outcome: "Resultado desconhecido."
+    duration: "Uma duração vai de 0 a 1440 minutos."
+    timezone: "Escolha um fuso horário."
+    slot: "Uma reunião termina depois de começar, no máximo 7 dias depois."
+    place: "Um local tem até 200 caracteres, ou é uma ligação https."
+call_outcome:
+    connected: "Atendida"
+    left_voicemail: "Mensagem de voz deixada"
+    no_answer: "Sem resposta"
+    busy: "Ocupado"
+    wrong_number: "Número errado"
+notify:
+    mention:
+        title: "%actor% mencionou-o numa nota do CRM"
+    category:
+        crm: "CRM"

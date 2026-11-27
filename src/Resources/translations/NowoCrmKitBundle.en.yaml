@@ -281,6 +281,13 @@ timeline:
     empty: Nothing has happened yet.
     open: Open
 activity:
+    call: "Call logged by %actor%"
+    meeting: "Meeting logged by %actor%"
+    email: "E-mail logged by %actor%"
+    activity_edited: "Activity edited by %actor%"
+    activity_deleted: "Activity deleted by %actor%"
+    form_submitted: "Form submitted"
+    sms: "Text message logged by %actor%"
     via_token: "via agent ‹%token%›"
     lifecycle_stage: 'Lifecycle stage changed by %actor%'
     next_action_closed: 'Next action closed by %actor%'
@@ -490,6 +497,7 @@ settings:
         merge_keep_days: Days a merge keeps the merged record's values (1-365)
 search:
     group:
+        activities: "Activities"
         companies: Companies
         contacts: Contacts
         deals: 'Deals'
@@ -751,3 +759,95 @@ lost_reason:
     competitor: 'Competitor'
     no_decision: 'No decision'
     other: 'Other'
+activity_log:
+    title: "Activities"
+    log_call: "Log call"
+    log_meeting: "Log meeting"
+    log_email: "Log e-mail"
+    edit_call: "Edit call"
+    edit_meeting: "Edit meeting"
+    edit_email: "Edit e-mail"
+    save: "Save"
+    logged_call: "Call logged."
+    logged_meeting: "Meeting logged."
+    logged_email: "E-mail logged."
+    saved: "Activity saved."
+    deleted: "Activity deleted."
+    edit: "Edit"
+    delete: "Delete"
+    delete_confirm: "Delete this activity? This cannot be undone."
+    ics: "Add to calendar (.ics)"
+    pin: "Pin"
+    unpin: "Unpin"
+    pinned: "Note pinned."
+    unpinned: "Note unpinned."
+    empty: "No activities yet."
+    empty_filtered: "No activities match the filter."
+    older: "Show older activities"
+    until: "until %time%"
+    minutes: "%count% min"
+    cancelled: "Cancelled"
+    attendees: "Attendees"
+    logged_on: "Logged on"
+    kind:
+        note: "Note"
+        call: "Call"
+        meeting: "Meeting"
+        email: "E-mail"
+        host: "Update"
+    direction:
+        in: "Inbound"
+        out: "Outbound"
+    filter:
+        kind: "Type"
+        person: "Person"
+        any_kind: "All types"
+        anybody: "Anybody"
+        apply: "Filter"
+        clear: "Clear"
+        kind_note: "Notes"
+        kind_call: "Calls"
+        kind_meeting: "Meetings"
+        kind_email: "E-mails"
+        kind_host: "Updates"
+    form:
+        meeting_title: "Title"
+        starts_at: "Starts"
+        ends_at: "Ends"
+        timezone: "Time zone"
+        place: "Place or video link"
+        members: "Team members"
+        contacts: "Contacts"
+        notes: "Notes"
+        cancelled: "Cancelled"
+        occurred_at: "When"
+        direction: "Direction"
+        outcome: "Outcome"
+        no_outcome: "No outcome"
+        duration: "Duration (minutes)"
+        call_title: "Summary"
+        subject: "Subject"
+        excerpt: "Excerpt (up to 500 characters)"
+activity_error:
+    kind: "The type of an activity cannot change."
+    attendees_limit: "A meeting has at most %max% attendees."
+    attendee_unknown: "Pick team members and contacts you can see."
+    time: "Enter a valid date and time."
+    title: "A title has up to 200 characters of text."
+    excerpt: "An excerpt has up to 500 characters of plain text."
+    outcome: "Unknown outcome."
+    duration: "A duration is 0 to 1440 minutes."
+    timezone: "Pick a time zone."
+    slot: "A meeting ends after it starts, at most 7 days later."
+    place: "A place is up to 200 characters, or an https link."
+call_outcome:
+    connected: "Connected"
+    left_voicemail: "Left voicemail"
+    no_answer: "No answer"
+    busy: "Busy"
+    wrong_number: "Wrong number"
+notify:
+    mention:
+        title: "%actor% mentioned you in a CRM note"
+    category:
+        crm: "CRM"

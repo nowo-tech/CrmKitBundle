@@ -7,6 +7,7 @@ namespace Nowo\CrmKitBundle\Application;
 use DateInterval;
 use DateTimeImmutable;
 use DateTimeZone;
+use Nowo\CrmKitBundle\Application\Engagement\EngagementHousekeeping;
 use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\ExternalRefHooksInterface;
@@ -54,6 +55,7 @@ final readonly class RecordPurger
         private ?EventDispatcherInterface $events = null,
         private ?PipelineHousekeeping $pipeline = null,
         private ?ExternalRefHooksInterface $refs = null,
+        private ?EngagementHousekeeping $engagements = null,
     ) {
     }
 
@@ -91,6 +93,8 @@ final readonly class RecordPurger
         }
         // 0.3.0: its deals are unlinked; its stage history, lifecycle stages and next actions go with it.
         $this->pipeline?->forgetRecord($tenant, $type, $id);
+        // 0.11.0: its logged activities and the associations and attendee rows that point at it go with it.
+        $this->engagements?->forgetRecord($tenant, $type, $id);
         $this->store->remove($record); // @igor-ignore - persistence or I/O call on a stateless collaborator; nothing is kept on the service
     }
 
@@ -100,7 +104,7 @@ final readonly class RecordPurger
      * batch, so a long run keeps it; a run whose claim was taken over stops at its next batch (null) and never frees
      * the other run's claim.
      *
-     * @return array{records: int, tombstones: int, activities: int, import_rows: int, merges: int, deals: int}|null
+     * @return array{records: int, tombstones: int, activities: int, import_rows: int, merges: int, deals: int, engagements: int}|null
      */
     public function purge(?TenantRef $only = null, bool $dryRun = false): ?array
     {
@@ -125,11 +129,11 @@ final readonly class RecordPurger
     /**
      * The purge itself.
      *
-     * @return array{records: int, tombstones: int, activities: int, import_rows: int, merges: int, deals: int}
+     * @return array{records: int, tombstones: int, activities: int, import_rows: int, merges: int, deals: int, engagements: int}
      */
     private function run(?TenantRef $only, bool $dryRun, PurgeClaim $claim): array
     {
-        $totals  = ['records' => 0, 'tombstones' => 0, 'activities' => 0, 'import_rows' => 0, 'merges' => 0, 'deals' => 0];
+        $totals  = ['records' => 0, 'tombstones' => 0, 'activities' => 0, 'import_rows' => 0, 'merges' => 0, 'deals' => 0, 'engagements' => 0];
         $tenants = $only instanceof TenantRef ? [$only] : array_map(static fn (string $t): TenantRef => new TenantRef($t), $this->runner->read(fn (): array => $this->store->tenants()));
         foreach ($tenants as $tenant) {
             $now          = $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
@@ -142,6 +146,8 @@ final readonly class RecordPurger
                 'import_rows' => $this->batches(fn (): int => $this->store->deleteImportRowsBefore($tenant, $now->sub(new DateInterval('P' . $settings->getImportKeepDays() . 'D')), self::BATCH), $dryRun, $claim),
                 'merges'      => $this->batches(fn (): int => $this->store->deleteMergesBefore($tenant, $mergedBefore, self::BATCH), $dryRun, $claim),
                 'deals'       => $this->purgeDeals($tenant, $now->sub(new DateInterval('P' . $settings->getTrashDays() . 'D')), $dryRun, $claim),
+                // 0.11.0: logged activities are kept as long as the timeline (timeline_years).
+                'engagements' => $this->purgeEngagements($tenant, $now->sub(new DateInterval('P' . $settings->getTimelineYears() . 'Y')), $dryRun, $claim),
             ];
             foreach ($counts as $kind => $count) {
                 $totals[$kind] += $count;
@@ -211,6 +217,28 @@ final readonly class RecordPurger
             $deleted = $this->claimed($claim, static fn (): int => $pipeline->purgeTrashed($tenant, $before));
             $total += $deleted;
         } while ($deleted > 0 && $deleted % PipelineHousekeeping::BATCH === 0);
+
+        return $total;
+    }
+
+    /**
+     * Deletes the logged activities that happened before the timeline's retention (0.11.0; none while activities are
+     * off).
+     */
+    private function purgeEngagements(TenantRef $tenant, DateTimeImmutable $before, bool $dryRun, PurgeClaim $claim): int
+    {
+        $engagements = $this->engagements;
+        if (!$engagements instanceof EngagementHousekeeping) {
+            return 0;
+        }
+        if ($dryRun) {
+            return $this->runner->read(static fn (): int => $engagements->countBefore($tenant, $before));
+        }
+        $total = 0;
+        do {
+            $deleted = $this->claimed($claim, static fn (): int => $engagements->purgeBefore($tenant, $before));
+            $total += $deleted;
+        } while ($deleted === EngagementHousekeeping::BATCH);
 
         return $total;
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection;
 
 use Nowo\CrmKitBundle\Domain\Value\AffiliationPurpose;
+use Nowo\CrmKitBundle\Domain\Value\CallOutcomeKey;
 use Nowo\CrmKitBundle\Domain\Value\ConsentPurpose;
 use Nowo\CrmKitBundle\Domain\Value\LostReasonKey;
 use Nowo\CrmKitBundle\Domain\Value\RoleKey;
@@ -43,6 +44,9 @@ final class ConfigurationTree
 
     /** Built-in lost reasons of the funnels (0.3.0; labels `lost_reason.<key>`). */
     public const DEFAULT_LOST_REASONS = ['price', 'timing', 'competitor', 'no_decision', 'other'];
+
+    /** Built-in call outcomes of the activities (0.11.0; labels `call_outcome.<key>`). */
+    public const DEFAULT_CALL_OUTCOMES = ['connected', 'left_voicemail', 'no_answer', 'busy', 'wrong_number'];
 
     /** Most keys per catalogue. */
     public const MAX_KEYS = 32;
@@ -167,6 +171,7 @@ final class ConfigurationTree
             ->validate()->ifTrue(static fn (array $v): bool => is_array($v['list_per_page'] ?? null) && $v['list_per_page'] !== [] && !in_array($v['page_size'] ?? null, $v['list_per_page'], true))->thenInvalid('ui.page_size must be one of ui.list_per_page; got %s.')->end()
         ->end();
         self::pipeline($children);
+        self::activities($children);
         self::api($children);
         $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !class_exists(HttpClient::class))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs symfony/http-client: composer require symfony/http-client.')->end();
         $root->validate()->ifTrue(static fn (array $v): bool => self::hubspotOn($v) && !self::hasSecretBox($v))->thenInvalid('nowo_crm_kit.import.hubspot.enabled needs a secret box: set secrets.box, or secrets.keys with secrets.current_key one of them.')->end();
@@ -337,6 +342,40 @@ final class ConfigurationTree
             ->scalarNode('column')->defaultNull()->info('The column (TaskBoard status name) new tasks go to; null = the board\'s first.')->end()
         ->end()->end();
         $pipeline->end()->end();
+    }
+
+    /**
+     * The logged activities (0.11.0): off by default; calls, meetings and e-mails, the activity feed, pinned notes,.
+     *
+     * @mentions, the host activity source, the TaskBoard calendar source and the `.ics` download.
+     */
+    private static function activities(NodeBuilder $children): void
+    {
+        $activities = $children->arrayNode('activities')->addDefaultsIfNotSet()->info('0.11.0: logged calls, meetings and e-mails with the activity feed of a record (filter by kind and person), pinned notes, @mentions and meetings on TaskBoard\'s calendar (tables and routes only while enabled).')->children();
+        $activities->booleanNode('enabled')->defaultFalse()->end();
+        $activities->arrayNode('call_outcomes')->info('Call outcome keys (labels call_outcome.<key> in the NowoCrmKitBundle domain).')
+            ->scalarPrototype()->end()->defaultValue(self::DEFAULT_CALL_OUTCOMES)
+            ->validate()->ifTrue(static fn (array $v): bool => !self::keys($v, CallOutcomeKey::PATTERN))->thenInvalid('activities.call_outcomes holds at most 32 distinct keys of 1-32 characters of a-z, 0-9 or "_", starting with a letter.')->end()
+        ->end();
+        $activities->integerNode('max_pinned')->defaultValue(1)->min(0)->max(20)->info('Most pinned notes per record; pinning one more unpins the oldest. 0 = no limit (as before 0.11.0).')->end();
+        $activities->scalarNode('host_source')->defaultNull()->info('Service id of a host CrmHostActivitySourceInterface (tasks, time entries, linked mail, tickets on the feed); null = none.')->end();
+        $activities->scalarNode('audience')->defaultNull()->info('Service id of a host CrmRecordAudienceInterface (who may view a record: mention candidates and recipients); null = the default rule of security.resource_scoping.')->end();
+        $activities->scalarNode('notifier')->defaultNull()->info('Service id of a host CrmNotifierInterface; null = the NotifyKit bridge when NotifyKit (>= 0.3) is installed, else no notifications.')->end();
+        $activities->arrayNode('mentions')->addDefaultsIfNotSet()->children()
+            ->booleanNode('enabled')->defaultTrue()->info('@mentions in notes: MilkdownEditor (>= 1.19) as the note field with the CRM\'s candidates, and notifications to the mentioned members.')->end()
+            ->integerNode('max_per_note')->defaultValue(20)->min(1)->max(50)->info('Most members one save of a note notifies.')->end()
+            ->arrayNode('rate_limit')->addDefaultsIfNotSet()->info('Calls of the mention endpoints (candidates and names) per person; beyond it 429 with Retry-After.')->children()
+                ->integerNode('limit')->defaultValue(60)->min(1)->max(1000)->end()
+                ->integerNode('interval')->defaultValue(60)->min(60)->max(3600)->info('Seconds (rounded up to minutes).')->end()
+            ->end()->end()
+        ->end()->end();
+        $activities->arrayNode('notify_kit')->addDefaultsIfNotSet()->children()
+            ->scalarNode('recipient_type')->defaultValue('user')->info('NotifyKit\'s RecipientRef type of the CRM\'s actor ids.')
+                ->validate()->ifTrue(static fn (mixed $v): bool => !is_string($v) || preg_match('/\A[a-z][a-z0-9_]{0,31}\z/D', $v) !== 1)->thenInvalid('activities.notify_kit.recipient_type is 1-32 of a-z, 0-9 or "_", starting with a letter; got %s.')->end()
+            ->end()
+        ->end()->end();
+        $activities->booleanNode('taskboard_calendar')->defaultTrue()->info('Meetings on TaskBoard\'s calendar (a CalendarEventSourceInterface source, when TaskBoard >= 2.24 is installed).')->end();
+        $activities->end()->end();
     }
 
     /**

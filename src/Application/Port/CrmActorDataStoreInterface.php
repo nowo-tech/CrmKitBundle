@@ -20,6 +20,15 @@ interface CrmActorDataStoreInterface
         'role.created_by', 'import.created_by', 'merge.actor', 'merge.owner', 'settings.updated_by',
     ];
 
+    /** The kinds of the logged activities (0.11.0, only while `activities.enabled` maps their tables). */
+    public const ACTIVITY_KINDS = ['engagement.author', 'engagement_attendee.actor'];
+
+    /**
+     * The person's @mention handles in note text (0.11.0, with `activities.mentions.enabled`, audit ZCR-L4): the
+     * handle is derived per tenant; a replacement rewrites `@<handle>` to `@<replacement>`.
+     */
+    public const MENTION_KIND = 'note.mention';
+
     /**
      * Up to `$limit` rows of `$kind` after the key `$after` that reference `$actorId` exactly, in key order; with
      * `$replacement`, those references are replaced in the same call (run it inside a write unit: the rows are locked

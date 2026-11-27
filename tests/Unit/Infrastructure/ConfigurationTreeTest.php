@@ -71,11 +71,24 @@ final class ConfigurationTreeTest extends TestCase
         self::assertSame('dialog', $this->process(['ui' => ['pipeline_forms' => 'dialog']])['ui']['pipeline_forms'] ?? null);
     }
 
+    public function testActivitiesAreOffByDefault(): void
+    {
+        $activities = $this->process([])['activities'] ?? null;
+        self::assertSame(['enabled' => false, 'call_outcomes' => ['connected', 'left_voicemail', 'no_answer', 'busy', 'wrong_number'], 'max_pinned' => 1, 'host_source' => null, 'audience' => null, 'notifier' => null, 'mentions' => ['enabled' => true, 'max_per_note' => 20, 'rate_limit' => ['limit' => 60, 'interval' => 60]], 'notify_kit' => ['recipient_type' => 'user'], 'taskboard_calendar' => true], $activities);
+        self::assertSame(['voicemail', 'other_2'], $this->process(['activities' => ['call_outcomes' => ['voicemail', 'other_2']]])['activities']['call_outcomes'] ?? null);
+    }
+
     /**
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function invalid(): iterable
     {
+        yield 'call outcome' => [['activities' => ['call_outcomes' => ['Busy']]], 'activities.call_outcomes'];
+        yield 'call outcome duplicate' => [['activities' => ['call_outcomes' => ['busy', 'busy']]], 'activities.call_outcomes'];
+        yield 'pins' => [['activities' => ['max_pinned' => 21]], 'max_pinned'];
+        yield 'mentions per note' => [['activities' => ['mentions' => ['max_per_note' => 0]]], 'max_per_note'];
+        yield 'recipient type' => [['activities' => ['notify_kit' => ['recipient_type' => 'User']]], 'recipient_type'];
+        yield 'recipient type not a string' => [['activities' => ['notify_kit' => ['recipient_type' => 5]]], 'recipient_type'];
         yield 'per page below 5' => [['ui' => ['list_per_page' => [4, 25]]], 'ui.list_per_page'];
         yield 'per page above 100' => [['ui' => ['list_per_page' => [25, 200]]], 'ui.list_per_page'];
         yield 'per page duplicate' => [['ui' => ['list_per_page' => [25, 25]]], 'ui.list_per_page'];

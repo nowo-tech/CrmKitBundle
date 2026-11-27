@@ -33,8 +33,17 @@ final class UiIcons
     public const PRIMARY_CONTACT       = 'person-check';
     public const PRIMARY_CONTACT_CLEAR = 'person-dash';
 
+    /** Pin / unpin a note (0.11.0). */
+    public const PIN   = 'pin-angle';
+    public const UNPIN = 'pin';
+
+    /** Log a call, a meeting, an e-mail (0.11.0). */
+    public const CALL    = 'telephone';
+    public const MEETING = 'calendar-event';
+    public const EMAIL   = 'envelope';
+
     /** The bare Bootstrap Icons names above (each one has its drawing in tests/Fixtures/icons/bi). */
-    public const BOOTSTRAP = [self::STATS, self::BOARD, self::MERGE, self::PRIMARY_CONTACT, self::PRIMARY_CONTACT_CLEAR];
+    public const BOOTSTRAP = [self::STATS, self::BOARD, self::MERGE, self::PRIMARY_CONTACT, self::PRIMARY_CONTACT_CLEAR, self::PIN, self::UNPIN, self::CALL, self::MEETING, self::EMAIL];
 
     /** The canonical UiKit icon names above. */
     public const CANONICAL = [self::STAGE_UP, self::STAGE_DOWN];

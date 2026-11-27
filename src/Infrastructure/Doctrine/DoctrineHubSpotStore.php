@@ -9,8 +9,6 @@ use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\LockMode;
 use Doctrine\DBAL\ParameterType;
-use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
-use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
@@ -29,7 +27,6 @@ use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcDateTimeImmutableType;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\Type\UtcMicroDateTimeImmutableType;
 
 use function in_array;
-use function intdiv;
 use function is_array;
 use function is_numeric;
 use function is_string;
@@ -117,7 +114,7 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
      */
     public function takeConnectAttempt(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval): bool
     {
-        return $this->take($tenant, $now, $limit, $interval, self::WINDOW, self::ATTEMPTS);
+        return (new DoctrineCounterWindow($this->runner))->take($tenant, $now, $limit, $interval, self::WINDOW, self::ATTEMPTS);
     }
 
     /**
@@ -125,7 +122,7 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
      */
     public function takeBrowseCall(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval): bool
     {
-        return $this->take($tenant, $now, $limit, $interval, self::BROWSE_WINDOW, self::BROWSE);
+        return (new DoctrineCounterWindow($this->runner))->take($tenant, $now, $limit, $interval, self::BROWSE_WINDOW, self::BROWSE);
     }
 
     /**
@@ -272,58 +269,6 @@ final readonly class DoctrineHubSpotStore implements HubSpotStoreInterface, Exte
     private function exactConnection(mixed $row, TenantRef $tenant): ?HubSpotConnection
     {
         return $row instanceof HubSpotConnection && $row->getTenantId() === $tenant->value ? $row : null;
-    }
-
-    /**
-     * A counter row's value, locked `FOR UPDATE` (inserted when missing; null for a new row).
-     */
-    private function lockedCounter(TenantRef $tenant, string $resource): ?int
-    {
-        $sql   = 'SELECT value FROM ' . $this->table(Counter::class) . ' WHERE tenant_id = ? AND resource = ?' . $this->forUpdate();
-        $value = $this->db()->fetchOne($sql, [$tenant->value, $resource]);
-        if (is_numeric($value)) {
-            return (int) $value;
-        }
-        $platform = $this->db()->getDatabasePlatform();
-        $table    = $this->table(Counter::class);
-        $insert   = match (true) {
-            $platform instanceof AbstractMySQLPlatform => 'INSERT IGNORE INTO ' . $table . ' (tenant_id, resource, value) VALUES (?, ?, 0)',
-            $platform instanceof PostgreSQLPlatform    => 'INSERT INTO ' . $table . ' (tenant_id, resource, value) VALUES (?, ?, 0) ON CONFLICT DO NOTHING',
-            default                                    => 'INSERT OR IGNORE INTO ' . $table . ' (tenant_id, resource, value) VALUES (?, ?, 0)',
-        };
-        $this->db()->executeStatement($insert, [$tenant->value, $resource]);
-        $this->db()->fetchOne($sql, [$tenant->value, $resource]);
-
-        return null;
-    }
-
-    /**
-     * Counts one call in a fixed window of `$interval` seconds (rounded up to minutes) under the two counter rows' locks;
-     * false once `$limit` calls were counted in it.
-     */
-    private function take(TenantRef $tenant, DateTimeImmutable $now, int $limit, int $interval, string $window, string $counter): bool
-    {
-        $minute = intdiv($now->getTimestamp(), 60);
-        // Always the window row first, then the count row: one order, so two checks never deadlock.
-        $start = $this->lockedCounter($tenant, $window);
-        $count = $this->lockedCounter($tenant, $counter);
-        if ($start === null || $minute - $start >= intdiv($interval + 59, 60)) {
-            $this->setCounter($tenant, $window, $minute);
-            $this->setCounter($tenant, $counter, 1);
-
-            return true;
-        }
-        if ($count >= $limit) {
-            return false;
-        }
-        $this->setCounter($tenant, $counter, ($count ?? 0) + 1);
-
-        return true;
-    }
-
-    private function setCounter(TenantRef $tenant, string $resource, int $value): void
-    {
-        $this->db()->executeStatement('UPDATE ' . $this->table(Counter::class) . ' SET value = ? WHERE tenant_id = ? AND resource = ?', [$value, $tenant->value, $resource], [0 => ParameterType::INTEGER]);
     }
 
     /**

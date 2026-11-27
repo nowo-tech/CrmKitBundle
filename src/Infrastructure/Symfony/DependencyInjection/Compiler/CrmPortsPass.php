@@ -6,6 +6,7 @@ namespace Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\Compiler;
 
 use LogicException;
 use Nowo\CrmKitBundle\Bridge\DoctrineEncrypt\DoctrineEncryptCrmSecretBox;
+use Nowo\CrmKitBundle\Bridge\NotifyKit\NotifyKitCrmNotifier;
 use Nowo\CrmKitBundle\Bridge\OutboundUrlGuard\GuardedHubSpotRequestOptions;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\CrmTaskBoardUserResolverInterface;
 use Nowo\CrmKitBundle\Bridge\TaskBoard\TaskBoardCrmTaskPort;
@@ -13,7 +14,10 @@ use Nowo\CrmKitBundle\Domain\Port\CrmActorDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmActorEmailLookupInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmHostActivitySourceInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmNotifierInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmRecordAudienceInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmSecretBoxInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmTaskPort;
 use Nowo\CrmKitBundle\Domain\Port\CrmTenantResolverInterface;
@@ -21,9 +25,11 @@ use Nowo\CrmKitBundle\Infrastructure\HubSpot\HttpHubSpotReader;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\ConfiguredCrmApiTenantResolver;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Api\SecurityUserCrmApiAuthenticator;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\DependencyInjection\ServiceDefinitions;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Event\CrmKitEvents;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\ConflictFallbackListener;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistry;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
+use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\OutboundUrlGuardBundle\Guard\OutboundUrlGuard;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiReadOperations;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiTaskOperations;
@@ -39,6 +45,7 @@ use function in_array;
 use function interface_exists;
 use function is_array;
 use function is_string;
+use function sprintf;
 
 /**
  * Points the port aliases at the host's services and wires the optional infrastructure (contract sections 8 and 10):
@@ -100,8 +107,44 @@ final class CrmPortsPass implements CompilerPassInterface
         if ($container->getParameter($p . 'import.hubspot.enabled') === true) {
             $this->hubspot($container);
         }
+        if ($container->hasParameter($p . 'activities.enabled') && $container->getParameter($p . 'activities.enabled') === true) {
+            $this->activities($container);
+        }
         if ($container->getParameter($p . 'import.messenger.enabled') === true && !$container->has('messenger.default_bus')) {
             throw new LogicException('nowo_crm_kit.import.messenger.enabled needs symfony/messenger with a default bus (framework.messenger).');
+        }
+    }
+
+    /**
+     * The logged activities' ports (0.11.0): `activities.host_source`, `activities.audience` and `activities.notifier`
+     * replace the defaults; without a notifier, the NotifyKit bridge when NotifyKit's notifier is defined.
+     */
+    private function activities(ContainerBuilder $container): void
+    {
+        $p = ServiceDefinitions::P;
+        foreach (['host_source' => CrmHostActivitySourceInterface::class, 'audience' => CrmRecordAudienceInterface::class, 'notifier' => CrmNotifierInterface::class] as $key => $interface) {
+            $id = $container->getParameter($p . 'activities.' . $key);
+            if (is_string($id) && $id !== '') {
+                $container->setAlias($interface, $id);
+            }
+        }
+        $audience = $container->getParameter($p . 'activities.audience');
+        if (!is_string($audience) || $audience === '') {
+            foreach ($container->findTaggedServiceIds('kernel.event_listener') as $id => $tags) {
+                foreach ($tags as $tag) {
+                    if (is_array($tag) && ($tag['event'] ?? null) === CrmKitEvents::RECORD_ACCESS_CHECK) {
+                        // Audit ZCR-L5: the default audience cannot ask the listeners about other people.
+                        $container->log($this, sprintf('nowo_crm_kit: "%s" listens to %s but activities.audience is not set: @mention candidates and recipients follow security.resource_scoping only. Implement CrmRecordAudienceInterface with the same rule.', $id, CrmKitEvents::RECORD_ACCESS_CHECK));
+
+                        break 2;
+                    }
+                }
+            }
+        }
+        $notifier = $container->getParameter($p . 'activities.notifier');
+        if ((!is_string($notifier) || $notifier === '') && interface_exists(NotifierInterface::class) && $container->has(NotifierInterface::class)) {
+            $container->setDefinition(NotifyKitCrmNotifier::class, (new Definition(NotifyKitCrmNotifier::class))->setArguments([new Reference(NotifierInterface::class), new Reference('router'), $container->getParameter($p . 'activities.notify_kit.recipient_type')]));
+            $container->setAlias(CrmNotifierInterface::class, NotifyKitCrmNotifier::class);
         }
     }
 

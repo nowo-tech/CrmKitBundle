@@ -29,6 +29,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned as **0.11.0** (Beacon spec 254, block A-1, tasks T001 and T002; Beacon priority moves it before H2). No BC
+break: everything new is behind `activities.enabled` (off by default); with it off no table is mapped and no route or
+service is added (the runner's lost-savepoint hardening and one more purge count apply to every host).
+
+### Added
+
+- **Logged activities** (`activities.enabled`): calls (direction, outcome from `activities.call_outcomes`, duration,
+  summary, notes), meetings (title, start / end in an IANA time zone, place or https video link, members and contacts
+  as attendees, notes, cancelled) and e-mails (direction, subject, plain-text excerpt of at most 500 characters) on a
+  company or contact, through `EngagementServiceInterface` (`log` / `edit` / `delete`): `edit` on the record, `manage`
+  too for someone else's activity, optimistic versions (409 `crm_record_stale`), the record locked `FOR UPDATE` in each
+  write, a timeline entry (`call`, `meeting`, `email`, `activity_edited`, `activity_deleted`), audit entries
+  `crm.activity.logged` / `edited` / `deleted` and the events `EngagementLogged` / `EngagementChanged` /
+  `EngagementDeleted` after the commit. Tables `crm_engagement`, `crm_engagement_subject`, `crm_engagement_attendee`
+  (mapping group `NowoCrmKitBundleActivities`).
+- **Association fan-out**: a contact's activity also shows on the contact's companies and open deals, a company's on
+  its open deals (stored when it is logged). An activity shows only while the viewer may view its primary record.
+- **Activity feed** of a company, contact or deal (`ActivityFeedInterface::feed()`): notes, activities and host items,
+  filtered by kind (`FeedKind`: note, call, meeting, email, host) and person (`TimelineFilter`), newest first in keyset
+  pages (`TimelineWindow`). On the 360° page: the "Activities" card with the log openers (the forms load on demand
+  into one UiKit remote dialog; plain pages without JavaScript), the filter and "Show older".
+- **Pinned notes**: `PinnedNotesInterface::pin()` (`edit` on the record) and pin / unpin buttons on the notes card;
+  `activities.max_pinned` (default 1; 0 = no limit) unpins the oldest pinned notes of the record in the same write.
+- **@mentions**: with MilkdownEditor (>= 1.19) installed and `activities.mentions.enabled`, the note field is
+  MilkdownEditor's with the CRM's `@` candidates (`MentionDirectoryInterface`: members of the same tenant who may view
+  the record, `CrmRecordAudienceInterface`) and names; handles are keyed hashes, never ids or e-mail addresses. The
+  members newly mentioned by a save are notified after the commit (`NoteMentioned`, `CrmNotifierInterface`; the
+  NotifyKit bridge with NotifyKit >= 0.3 installed, type `crm.mention`, no record name or note text in it).
+- **Host activity source** (T002): `CrmHostActivitySourceInterface` (`activities.host_source`) adds the host's items
+  (tasks, time entries, linked mail, tickets) to the feed; the kit drops items of another record or outside the page.
+- **Meetings on TaskBoard's calendar** (`Bridge/TaskBoard/CrmMeetingCalendarSource`, TaskBoard >= 2.24,
+  `activities.taskboard_calendar`): the signed-in person's meetings on records they may view, read-only.
+- **`.ics` download** of a meeting (view on its record; UID, SEQUENCE that moves with every change of time, place,
+  title or cancellation, STATUS; no notes or addresses). MailKit has no invite part yet: invites by e-mail are a
+  follow-up (MailKit 2.3, `METHOD:REQUEST` / `CANCEL`).
+- **SearchKit** group `crm_activities` (titles of calls, meetings and e-mails on visible records).
+- **GDPR**: a contact's export lists its activities and the meetings it attends; erasure deletes its activities and
+  its attendance; a purged record takes its activities along; activities older than `timeline_years` are deleted by
+  `nowo:crm-kit:purge`; `anonymiseActor()` covers activity authors and member attendees.
+- Audit ZCR fixes before the tag: the feed reads past hidden activities (no early end), the mention candidates match
+  names (or an exact e-mail address) only, a per-person limit on the mention endpoints (429), a meeting edit keeps the
+  attendee contacts the editor cannot see, anonymisation rewrites the member's mention handles, a container warning when
+  `record_access_check` listeners exist without `activities.audience`, a narrower export of meetings on other records.
+- Configuration `activities.*` (CONFIGURATION.md), translations in the seven locales, the TaskBoard calendar, NotifyKit
+  and MilkdownEditor test stand-ins.
+
+### Fixed
+
+- Versions up to 0.10.3: after a MySQL / MariaDB deadlock inside the ORM flush's savepoint, the rollback could fail
+  with 1305 (lost savepoint), take the place of the deadlock and leave the connection's nesting level above 0, so on a
+  kept-alive worker later CRM writes failed with "writes in transactions of its own" until a restart. The runner now
+  repairs the connection (see "Changed"); the deadlock stays in the exception chain (replay, else 409).
+
+### Changed
+
+- REQ-RUNTIME-003 lost-savepoint pattern in `DoctrineTransactionRunner`: a failed unit is repaired by
+  transaction-doctrine's `ConnectionRepairer` (rolls back to the level the unit started at; closes the connection, with
+  a warning, when that rollback fails; clears a rollback-only flag) and the original failure is rethrown. The private
+  entity manager is closed on a failure as before.
+- The HubSpot check limits and the mention endpoints share one fixed-window counter (`DoctrineCounterWindow`).
+- `RecordPurger::purge()` returns an `engagements` count (also in a dry run) (0 while activities are off); the purge command prints
+  "logged activities" only when some were deleted.
+
 ### Documentation
 
 - `docs/images/demo/` keeps only the two README screenshots (REQ-DEMO-013: 1-3 images, no gallery). The 68 before /

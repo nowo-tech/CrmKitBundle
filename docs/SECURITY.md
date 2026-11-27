@@ -16,6 +16,7 @@
 - [Shared entity manager](#shared-entity-manager)
 - [Release security checklist (12.4.1)](#release-security-checklist-1241)
 - [Reporting](#reporting)
+- [Activities and mentions (0.11.0)](#activities-and-mentions-0110)
 
 ## Status and scope
 
@@ -277,3 +278,19 @@ Before each 0.x tag and 1.0.0 (REQ-SEC-004):
 
 Report vulnerabilities privately through GitHub Security Advisories of `nowo-tech/CrmKitBundle` or by e-mail to
 **hectorfranco@nowo.tech**. Please do not open a public issue.
+
+## Activities and mentions (0.11.0)
+
+- An activity is shown (feed, calendar, search, `.ics`) only while the viewer may view its primary record; fan-out
+  rows are filtered the same way.
+- Mention candidates: members of the same tenant whose name contains the query or whose e-mail is exactly the query,
+  limited to those `CrmRecordAudienceInterface` lets view the record, at most 10. Both mention endpoints (candidates,
+  names) count against `activities.mentions.rate_limit` per person (429 with `Retry-After`). The names endpoint
+  resolves handles of any member of the tenant for anyone with `view` on the record: a handle only appears in notes
+  that person can read, and the page shows the same names.
+- Handles are HMACs of the tenant and the actor id with `kernel.secret`; anonymising a member rewrites their handles
+  in note text. Rotating the secret leaves old handles as plain text.
+- A host with `nowo_crm_kit.record_access_check` listeners implements `activities.audience`; without it the container
+  build logs a warning.
+- Mention notifications carry no record name and no note text.
+

@@ -91,7 +91,7 @@ deptrac:
     - name: BridgedPackages
       collectors:
         - type: classLike
-          value: '^Nowo\\(SearchKitBundle|TaskBoardBundle|DoctrineEncryptBundle|OutboundUrlGuardBundle)\\'
+          value: '^Nowo\\(SearchKitBundle|TaskBoardBundle|DoctrineEncryptBundle|OutboundUrlGuardBundle|NotifyKitBundle)\\'
   ruleset:
     Domain:
       - Psr

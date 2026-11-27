@@ -18,6 +18,7 @@
   - [Filter bars (0.10.2)](#filter-bars-0102)
   - [Import steps opened directly (0.10.3)](#import-steps-opened-directly-0103)
   - [Area tab icons](#area-tab-icons)
+- [Activities (0.11.0)](#activities-0110)
 - [Later phases](#later-phases)
 - [Per-tenant settings](#per-tenant-settings)
 - [Container parameters](#container-parameters)
@@ -120,6 +121,16 @@ nowo_crm_kit:
         search_width: null         # 0.10.2: null = one grid column | xs | sm | md | lg (two columns) | full
         per_page_row_class: null   # 0.10.2: extra classes on the "N per page" row, e.g. issue-filters__pager
     pipeline:  { enabled: false }  # phase B, funnels (0.3.0)
+    activities:                    # 0.11.0: logged calls, meetings and e-mails, the activity feed (see "Activities")
+        enabled: false             # tables, services and routes only while true
+        call_outcomes: [connected, left_voicemail, no_answer, busy, wrong_number]   # labels call_outcome.<key>
+        max_pinned: 1              # 0..20: pinned notes per record (pinning one more unpins the oldest); 0 = no limit
+        host_source: null          # a CrmHostActivitySourceInterface service id (host items on the feed); null = none
+        audience: null             # a CrmRecordAudienceInterface service id (who may view a record); null = resource_scoping rule
+        notifier: null             # a CrmNotifierInterface service id; null = NotifyKit bridge when installed, else none
+        mentions: { enabled: true, max_per_note: 20, rate_limit: { limit: 60, interval: 60 } }   # @mentions in notes (MilkdownEditor >= 1.19); per-person limit of the mention endpoints
+        notify_kit: { recipient_type: user }            # NotifyKit's RecipientRef type of the CRM's actor ids
+        taskboard_calendar: true   # meetings on TaskBoard's calendar (TaskBoard >= 2.24 installed)
     api:                           # 0.3.0: see API.md
         enabled: false             # the Api\Operation layer and the idempotency table (an MCP host needs only this)
         page_size: 25              # 10..100: default page of the keyset lists
@@ -589,6 +600,31 @@ assistive technology and the tooltip, but check overrides against the icon set t
 name goes to `ux_icon()` as written, so a missing icon follows `ux_icons.ignore_not_found` (an exception, or nothing
 drawn): with Iconify `on_demand: false`, import the seven defaults (`bin/console ux:icons:import tabler:building
 tabler:users tabler:briefcase tabler:tags tabler:forms tabler:settings tabler:filter`) and any override.
+
+## Activities (0.11.0)
+
+`activities.enabled: true` maps three tables (mapping group `NowoCrmKitBundleActivities`: `crm_engagement`,
+`crm_engagement_subject`, `crm_engagement_attendee`; see UPGRADING "To 0.11.0"), adds the services, the routes (with
+`ui.enabled`) and the "Activities" card of the 360° page. With it off nothing of it exists.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `call_outcomes` | five built-in keys | The outcomes a call may have (1–32 of a-z, 0-9, `_`, starting with a letter; ≤ 32 keys); labels `call_outcome.<key>` |
+| `max_pinned` | `1` | Most pinned notes per record; pinning (or adding / editing a pinned note) unpins the oldest beyond it in the same write. `0` keeps the 0.10 behaviour (no limit) |
+| `host_source` | `null` | Service id of the host's `CrmHostActivitySourceInterface` (USAGE "Host activity source") |
+| `audience` | `null` | Service id of a `CrmRecordAudienceInterface`: who among the tenant's members may view a record (mention candidates and recipients). Default: every member without `security.resource_scoping`; with it, the record's owner (every member when it has none). **A host with `nowo_crm_kit.record_access_check` listeners or its own checker must implement it with the same rule** |
+| `notifier` | `null` | Service id of a `CrmNotifierInterface`; `null` = the NotifyKit bridge when `Nowo\NotifyKitBundle\Contract\NotifierInterface` is a service, else no notifications |
+| `mentions.enabled` | `true` | MilkdownEditor's field (when installed) with the CRM's `@` candidates; notifications of the newly mentioned members |
+| `mentions.max_per_note` | `20` | Most people one save of a note notifies (1–50) |
+| `mentions.rate_limit` | `{limit: 60, interval: 60}` | Calls of the mention endpoints (candidates and names) per person and window (seconds, rounded up to minutes, 60–3600); beyond it 429 with `Retry-After` |
+| `notify_kit.recipient_type` | `user` | `RecipientRef` type of the CRM's actor ids in NotifyKit |
+| `taskboard_calendar` | `true` | Registers the TaskBoard calendar source (`crm-meetings`) when TaskBoard >= 2.24 is installed |
+
+Retention: activities follow the per-tenant `timeline_years` (purged by `nowo:crm-kit:purge`).
+
+**Keep it on once used.** With `activities.enabled: false` the three tables are not mapped, so contact erasure, the
+trash purge, merges, retention and actor anonymisation no longer reach rows stored while it was on. Switch it off only
+after exporting and dropping the tables (UPGRADING "To 0.11.0").
 
 ## Later phases
 

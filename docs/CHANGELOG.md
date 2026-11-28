@@ -35,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The CSV import reads through a `php://temp` stream and `fgetcsv()` instead of `SplFileObject::fgetcsv()`, which PHP 8.6 deprecates (same parsing).
 - PHP 8.6: `composer.json` allows PHP below 8.7 (was below 8.6). CI adds a forward-compatibility workflow with a
   PHP 8.6 cell and a Symfony 8.2 cell (stable Symfony 8.2.0).
 

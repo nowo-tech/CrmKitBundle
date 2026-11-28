@@ -45,6 +45,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   same configuration earlier in the run, as a new kernel and a new container instance, instead of compiling it again
   for every test; the Database suite runs in about half the time and memory. Kernels with a configuration that cannot
   be identified (a captured closure or anonymous class) still compile their own container.
+- Tests: the two kernel tests of a host without Symfony Mailer or Messenger disable `framework.mailer` /
+  `framework.messenger` explicitly; FrameworkBundle 8.2 (installed by the Symfony 8.1 CI cells, `^8.1`) enables them as
+  soon as the package is installed, and the expected refusals were no longer reached.
 
 ## [0.13.0] - 2026-11-28
 

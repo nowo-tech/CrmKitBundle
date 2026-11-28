@@ -99,6 +99,9 @@ final class TemplatesKernelTest extends KernelTestCase
             if ($mailer) {
                 $s->set('test.mailer', TestMailer::class)->public();
                 $s->alias(MailerInterface::class, 'test.mailer')->public();
+            } else {
+                // A host without Symfony Mailer: FrameworkBundle 8.2 enables framework.mailer once symfony/mailer is installed.
+                $container->extension('framework', ['mailer' => ['enabled' => false]]);
             }
             if ($sender) {
                 $s->set('test.sender', TestHostSender::class)->public();

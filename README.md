@@ -52,18 +52,18 @@ Phase A (0.1.0), always on when the bundle is enabled:
   technical, general; configurable).
 - **Notes and timeline**: plain-text notes (pinned first) and an append-only activity timeline per record; a company's
   timeline includes its contacts' entries; your application adds its own entries.
-- **Activities** (unreleased, 0.11.0, opt-in `activities.enabled`): log calls, meetings and e-mails on companies and
+- **Activities** (0.11.0, opt-in `activities.enabled`): log calls, meetings and e-mails on companies and
   contacts (shown on their companies and open deals too), an activity feed filtered by kind and person, pinned notes,
   @mentions with MilkdownEditor and NotifyKit, your own items on the feed (host activity source), meetings on
   TaskBoard's calendar and as `.ics`.
-- **E-mail templates** (unreleased, 0.13.0, opt-in `templates.enabled`, with MailKit >= 2.8): personal and shared
+- **E-mail templates** (0.13.0, opt-in `templates.enabled`, with MailKit >= 2.8): personal and shared
   templates and snippets with `contact.*`, `company.*`, `deal.*` and `me.*` placeholders (closed, never evaluated), a
   consent purpose per template, and *Write e-mail* on a contact's page (sent mail logged as an `email` activity).
 - **360° page**: details, contacts / companies, host links (your projects, tickets and so on, referenced by id and
   resolved by your code on every view), host panels (your read models), notes, timeline, possible duplicates, consents.
 - **Import and export**: CSV (`,` or `;`) and vCard 3.0 / 4.0 import in a modal from the lists (0.4.0; the import page
   stays the no-JS fallback) with a preview, an editable column mapping and a duplicate policy; CSV export of a filtered list (formula cells neutralised) and a vCard 4.0 per contact.
-- **HubSpot import** (unreleased, 0.10.0, opt-in): companies, contacts, associations, owners and lists from a HubSpot
+- **HubSpot import** (0.10.0, opt-in): companies, contacts, associations, owners and lists from a HubSpot
   account through a service key (or a legacy private app token) sealed at rest; re-runs update instead of duplicating
   (USAGE, "HubSpot import").
 - **Duplicates and merging**: hints by name, website domain and tax id (companies) or sort name (contacts); a

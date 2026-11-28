@@ -33,6 +33,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Documentation
+
+- Spec Kit code inventory re-audited at 616/616 `src/` files (the three 0.13.0 mail-log files mapped); README no longer
+  calls 0.13.0 unreleased.
+
 ### Changed
 
 - The CSV import reads through a `php://temp` stream and `fgetcsv()` instead of `SplFileObject::fgetcsv()`, which PHP 8.6 deprecates (same parsing).

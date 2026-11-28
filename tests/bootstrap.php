@@ -1,11 +1,13 @@
 <?php
 
 declare(strict_types=1);
+use Nowo\CrmKitBundle\Tests\Integration\Kernel\TestKernel;
 use Nowo\DoctrineEncryptBundle\Encryptors\EncryptorRegistryInterface;
 use Nowo\NotifyKitBundle\Contract\NotifierInterface;
 use Nowo\TaskBoardBundle\Api\Operation\TaskApiTaskOperations;
 use Nowo\TaskBoardBundle\Calendar\CalendarEventSourceInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\Component\Filesystem\Filesystem;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -40,4 +42,15 @@ if (!class_exists('ParagonIE\\Halite\\Alerts\\HaliteAlert')) {
 
 if (!class_exists('Defuse\\Crypto\\Exception\\CryptoException')) {
     require_once __DIR__ . '/Stubs/Crypto/Defuse.php';
+}
+
+// The containers shared by the test kernels of one PHPUnit process (TestKernel::sharedDir()): remove those of the
+// processes that ended (where the process table can be read; a running process keeps its own).
+if (is_dir('/proc/self')) {
+    foreach (glob(TestKernel::sharedDirPrefix() . '*', \GLOB_ONLYDIR) ?: [] as $sharedDir) {
+        $pid = substr($sharedDir, strlen(TestKernel::sharedDirPrefix()));
+        if (ctype_digit($pid) && !is_dir('/proc/' . $pid)) {
+            (new Filesystem())->remove($sharedDir);
+        }
+    }
 }

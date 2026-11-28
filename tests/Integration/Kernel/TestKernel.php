@@ -27,6 +27,7 @@ use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
 
 use function dirname;
 use function getenv;
+use function getmypid;
 use function is_string;
 use function sys_get_temp_dir;
 
@@ -42,6 +43,8 @@ final class TestKernel extends Kernel
     /**
      * @param array<string, mixed> $bundleConfig `nowo_crm_kit` configuration
      * @param Closure(ContainerConfigurator, string): void $configure host configuration (Doctrine)
+     * @param bool $shared cache directory under {@see self::sharedDir()} (kept for the process; `$id` must then identify
+     *                     the whole configuration, the kernel is not in debug mode and never recompiles a cached container)
      */
     public function __construct(
         private readonly string $id,
@@ -49,6 +52,7 @@ final class TestKernel extends Kernel
         private readonly Closure $configure,
         private readonly bool $full = true,
         private readonly bool $transactionBundle = true,
+        private readonly bool $shared = false,
     ) {
         parent::__construct('test', false);
     }
@@ -108,12 +112,12 @@ final class TestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return self::baseDir() . '/' . $this->id . '/cache';
+        return ($this->shared ? self::sharedDir() : self::baseDir()) . '/' . $this->id . '/cache';
     }
 
     public function getLogDir(): string
     {
-        return self::baseDir() . '/' . $this->id . '/log';
+        return ($this->shared ? self::sharedDir() : self::baseDir()) . '/' . $this->id . '/log';
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void
@@ -125,6 +129,24 @@ final class TestKernel extends Kernel
     public static function baseDir(): string
     {
         return sys_get_temp_dir() . '/nowo-crm-kit-tests';
+    }
+
+    /**
+     * The containers shared by the kernels of the same configuration, for this PHP process only: another process (e.g.
+     * another engine's run on the same machine) never reads them, and tests/bootstrap.php removes the directories of
+     * the processes that ended.
+     */
+    public static function sharedDir(): string
+    {
+        return self::sharedDirPrefix() . getmypid();
+    }
+
+    /**
+     * {@see self::sharedDir()} without the process id.
+     */
+    public static function sharedDirPrefix(): string
+    {
+        return sys_get_temp_dir() . '/nowo-crm-kit-test-containers-';
     }
 
     protected function configureContainer(ContainerConfigurator $container): void

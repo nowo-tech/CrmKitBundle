@@ -88,7 +88,12 @@ abstract class CrmTestCase extends KernelTestCase
                 }
             };
         }
-        $this->kernel = $this->bootKernel($host->bundleConfig($merged), $configure);
+        // The host kind identifies `$host->configure()`; the extra closures by where they are defined and what they
+        // captured. Any part that cannot be identified boots a container of its own.
+        $ofServices   = self::closureFingerprint($services);
+        $ofExtensions = self::closureFingerprint($extensions);
+        $fingerprint  = $ofServices === null || $ofExtensions === null ? null : ['crm', $host->kind, $uiKit, $ofServices, $ofExtensions];
+        $this->kernel = $this->bootKernel($host->bundleConfig($merged), $configure, fingerprint: $fingerprint);
         $this->schema();
         $client = $this->kernel->getContainer()->get('test.client');
         self::assertInstanceOf(KernelBrowser::class, $client);

@@ -33,6 +33,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- CI and tests only (no change to the package): the Database suite job (2 h 09 min, every engine and both time zones
+  one after the other) is split into one job per engine x time zone (SQLite, MySQL 8.4, MariaDB 11.4, PostgreSQL 16;
+  UTC and Europe/Madrid) running in parallel, each starting only its own server with its data directory on tmpfs. The
+  required check `Databases (SQLite, MySQL, MariaDB, PostgreSQL)` now reports the result of those eight jobs. The
+  MySQL service of the dependency-floor job also runs on tmpfs.
+- Tests: a functional test kernel whose configuration is fully identified (bundle and UiKit configuration, host kind,
+  the extra service closures by definition and captured values, database URL) reuses the container compiled for the
+  same configuration earlier in the run, as a new kernel and a new container instance, instead of compiling it again
+  for every test; the Database suite runs in about half the time and memory. Kernels with a configuration that cannot
+  be identified (a captured closure or anonymous class) still compile their own container.
+
 ## [0.13.0] - 2026-11-28
 
 Planned as **0.13.0** (block A-2: e-mail templates and *Write e-mail*). 0.12.0 (the

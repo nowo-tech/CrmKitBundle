@@ -28,7 +28,7 @@
   </coverage>
   <php>
     <!-- REQ-SF-005: fail on direct deprecations from this package -->
-    <!-- Every test boots its own kernel and compiles its own container class, which PHP never unloads: the Database suite grows about 3 MB per test and passed 1 GB on MySQL (0.8.1). -->
+    <!-- A test kernel compiles its own container class, which PHP never unloads, unless one with the same configuration was compiled earlier in the run (shared container, Unreleased): the Database suite passed 1 GB on MySQL (0.8.1) before that sharing. -->
     <ini name="memory_limit" value="2G"/>
     <env name="SYMFONY_DEPRECATIONS_HELPER" value="max[direct]=0"/>
   </php>

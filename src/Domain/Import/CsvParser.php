@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Nowo\CrmKitBundle\Domain\Import;
 
-use SplTempFileObject;
-
 use function array_keys;
 use function count;
+use function fclose;
+use function feof;
+use function fgetcsv;
+use function fopen;
+use function fwrite;
 use function is_array;
 use function preg_match;
 use function preg_replace;
+use function rewind;
 use function str_starts_with;
 use function strlen;
 use function substr;
@@ -41,32 +45,39 @@ final class CsvParser
         }
         $firstLine = (string) preg_replace('/\R.*/s', '', $bytes);
         $separator = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
-        $file      = new SplTempFileObject();
-        $file->fwrite($bytes);
-        $file->rewind();
-        $columns = [];
-        foreach ((array) $file->fgetcsv($separator, '"', '') as $column) {
-            $name = trim((string) $column);
-            if ($name === '' || isset($columns[$name])) {
-                throw new ImportFileException('import.error.header');
+        // A temp stream and fgetcsv(): SplFileObject::fgetcsv() is deprecated since PHP 8.6 (same parsing, no escape character).
+        /** @var resource $file php://temp always opens */
+        $file = fopen('php://temp', 'r+');
+
+        try {
+            fwrite($file, $bytes);
+            rewind($file);
+            $columns = [];
+            foreach ((array) fgetcsv($file, null, $separator, '"', '') as $column) {
+                $name = trim((string) $column);
+                if ($name === '' || isset($columns[$name])) {
+                    throw new ImportFileException('import.error.header');
+                }
+                $columns[$name] = true;
             }
-            $columns[$name] = true;
-        }
-        $names = array_keys($columns);
-        $rows  = [];
-        while (!$file->eof()) {
-            $cells = $file->fgetcsv($separator, '"', '');
-            if (!is_array($cells) || $cells === [null] || (count($cells) === 1 && trim((string) $cells[0]) === '')) {
-                continue;
+            $names = array_keys($columns);
+            $rows  = [];
+            while (!feof($file)) {
+                $cells = fgetcsv($file, null, $separator, '"', '');
+                if (!is_array($cells) || $cells === [null] || (count($cells) === 1 && trim((string) $cells[0]) === '')) {
+                    continue;
+                }
+                if (count($rows) >= $maxRows) {
+                    throw new ImportFileException('import.error.too_many_rows');
+                }
+                $row = [];
+                foreach ($names as $i => $name) {
+                    $row[$name] = $cells[$i] ?? '';
+                }
+                $rows[] = $row;
             }
-            if (count($rows) >= $maxRows) {
-                throw new ImportFileException('import.error.too_many_rows');
-            }
-            $row = [];
-            foreach ($names as $i => $name) {
-                $row[$name] = (string) ($cells[$i] ?? '');
-            }
-            $rows[] = $row;
+        } finally {
+            fclose($file);
         }
         if ($rows === []) {
             throw new ImportFileException('import.error.empty');

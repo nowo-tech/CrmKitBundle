@@ -33,6 +33,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The CSV import reads through a `php://temp` stream and `fgetcsv()` instead of `SplFileObject::fgetcsv()`, which PHP 8.6 deprecates (same parsing).
+- PHP 8.6: `composer.json` allows PHP below 8.7 (was below 8.6). CI adds a forward-compatibility workflow with a
+  PHP 8.6 cell and a Symfony 8.2 cell (stable Symfony 8.2.0).
+
 ## [0.13.0] - 2026-11-28
 
 Planned as **0.13.0** (block A-2: e-mail templates and *Write e-mail*). 0.12.0 (the

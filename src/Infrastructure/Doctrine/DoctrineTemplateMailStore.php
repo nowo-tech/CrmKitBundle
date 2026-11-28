@@ -66,11 +66,10 @@ final readonly class DoctrineTemplateMailStore implements TemplateMailStoreInter
         $out = [];
         foreach ($rows as $row) {
             $id = is_array($row) ? ($row['id'] ?? null) : null;
-            if (!is_array($row) || !is_string($id) || ($row['tenantId'] ?? null) !== $tenant->value || !array_key_exists($id, $versions)) {
-                continue;
-            }
-            // Audit ZDI-L1: the classification of another version is none.
-            if (is_numeric($row['version'] ?? null) && (int) $row['version'] === $versions[$id]) {
+            // Exact re-check of what the query matched (a case-insensitive collation may widen it); audit ZDI-L1: the
+            // classification of another version is none.
+            if (is_array($row) && is_string($id) && ($row['tenantId'] ?? null) === $tenant->value && array_key_exists($id, $versions)
+                && is_numeric($row['version'] ?? null) && (int) $row['version'] === $versions[$id]) {
                 $purpose  = $row['purpose'] ?? null;
                 $out[$id] = is_string($purpose) ? $purpose : null;
             }

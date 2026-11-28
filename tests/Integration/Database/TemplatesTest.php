@@ -185,6 +185,7 @@ final class TemplatesTest extends TemplatesTestCase
         self::assertSame([], $contact->resolve(['first_name'], new PlaceholderContext(new TemplateActor('acme', 'leo'), 'en', ['contact' => $ada])), 'another person');
         self::assertSame([], $contact->resolve(['first_name'], new PlaceholderContext(new TemplateActor('globex', 'ana'), 'en', ['contact' => $ada])), 'another tenant');
         self::assertSame([], $contact->resolve(['first_name'], new PlaceholderContext(new TemplateActor('acme', 'ana'), 'en')), 'no contact');
+        self::assertSame([], $contact->resolve(['first_name'], new PlaceholderContext(new TemplateActor('acme', 'ana'), 'en', ['contact' => '0190a000-0000-7000-8000-00000000dead'])), 'a contact that does not exist');
         self::assertSame([], $this->service(CompanyPlaceholders::class)->resolve(['name'], $own));
         self::assertSame([], $this->service(DealPlaceholders::class)->resolve(['title'], new PlaceholderContext(new TemplateActor('acme', 'ana'), 'en', ['deal' => $ada])), 'funnels off');
         self::assertSame(['name' => 'Ana', 'email' => 'ana@example.test'], $this->service(MePlaceholders::class)->resolve(['name', 'email'], $own));

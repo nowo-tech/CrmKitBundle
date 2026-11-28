@@ -72,7 +72,7 @@ final class CsvParser
                 }
                 $row = [];
                 foreach ($names as $i => $name) {
-                    $row[$name] = (string) ($cells[$i] ?? '');
+                    $row[$name] = $cells[$i] ?? '';
                 }
                 $rows[] = $row;
             }

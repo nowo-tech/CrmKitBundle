@@ -113,7 +113,10 @@ final class HubSpotKernelTest extends KernelTestCase
         self::assertInstanceOf(RunCrmImportHandler::class, $this->services($container)->get(RunCrmImportHandler::class));
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('import.messenger.enabled needs symfony/messenger');
-        $this->bootKernel(TestServices::PORTS + ['import' => ['messenger' => ['enabled' => true]]]);
+        // A host without Messenger: FrameworkBundle 8.2 enables framework.messenger once symfony/messenger is installed.
+        $this->bootKernel(TestServices::PORTS + ['import' => ['messenger' => ['enabled' => true]]], $this->host(static function (ServicesConfigurator $services, ContainerConfigurator $container): void {
+            $container->extension('framework', ['messenger' => ['enabled' => false]]);
+        }));
     }
 
     private function services(ContainerInterface $container): ContainerInterface

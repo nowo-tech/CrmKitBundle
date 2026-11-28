@@ -3,6 +3,8 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.13.0](#to-0130)
+  - [E-mail templates (0.13.0, opt-in)](#e-mail-templates-0130-opt-in)
 - [To 0.12.1](#to-0121)
 - [To 0.12.0](#to-0120)
 - [To 0.11.0](#to-0110)
@@ -27,6 +29,14 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.13.0
+
+From **0.12.1**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
 
 Planned as **0.13.0** (Beacon spec 254, A-2 e-mail templates). From 0.11.0, 0.12.0 or 0.12.1:
 

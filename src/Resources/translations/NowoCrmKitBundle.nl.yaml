@@ -1,5 +1,6 @@
 # CRM-kit, fase A (bedrijven en contacten). Domein NowoCrmKitBundle. Parameters staan tussen %.
 nav:
+    templates: 'Sjablonen'
     funnels: 'Trechters'
     deals: 'Deals'
     label: CRM
@@ -514,6 +515,7 @@ search:
     see_all: 'Alle %count% tonen'
 flash:
     conflict:
+        crm_mail_already_sent: 'Deze e-mail is al verzonden. Sluit het venster om hem bij het contact te zien.'
         crm_hubspot_rate_limited: 'Te veel sleutelcontroles voor deze organisatie. Wacht een paar minuten.'
         crm_stage_invalid: 'Deze fase kan niet worden gebruikt: ze hoort bij een andere trechter, of de fase of de trechter is gearchiveerd of gesloten.'
         crm_record_stale: 'Iemand heeft dit record op hetzelfde moment gewijzigd. Het formulier toont de huidige waarden: controleer ze en sla opnieuw op.'
@@ -862,3 +864,92 @@ notify:
         title: "%actor% heeft u genoemd in een CRM-notitie"
     category:
         crm: "CRM"
+templates:
+    title: 'E-mailsjablonen'
+    intro: 'Uw sjablonen en tekstblokken, en die van de organisatie. E-mail schrijven bij een contact voegt ze in.'
+    empty: 'Nog geen sjablonen.'
+    empty_hint: 'Maak een sjabloon voor berichten die u vaak verstuurt, of een tekstblok zoals uw handtekening.'
+template:
+    new_template: 'Nieuw sjabloon'
+    new_snippet: 'Nieuw tekstblok'
+    edit_template: 'Sjabloon bewerken'
+    edit_snippet: 'Tekstblok bewerken'
+    edit: 'Bewerken'
+    delete: 'Verwijderen'
+    delete_confirm: 'Dit sjabloon definitief verwijderen?'
+    save: 'Opslaan'
+    created: 'Het sjabloon is opgeslagen.'
+    saved: 'Het sjabloon is opgeslagen.'
+    deleted: 'Het sjabloon is verwijderd.'
+    unclassified: 'Niet ingedeeld (kan niet worden verzonden)'
+    html_notice: 'Dit sjabloon heeft een elders geschreven HTML-inhoud. Hier opslaan vervangt die door de tekst hieronder.'
+    kind:
+        template: 'Sjabloon'
+        snippet: 'Tekstblok'
+    scope:
+        personal: 'Alleen ik'
+        shared: 'Organisatie'
+    form:
+        name: 'Naam'
+        key: 'Sleutel'
+        key_help: 'Kleine letters, cijfers, ".", "_" en "-", uniek per taal.'
+        locale: 'Taal'
+        locale_help: 'Bijvoorbeeld "nl" of "nl_NL".'
+        scope: 'Wie het mag gebruiken'
+        subject: 'Onderwerp'
+        purpose: 'Toestemming'
+        purpose_help: 'Een commercieel sjabloon vraagt de toestemming van het contact voor dit doel; een servicebericht niet.'
+        service: 'Servicebericht (geen toestemming nodig)'
+        text: 'Tekst'
+        text_help: 'Plaatsaanduidingen worden bij het invoegen vervangen door de waarden van de kaart: %placeholders%. Onbekende blijven als tekst staan.'
+        kind: 'Soort'
+    placeholder:
+        full_name: 'Volledige naam'
+        owner_name: 'Eigenaar'
+        deal_title: 'Titel van de deal'
+        deal_amount: 'Bedrag van de deal'
+        deal_expected_close: 'Verwachte afsluiting'
+        me_name: 'Mijn naam'
+        me_email: 'Mijn e-mail'
+template_error:
+    key: 'Gebruik 1 tot 64 kleine letters, cijfers, ".", "_" of "-".'
+    locale: 'Gebruik een taalcode zoals "nl" of "nl_NL".'
+    name: 'Gebruik 1 tot 190 tekens zonder stuurtekens.'
+    subject: 'Gebruik 1 tot 255 tekens op één regel.'
+    body: 'De tekst is leeg of te lang.'
+    html: 'Plaatsaanduidingen zijn niet toegestaan in links of afbeeldingen.'
+    placeholders: 'Te veel plaatsaanduidingen.'
+    scope: 'Het bereik van een sjabloon kan niet veranderen.'
+    output: 'De gemaakte tekst is te lang.'
+    key_taken: 'Er bestaat al een sjabloon met deze sleutel en taal.'
+    kind: 'De soort van een sjabloon kan niet veranderen.'
+mail:
+    write: 'E-mail schrijven'
+    title: 'E-mail aan %name%'
+    send: 'Verzenden'
+    sent: 'De e-mail is verzonden en vastgelegd.'
+    sent_not_logged: 'De e-mail is verzonden, maar kon niet als activiteit worden vastgelegd.'
+    unresolved: 'Als tekst gelaten (geen waarde die u mag zien): %placeholders%.'
+    form:
+        stay: 'Bijwerken'
+        to: 'Aan:'
+        template: 'Sjabloon'
+        no_template: 'Geen sjabloon'
+        insert_template: 'Sjabloon invoegen'
+        deal: 'Deal'
+        deal_help: 'Voor de plaatsaanduidingen {{ deal.* }}.'
+        no_deal: 'Geen deal'
+        subject: 'Onderwerp'
+        text: 'Bericht'
+        snippet: 'Tekstblok'
+        no_snippet: 'Kies een tekstblok'
+        insert_snippet: 'Tekstblok invoegen'
+mail_error:
+    no_consent: 'Dit contact heeft geen toestemming gegeven voor "%purpose%". Gebruik een servicesjabloon of schrijf het bericht zelf.'
+    no_address: 'Dit contact heeft geen e-mailadres.'
+    unclassified: 'Dit sjabloon is nog niet ingedeeld: een beheerder moet de toestemming kiezen.'
+    template: 'Kies een sjabloon dat u mag gebruiken.'
+    subject: 'Schrijf een onderwerp van maximaal 255 tekens op één regel.'
+    text: 'Schrijf een bericht (maximaal 100 000 tekens).'
+    not_sent: 'De e-mail kon niet worden verzonden. Probeer het later opnieuw.'
+    rate_limited: 'U hebt in korte tijd veel e-mails verzonden. Wacht een paar minuten.'

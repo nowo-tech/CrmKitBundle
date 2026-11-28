@@ -1,0 +1,11 @@
+{#
+  The person's and the organisation's e-mail templates and snippets (0.13.0, `templates.enabled`): the list, with
+  "New template" / "New snippet" and each row's Edit opening its form on demand in the page's one remote dialog
+  (crm_dialog, see pipeline/_dialog.html.twig), and Delete (a POST action with a confirm). Names and subjects are
+  untrusted (printed escaped). Variables: page (ListPage), crm_dialog ({id, title} or null).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
+
+{% block nowo_ui_list_after %}
+    {{ include('@NowoCrmKit/pipeline/_dialog.html.twig', {crm_dialog: crm_dialog|default(null)}, false) }}
+{% endblock %}

@@ -1,5 +1,6 @@
 # CRM kit, fase A (empresas e contactos). Domínio NowoCrmKitBundle. Os parâmetros vêm entre %.
 nav:
+    templates: 'Modelos'
     funnels: 'Funis'
     deals: 'Negócios'
     label: CRM
@@ -514,6 +515,7 @@ search:
     see_all: 'Ver os %count%'
 flash:
     conflict:
+        crm_mail_already_sent: 'Este e-mail já foi enviado. Feche a janela para o ver no contacto.'
         crm_hubspot_rate_limited: 'Demasiadas verificações de chave para esta organização. Aguarde alguns minutos.'
         crm_stage_invalid: 'Esta etapa não pode ser usada: pertence a outro funil, ou a etapa ou o funil está arquivado ou fechado.'
         crm_record_stale: 'Alguém alterou este registo ao mesmo tempo. O formulário mostra os valores atuais: verifique-os e guarde novamente.'
@@ -862,3 +864,92 @@ notify:
         title: "%actor% mencionou-o numa nota do CRM"
     category:
         crm: "CRM"
+templates:
+    title: 'Modelos de e-mail'
+    intro: 'Os seus modelos e excertos, e os da organização. Escrever e-mail num contacto insere-os.'
+    empty: 'Ainda não há modelos.'
+    empty_hint: 'Crie um modelo para as mensagens que envia com frequência, ou um excerto como a sua assinatura.'
+template:
+    new_template: 'Novo modelo'
+    new_snippet: 'Novo excerto'
+    edit_template: 'Editar modelo'
+    edit_snippet: 'Editar excerto'
+    edit: 'Editar'
+    delete: 'Eliminar'
+    delete_confirm: 'Eliminar este modelo definitivamente?'
+    save: 'Guardar'
+    created: 'O modelo foi guardado.'
+    saved: 'O modelo foi guardado.'
+    deleted: 'O modelo foi eliminado.'
+    unclassified: 'Não classificado (não pode ser enviado)'
+    html_notice: 'Este modelo tem um corpo HTML escrito noutro lado. Guardar aqui substitui-o pelo texto abaixo.'
+    kind:
+        template: 'Modelo'
+        snippet: 'Excerto'
+    scope:
+        personal: 'Só eu'
+        shared: 'Organização'
+    form:
+        name: 'Nome'
+        key: 'Chave'
+        key_help: 'Minúsculas, dígitos, ".", "_" e "-", única por idioma.'
+        locale: 'Idioma'
+        locale_help: 'Por exemplo "pt" ou "pt_PT".'
+        scope: 'Quem o pode usar'
+        subject: 'Assunto'
+        purpose: 'Consentimento'
+        purpose_help: 'Um modelo comercial precisa do consentimento do contacto para esta finalidade; uma mensagem de serviço não.'
+        service: 'Mensagem de serviço (sem consentimento)'
+        text: 'Texto'
+        text_help: 'Os marcadores são substituídos pelos valores da ficha ao inserir o modelo: %placeholders%. Os desconhecidos ficam como texto.'
+        kind: 'Tipo'
+    placeholder:
+        full_name: 'Nome completo'
+        owner_name: 'Responsável'
+        deal_title: 'Título do negócio'
+        deal_amount: 'Valor do negócio'
+        deal_expected_close: 'Fecho previsto'
+        me_name: 'O meu nome'
+        me_email: 'O meu e-mail'
+template_error:
+    key: 'Use de 1 a 64 minúsculas, dígitos, ".", "_" ou "-".'
+    locale: 'Use um código de idioma como "pt" ou "pt_PT".'
+    name: 'Use de 1 a 190 caracteres sem caracteres de controlo.'
+    subject: 'Use de 1 a 255 caracteres numa linha.'
+    body: 'O texto está vazio ou é demasiado longo.'
+    html: 'Não são permitidos marcadores em ligações ou imagens.'
+    placeholders: 'Demasiados marcadores.'
+    scope: 'O âmbito de um modelo não pode mudar.'
+    output: 'O texto resultante é demasiado longo.'
+    key_taken: 'Já existe um modelo com esta chave e idioma.'
+    kind: 'O tipo de um modelo não pode mudar.'
+mail:
+    write: 'Escrever e-mail'
+    title: 'E-mail para %name%'
+    send: 'Enviar'
+    sent: 'O e-mail foi enviado e registado.'
+    sent_not_logged: 'O e-mail foi enviado, mas não foi possível registá-lo como atividade.'
+    unresolved: 'Ficaram como texto (sem um valor que possa ver): %placeholders%.'
+    form:
+        stay: 'Atualizar'
+        to: 'Para:'
+        template: 'Modelo'
+        no_template: 'Sem modelo'
+        insert_template: 'Inserir modelo'
+        deal: 'Negócio'
+        deal_help: 'Para os marcadores {{ deal.* }}.'
+        no_deal: 'Sem negócio'
+        subject: 'Assunto'
+        text: 'Mensagem'
+        snippet: 'Excerto'
+        no_snippet: 'Escolha um excerto'
+        insert_snippet: 'Inserir excerto'
+mail_error:
+    no_consent: 'Este contacto não deu consentimento para "%purpose%". Use um modelo de serviço ou escreva a mensagem.'
+    no_address: 'Este contacto não tem endereço de e-mail.'
+    unclassified: 'Este modelo ainda não está classificado: um responsável deve escolher o consentimento.'
+    template: 'Escolha um modelo que possa usar.'
+    subject: 'Escreva um assunto de até 255 caracteres numa linha.'
+    text: 'Escreva uma mensagem (até 100 000 caracteres).'
+    not_sent: 'Não foi possível enviar o e-mail. Tente mais tarde.'
+    rate_limited: 'Enviou muitos e-mails em pouco tempo. Aguarde alguns minutos.'

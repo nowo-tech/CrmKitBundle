@@ -1,5 +1,6 @@
 # CRM kit, fase A (aziende e contatti). Dominio NowoCrmKitBundle. I parametri sono racchiusi tra %.
 nav:
+    templates: 'Modelli'
     funnels: 'Imbuti'
     deals: 'Trattative'
     label: CRM
@@ -514,6 +515,7 @@ search:
     see_all: 'Mostra tutti i %count%'
 flash:
     conflict:
+        crm_mail_already_sent: 'Questa e-mail è già stata inviata. Chiudi la finestra per vederla sul contatto.'
         crm_hubspot_rate_limited: 'Troppi controlli di chiave per questa organizzazione. Attendi qualche minuto.'
         crm_stage_invalid: 'Questa fase non può essere usata: appartiene a un altro imbuto, oppure la fase o l’imbuto è archiviato o chiuso.'
         crm_record_stale: 'Qualcuno ha modificato questo record nello stesso momento. Il modulo mostra i valori attuali: controllali e salva di nuovo.'
@@ -862,3 +864,92 @@ notify:
         title: "%actor% ti ha menzionato in una nota del CRM"
     category:
         crm: "CRM"
+templates:
+    title: 'Modelli di e-mail'
+    intro: 'I tuoi modelli e frammenti, e quelli dell''organizzazione. Scrivi e-mail su un contatto li inserisce.'
+    empty: 'Ancora nessun modello.'
+    empty_hint: 'Crea un modello per i messaggi che invii spesso, o un frammento come la tua firma.'
+template:
+    new_template: 'Nuovo modello'
+    new_snippet: 'Nuovo frammento'
+    edit_template: 'Modifica modello'
+    edit_snippet: 'Modifica frammento'
+    edit: 'Modifica'
+    delete: 'Elimina'
+    delete_confirm: 'Eliminare definitivamente questo modello?'
+    save: 'Salva'
+    created: 'Il modello è stato salvato.'
+    saved: 'Il modello è stato salvato.'
+    deleted: 'Il modello è stato eliminato.'
+    unclassified: 'Non classificato (non può essere inviato)'
+    html_notice: 'Questo modello ha un corpo HTML scritto altrove. Salvare qui lo sostituisce con il testo sotto.'
+    kind:
+        template: 'Modello'
+        snippet: 'Frammento'
+    scope:
+        personal: 'Solo io'
+        shared: 'Organizzazione'
+    form:
+        name: 'Nome'
+        key: 'Chiave'
+        key_help: 'Minuscole, cifre, ".", "_" e "-", unica per lingua.'
+        locale: 'Lingua'
+        locale_help: 'Per esempio "it" o "it_IT".'
+        scope: 'Chi può usarlo'
+        subject: 'Oggetto'
+        purpose: 'Consenso'
+        purpose_help: 'Un modello commerciale richiede il consenso del contatto per questa finalità; un messaggio di servizio no.'
+        service: 'Messaggio di servizio (nessun consenso)'
+        text: 'Testo'
+        text_help: 'I segnaposto vengono sostituiti dai valori della scheda quando si inserisce il modello: %placeholders%. Quelli sconosciuti restano come testo.'
+        kind: 'Tipo'
+    placeholder:
+        full_name: 'Nome completo'
+        owner_name: 'Responsabile'
+        deal_title: 'Titolo dell''opportunità'
+        deal_amount: 'Importo dell''opportunità'
+        deal_expected_close: 'Chiusura prevista'
+        me_name: 'Il mio nome'
+        me_email: 'La mia e-mail'
+template_error:
+    key: 'Usa da 1 a 64 minuscole, cifre, ".", "_" o "-".'
+    locale: 'Usa un codice di lingua come "it" o "it_IT".'
+    name: 'Usa da 1 a 190 caratteri senza caratteri di controllo.'
+    subject: 'Usa da 1 a 255 caratteri su una riga.'
+    body: 'Il testo è vuoto o troppo lungo.'
+    html: 'I segnaposto non sono ammessi in link o immagini.'
+    placeholders: 'Troppi segnaposto.'
+    scope: 'L''ambito di un modello non può cambiare.'
+    output: 'Il testo risultante è troppo lungo.'
+    key_taken: 'Esiste già un modello con questa chiave e lingua.'
+    kind: 'Il tipo di un modello non può cambiare.'
+mail:
+    write: 'Scrivi e-mail'
+    title: 'E-mail a %name%'
+    send: 'Invia'
+    sent: 'L''e-mail è stata inviata e registrata.'
+    sent_not_logged: 'L''e-mail è stata inviata, ma non è stato possibile registrarla come attività.'
+    unresolved: 'Lasciati come testo (nessun valore che puoi vedere): %placeholders%.'
+    form:
+        stay: 'Aggiorna'
+        to: 'A:'
+        template: 'Modello'
+        no_template: 'Nessun modello'
+        insert_template: 'Inserisci modello'
+        deal: 'Opportunità'
+        deal_help: 'Per i segnaposto {{ deal.* }}.'
+        no_deal: 'Nessuna opportunità'
+        subject: 'Oggetto'
+        text: 'Messaggio'
+        snippet: 'Frammento'
+        no_snippet: 'Scegli un frammento'
+        insert_snippet: 'Inserisci frammento'
+mail_error:
+    no_consent: 'Questo contatto non ha dato il consenso per "%purpose%". Usa un modello di servizio o scrivi tu il messaggio.'
+    no_address: 'Questo contatto non ha un indirizzo e-mail.'
+    unclassified: 'Questo modello non è ancora classificato: un responsabile deve sceglierne il consenso.'
+    template: 'Scegli un modello che puoi usare.'
+    subject: 'Scrivi un oggetto di massimo 255 caratteri su una riga.'
+    text: 'Scrivi un messaggio (massimo 100 000 caratteri).'
+    not_sent: 'Non è stato possibile inviare l''e-mail. Riprova più tardi.'
+    rate_limited: 'Hai inviato molte e-mail in poco tempo. Attendi qualche minuto.'

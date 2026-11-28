@@ -220,8 +220,11 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
         $data        = $this->call($token, 'GET', '/crm/v3/objects/' . rawurlencode($kind->value), $query);
         $engagements = [];
         foreach ($this->results($data) as $row) {
-            $associations  = is_array($row['associations'] ?? null) ? $row['associations'] : [];
-            $engagements[] = new HubSpotEngagement($this->objectId($row['id'] ?? null), $this->values($row, $names), $this->associated($associations['contacts'] ?? null), $this->associated($associations['companies'] ?? null));
+            $associations = is_array($row['associations'] ?? null) ? $row['associations'] : [];
+            // 0.12.1 (audit ZDE-v-1): every inline contact id is kept for the erased-person check; only the records used
+            // as subjects are capped.
+            $contacts      = $this->associated($associations['contacts'] ?? null);
+            $engagements[] = new HubSpotEngagement($this->objectId($row['id'] ?? null), $this->values($row, $names), array_slice($contacts, 0, self::MAX_ASSOCIATED), array_slice($this->associated($associations['companies'] ?? null), 0, self::MAX_ASSOCIATED), $contacts);
         }
 
         return new HubSpotEngagementPage($engagements, $this->next($data));
@@ -342,8 +345,8 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
     }
 
     /**
-     * The distinct ids of one association kind of a v3 result (`{"results": [{"id": …, "type": …}]}`), at most
-     * {@see self::MAX_ASSOCIATED}; the association's own paging is not followed.
+     * The distinct ids of one association kind of a v3 result (`{"results": [{"id": …, "type": …}]}`), every inline one
+     * (the caller caps the ones it uses, {@see self::MAX_ASSOCIATED}); the association's own paging is not followed.
      *
      * @throws HubSpotException
      *
@@ -357,10 +360,8 @@ final readonly class HttpHubSpotReader implements HubSpotReaderInterface
         $rows = is_array($block) && is_array($block['results'] ?? null) ? $block['results'] : throw new HubSpotException(HubSpotException::BAD_RESPONSE, 200);
         $ids  = [];
         foreach ($rows as $row) {
-            $id = $this->objectId(is_array($row) ? ($row['id'] ?? null) : null);
-            if (count($ids) < self::MAX_ASSOCIATED) {
-                $ids[$id->value] = $id;
-            }
+            $id              = $this->objectId(is_array($row) ? ($row['id'] ?? null) : null);
+            $ids[$id->value] = $id;
         }
 
         return array_values($ids);

@@ -118,6 +118,7 @@ Read for this contract (2026-11-18):
   - [25.8 0.10.0: lean informative circulars](#258-0100-lean-informative-circulars)
 - [26. Addendum: HubSpot import source (design, 2026-11-23)](#26-addendum-hubspot-import-source-design-2026-11-23)
 - [27. Addendum: activities (A-1, 0.11.0)](#27-addendum-activities-a-1-0110)
+- [28. Addendum: e-mail templates (A-2, 0.13.0)](#28-addendum-e-mail-templates-a-2-0130)
 
 ## 0. Findings that shaped the contract
 
@@ -1275,3 +1276,32 @@ Full requirements: [`specs/002-activities/spec.md`](../specs/002-activities/spec
 - **Deviations from the roadmap's plan.** No MailKit invite part yet (an authorised `.ics` download instead;
   `CrmMailSenderInterface` with MailKit 2.3); no NotifyKit reminders (Q-254-2, later slice); `ActivityDirection`
   instead of `CallDirection`; HubSpot engagements in HubSpot part 4.
+
+## 28. Addendum: e-mail templates (A-2, 0.13.0)
+
+Contract revision of Beacon spec 254 block A-2 (task T003, FR-015 / FR-016), built as 0.13.0 on MailKit 2.7's stored
+templates (MailKit contract C1–C12; owner D-20261127-02). Full requirements:
+[`specs/003-templates/spec.md`](../specs/003-templates/spec.md); configuration:
+[CONFIGURATION.md](CONFIGURATION.md#e-mail-templates-0130); usage:
+[USAGE.md](USAGE.md#e-mail-templates-and-write-e-mail-0130).
+
+- **Switch.** `templates.enabled` (default false; needs `activities.enabled` and the optional
+  `nowo-tech/mail-kit-bundle` >= 2.7 with `nowo_mail_kit.templates.enabled`): one table (`crm_template_purpose`),
+  services, routes and the providers only while on.
+- **Services.** `EmailTemplatesInterface` (`list`, `get`, `create`, `update`, `delete`, `compose`, `placeholders`),
+  `MailComposerInterface` (`send`). Values `EmailTemplateView`, `ComposedText`, `MailOutcome`, `EmailTemplateInput`,
+  `MailDraft`, `TemplateRef`, `CrmOutgoingMail`, `CrmSentMailRef`, enum `EmailTemplateKind`.
+- **Ports.** `CrmMailSenderInterface` (host; default the MailKit bridge on Symfony Mailer). The CRM implements
+  MailKit's `TemplatePermissionInterface` (`nowo_crm_kit.template_permission`) and four
+  `PlaceholderProviderInterface` (`contact`, `company`, `deal`, `me`). MailKit types stay in `Bridge/MailKit`
+  (REQ-ARCH-001 rule 3).
+- **Access.** `edit` (tenant-wide) to use templates, `manage` for the organisation's; *Write e-mail* needs `edit` on
+  the contact; placeholders resolve only for the exact CRM tenant and person and only what the record view shows.
+- **Consent (§16).** A template is classified (a `gdpr.purposes` key or a service message); a commercial one is sent
+  only while the contact's latest decision for its purpose is a grant; unclassified templates are refused.
+- **Concurrency (REQ-RUNTIME-003).** Checks in one unit under the contact's lock, a one-time send key, the send outside
+  any transaction, the activity in its own unit (CONCURRENCY.md "Write e-mail").
+- **Events.** `CrmMailSent` (after the send). Audit `crm.template.created` / `saved` / `deleted`, `crm.mail.claimed`.
+- **Deviations.** No `MergeField` value object (MailKit owns the grammar); contacts only, plain text, one recipient
+  (spec 248's composer in Beacon covers the rest); the CRM's form edits the text body only.
+

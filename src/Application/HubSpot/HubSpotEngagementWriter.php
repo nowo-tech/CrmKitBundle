@@ -38,6 +38,8 @@ use Nowo\CrmKitBundle\Domain\Value\MeetingPlace;
 use Nowo\CrmKitBundle\Domain\Value\MeetingSlot;
 use Nowo\CrmKitBundle\Domain\Value\SubjectRef;
 
+use function array_flip;
+use function array_intersect_key;
 use function array_map;
 use function array_unique;
 use function array_values;
@@ -108,8 +110,9 @@ final readonly class HubSpotEngagementWriter
         $hids     = array_map(static fn (HubSpotEngagement $e): string => $e->id->value, $items);
         $refs     = $this->store->refs($context->tenant, $account, $kind->refType(), $hids);
         $existing = $this->existing($context, $account, $kind, $items, $refs);
+        // Every inline contact's reference (the erased-person check), but only the capped ones become records.
         $people   = $this->store->refs($context->tenant, $account, 'contact', $this->ids($items, true));
-        $contacts = $this->records->targets($context, SubjectType::Contact, $people);
+        $contacts = $this->records->targets($context, SubjectType::Contact, array_intersect_key($people, array_flip($this->ids($items, true, true))));
         $partners = $this->records->targets($context, SubjectType::Company, $this->store->refs($context->tenant, $account, 'company', $this->ids($items, false)));
         $lock     = [SubjectType::Contact->value => array_values($contacts), SubjectType::Company->value => array_values($partners)];
         foreach ($existing as $item) {
@@ -517,7 +520,8 @@ final readonly class HubSpotEngagementWriter
         if ($ref instanceof ExternalRef && $ref->isErased()) {
             return true;
         }
-        foreach ($item->contacts as $contact) {
+        // 0.12.1 (audit ZDE-v-1): every inline contact, not only the ones used as records.
+        foreach ($item->allContacts as $contact) {
             if (($people[$contact->value] ?? null)?->isErased() === true) {
                 return true;
             }
@@ -547,17 +551,18 @@ final readonly class HubSpotEngagementWriter
     }
 
     /**
-     * The distinct associated contact (or company) ids of the page.
+     * The distinct associated contact (or company) ids of the page: every inline contact, or (`$capped`) only those
+     * used as records.
      *
      * @param list<HubSpotEngagement> $items
      *
      * @return list<string>
      */
-    private function ids(array $items, bool $contacts): array
+    private function ids(array $items, bool $contacts, bool $capped = false): array
     {
         $ids = [];
         foreach ($items as $item) {
-            foreach ($contacts ? $item->contacts : $item->companies as $id) {
+            foreach ($contacts ? ($capped ? $item->contacts : $item->allContacts) : $item->companies as $id) {
                 $ids[$id->value] = $id->value;
             }
         }

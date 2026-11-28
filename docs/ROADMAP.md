@@ -14,7 +14,7 @@ contract revision (tables, services, concurrency) before it is built.
   - [Release plan](#release-plan)
   - [Reuse matrix](#reuse-matrix)
   - [Old phases and spec 254](#old-phases-and-spec-254)
-  - [Block A — activities and templates (A-1 0.11.0, A-2 0.15.0)](#block-a--activities-and-templates-a-1-0110-a-2-0150)
+  - [Block A — activities and templates (A-1 0.11.0, A-2 0.13.0)](#block-a--activities-and-templates-a-1-0110-a-2-0130)
   - [Block B — mailbox sync and tracking (CrmKit 0.16.0)](#block-b--mailbox-sync-and-tracking-crmkit-0160)
   - [Block C — products, line items and quotes (C-1 0.17.0, C-2 0.18.0)](#block-c--products-line-items-and-quotes-c-1-0170-c-2-0180)
   - [Block D — tickets, SLA and support inbox (D-1 0.19.0, D-2 0.20.0, D-3 later)](#block-d--tickets-sla-and-support-inbox-d-1-0190-d-2-0200-d-3-later)
@@ -104,8 +104,9 @@ Q-O questions) in [CONTRACT.md](CONTRACT.md) before it is built.
 
 ### Release plan
 
-Version numbers as of 2026-11-27: A-1 moved first (Beacon priority) and is **0.11.0**; then the HubSpot activities
-import 0.12.0, A-2 templates 0.13.0, then H2, Z1 (Zoho companies and contacts) and H3; the slices after them take the next free minor in the order of this table
+Version numbers as of 2026-11-27: A-1 moved first (Beacon priority) and is **0.11.0**; the HubSpot activity import
+is 0.12.0 and **A-2 templates 0.13.0** (owner D-20261127-02); H2, Z1 (Zoho companies and contacts)
+and H3 follow with the next free minors; the slices after them take the next free minor in the order of this table
 when they are scheduled (numbers move up when another release lands first; the order does not change). "Kit option" is the configuration switch; off means no tables mapped, no routes, no services, no menu entries.
 
 | Slice | CrmKit | Content | Kit option | Other bundles (new work in **bold**) | Beacon release (target) |
@@ -200,7 +201,7 @@ created, README only).
 | E2 circulars | **F-2** (needs the verified domain of FR-064) |
 | G reports | Forecast and goals become **G**; velocity, cohorts and deal scoring stay in phase G "reports" later |
 
-### Block A — activities and templates (A-1 0.11.0, A-2 0.15.0)
+### Block A — activities and templates (A-1 0.11.0, A-2 0.13.0)
 
 - **A-1 as built (0.11.0, Beacon tasks T001 and T002; spec in `specs/002-activities/`).** `activities.enabled` (off by
   default); calls, meetings and e-mails (`Engagement`, its records and attendees, three tables) with log / edit dialogs
@@ -218,6 +219,20 @@ created, README only).
   - NotifyKit reminders (Q-254-2) are not part of 0.11.0; they reuse `CrmNotifierInterface` in a later slice.
   - `ActivityDirection` (in / out) serves calls and e-mails instead of a `CallDirection` of calls only.
 
+- **A-2 as built (0.13.0, Beacon task T003, FR-015 / FR-016; spec in `specs/003-templates/`).** `templates.enabled`
+  (off by default; needs `activities.enabled` and MailKit >= 2.7, an optional dependency) on MailKit 2.7's stored
+  templates (contract C1–C12): `EmailTemplatesInterface` over MailKit's library and renderer; the `contact.*`,
+  `company.*`, `deal.*`, `me.*` providers (only the exact CRM tenant and person, only what the record view shows);
+  MailKit's permission port on the CRM gate (`nowo_crm_kit.template_permission`: `edit` / `manage`); the consent
+  classification per template (`crm_template_purpose`, cleaned on `TemplateDeletedEvent`; unclassified templates
+  cannot be sent); *Write e-mail* on a contact's 360° page (server-side template / snippet inserts, the checks under the
+  contact's lock, a one-time send key, a per-person rate limit, the send outside the transaction through
+  `CrmMailSenderInterface`, an `email` activity and `CrmMailSent`); the Templates page. Deviations from the plan below:
+  - `MergeField` is not a CRM value object: MailKit's registry owns the grammar (`{{ ns.name }}`) and each provider
+    has a closed name list. `TemplateRef` is the MailKit id.
+  - *Write e-mail* is on contacts only (one recipient, plain text); company and deal pages, attachments, cc and the
+    person's own mailbox as sender are spec 248's composer in Beacon (or `templates.mail_sender`).
+  - The CRM's form edits the text body; HTML bodies written elsewhere are replaced when saved in the CRM.
 - **Reuse (owner rule).**
   - Meetings on a calendar: **reuse TaskBoard as is** (`CalendarEventSourceInterface`, timed events since 2.24;
     CrmKit's `Bridge/TaskBoard` adds a source). Meetings already in a person's Outlook / Google calendar: **reuse

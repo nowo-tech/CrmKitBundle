@@ -41,6 +41,7 @@ final readonly class UiOptions
         'fields'    => 'tabler:forms',
         'settings'  => 'tabler:settings',
         'funnels'   => 'tabler:filter',
+        'templates' => 'tabler:mail',
     ];
 
     /**

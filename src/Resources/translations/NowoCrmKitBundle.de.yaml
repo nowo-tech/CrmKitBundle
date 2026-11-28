@@ -1,5 +1,6 @@
 # CRM-Kit, Phase A (Unternehmen und Kontakte). Domain NowoCrmKitBundle. Parameter stehen in %.
 nav:
+    templates: 'Vorlagen'
     funnels: 'Trichter'
     deals: 'Deals'
     label: CRM
@@ -514,6 +515,7 @@ search:
     see_all: 'Alle %count% anzeigen'
 flash:
     conflict:
+        crm_mail_already_sent: 'Diese E-Mail wurde bereits gesendet. Schließen Sie den Dialog, um sie beim Kontakt zu sehen.'
         crm_hubspot_rate_limited: 'Zu viele Schlüsselprüfungen für diese Organisation. Warten Sie einige Minuten.'
         crm_stage_invalid: 'Diese Phase kann nicht verwendet werden: Sie gehört zu einem anderen Trichter, oder die Phase oder der Trichter ist archiviert oder abgeschlossen.'
         crm_record_stale: 'Jemand hat diesen Datensatz gleichzeitig geändert. Das Formular zeigt die aktuellen Werte: Prüfen Sie sie und speichern Sie erneut.'
@@ -862,3 +864,92 @@ notify:
         title: "%actor% hat Sie in einer CRM-Notiz erwähnt"
     category:
         crm: "CRM"
+templates:
+    title: 'E-Mail-Vorlagen'
+    intro: 'Ihre Vorlagen und Bausteine und die der Organisation. „E-Mail schreiben“ bei einem Kontakt fügt sie ein.'
+    empty: 'Noch keine Vorlagen.'
+    empty_hint: 'Legen Sie eine Vorlage für häufige Nachrichten an oder einen Baustein wie Ihre Signatur.'
+template:
+    new_template: 'Neue Vorlage'
+    new_snippet: 'Neuer Baustein'
+    edit_template: 'Vorlage bearbeiten'
+    edit_snippet: 'Baustein bearbeiten'
+    edit: 'Bearbeiten'
+    delete: 'Löschen'
+    delete_confirm: 'Diese Vorlage endgültig löschen?'
+    save: 'Speichern'
+    created: 'Die Vorlage wurde gespeichert.'
+    saved: 'Die Vorlage wurde gespeichert.'
+    deleted: 'Die Vorlage wurde gelöscht.'
+    unclassified: 'Nicht eingestuft (kann nicht gesendet werden)'
+    html_notice: 'Diese Vorlage hat einen anderswo geschriebenen HTML-Inhalt. Speichern hier ersetzt ihn durch den Text unten.'
+    kind:
+        template: 'Vorlage'
+        snippet: 'Baustein'
+    scope:
+        personal: 'Nur ich'
+        shared: 'Organisation'
+    form:
+        name: 'Name'
+        key: 'Schlüssel'
+        key_help: 'Kleinbuchstaben, Ziffern, ".", "_" und "-", eindeutig je Sprache.'
+        locale: 'Sprache'
+        locale_help: 'Zum Beispiel "de" oder "de_DE".'
+        scope: 'Wer sie nutzen kann'
+        subject: 'Betreff'
+        purpose: 'Einwilligung'
+        purpose_help: 'Eine Werbevorlage braucht die Einwilligung des Kontakts für diesen Zweck; eine Servicenachricht nicht.'
+        service: 'Servicenachricht (keine Einwilligung nötig)'
+        text: 'Text'
+        text_help: 'Platzhalter werden beim Einfügen durch die Werte des Datensatzes ersetzt: %placeholders%. Unbekannte bleiben als Text.'
+        kind: 'Art'
+    placeholder:
+        full_name: 'Vollständiger Name'
+        owner_name: 'Verantwortlich'
+        deal_title: 'Titel der Verkaufschance'
+        deal_amount: 'Betrag der Verkaufschance'
+        deal_expected_close: 'Erwarteter Abschluss'
+        me_name: 'Mein Name'
+        me_email: 'Meine E-Mail'
+template_error:
+    key: 'Verwenden Sie 1 bis 64 Kleinbuchstaben, Ziffern, ".", "_" oder "-".'
+    locale: 'Verwenden Sie einen Sprachcode wie "de" oder "de_DE".'
+    name: 'Verwenden Sie 1 bis 190 Zeichen ohne Steuerzeichen.'
+    subject: 'Verwenden Sie 1 bis 255 Zeichen in einer Zeile.'
+    body: 'Der Text ist leer oder zu lang.'
+    html: 'Platzhalter sind in Links und Bildern nicht erlaubt.'
+    placeholders: 'Zu viele Platzhalter.'
+    scope: 'Der Geltungsbereich einer Vorlage kann sich nicht ändern.'
+    output: 'Der erzeugte Text ist zu lang.'
+    key_taken: 'Eine Vorlage mit diesem Schlüssel und dieser Sprache gibt es bereits.'
+    kind: 'Die Art einer Vorlage kann sich nicht ändern.'
+mail:
+    write: 'E-Mail schreiben'
+    title: 'E-Mail an %name%'
+    send: 'Senden'
+    sent: 'Die E-Mail wurde gesendet und protokolliert.'
+    sent_not_logged: 'Die E-Mail wurde gesendet, konnte aber nicht als Aktivität protokolliert werden.'
+    unresolved: 'Als Text belassen (kein für Sie sichtbarer Wert): %placeholders%.'
+    form:
+        stay: 'Aktualisieren'
+        to: 'An:'
+        template: 'Vorlage'
+        no_template: 'Keine Vorlage'
+        insert_template: 'Vorlage einfügen'
+        deal: 'Verkaufschance'
+        deal_help: 'Für die Platzhalter {{ deal.* }}.'
+        no_deal: 'Keine Verkaufschance'
+        subject: 'Betreff'
+        text: 'Nachricht'
+        snippet: 'Baustein'
+        no_snippet: 'Baustein wählen'
+        insert_snippet: 'Baustein einfügen'
+mail_error:
+    no_consent: 'Dieser Kontakt hat für „%purpose%“ nicht eingewilligt. Verwenden Sie eine Servicevorlage oder schreiben Sie die Nachricht selbst.'
+    no_address: 'Dieser Kontakt hat keine E-Mail-Adresse.'
+    unclassified: 'Diese Vorlage ist noch nicht eingestuft: Eine verantwortliche Person muss die Einwilligung wählen.'
+    template: 'Wählen Sie eine Vorlage, die Sie verwenden dürfen.'
+    subject: 'Schreiben Sie einen Betreff mit bis zu 255 Zeichen in einer Zeile.'
+    text: 'Schreiben Sie eine Nachricht (bis zu 100 000 Zeichen).'
+    not_sent: 'Die E-Mail konnte nicht gesendet werden. Versuchen Sie es später erneut.'
+    rate_limited: 'Sie haben in kurzer Zeit viele E-Mails gesendet. Warten Sie einige Minuten.'

@@ -3,6 +3,9 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 0.13.0](#to-0130)
+  - [E-mail templates (0.13.0, opt-in)](#e-mail-templates-0130-opt-in)
+- [To 0.12.1](#to-0121)
 - [To 0.12.0](#to-0120)
 - [To 0.11.0](#to-0110)
 - [To 0.10.3](#to-0103)
@@ -26,6 +29,65 @@
 - [Policy for later releases](#policy-for-later-releases)
 
 ## Unreleased
+
+## To 0.13.0
+
+From **0.12.1**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
+
+Planned as **0.13.0** (Beacon spec 254, A-2 e-mail templates). From 0.11.0, 0.12.0 or 0.12.1:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
+
+No BC break: everything new is behind `templates.enabled` (default `false`); with it off there is nothing to do.
+
+### E-mail templates (0.13.0, opt-in)
+
+1. Keep `activities.enabled: true` (a sent e-mail is logged as an `email` activity; without it the configuration is
+   refused).
+2. Install MailKit >= 2.8 and turn its stored templates on (its UPGRADING "To 2.7.0": the `mail_kit_template` table):
+
+   ```bash
+   composer require nowo-tech/mail-kit-bundle:^2.8
+   ```
+
+   ```yaml
+   nowo_mail_kit:
+       templates:
+           enabled: true
+           permission: nowo_crm_kit.template_permission   # or your own port (it must check the tenant membership)
+   nowo_crm_kit:
+       templates:
+           enabled: true
+           # mail_sender: App\Crm\MailboxSender            # optional: CrmMailSenderInterface; default Symfony Mailer
+   ```
+
+3. Create the CRM's table `crm_template_purpose` (`doctrine:migrations:diff` on the CRM's entity manager, mapping group
+   `NowoCrmKitBundleTemplates`): `id` (MailKit template id, 36), `tenant_id` (128, indexed), `purpose` (64, nullable;
+   null = a service message), `version` (int: the MailKit template version it classifies), `updated_at`. Key columns
+   get the binary NO PAD collation on MySQL / MariaDB like the other CRM tables.
+4. Templates stored before (MailKit's API) are **unclassified**: they are not offered in *Write e-mail* and cannot be
+   sent until a person who may manage them saves them on the Templates page with a consent choice.
+5. Permissions: personal templates and *Write e-mail* need `edit`, the organisation's templates `manage`
+   (with `nowo_crm_kit.template_permission`). Hosts with their own MailKit permission port keep their mapping.
+6. Keep it on once used, as for the activities: with it off the classification table is not mapped (it holds no
+   personal data; the activities stay).
+
+## To 0.12.1
+
+From **0.12.0**:
+
+```bash
+composer update nowo-tech/crm-kit-bundle
+```
+
+Planned as **0.12.1**: nothing to do. If you ever imported from HubSpot and switched `import.hubspot.enabled` off, read
+SECURITY "GDPR" (tombstones are written only while the import is on).
 
 ## To 0.12.0
 

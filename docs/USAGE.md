@@ -39,6 +39,7 @@
   - [Logging and the feed](#logging-and-the-feed)
   - [Pinned notes and @mentions](#pinned-notes-and-mentions)
   - [Host activity source](#host-activity-source)
+- [E-mail templates and Write e-mail (0.13.0)](#e-mail-templates-and-write-e-mail-0130)
   - [Meetings: TaskBoard's calendar and .ics](#meetings-taskboards-calendar-and-ics)
 - [SearchKit](#searchkit)
 - [UiKit context menus and focus mode](#uikit-context-menus-and-focus-mode)
@@ -1064,7 +1065,8 @@ with one row `import.hubspot.activities_off` (or `import.hubspot.tasks_off`).
 
 Each page is one `GET /crm/v3/objects/{notes|calls|meetings|tasks}` with `associations=contacts,companies` (at most
 25 items per page whatever `page_size`, so HTML bodies stay under `max_response_bytes`; at most 20 ids of each kind
-per item; the association's own paging is not followed), settled in one write unit like the records.
+per item used as records, every inline contact id checked against erased people; the association's own paging is not
+followed), settled in one write unit like the records.
 
 - **Where it lands.** The primary record is the first associated contact that has a live record of the same account,
   else the first company, that the run may write on (`edit` when a person runs the page; unattended under
@@ -1234,6 +1236,100 @@ Every meeting has "Add to calendar (.ics)": `GET <crm>/activities/{id}/meeting.i
 `STATUS:CANCELLED` once cancelled, no notes and no addresses. The UID's host and the `URL` come from the request's
 host when it is a plain host name (`[a-z0-9.-]`), else `crm.invalid` and no `URL`: set `framework.trusted_hosts`. Invites by e-mail (`METHOD:REQUEST` / `CANCEL`) wait for
 MailKit's invite part (MailKit 2.3, follow-up).
+
+## E-mail templates and Write e-mail (0.13.0)
+
+Opt in with `templates.enabled: true` next to `activities.enabled: true`, install MailKit **>= 2.8** with its stored
+templates on, point MailKit's permission port at the CRM's ([CONFIGURATION.md](CONFIGURATION.md#e-mail-templates-0130))
+and create the table (UPGRADING "To 0.13.0"). The templates and snippets are MailKit's rows; the CRM adds the
+`contact.*`, `company.*`, `deal.*` and `me.*` placeholders, a consent purpose per template and *Write e-mail*.
+
+### Templates and their consent purpose
+
+```php
+use Nowo\CrmKitBundle\Domain\Enum\EmailTemplateKind;
+use Nowo\CrmKitBundle\Domain\Service\EmailTemplateInput;
+use Nowo\CrmKitBundle\Domain\Service\EmailTemplatesInterface;
+
+// Personal (false) or the organisation's (true, needs manage); purpose null = a service message.
+$id = $templates->create(new EmailTemplateInput(EmailTemplateKind::Template, true, 'offer', 'Spring offer', 'en',
+    'An offer for {{ company.name }}', "Hello {{ contact.first_name }},\n…\n{{ me.name }}", 'marketing_email'));
+$templates->create(new EmailTemplateInput(EmailTemplateKind::Snippet, false, 'signature', 'Signature', 'en', '', "--\n{{ me.name }}"));
+
+$rows = $templates->list();                      // EmailTemplateView: personal first, then shared
+$one  = $templates->get($id);                    // with its text; $one->purpose, $one->classified, $one->manageable
+$templates->update($id, $input, $one->version);  // 409 crm_record_stale on an old version; kind and scope never change
+$templates->delete($id, $one->version);          // its classification goes with MailKit's TemplateDeletedEvent
+
+$text = $templates->compose($id, $contactId, $dealId);   // ComposedText: subject, text, unresolved placeholders
+```
+
+- Every call acts as the session's CRM tenant and person (`edit` tenant-wide); MailKit's permission port decides
+  personal / shared (`manage` for the organisation's rows with `nowo_crm_kit.template_permission`). A row the person
+  may not see is 404, a shared row without `manage` 403. Input errors per field (`key`, `locale`, `name`, `subject`,
+  `text`, `purpose`, `shared`, `kind`; `template_error.*` messages).
+- The CRM's form edits the **text** body only: saving there replaces an HTML body written elsewhere (the edit form says
+  so). Placeholders are text: MailKit refuses them in links and images.
+- **Consent classification.** A template saved through the CRM is always classified: a `gdpr.purposes` key (a
+  commercial template: the recipient must have granted that purpose) or a service message (`null`). A template written
+  elsewhere (MailKit's API) is **unclassified** until a person who may manage it saves it in the CRM: it is not offered
+  in *Write e-mail* and cannot be sent (deny by default). Snippets have no classification.
+- Audit entries `crm.template.created`, `crm.template.saved` (with the purpose), `crm.template.deleted`.
+
+### Placeholders
+
+`{{ namespace.name }}` is replaced by MailKit's closed registry (pure substitution, never Twig, never re-expanded); a
+placeholder without a value the person may see stays as its literal text and is listed in `unresolved` (*Write
+e-mail* shows the list). The providers resolve only for the exact CRM tenant and person of the call, through the CRM's
+readers (tenant, `view` and the host's `record_access_check` decisions):
+
+| Namespace | Subject | Names |
+| --- | --- | --- |
+| `contact` | the contact written to | `first_name`, `last_name`, `full_name`, `email`, `phone`, `mobile`, `job_title`, `street`, `postal_code`, `city`, `region`, `country`, `owner_name` |
+| `company` | the contact's primary company | `name`, `legal_name`, `tax_id`, `website`, `industry`, `email`, `phone`, `street`, `postal_code`, `city`, `region`, `country`, `owner_name` |
+| `deal` | the deal picked in *Write e-mail* (`pipeline.enabled`) | `title`, `amount` (only with `amounts_view`), `expected_close`, `owner_name` |
+| `me` | the person writing | `name`, `email` (when the actor directory shares it) |
+
+Only active records resolve; custom fields are not offered. The labels of `PlaceholderDefinition` are
+`NowoCrmKitBundle` translation keys. MailKit ships no provider: these four own their namespaces.
+
+### Write e-mail
+
+On a contact's 360° page "Write e-mail" (`edit` on the contact) opens its form on demand in the activity dialog
+(`GET|POST <crm>/contacts/{id}/write-email`; a plain page without JavaScript):
+
+- **Insert template** renders the chosen template for the contact (and the chosen deal) on the server and fills the
+  subject and the text; **Insert snippet** appends a snippet. Only classified templates and the snippets the person may
+  use are offered. Inserting the same template again does nothing. Pressing Enter in a field neither sends nor
+  inserts: the form's first, visually hidden button only shows the form again.
+- **Send** goes through `MailComposerInterface::send(MailDraft)`:
+
+```php
+use Nowo\CrmKitBundle\Domain\Service\MailComposerInterface;
+use Nowo\CrmKitBundle\Domain\Service\MailDraft;
+
+$outcome = $composer->send(new MailDraft($contactId, $subject, $text, $insertedTemplateId, MailDraft::newKey()));
+$outcome->engagementId;   // the email activity, or null when the mail went out but logging it failed
+```
+
+  1. one write unit with the contact locked `FOR UPDATE`: `edit` on it, an active contact with an e-mail address
+     (`to` error otherwise), the inserted template's consent purpose granted by the contact (the latest decision for
+     that purpose; `template` error otherwise — an unclassified template is refused too), the per-person limit
+     (`templates.send_rate_limit`, `RateLimitedException`), the send key claimed once (`crm_mail_already_sent` for a
+     second submission of the same form) and the audit entry `crm.mail.claimed`;
+  2. the message through `CrmMailSenderInterface`, **outside** any transaction (a deadlock replay never sends twice);
+     a failure releases the key and answers `mail_error.not_sent`, nothing is logged;
+  3. an `email` activity (direction out, the subject as title, the first 500 characters of the text as excerpt) on
+     the contact, shown on its companies and open deals (A-1 fan-out); then `CrmMailSent` (`CrmKitEvents::MAIL_SENT`:
+     contact, activity, template and purpose ids; no address or text).
+- A message without a template is a service message (no consent needed). The template that applies is the one last
+  inserted, not the picker's current value.
+- The default sender sends plain text with Symfony Mailer (MailKit decorates it: From and Reply-To from its settings
+  when missing, the sent-mail log with the tenant's tag `$mail->logTag`, the template key, or `crm` without one, as
+  the tracking template id). Reply-To is the person's e-mail when the actor directory shares it. To send from the
+  person's own mailbox, implement `CrmMailSenderInterface` and set `templates.mail_sender`. A host sender that sends
+  through Symfony Mailer must call `MailHeaders::tag($email, $mail->logTag)`: the contact's export and erasure only
+  find tagged rows of MailKit's sent-mail log.
 
 ## SearchKit
 

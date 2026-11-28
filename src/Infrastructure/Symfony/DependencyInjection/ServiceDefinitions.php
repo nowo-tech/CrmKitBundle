@@ -58,6 +58,7 @@ use Nowo\CrmKitBundle\Application\Pipeline\PipelineHousekeeping;
 use Nowo\CrmKitBundle\Application\Pipeline\PipelineSupport;
 use Nowo\CrmKitBundle\Application\Pipeline\Port\PipelineStoreInterface;
 use Nowo\CrmKitBundle\Application\PlanCounter;
+use Nowo\CrmKitBundle\Application\Port\ContactMailLogInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmActorDataStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmBatchLookupStoreInterface;
 use Nowo\CrmKitBundle\Application\Port\CrmStoreInterface;
@@ -71,7 +72,18 @@ use Nowo\CrmKitBundle\Application\SettingsService;
 use Nowo\CrmKitBundle\Application\Shared\TransactionRunnerInterface;
 use Nowo\CrmKitBundle\Application\Taggings;
 use Nowo\CrmKitBundle\Application\TagService;
+use Nowo\CrmKitBundle\Application\Templates\Port\TemplateMailStoreInterface;
 use Nowo\CrmKitBundle\Application\WriteSupport;
+use Nowo\CrmKitBundle\Bridge\MailKit\CompanyPlaceholders;
+use Nowo\CrmKitBundle\Bridge\MailKit\ContactPlaceholders;
+use Nowo\CrmKitBundle\Bridge\MailKit\CrmTemplateActors;
+use Nowo\CrmKitBundle\Bridge\MailKit\CrmTemplatePermission;
+use Nowo\CrmKitBundle\Bridge\MailKit\DealPlaceholders;
+use Nowo\CrmKitBundle\Bridge\MailKit\MailKitContactMailLog;
+use Nowo\CrmKitBundle\Bridge\MailKit\MailKitEmailTemplates;
+use Nowo\CrmKitBundle\Bridge\MailKit\MailKitMailComposer;
+use Nowo\CrmKitBundle\Bridge\MailKit\MePlaceholders;
+use Nowo\CrmKitBundle\Bridge\MailKit\TemplatePurposeCleaner;
 use Nowo\CrmKitBundle\Bridge\NotifyKit\CrmNotifyKitTypes;
 use Nowo\CrmKitBundle\Bridge\SearchKit\CrmDealSearchDefinition;
 use Nowo\CrmKitBundle\Bridge\SearchKit\CrmEngagementSearchDefinition;
@@ -87,6 +99,7 @@ use Nowo\CrmKitBundle\Domain\Port\CrmAuditSinkInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmFeatureGateInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostActivitySourceInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmHostObjectResolverInterface;
+use Nowo\CrmKitBundle\Domain\Port\CrmMailSenderInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmNotifierInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPanelProviderInterface;
 use Nowo\CrmKitBundle\Domain\Port\CrmPlanLimitsInterface;
@@ -105,6 +118,7 @@ use Nowo\CrmKitBundle\Domain\Service\CrmExporterInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmPersonalDataInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmReaderInterface;
 use Nowo\CrmKitBundle\Domain\Service\CrmSettingsInterface;
+use Nowo\CrmKitBundle\Domain\Service\EmailTemplatesInterface;
 use Nowo\CrmKitBundle\Domain\Service\EngagementServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\FieldServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HostLinkServiceInterface;
@@ -112,6 +126,7 @@ use Nowo\CrmKitBundle\Domain\Service\HostObjectPickerInterface;
 use Nowo\CrmKitBundle\Domain\Service\HubSpotConnectionServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\HubSpotImportServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\ImportServiceInterface;
+use Nowo\CrmKitBundle\Domain\Service\MailComposerInterface;
 use Nowo\CrmKitBundle\Domain\Service\MentionDirectoryInterface;
 use Nowo\CrmKitBundle\Domain\Service\MergeServiceInterface;
 use Nowo\CrmKitBundle\Domain\Service\NoteServiceInterface;
@@ -128,6 +143,7 @@ use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineCrmStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineEngagementStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineHubSpotStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrinePipelineStore;
+use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTemplateMailStore;
 use Nowo\CrmKitBundle\Infrastructure\Doctrine\DoctrineTransactionRunner;
 use Nowo\CrmKitBundle\Infrastructure\HubSpot\HttpHubSpotReader;
 use Nowo\CrmKitBundle\Infrastructure\HubSpot\HubSpotHttpClientFactory;
@@ -158,6 +174,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordForms;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordPage;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordPartsController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\TemplateController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\UiOptions;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\UiSupport;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ActionType;
@@ -166,6 +183,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\AffiliationType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\ConsentType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\DealFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\DealType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\EmailTemplateType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\EngagementType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FeedFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\FieldDefinitionType;
@@ -189,6 +207,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\StageType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\StatsFilterType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\TagsAssignType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\TagType;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Form\WriteEmailType;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\CrmConflictFormatter;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\DomainExceptionListener;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Http\EntityManagerHygieneListener;
@@ -261,6 +280,24 @@ final class ServiceDefinitions
 
     /** SearchKit's `EntitySearchDefinition::TAG` (a literal: SearchKit is optional). */
     public const SEARCH_DEFINITION_TAG = 'nowo_search_kit.entity_definition';
+
+    /** MailKit's template library (a literal: MailKit is optional; 0.13.0). */
+    public const MAIL_KIT_LIBRARY = 'Nowo\\MailKitBundle\\Template\\Service\\TemplateLibraryInterface';
+
+    /** MailKit's template renderer (0.13.0). */
+    public const MAIL_KIT_RENDERER = 'Nowo\\MailKitBundle\\Template\\Service\\TemplateRendererInterface';
+
+    /** MailKit's tag of placeholder providers (0.13.0). */
+    public const MAIL_KIT_PLACEHOLDER_TAG = 'nowo_mail_kit.template_placeholder_provider';
+
+    /** MailKit's tag-scoped erasure port of the sent-mail log (audit ZDI-M1, MailKit >= 2.8). */
+    public const MAIL_KIT_LOG_ERASER = 'Nowo\\MailKitBundle\\Log\\SentMailTaggedPersonalDataEraserInterface';
+
+    /** MailKit's tag-scoped export port of the sent-mail log (audit ZDI-M1, MailKit >= 2.8). */
+    public const MAIL_KIT_LOG_EXPORTER = 'Nowo\\MailKitBundle\\Log\\SentMailTaggedPersonalDataExporterInterface';
+
+    /** MailKit's event after a template was deleted (its class name; 0.13.0). */
+    public const MAIL_KIT_TEMPLATE_DELETED = 'Nowo\\MailKitBundle\\Template\\Event\\TemplateDeletedEvent';
 
     /** Prefix of the bundle's service ids and parameters. */
     public const P = NowoCrmKitBundle::ALIAS . '.';
@@ -403,7 +440,9 @@ final class ServiceDefinitions
         $s->alias(CrmActorDataStoreInterface::class, DoctrineCrmActorDataStore::class);
         $s->set(ActorPersonalData::class)->args([service(CrmActorDataStoreInterface::class), service(TransactionRunnerInterface::class), service(CrmAuditSinkInterface::class), $clock, $events, $activities ? [...CrmActorDataStoreInterface::KINDS, ...CrmActorDataStoreInterface::ACTIVITY_KINDS, ...($mentions ? [CrmActorDataStoreInterface::MENTION_KIND] : [])] : CrmActorDataStoreInterface::KINDS]);
         $s->alias(CrmActorPersonalDataInterface::class, ActorPersonalData::class)->public();
-        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping, $refs, $keeping]);
+        // 0.13.0 (audit ZDI-M1): with the e-mail templates, the contact's erasure covers MailKit's sent-mail log.
+        $templatesOn = $activities && is_array($config['templates'] ?? null) && ($config['templates']['enabled'] ?? false) === true;
+        $s->set(CrmPersonalData::class)->args([service(WriteSupport::class), service(PlanCounter::class), $housekeeping, $refs, $keeping, $templatesOn ? service(ContactMailLogInterface::class) : null]);
         $s->alias(CrmPersonalDataInterface::class, CrmPersonalData::class)->public();
         $s->set(SettingsService::class)->args([service(WriteSupport::class)]);
         $s->alias(CrmSettingsInterface::class, SettingsService::class)->public();
@@ -419,7 +458,7 @@ final class ServiceDefinitions
 
         // HTTP.
         $s->set(CrmApiRouteLoader::class)->args([param($p . 'api.http.enabled'), param($p . 'api_path'), param($p . 'pipeline.enabled')])->tag('routing.loader');
-        $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path'), param($p . 'pipeline.enabled'), param($p . 'import.hubspot.enabled'), param($p . 'activities.enabled')])->tag('routing.loader');
+        $s->set(UiRouteLoader::class)->args([param($p . 'ui.enabled'), param($p . 'ui.path'), param($p . 'pipeline.enabled'), param($p . 'import.hubspot.enabled'), param($p . 'activities.enabled'), param($p . 'templates.enabled')])->tag('routing.loader');
         $s->set(DomainExceptionListener::class)->tag('kernel.event_listener', ['event' => 'kernel.exception', 'method' => 'onKernelException', 'priority' => 32]);
         if (interface_exists(ConflictResponseFormatterInterface::class)) {
             $s->set(CrmConflictFormatter::class)->tag('nowo_transaction_doctrine.conflict_response_formatter', ['priority' => 10]);
@@ -430,6 +469,11 @@ final class ServiceDefinitions
         }
         if ($activities) {
             self::activities($container, $config, $pipeline, $mentions);
+        }
+        // 0.13.0: the e-mail templates (they need the activities: a sent e-mail is logged as one).
+        $templates = $activities && is_array($config['templates'] ?? null) && ($config['templates']['enabled'] ?? false) === true;
+        if ($templates) {
+            self::templates($container, $pipeline);
         }
         if ($hubspot) {
             self::hubspot($container, $config, self::hubspotActivities($activities, $pipeline));
@@ -448,13 +492,16 @@ final class ServiceDefinitions
             self::api($container, $pipeline);
         }
         if ($ui) {
-            self::ui($container, self::tabIcons($config['ui']));
+            self::ui($container, self::tabIcons($config['ui']), $templates);
         }
         if ($ui && $pipeline) {
             self::pipelineUi($container);
         }
         if ($ui && $activities) {
-            self::activitiesUi($container, $mentions);
+            self::activitiesUi($container, $mentions, $templates);
+        }
+        if ($ui && $templates) {
+            self::templatesUi($container, $pipeline);
         }
         if ($ui && $hubspot) {
             $s->set(HubSpotImportController::class)->args([service(UiSupport::class), service(HubSpotConnectionServiceInterface::class), service(HubSpotImportServiceInterface::class), service(ImportServiceInterface::class), param($p . 'import.sync_chunks'), self::hubspotActivities($activities, $pipeline)])->public()->tag('controller.service_arguments');
@@ -636,14 +683,72 @@ final class ServiceDefinitions
      * The activity pages (0.11.0, with `ui.enabled` and `activities.enabled`): the record page's block, the log / edit
      * pages and actions, and the forms.
      */
-    private static function activitiesUi(ContainerConfigurator $container, bool $mentions): void
+    private static function activitiesUi(ContainerConfigurator $container, bool $mentions, bool $templates = false): void
     {
         $s = $container->services();
         $p = self::P;
         $s->set($p . 'activity_dialogs', PipelineDialogs::class)->args([service(UiSupport::class), service(RemoteDialogResponder::class)->nullOnInvalid(), true, PipelineDialogs::ACTIVITY_DIALOG]);
-        $s->set(ActivityRecordBlock::class)->args([service(UiSupport::class), service(ActivityFeedInterface::class), service(CrmAccess::class), service(CrmReaderInterface::class), service($p . 'activity_dialogs'), service('request_stack'), $mentions ? service(Mentions::class) : null, $mentions]);
+        $s->set(ActivityRecordBlock::class)->args([service(UiSupport::class), service(ActivityFeedInterface::class), service(CrmAccess::class), service(CrmReaderInterface::class), service($p . 'activity_dialogs'), service('request_stack'), $mentions ? service(Mentions::class) : null, $mentions, $templates]);
         $s->set(ActivityController::class)->args([service(UiSupport::class), service(EngagementServiceInterface::class), service(ActivityFeedInterface::class), service(PinnedNotesInterface::class), service(CrmReaderInterface::class), service($p . 'activity_dialogs'), param($p . 'activities.call_outcomes'), $mentions ? service(MentionDirectoryInterface::class) : null])->public()->tag('controller.service_arguments');
         foreach ([EngagementType::class, FeedFilterType::class] as $type) {
+            $s->set($type)->tag('form.type');
+        }
+    }
+
+    /**
+     * The e-mail templates (0.13.0, `templates.enabled` with `activities.enabled`, MailKit >= 2.8): the CRM's
+     * classification store, the MailKit permission port (`nowo_crm_kit.template_permission`), the `contact`, `company`,
+     * `deal` and `me` placeholder providers, the listener of MailKit's deletes, the templates service and *Write e-mail*.
+     * {@see Compiler\CrmPortsPass} checks MailKit's services and wires the mail sender.
+     */
+    private static function templates(ContainerConfigurator $container, bool $pipeline): void
+    {
+        $s       = $container->services();
+        $p       = self::P;
+        $library = service(self::MAIL_KIT_LIBRARY);
+        $s->set(DoctrineTemplateMailStore::class)->args([service(DoctrineTransactionRunner::class)]);
+        $s->alias(TemplateMailStoreInterface::class, DoctrineTemplateMailStore::class);
+        $s->set(CrmTemplateActors::class)->args([service(CrmAccess::class)]);
+        $s->set($p . 'template_permission', CrmTemplatePermission::class)->args([service(CrmTemplateActors::class)])->public();
+        $s->set(ContactPlaceholders::class)->args([service(CrmTemplateActors::class), service(CrmReaderInterface::class)])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
+        $s->set(CompanyPlaceholders::class)->args([service(CrmTemplateActors::class), service(CrmReaderInterface::class)])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
+        $s->set(DealPlaceholders::class)->args([service(CrmTemplateActors::class), $pipeline ? service(DealReader::class) : null])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
+        $s->set(MePlaceholders::class)->args([service(CrmTemplateActors::class), service(CrmActorDirectoryInterface::class)])->tag(self::MAIL_KIT_PLACEHOLDER_TAG);
+        // Audit ZDI-M1: MailKit's tag-scoped sent-mail log ports (always registered by MailKit >= 2.8) for the contact's
+        // erasure and export.
+        $s->set(MailKitContactMailLog::class)->args([service(self::MAIL_KIT_LOG_ERASER), service(self::MAIL_KIT_LOG_EXPORTER)]);
+        $s->alias(ContactMailLogInterface::class, MailKitContactMailLog::class);
+        $s->set(TemplatePurposeCleaner::class)->args([service(TemplateMailStoreInterface::class)])
+            ->tag('kernel.event_listener', ['event' => self::MAIL_KIT_TEMPLATE_DELETED, 'method' => '__invoke']);
+        $s->set(MailKitEmailTemplates::class)->args([service(CrmTemplateActors::class), $library, service(self::MAIL_KIT_RENDERER), service(TemplateMailStoreInterface::class), service(WriteSupport::class), service(CrmReaderInterface::class), param($p . 'gdpr.purposes'), $pipeline ? service(DealReader::class) : null]);
+        $s->alias(EmailTemplatesInterface::class, MailKitEmailTemplates::class)->public();
+        $s->set(MailKitMailComposer::class)->args([
+            service(CrmTemplateActors::class),
+            $library,
+            service(TemplateMailStoreInterface::class),
+            service(WriteSupport::class),
+            service(EngagementServiceInterface::class),
+            service(CrmMailSenderInterface::class),
+            service(CrmActorDirectoryInterface::class),
+            param($p . 'templates.send_rate_limit.limit'),
+            param($p . 'templates.send_rate_limit.interval'),
+            service('event_dispatcher')->nullOnInvalid(),
+            service('logger')->nullOnInvalid(),
+        ]);
+        $s->alias(MailComposerInterface::class, MailKitMailComposer::class)->public();
+    }
+
+    /**
+     * The template pages (0.13.0, with `ui.enabled` and `templates.enabled`): the list, its dialog, *Write e-mail* in
+     * the record page's activity dialog, and the forms.
+     */
+    private static function templatesUi(ContainerConfigurator $container, bool $pipeline): void
+    {
+        $s = $container->services();
+        $p = self::P;
+        $s->set($p . 'template_dialogs', PipelineDialogs::class)->args([service(UiSupport::class), service(RemoteDialogResponder::class)->nullOnInvalid(), true, TemplateController::DIALOG]);
+        $s->set(TemplateController::class)->args([service(UiSupport::class), service(EmailTemplatesInterface::class), service(MailComposerInterface::class), service(CrmReaderInterface::class), service($p . 'template_dialogs'), service($p . 'activity_dialogs'), param($p . 'gdpr.purposes'), $pipeline ? service(DealReader::class) : null])->public()->tag('controller.service_arguments');
+        foreach ([EmailTemplateType::class, WriteEmailType::class] as $type) {
             $s->set($type)->tag('form.type');
         }
     }
@@ -750,12 +855,12 @@ final class ServiceDefinitions
      *
      * @param array<string, string|null> $tabIcons host overrides of the area tab icons
      */
-    private static function ui(ContainerConfigurator $container, array $tabIcons): void
+    private static function ui(ContainerConfigurator $container, array $tabIcons, bool $templates = false): void
     {
         $s = $container->services();
         $p = self::P;
         $s->set(UiOptions::class)->args([param($p . 'ui.row_actions'), param($p . 'ui.header_actions'), param($p . 'ui.record_actions'), param($p . 'ui.record_tabs'), param($p . 'ui.filters_fold'), param($p . 'ui.filters_slot'), param($p . 'ui.list_tabs'), param($p . 'ui.admin_create'), param($p . 'ui.settings_width'), $tabIcons, param($p . 'ui.list_per_page'), param($p . 'ui.record_create'), param($p . 'ui.pipeline_forms'), ['companies' => param($p . 'ui.filters_more.companies'), 'contacts' => param($p . 'ui.filters_more.contacts'), 'deals' => param($p . 'ui.filters_more.deals')], param($p . 'ui.per_page_position'), param($p . 'ui.search_width'), param($p . 'ui.per_page_row_class')]);
-        $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size'), param($p . 'pipeline.enabled'), service(UiOptions::class)]);
+        $s->set(UiSupport::class)->args([service('twig'), service('router'), service('form.factory'), service(CrmKitGuard::class), service('translator'), service('security.csrf.token_manager'), param($p . 'ui.layout'), param($p . 'ui.page_size'), param($p . 'pipeline.enabled'), service(UiOptions::class), $templates]);
         $s->set(RecordForms::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), tagged_iterator(CrmHostObjectResolverInterface::HOST_OBJECT_TAG), param($p . 'gdpr.purposes'), service(PartyCatalogue::class)]);
         $s->set(RecordPage::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(CrmAccess::class), service(RecordForms::class), service(PipelineRecordBlock::class)->nullOnInvalid(), service(ActivityRecordBlock::class)->nullOnInvalid()]);
         $s->set(RecordController::class)->args([service(UiSupport::class), service(CrmReaderInterface::class), service(RecordServiceInterface::class), service(MergeServiceInterface::class), service(CrmExporterInterface::class), service(RecordForms::class), service(RecordPage::class), service(ImportServiceInterface::class), service(RemoteDialogResponder::class)->nullOnInvalid(), param($p . 'import.hubspot.enabled')])->public()->tag('controller.service_arguments');

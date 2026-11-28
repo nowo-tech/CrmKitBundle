@@ -1,0 +1,28 @@
+{#
+  The fields of *Write e-mail* (0.13.0), shared by the dialog fragment and the page: the recipient (text), the
+  notice of placeholders left as text after an insert, the form errors, the template picker with its Insert button, the
+  deal, the subject and the text, the snippet picker with its Insert button. A visually hidden "stay" button comes first:
+  it is the form's default button, so Enter in the subject shows the form again (never sends, never inserts). Variables: form (FormView),
+  crm_mail_to (string|null), crm_mail_name (string), crm_mail_notice (string|null), testid.
+#}
+{%- set _b = 'NowoCrmKitBundle' -%}
+{{ form_widget(form.stay, {attr: {class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true', formnovalidate: 'formnovalidate', 'data-testid': testid ~ '-default'}}) }}
+<p data-testid="{{ testid }}-to"><strong>{{ 'mail.form.to'|trans({}, _b) }}</strong> {{ crm_mail_name }}{% if crm_mail_to %} &lt;{{ crm_mail_to }}&gt;{% else %} — <span role="alert">{{ 'mail_error.no_address'|trans({}, _b) }}</span>{% endif %}</p>
+{% if crm_mail_notice %}<p class="{{ nowo_ui_class('flash_info', _b) }}" role="status" data-testid="{{ testid }}-notice">{{ crm_mail_notice }}</p>{% endif %}
+{% if form.vars.errors|length > 0 %}<div class="{{ nowo_ui_class('flash_error', _b) }}" role="alert" data-testid="{{ testid }}-errors">{{ form_errors(form) }}</div>{% endif %}
+{% if form.template is defined %}
+    <div class="crm-kit-mail-picker">
+        {{ form_row(form.template) }}
+        {{ form_widget(form.insert_template, {attr: {class: nowo_ui_class('btn_secondary', _b), 'data-testid': testid ~ '-insert-template', formnovalidate: 'formnovalidate'}}) }}
+    </div>
+{% endif %}
+{% if form.deal is defined %}{{ form_row(form.deal) }}{% endif %}
+{{ form_row(form.subject) }}
+{{ form_row(form.text) }}
+{% if form.snippet is defined %}
+    <div class="crm-kit-mail-picker">
+        {{ form_row(form.snippet) }}
+        {{ form_widget(form.insert_snippet, {attr: {class: nowo_ui_class('btn_secondary', _b), 'data-testid': testid ~ '-insert-snippet', formnovalidate: 'formnovalidate'}}) }}
+    </div>
+{% endif %}
+{{ form_rest(form) }}

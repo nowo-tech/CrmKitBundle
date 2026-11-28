@@ -22,7 +22,7 @@ use function count;
  */
 final class TestSentMailLog implements SentMailTaggedPersonalDataEraserInterface, SentMailTaggedPersonalDataExporterInterface
 {
-    /** @var array<string, list<array{id: string, roles: list<'recipient'|'sender'>, status: string, template: string|null, subject: string, queued_at: string|null, sent_at: string|null, failed_at: string|null}>> */
+    /** @var array<string, list<array{id: string, roles: list<'recipient'|'sender'>, status: string, template: string|null, subject: string, queued_at: string|null, sent_at: string|null, failed_at: string|null, error: string|null, html_body: string|null, text_body: string|null}>> */
     public array $rows = [];
 
     /** @var list<string> "address tag" pairs */
@@ -38,7 +38,7 @@ final class TestSentMailLog implements SentMailTaggedPersonalDataEraserInterface
     public function log(string $address, string $subject, ?string $tag = null): void
     {
         $email                = SentMailPersonalDataSubject::fromEmail($address)->email;
-        $this->rows[$email][] = ['id' => (string) ++$this->next, 'roles' => ['recipient'], 'status' => 'sent', 'template' => $tag, 'subject' => $subject, 'queued_at' => null, 'sent_at' => '2026-11-18T10:00:00+00:00', 'failed_at' => null];
+        $this->rows[$email][] = ['id' => (string) ++$this->next, 'roles' => ['recipient'], 'status' => 'sent', 'template' => $tag, 'subject' => $subject, 'queued_at' => null, 'sent_at' => '2026-11-18T10:00:00+00:00', 'failed_at' => null, 'error' => null, 'html_body' => null, 'text_body' => null];
     }
 
     public function eraseTagged(SentMailPersonalDataSubject $subject, string $tag): SentMailErasureResult

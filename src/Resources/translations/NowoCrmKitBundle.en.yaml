@@ -1,5 +1,6 @@
 # CRM kit, phase A (companies and contacts). Domain NowoCrmKitBundle. Parameters are %wrapped%.
 nav:
+    templates: 'Templates'
     funnels: 'Funnels'
     deals: 'Deals'
     label: CRM
@@ -514,6 +515,7 @@ search:
     see_all: 'See all %count%'
 flash:
     conflict:
+        crm_mail_already_sent: 'This e-mail was sent already. Close the dialog to see it on the contact.'
         crm_hubspot_rate_limited: 'Too many key checks for this organisation. Wait a few minutes and try again.'
         crm_stage_invalid: 'This stage cannot be used: it belongs to another funnel, or the stage or the funnel is archived or closed.'
         crm_record_stale: 'Someone changed this record at the same moment. The form shows the current values: check them and save again.'
@@ -862,3 +864,92 @@ notify:
         title: "%actor% mentioned you in a CRM note"
     category:
         crm: "CRM"
+templates:
+    title: 'E-mail templates'
+    intro: 'Your templates and snippets, and the organisation''s. Write e-mail on a contact inserts them.'
+    empty: 'No templates yet.'
+    empty_hint: 'Create a template for the messages you send often, or a snippet such as your signature.'
+template:
+    new_template: 'New template'
+    new_snippet: 'New snippet'
+    edit_template: 'Edit template'
+    edit_snippet: 'Edit snippet'
+    edit: 'Edit'
+    delete: 'Delete'
+    delete_confirm: 'Delete this template for good?'
+    save: 'Save'
+    created: 'The template was saved.'
+    saved: 'The template was saved.'
+    deleted: 'The template was deleted.'
+    unclassified: 'Not classified (cannot be sent)'
+    html_notice: 'This template has an HTML body written elsewhere. Saving here replaces it with the text below.'
+    kind:
+        template: 'Template'
+        snippet: 'Snippet'
+    scope:
+        personal: 'Only me'
+        shared: 'Organisation'
+    form:
+        name: 'Name'
+        key: 'Key'
+        key_help: 'Lowercase letters, digits, ".", "_" and "-", unique per language.'
+        locale: 'Language'
+        locale_help: 'For example "en" or "es_ES".'
+        scope: 'Who can use it'
+        subject: 'Subject'
+        purpose: 'Consent'
+        purpose_help: 'A commercial template needs the contact''s consent for this purpose; a service message needs none.'
+        service: 'Service message (no consent needed)'
+        text: 'Text'
+        text_help: 'Placeholders are replaced by the record''s values when the template is inserted: %placeholders%. Unknown ones stay as text.'
+        kind: 'Kind'
+    placeholder:
+        full_name: 'Full name'
+        owner_name: 'Owner'
+        deal_title: 'Deal title'
+        deal_amount: 'Deal amount'
+        deal_expected_close: 'Expected close'
+        me_name: 'My name'
+        me_email: 'My e-mail'
+template_error:
+    key: 'Use 1 to 64 lowercase letters, digits, ".", "_" or "-".'
+    locale: 'Use a language code such as "en" or "es_ES".'
+    name: 'Use 1 to 190 characters without control characters.'
+    subject: 'Use 1 to 255 characters on one line.'
+    body: 'The text is empty or too long.'
+    html: 'Placeholders are not allowed in links or images.'
+    placeholders: 'Too many placeholders.'
+    scope: 'The scope of a template cannot change.'
+    output: 'The rendered text is too long.'
+    key_taken: 'A template with this key and language exists already.'
+    kind: 'The kind of a template cannot change.'
+mail:
+    write: 'Write e-mail'
+    title: 'E-mail to %name%'
+    send: 'Send'
+    sent: 'The e-mail was sent and logged.'
+    sent_not_logged: 'The e-mail was sent, but it could not be logged as an activity.'
+    unresolved: 'Left as text (no value you may see): %placeholders%.'
+    form:
+        stay: 'Update'
+        to: 'To:'
+        template: 'Template'
+        no_template: 'No template'
+        insert_template: 'Insert template'
+        deal: 'Deal'
+        deal_help: 'For the {{ deal.* }} placeholders.'
+        no_deal: 'No deal'
+        subject: 'Subject'
+        text: 'Message'
+        snippet: 'Snippet'
+        no_snippet: 'Choose a snippet'
+        insert_snippet: 'Insert snippet'
+mail_error:
+    no_consent: 'This contact has not given consent for "%purpose%". Use a service template or write the message yourself.'
+    no_address: 'This contact has no e-mail address.'
+    unclassified: 'This template is not classified yet: a manager must choose its consent.'
+    template: 'Choose a template you may use.'
+    subject: 'Write a subject of up to 255 characters on one line.'
+    text: 'Write a message (up to 100 000 characters).'
+    not_sent: 'The e-mail could not be sent. Try again later.'
+    rate_limited: 'You sent many e-mails in a short time. Wait a few minutes and try again.'

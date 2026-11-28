@@ -41,6 +41,9 @@ final class ConflictException extends RuntimeException implements CrmException
     /** 0.10.0: too many HubSpot token checks for the tenant (`import.hubspot.connect_rate_limit`). */
     public const HUBSPOT_RATE_LIMITED = 'crm_hubspot_rate_limited';
 
+    /** 0.13.0: this *Write e-mail* form was sent already (a second submission of the same form). */
+    public const MAIL_SENT = 'crm_mail_already_sent';
+
     /**
      * @param string $errorCode one of the constants
      * @param string|null $recordId the record the conflict is about (merged: the survivor)

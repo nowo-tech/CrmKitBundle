@@ -61,6 +61,9 @@ final class NowoCrmKitBundle extends AbstractBundle
     /** Doctrine mapping name of the logged activities (0.11.0; only with `activities.enabled`). */
     public const ACTIVITIES_MAPPING_NAME = 'NowoCrmKitBundleActivities';
 
+    /** Doctrine mapping name of the e-mail templates' consent classification (0.13.0; only with `templates.enabled`). */
+    public const TEMPLATES_MAPPING_NAME = 'NowoCrmKitBundleTemplates';
+
     /** Doctrine mapping name of the HubSpot import (0.10.0; only with `import.hubspot.enabled`). */
     public const HUBSPOT_MAPPING_NAME = 'NowoCrmKitBundleHubSpot';
 
@@ -132,9 +135,13 @@ final class NowoCrmKitBundle extends AbstractBundle
         $api      = false;
         $hubspot  = false;
         $active   = false;
+        $mails    = false;
         foreach ($builder->getExtensionConfig(self::ALIAS) as $config) {
             if (is_array($config) && is_array($config['activities'] ?? null) && array_key_exists('enabled', $config['activities'])) {
                 $active = $config['activities']['enabled'] === true;
+            }
+            if (is_array($config) && is_array($config['templates'] ?? null) && array_key_exists('enabled', $config['templates'])) {
+                $mails = $config['templates']['enabled'] === true;
             }
             $doctrine = is_array($config) && is_array($config['doctrine'] ?? null) ? $config['doctrine'] : [];
             if (array_key_exists('entity_manager', $doctrine)) {
@@ -169,6 +176,10 @@ final class NowoCrmKitBundle extends AbstractBundle
         if ($active) {
             // 0.11.0: the logged activities, their records and their meeting attendees only while `activities.enabled`.
             $mappings[self::ACTIVITIES_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-activities', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Engagement', 'is_bundle' => false];
+        }
+        if ($mails) {
+            // 0.13.0: the consent classification of the e-mail templates only while `templates.enabled`.
+            $mappings[self::TEMPLATES_MAPPING_NAME] = ['type' => 'xml', 'dir' => __DIR__ . '/Resources/config/doctrine-templates', 'prefix' => 'Nowo\\CrmKitBundle\\Domain\\Model\\Template', 'is_bundle' => false];
         }
         if ($hubspot) {
             // 0.10.0: the HubSpot connection and external reference tables only while `import.hubspot.enabled`.

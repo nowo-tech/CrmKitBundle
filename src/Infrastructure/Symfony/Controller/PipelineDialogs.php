@@ -80,13 +80,18 @@ final readonly class PipelineDialogs
      * A form page or, for a dialog request, its fragment. The fragment's form posts to `$action` (the page's own URL; the
      * page posts to itself); Cancel goes back to `$cancel`.
      *
+     * **(0.13.0)** `$templates`: other templates for the fragment and the page (`fragment`, `page`, both receiving the
+     * same variables) and `$extra`: more variables for them.
+     *
      * @param FormInterface<mixed> $form
      * @param array<string, int|string> $titleParams
+     * @param array{fragment?: string, page?: string} $templates
+     * @param array<string, mixed> $extra
      */
-    public function render(Request $request, FormInterface $form, string $action, string $title, string $submit, string $cancel, string $testid, int $status, array $titleParams = [], ?string $intro = null, string $variant = 'btn_primary'): Response
+    public function render(Request $request, FormInterface $form, string $action, string $title, string $submit, string $cancel, string $testid, int $status, array $titleParams = [], ?string $intro = null, string $variant = 'btn_primary', array $templates = [], array $extra = []): Response
     {
         if ($this->isDialog($request)) {
-            return $this->vary($this->ui->render('@NowoCrmKit/_dialog_form.html.twig', [
+            return $this->vary($this->ui->render($templates['fragment'] ?? '@NowoCrmKit/_dialog_form.html.twig', [
                 'form'    => $form->createView(),
                 'action'  => $action,
                 'dialog'  => $this->dialogId,
@@ -94,10 +99,10 @@ final readonly class PipelineDialogs
                 'submit'  => $submit,
                 'intro'   => $intro === null ? null : $this->ui->trans($intro),
                 'variant' => $variant,
-            ], $status));
+            ] + $extra, $status));
         }
 
-        return $this->vary($this->ui->render('@NowoCrmKit/pipeline/form.html.twig', [
+        return $this->vary($this->ui->render($templates['page'] ?? '@NowoCrmKit/pipeline/form.html.twig', $extra + [
             'page' => new FormPage(
                 new PageHeader(UiSupport::label($title, $titleParams), $intro === null ? null : UiSupport::label($intro), []),
                 $form->createView(),

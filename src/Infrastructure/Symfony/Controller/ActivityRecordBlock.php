@@ -10,6 +10,7 @@ use Nowo\CrmKitBundle\Domain\Enum\ActivityKind;
 use Nowo\CrmKitBundle\Domain\Enum\CrmPermission;
 use Nowo\CrmKitBundle\Domain\Enum\FeedKind;
 use Nowo\CrmKitBundle\Domain\Enum\RecordStatus;
+use Nowo\CrmKitBundle\Domain\Enum\SubjectType;
 use Nowo\CrmKitBundle\Domain\Read\EngagementView;
 use Nowo\CrmKitBundle\Domain\Read\NoteView;
 use Nowo\CrmKitBundle\Domain\Read\RecordView;
@@ -58,6 +59,7 @@ final readonly class ActivityRecordBlock
         private RequestStack $requests,
         private ?Mentions $mentions = null,
         private bool $milkdown = false,
+        private bool $mail = false,
     ) {
     }
 
@@ -110,6 +112,13 @@ final readonly class ActivityRecordBlock
                     ? $this->dialogs->opener('custom', 'activity_log.log_' . $loggable->value, 'nowo_crm_kit_activity_log', ['type' => $seg, 'id' => $view->id, 'kind' => $loggable->value], 'crm-activity-log-' . $loggable->value, 'secondary')
                     : new Action('custom', UiSupport::label('activity_log.log_' . $loggable->value), $this->ui->url('nowo_crm_kit_activity_log', ['type' => $seg, 'id' => $view->id, 'kind' => $loggable->value]), variant: 'secondary', attributes: ['data-testid' => 'crm-activity-log-' . $loggable->value]);
                 $openers[] = $opener->withDisplay('icon_text', $icon);
+            }
+            if ($this->mail && $view->type === SubjectType::Contact) {
+                // 0.13.0 (templates.enabled): Write e-mail, in the same dialog, loaded on demand.
+                $opener = $this->dialogs->enabled()
+                    ? $this->dialogs->opener('custom', 'mail.write', 'nowo_crm_kit_mail_write', ['id' => $view->id], 'crm-mail-write', 'primary')
+                    : new Action('custom', UiSupport::label('mail.write'), $this->ui->url('nowo_crm_kit_mail_write', ['id' => $view->id]), variant: 'primary', attributes: ['data-testid' => 'crm-mail-write']);
+                $openers[] = $opener->withDisplay('icon_text', UiIcons::EMAIL);
             }
         }
         $pins = [];

@@ -18,6 +18,7 @@
 - [Release security checklist (12.4.1)](#release-security-checklist-1241)
 - [Reporting](#reporting)
 - [Activities and mentions (0.11.0)](#activities-and-mentions-0110)
+- [E-mail templates and Write e-mail (0.13.0)](#e-mail-templates-and-write-e-mail-0130)
 
 ## Status and scope
 
@@ -329,3 +330,50 @@ Report vulnerabilities privately through GitHub Security Advisories of `nowo-tec
   build logs a warning.
 - Mention notifications carry no record name and no note text.
 
+## E-mail templates and Write e-mail (0.13.0)
+
+- **Closed placeholders, no evaluation.** Templates are MailKit's rows; `{{ ns.name }}` is pure substitution by
+  MailKit's registry (never Twig, never re-expanded, unknown placeholders stay as text). The CRM's providers return
+  plain text; MailKit escapes it in HTML bodies and refuses placeholders in link and image addresses. The CRM's form and
+  *Write e-mail* handle text only: the sent message is `text/plain`.
+- **Actor binding.** MailKit takes a caller-passed `TemplateActor(tenant, owner)`. The CRM builds it from its own gate
+  and its providers and permission port accept only an actor that is exactly the call's CRM tenant and person (another
+  tenant or person resolves nothing and is refused), so a host bug passing another actor cannot read CRM data.
+- **What a placeholder shows.** Only records the person may view (tenant, `view`, the host's
+  `nowo_crm_kit.record_access_check` decisions), only active ones, only the core fields the record page shows; deal
+  amounts only with `amounts_view`; `me.email` only when the actor directory shares it. No ids are offered as
+  placeholders.
+- **Permissions.** Personal templates: their owner only (MailKit, no override). With
+  `nowo_crm_kit.template_permission`: `edit` to use templates and write, `manage` for the organisation's templates.
+  *Write e-mail* needs `edit` on the contact, checked under the contact's lock.
+- **Consent (GDPR, spec 248 FR-007).** A commercial template carries a consent purpose; the send is refused unless the
+  contact's latest decision for it is a grant, read under the same row lock a consent change takes. Templates without a
+  CRM classification (written through MailKit's API) cannot be sent (deny by default). The classification names the
+  MailKit template version it was decided for (audit ZDI-L1): it is written only over an older version's, and a
+  template whose current version differs (edited elsewhere, two saves racing, a crash between MailKit's commit and the
+  CRM's) counts as unclassified until it is saved again in the CRM. A message written by hand is a service message: the
+  person, not the CRM, decides its nature. *Write e-mail* fills `{{ deal.* }}` only from a deal of the contact.
+- **Abuse limits.** Per-person send window (`templates.send_rate_limit`), one send per form (a random send key claimed
+  in the write unit), CSRF tokens on every form (`nowo_crm_kit_template`, `nowo_crm_kit_mail`) and the delete action.
+- **Data.** `crm_template_purpose` holds template ids, tenant and purpose only (no personal data). The counter rows of
+  the send window are keyed by a hash of the person's id; send keys are random. `CrmMailSent` carries ids only. The
+  sent message's subject and first 500 characters are stored as the `email` activity (A-1's GDPR paths cover it).
+- **MailKit's sent-mail log (audit ZDI-M1).** Every *Write e-mail* sent through Symfony Mailer also writes a row of
+  MailKit's sent-mail log (the contact's address and the subject; the body too with MailKit's `log.store_bodies`).
+  MailKit's log has no tenant column, so every message the CRM hands to its sender carries the tenant's log tag
+  (`CrmOutgoingMail::$logTag` = `Bridge\MailKit\CrmMailLogTag::of()`: `crm:` and 32 hex characters of a SHA-256 of
+  the tenant). The default sender puts it on the message (the template key, or `crm` without one, goes to MailKit's
+  tracking policy as the template id instead). **A host sender (`templates.mail_sender`) that sends through Symfony
+  Mailer must do the same** (`MailHeaders::tag($email, $mail->logTag)`): rows it leaves untagged are not found by the
+  contact's export and erasure and stay the host's to export and erase. With `templates.enabled`, `CrmPersonalDataInterface::export()`
+  lists (`sent_mail`: status, subject, dates) and `erase()` erases, in the same unit, only the log rows with that tag
+  (MailKit >= 2.8 `SentMailTaggedPersonalDataExporterInterface` / `SentMailTaggedPersonalDataEraserInterface`: rows of
+  the address deleted, or unlinked and masked when they have other recipients), for the contact's current address and
+  those its merge traces keep of the contacts merged into it, by exact (normalised) address. Rows another tenant's CRM
+  or the host sent to the same address are never read or changed: the host's own data-subject export and erasure
+  cover them. A missing log table fails the export and the erasure (the CRM's unit rolls back) instead of reporting
+  them complete. Rows logged under an address the contact no longer has (changed before the erasure, or kept only by a
+  purged merge trace) are not found: the host erases them with `nowo:mail-kit:log:forget <address>` and keeps
+  `nowo:mail-kit:log:purge` scheduled. A host sender (`templates.mail_sender`) that does not go through Symfony Mailer
+  (for example MailKit's delegated mailboxes, which write no sent-mail log row) keeps its own records: their export
+  and erasure are the host's. The export and erasure cover a host sender's rows only when it applied the log tag.

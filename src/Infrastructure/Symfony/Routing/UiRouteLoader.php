@@ -14,6 +14,7 @@ use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineAdminController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\PipelineController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordController;
 use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\RecordPartsController;
+use Nowo\CrmKitBundle\Infrastructure\Symfony\Controller\TemplateController;
 use Symfony\Component\Config\Loader\Loader;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
@@ -39,7 +40,7 @@ final class UiRouteLoader extends Loader
     /**
      * Wires the settings.
      */
-    public function __construct(private readonly bool $enabled = false, private readonly string $path = '/crm', private readonly bool $pipeline = false, private readonly bool $hubspot = false, private readonly bool $activities = false)
+    public function __construct(private readonly bool $enabled = false, private readonly string $path = '/crm', private readonly bool $pipeline = false, private readonly bool $hubspot = false, private readonly bool $activities = false, private readonly bool $templates = false)
     {
         parent::__construct();
     }
@@ -107,6 +108,9 @@ final class UiRouteLoader extends Loader
         if ($this->activities) {
             $this->activities($routes, $base, $id, $seg);
         }
+        if ($this->activities && $this->templates) {
+            $this->templates($routes, $base, $id);
+        }
 
         return $routes;
     }
@@ -160,6 +164,22 @@ final class UiRouteLoader extends Loader
         $this->add($routes, 'note_pin', $base . '/notes/{id}/pin/{state}', $c . 'pin', ['POST'], $id + ['state' => 'on|off']);
         $this->add($routes, 'mentions', $base . '/{type}/{id}/mentions', $c . 'mentions', ['GET'], $seg + $id);
         $this->add($routes, 'mention_names', $base . '/{type}/{id}/mentions/names', $c . 'mentionNames', ['GET'], $seg + $id);
+    }
+
+    /**
+     * The e-mail templates (0.13.0, `templates.enabled`): the list, the create / edit pages, delete and *Write e-mail*
+     * of a contact.
+     *
+     * @param array<string, string> $id
+     */
+    private function templates(RouteCollection $routes, string $base, array $id): void
+    {
+        $c = TemplateController::class . '::';
+        $this->add($routes, 'templates', $base . '/templates', $c . 'list', ['GET']);
+        $this->add($routes, 'template_new', $base . '/templates/new/{kind}', $c . 'create', ['GET', 'POST'], ['kind' => 'template|snippet']);
+        $this->add($routes, 'template_edit', $base . '/templates/{id}', $c . 'edit', ['GET', 'POST'], $id);
+        $this->add($routes, 'template_delete', $base . '/templates/{id}/delete', $c . 'delete', ['POST'], $id);
+        $this->add($routes, 'mail_write', $base . '/contacts/{id}/write-email', $c . 'write', ['GET', 'POST'], $id);
     }
 
     /**

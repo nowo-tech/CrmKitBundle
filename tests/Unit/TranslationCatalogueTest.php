@@ -38,6 +38,9 @@ final class TranslationCatalogueTest extends TestCase
      */
     private const ALLOWED_IDENTICAL = [
         'de' => [
+            'template.scope.shared',
+            'template.form.name',
+            'template.form.text',
             'activity_log.kind.meeting',
             'activity_log.filter.person',
             'activity_log.filter.kind_meeting',
@@ -100,6 +103,8 @@ final class TranslationCatalogueTest extends TestCase
             'value.no',
         ],
         'fr' => [
+            'template.scope.shared',
+            'mail.form.text',
             'activity_log.minutes',
             'activity_log.kind.note',
             'activity_log.kind.email',
@@ -159,6 +164,7 @@ final class TranslationCatalogueTest extends TestCase
             'value.no',
         ],
         'nl' => [
+            'mail.form.deal',
             'activity_log.minutes',
             'activity_log.kind.email',
             'activity_log.kind.host',
